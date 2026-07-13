@@ -35,7 +35,13 @@ interface State { location:string; filters:FilterState; }
 function reducer(s: State, a: Action): State {
   switch(a.type) {
     case 'SET_LOCATION': return {...s, location:a.payload, filters:{...s.filters,page:1}};
-    case 'SET_FILTER':   return {...s, filters:{...s.filters,...a.payload,page:1}};
+    case 'SET_FILTER': {
+      const keys = Object.keys(a.payload);
+      // Only reset to page 1 when a real filter changed (not a page navigation)
+      const isPageOnly = keys.length === 1 && keys[0] === 'page';
+      const newPage = isPageOnly ? (a.payload.page ?? 1) : 1;
+      return {...s, filters:{...s.filters, ...a.payload, page: newPage}};
+    }
     case 'SET_SORT': {
       const col=a.payload, dir=s.filters.sortCol===col&&s.filters.sortDir==='asc'?'desc':'asc';
       return {...s, filters:{...s.filters,sortCol:col,sortDir:dir}};
