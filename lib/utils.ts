@@ -29,18 +29,21 @@ export function computeChartData(b: Barrier[]): CategoryConformidade[] {
 export function applyFilters(b: Barrier[], f: FilterState): Barrier[] {
   let d=b;
   if(f.query){const q=f.query.toLowerCase();d=d.filter(x=>x.tag.toLowerCase().includes(q)||x.locDesc.toLowerCase().includes(q)||x.instalacao.toLowerCase().includes(q)||x.categoria.toLowerCase().includes(q));}
-  if(f.disponibilidade==='__NC__'){d=d.filter(x=>x.disponibilidade==='Degradado'||x.disponibilidade==='Indisponível');}
-  else if(f.disponibilidade){d=d.filter(x=>x.disponibilidade===f.disponibilidade);}
-  if(f.conformidade)d=d.filter(x=>x.conformidade===f.conformidade);
-  if(f.categoria)   d=d.filter(x=>x.categoria===f.categoria);
+  if(f.disponibilidade) d=d.filter(x=>x.disponibilidade===f.disponibilidade);
+  if(f.conformidade)    d=d.filter(x=>x.conformidade===f.conformidade);
+  if(f.categoria)       d=d.filter(x=>x.categoria===f.categoria);
   return d;
 }
 
 export function applySorting(b: Barrier[], f: FilterState): Barrier[] {
-  if(!f.sortCol)return b;
-  return[...b].sort((a,x)=>{
-    const av=String(a[f.sortCol]).toLowerCase(),bv=String(x[f.sortCol]).toLowerCase();
-    const c=av.localeCompare(bv,'pt-BR',{numeric:true});
+  if(!f.sortCol) return b;
+  return [...b].sort((a,x)=>{
+    const av=String(a[f.sortCol as keyof Barrier]??'').toLowerCase();
+    const bv=String(x[f.sortCol as keyof Barrier]??'').toLowerCase();
+    // ISO dates sort lexicographically correctly
+    const c = f.sortCol==='id'
+      ? (a.id - x.id)
+      : av.localeCompare(bv,'pt-BR',{numeric:true});
     return f.sortDir==='asc'?c:-c;
   });
 }
