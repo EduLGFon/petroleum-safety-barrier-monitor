@@ -1,42 +1,57 @@
-interface LogoProps { variant?:'full'|'icon'; height?:number; light?:boolean; }
+interface LogoProps {
+  variant?: 'full' | 'icon' | 'waves';
+  height?:  number;
+  light?:   boolean;
+  theme?:   'light' | 'dark' | 'amoled';
+}
 
-export function SeacrestLogo({ variant='full', height=40, light=true }: LogoProps) {
-  const id = `sc-${height}`;
-  const icon = (
-    <svg width={height} height={height} viewBox="0 0 40 40" fill="none">
-      <defs>
-        <linearGradient id={`${id}-s`} x1="0%" y1="0%" x2="100%" y2="100%">
-          <stop offset="0%" stopColor="#38bdf8"/>
-          <stop offset="100%" stopColor="#1d4ed8"/>
-        </linearGradient>
-        <linearGradient id={`${id}-f`} x1="0%" y1="0%" x2="100%" y2="100%">
-          <stop offset="0%" stopColor="#fbbf24"/>
-          <stop offset="100%" stopColor="#ea580c"/>
-        </linearGradient>
-      </defs>
-      <path d="M20 3L5 9v10c0 8.8 6.4 17.1 15 19C28.6 36.1 35 27.8 35 19V9L20 3z" fill={`url(#${id}-s)`}/>
-      <path d="M20 3L5 9v10c0 .6.02 1.2.06 1.8C8.4 16 13.8 13 20 13s11.6 3 14.94 7.8c.04-.6.06-1.2.06-1.8V9L20 3z" fill="rgba(255,255,255,0.12)"/>
-      <path d="M13 19c1.8-1.3 2.8-1.3 5 0s3.2 1.3 5 0" stroke="rgba(255,255,255,0.88)" strokeWidth="2.2" fill="none" strokeLinecap="round"/>
-      <path d="M13 23c1.8-1.3 2.8-1.3 5 0s3.2 1.3 5 0" stroke="rgba(255,255,255,0.5)" strokeWidth="1.8" fill="none" strokeLinecap="round"/>
-      <path d="M20 11c0 0-3 2.8-3 5.8 0 1.7 1.3 3 3 3s3-1.3 3-3C23 13.8 20 11 20 11z" fill={`url(#${id}-f)`}/>
+/** Recreates the official Seacrest Petróleo wave logo mark */
+function WaveMark({ size, bg, waveColor }: { size: number; bg: string; waveColor: string }) {
+  const s = size / 100;
+  return (
+    <svg width={size} height={size} viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <rect width="100" height="100" rx={14 * s * 4} fill={bg}/>
+      {/* 4 sweeping wave paths — traced from brand asset */}
+      <path d="M-2 88 C 18 74, 44 54, 72 30 C 84 20, 96 14, 104 10"
+        stroke={waveColor} strokeWidth="8" strokeLinecap="round" fill="none"/>
+      <path d="M-2 76 C 16 64, 42 46, 70 22 C 82 12, 95 6, 104 2"
+        stroke={waveColor} strokeWidth="6.5" strokeLinecap="round" fill="none"/>
+      <path d="M-2 96 C 20 84, 46 64, 76 42 C 88 32, 98 26, 104 22"
+        stroke={waveColor} strokeWidth="6" strokeLinecap="round" fill="none"/>
+      <path d="M 8 102 C 28 92, 54 74, 82 54 C 92 46, 100 40, 104 36"
+        stroke={waveColor} strokeWidth="5.5" strokeLinecap="round" fill="none"/>
     </svg>
   );
+}
 
-  if (variant === 'icon') return icon;
+export function SeacrestLogo({ variant = 'full', height = 40, light = true, theme }: LogoProps) {
+  // Wave colour adapts to context
+  const onDark  = light;
+  const bg      = onDark ? '#000000' : '#ffffff';
+  const waves   = onDark ? '#ffffff' : '#0a1628';
+  const textCol = onDark ? '#ffffff' : '#0f172a';
+  const subCol  = onDark ? 'rgba(148,163,184,0.85)' : '#64748b';
 
-  const textColor = light ? '#ffffff' : '#0f172a';
-  const subColor  = light ? 'rgba(148,163,184,0.85)' : '#64748b';
+  if (variant === 'icon') return <WaveMark size={height} bg={bg} waveColor={waves}/>;
+
+  if (variant === 'waves') {
+    // Just the waves, no square bg — for use on gradient headers
+    return (
+      <svg width={height} height={height} viewBox="0 0 100 100" fill="none">
+        <path d="M-2 88 C 18 74, 44 54, 72 30 C 84 20, 96 14, 104 10" stroke={onDark?'#fff':'#0a1628'} strokeWidth="9" strokeLinecap="round"/>
+        <path d="M-2 76 C 16 64, 42 46, 70 22 C 82 12, 95 6, 104 2"  stroke={onDark?'rgba(255,255,255,.82)':'rgba(10,22,40,.7)'} strokeWidth="7" strokeLinecap="round"/>
+        <path d="M-2 96 C 20 84, 46 64, 76 42 C 88 32, 98 26, 104 22" stroke={onDark?'rgba(255,255,255,.6)':'rgba(10,22,40,.5)'} strokeWidth="6" strokeLinecap="round"/>
+        <path d="M 8 102 C 28 92, 54 74, 82 54 C 92 46, 100 40, 104 36" stroke={onDark?'rgba(255,255,255,.4)':'rgba(10,22,40,.35)'} strokeWidth="5" strokeLinecap="round"/>
+      </svg>
+    );
+  }
 
   return (
     <div style={{ display:'flex', alignItems:'center', gap:12 }}>
-      {icon}
+      <WaveMark size={height} bg={bg} waveColor={waves}/>
       <div style={{ lineHeight:1 }}>
-        <div style={{ fontSize:height*0.43, fontWeight:900, letterSpacing:'-0.025em', color:textColor, lineHeight:1.1 }}>
-          Seacrest
-        </div>
-        <div style={{ fontSize:height*0.22, fontWeight:600, letterSpacing:'0.2em', textTransform:'uppercase', color:subColor, marginTop:2 }}>
-          Petróleo
-        </div>
+        <div style={{ fontSize:height*0.43, fontWeight:900, letterSpacing:'-0.025em', color:textCol, lineHeight:1.1 }}>Seacrest</div>
+        <div style={{ fontSize:height*0.22, fontWeight:600, letterSpacing:'0.2em', textTransform:'uppercase', color:subCol, marginTop:2 }}>Petróleo</div>
       </div>
     </div>
   );
