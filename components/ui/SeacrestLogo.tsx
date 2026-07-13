@@ -1,57 +1,53 @@
-interface LogoProps {
-  variant?: 'full' | 'icon' | 'waves';
-  height?:  number;
-  light?:   boolean;
-  theme?:   'light' | 'dark' | 'amoled';
-}
+interface P { variant?:"full"|"icon"|"adaptive"; height?:number; light?:boolean; }
 
-/** Recreates the official Seacrest Petróleo wave logo mark */
-function WaveMark({ size, bg, waveColor }: { size: number; bg: string; waveColor: string }) {
-  const s = size / 100;
+const SVG_PATHS = `<g transform="translate(0,322) scale(0.1,-0.1)" stroke="none">
+<path d="M141 3200 c-43 -10 -81 -39 -104 -79 -18 -29 -19 -63 -20 -494 l-1 -462 24 -12 c45 -21 235 -43 373 -43 274 0 561 56 1047 206 664 204 932 262 1280 280 111 5 220 -1 413 -22 l59 -7 -4 259 c-3 238 -5 262 -23 293 -26 44 -62 70 -111 81 -48 11 -2884 11 -2933 0z"/>
+<path d="M2635 2444 c-16 -2 -70 -9 -120 -15 -246 -30 -476 -86 -1000 -244 -500 -151 -709 -197 -967 -215 -143 -9 -353 0 -461 20 -33 6 -62 8 -65 5 -4 -4 -8 -119 -10 -257 -3 -199 -1 -253 10 -259 22 -14 316 -10 413 6 298 48 514 132 1135 440 425 211 580 279 795 352 242 82 451 124 685 140 98 6 109 8 75 15 -43 9 -440 19 -490 12z"/>
+<path d="M2837 2249 c-374 -65 -617 -156 -1228 -460 -217 -108 -449 -220 -515 -249 -348 -152 -689 -229 -967 -218 -99 3 -106 2 -111 -17 -3 -11 -6 -127 -6 -257 0 -197 2 -238 15 -245 20 -12 204 2 300 22 205 42 469 153 690 289 131 81 326 218 560 391 455 339 779 530 1090 643 100 37 356 105 430 115 17 2 -10 4 -60 4 -49 1 -138 -7 -198 -18z"/>
+<path d="M3015 2095 c-403 -85 -758 -265 -1280 -648 -82 -61 -208 -153 -279 -205 -525 -385 -932 -565 -1331 -589 -55 -3 -103 -11 -107 -17 -4 -6 -8 -125 -8 -265 l0 -254 103 6 c432 25 835 263 1477 872 670 637 1042 908 1490 1087 41 16 77 32 79 34 9 8 -37 2 -144 -21z"/>
+<path d="M3061 1915 c-222 -97 -414 -213 -651 -393 -190 -145 -282 -225 -629 -547 -461 -427 -585 -533 -809 -682 -143 -96 -324 -187 -472 -238 -57 -20 -105 -37 -106 -38 -1 -1 581 -1 1294 1 713 1 1322 2 1353 2 65 0 111 25 142 77 18 31 18 72 19 950 1 534 -3 918 -8 920 -5 1 -65 -22 -133 -52z"/>
+</g>`;
+
+function WaveSVG({ size, bg, fill }: { size:number; bg:string; fill:string }) {
   return (
-    <svg width={size} height={size} viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
-      <rect width="100" height="100" rx={14 * s * 4} fill={bg}/>
-      {/* 4 sweeping wave paths — traced from brand asset */}
-      <path d="M-2 88 C 18 74, 44 54, 72 30 C 84 20, 96 14, 104 10"
-        stroke={waveColor} strokeWidth="8" strokeLinecap="round" fill="none"/>
-      <path d="M-2 76 C 16 64, 42 46, 70 22 C 82 12, 95 6, 104 2"
-        stroke={waveColor} strokeWidth="6.5" strokeLinecap="round" fill="none"/>
-      <path d="M-2 96 C 20 84, 46 64, 76 42 C 88 32, 98 26, 104 22"
-        stroke={waveColor} strokeWidth="6" strokeLinecap="round" fill="none"/>
-      <path d="M 8 102 C 28 92, 54 74, 82 54 C 92 46, 100 40, 104 36"
-        stroke={waveColor} strokeWidth="5.5" strokeLinecap="round" fill="none"/>
+    <svg width={size} height={size} viewBox="0 0 323 322" xmlns="http://www.w3.org/2000/svg">
+      <rect width="323" height="322" rx={Math.round(size * 0.1)} fill={bg}/>
+      <g transform="translate(0,322) scale(0.1,-0.1)" fill={fill} stroke="none"
+        dangerouslySetInnerHTML={{ __html: SVG_PATHS.replace(/<g[^>]*>|<\/g>/g,'') }}/>
     </svg>
   );
 }
 
-export function SeacrestLogo({ variant = 'full', height = 40, light = true, theme }: LogoProps) {
-  // Wave colour adapts to context
-  const onDark  = light;
-  const bg      = onDark ? '#000000' : '#ffffff';
-  const waves   = onDark ? '#ffffff' : '#0a1628';
-  const textCol = onDark ? '#ffffff' : '#0f172a';
-  const subCol  = onDark ? 'rgba(148,163,184,0.85)' : '#64748b';
+export function SeacrestLogo({ variant="full", height=40, light=true }: P) {
+  const bg   = light ? "#000000" : "#ffffff";
+  const wave = light ? "#ffffff" : "#0a1628";
+  const textColor = light ? "#ffffff" : "#0f172a";
+  const subColor  = light ? "rgba(148,163,184,0.8)" : "#64748b";
 
-  if (variant === 'icon') return <WaveMark size={height} bg={bg} waveColor={waves}/>;
+  if (variant === "icon") return <WaveSVG size={height} bg={bg} fill={wave}/>;
 
-  if (variant === 'waves') {
-    // Just the waves, no square bg — for use on gradient headers
+  if (variant === "adaptive") {
+    // Uses CSS currentColor — adapts to theme automatically
     return (
-      <svg width={height} height={height} viewBox="0 0 100 100" fill="none">
-        <path d="M-2 88 C 18 74, 44 54, 72 30 C 84 20, 96 14, 104 10" stroke={onDark?'#fff':'#0a1628'} strokeWidth="9" strokeLinecap="round"/>
-        <path d="M-2 76 C 16 64, 42 46, 70 22 C 82 12, 95 6, 104 2"  stroke={onDark?'rgba(255,255,255,.82)':'rgba(10,22,40,.7)'} strokeWidth="7" strokeLinecap="round"/>
-        <path d="M-2 96 C 20 84, 46 64, 76 42 C 88 32, 98 26, 104 22" stroke={onDark?'rgba(255,255,255,.6)':'rgba(10,22,40,.5)'} strokeWidth="6" strokeLinecap="round"/>
-        <path d="M 8 102 C 28 92, 54 74, 82 54 C 92 46, 100 40, 104 36" stroke={onDark?'rgba(255,255,255,.4)':'rgba(10,22,40,.35)'} strokeWidth="5" strokeLinecap="round"/>
+      <svg width={height} height={height} viewBox="0 0 323 322" xmlns="http://www.w3.org/2000/svg"
+        style={{ borderRadius: Math.round(height * 0.1) }}>
+        <rect width="323" height="322" rx={Math.round(323 * 0.1)} fill="var(--bg-page)"/>
+        <g transform="translate(0,322) scale(0.1,-0.1)" fill="var(--text-primary)" stroke="none"
+          dangerouslySetInnerHTML={{ __html: SVG_PATHS.replace(/<g[^>]*>|<\/g>/g,'') }}/>
       </svg>
     );
   }
 
   return (
-    <div style={{ display:'flex', alignItems:'center', gap:12 }}>
-      <WaveMark size={height} bg={bg} waveColor={waves}/>
+    <div style={{ display:"flex", alignItems:"center", gap:12 }}>
+      <WaveSVG size={height} bg={bg} fill={wave}/>
       <div style={{ lineHeight:1 }}>
-        <div style={{ fontSize:height*0.43, fontWeight:900, letterSpacing:'-0.025em', color:textCol, lineHeight:1.1 }}>Seacrest</div>
-        <div style={{ fontSize:height*0.22, fontWeight:600, letterSpacing:'0.2em', textTransform:'uppercase', color:subCol, marginTop:2 }}>Petróleo</div>
+        <div style={{ fontSize:height*0.43, fontWeight:900, letterSpacing:"-0.025em", color:textColor, lineHeight:1.1 }}>
+          Seacrest
+        </div>
+        <div style={{ fontSize:height*0.22, fontWeight:600, letterSpacing:"0.2em", textTransform:"uppercase", color:subColor, marginTop:2 }}>
+          Petróleo
+        </div>
       </div>
     </div>
   );
