@@ -1,7 +1,10 @@
 'use client';
 import dynamic from 'next/dynamic';
 import type { CategoryConformidade } from '@/lib/types';
-const Chart = dynamic(() => import('./ConformidadeChartInner'), { ssr:false, loading:()=><div style={{height:240,background:'var(--bg-elevated)',borderRadius:8,animation:'pulse 1.5s ease-in-out infinite'}}/> });
+const Chart = dynamic(() => import('./ConformidadeChartInner'), {
+  ssr:false,
+  loading:()=><div style={{height:240,background:'linear-gradient(90deg,var(--bg-elevated) 25%,var(--bg-surface) 50%,var(--bg-elevated) 75%)',backgroundSize:'200% 100%',borderRadius:8,animation:'shimmer 1.5s linear infinite'}}/>
+});
 interface Props { data: CategoryConformidade[]; }
 export function ConformidadeChart({ data }: Props) {
   return (
