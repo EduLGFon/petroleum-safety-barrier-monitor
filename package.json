@@ -1,25 +1,25 @@
 {
   "name": "seacrest-barriers",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
+    "dev":   "next dev",
     "build": "next build",
     "start": "next start"
   },
   "dependencies": {
-    "next": "14.2.18",
-    "react": "^18.3.1",
-    "react-dom": "^18.3.1",
-    "recharts": "^2.13.3",
-    "exceljs": "^4.4.0",
-    "jspdf": "^2.5.1",
-    "jspdf-autotable": "^3.8.2"
+    "next":             "15.3.3",
+    "react":            "^19.0.0",
+    "react-dom":        "^19.0.0",
+    "recharts":         "^2.15.0",
+    "exceljs":          "^4.4.0",
+    "jspdf":            "^2.5.2",
+    "jspdf-autotable":  "^3.8.4"
   },
   "devDependencies": {
-    "@types/node": "^20",
-    "@types/react": "^18",
-    "@types/react-dom": "^18",
-    "typescript": "^5"
+    "@types/node":      "^22",
+    "@types/react":     "^19",
+    "@types/react-dom": "^19",
+    "typescript":       "^5"
   }
 }
