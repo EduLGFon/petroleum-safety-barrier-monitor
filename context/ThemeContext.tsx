@@ -1,50 +1,19 @@
 'use client';
-
-import {
-  createContext,
-  useContext,
-  useEffect,
-  useState,
-  type ReactNode,
-} from 'react';
+import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
 import type { Theme } from '@/lib/types';
-
-interface ThemeContextValue {
-  theme:    Theme;
-  setTheme: (t: Theme) => void;
-}
-
-const ThemeContext = createContext<ThemeContextValue>({
-  theme:    'dark',
-  setTheme: () => {},
-});
-
-const STORAGE_KEY = 'sgso-theme';
-
+interface ThemeCtx { theme: Theme; setTheme: (t: Theme) => void; }
+const ThemeContext = createContext<ThemeCtx>({ theme:'dark', setTheme:()=>{} });
+const KEY = 'seacrest-theme';
 export function ThemeProvider({ children }: { children: ReactNode }) {
   const [theme, setThemeState] = useState<Theme>('dark');
-
-  // Read persisted theme on first mount
   useEffect(() => {
-    const stored = localStorage.getItem(STORAGE_KEY) as Theme | null;
-    if (stored === 'light' || stored === 'dark' || stored === 'amoled') {
-      setThemeState(stored);
-    }
+    const s = localStorage.getItem(KEY) as Theme|null;
+    if (s==='light'||s==='dark'||s==='amoled') setThemeState(s);
   }, []);
-
-  // Apply data-theme attribute whenever theme changes
   useEffect(() => {
     document.documentElement.dataset.theme = theme;
-    localStorage.setItem(STORAGE_KEY, theme);
+    localStorage.setItem(KEY, theme);
   }, [theme]);
-
-  return (
-    <ThemeContext.Provider value={{ theme, setTheme: setThemeState }}>
-      {children}
-    </ThemeContext.Provider>
-  );
+  return <ThemeContext.Provider value={{ theme, setTheme: setThemeState }}>{children}</ThemeContext.Provider>;
 }
-
-export function useTheme() {
-  return useContext(ThemeContext);
-}
+export function useTheme() { return useContext(ThemeContext); }
