@@ -1,0 +1,41 @@
+interface P { size?:number; color?:string; strokeWidth?:number; }
+const D = (s:number,c:string,w:number,ch:string) => (
+  <svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth={w} strokeLinecap="round" strokeLinejoin="round" dangerouslySetInnerHTML={{__html:ch}}/>
+);
+export const ShieldIcon=({size=16,color='currentColor',strokeWidth=2}:P)=>D(size,color,strokeWidth,'<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>');
+export const ShieldCheckIcon=({size=16,color='currentColor',strokeWidth=2}:P)=>D(size,color,strokeWidth,'<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="m9 12 2 2 4-4"/>');
+export const CheckCircleIcon=({size=16,color='currentColor',strokeWidth=2}:P)=>D(size,color,strokeWidth,'<circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/>');
+export const XCircleIcon=({size=16,color='currentColor',strokeWidth=2}:P)=>D(size,color,strokeWidth,'<circle cx="12" cy="12" r="10"/><path d="m15 9-6 6"/><path d="m9 9 6 6"/>');
+export const AlertTriangleIcon=({size=16,color='currentColor',strokeWidth=2}:P)=>D(size,color,strokeWidth,'<path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><path d="M12 9v4"/><path d="M12 17h.01"/>');
+export const AlertOctagonIcon=({size=16,color='currentColor',strokeWidth=2}:P)=>D(size,color,strokeWidth,'<polygon points="7.86 2 16.14 2 22 7.86 22 16.14 16.14 22 7.86 22 2 16.14 2 7.86 7.86 2"/><path d="M12 8v4"/><path d="M12 16h.01"/>');
+export const ActivityIcon=({size=16,color='currentColor',strokeWidth=2}:P)=>D(size,color,strokeWidth,'<polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>');
+export const SearchIcon=({size=16,color='currentColor',strokeWidth=2}:P)=>D(size,color,strokeWidth,'<circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>');
+export const FilterIcon=({size=16,color='currentColor',strokeWidth=2}:P)=>D(size,color,strokeWidth,'<polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/>');
+export const CloseIcon=({size=16,color='currentColor',strokeWidth=2}:P)=>D(size,color,strokeWidth,'<path d="M18 6 6 18"/><path d="m6 6 12 12"/>');
+export const SortIcon=({size=14,color='currentColor',strokeWidth=2}:P)=>D(size,color,strokeWidth,'<path d="m3 16 4 4 4-4"/><path d="M7 20V4"/><path d="m21 8-4-4-4 4"/><path d="M17 4v16"/>');
+export const ChevronUpIcon=({size=16,color='currentColor',strokeWidth=2}:P)=>D(size,color,strokeWidth,'<path d="m18 15-6-6-6 6"/>');
+export const ChevronDownIcon=({size=16,color='currentColor',strokeWidth=2}:P)=>D(size,color,strokeWidth,'<path d="m6 9 6 6 6-6"/>');
+export const ChevronLeftIcon=({size=16,color='currentColor',strokeWidth=2}:P)=>D(size,color,strokeWidth,'<path d="m15 18-6-6 6-6"/>');
+export const ChevronRightIcon=({size=16,color='currentColor',strokeWidth=2}:P)=>D(size,color,strokeWidth,'<path d="m9 18 6-6-6-6"/>');
+export const ChevronsLeftIcon=({size=16,color='currentColor',strokeWidth=2}:P)=>D(size,color,strokeWidth,'<path d="m11 17-5-5 5-5"/><path d="m18 17-5-5 5-5"/>');
+export const ChevronsRightIcon=({size=16,color='currentColor',strokeWidth=2}:P)=>D(size,color,strokeWidth,'<path d="m6 17 5-5-5-5"/><path d="m13 17 5-5-5-5"/>');
+export const DownloadIcon=({size=16,color='currentColor',strokeWidth=2}:P)=>D(size,color,strokeWidth,'<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>');
+export const FileSpreadsheetIcon=({size=16,color='currentColor',strokeWidth=2}:P)=>D(size,color,strokeWidth,'<path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="16" y2="17"/><line x1="8" y1="9" x2="10" y2="9"/>');
+export const FilePdfIcon=({size=16,color='currentColor',strokeWidth=2}:P)=>D(size,color,strokeWidth,'<path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/><path d="M9 13v-1h1.5a1 1 0 0 1 0 2H9v1"/><path d="M13 12v3"/><path d="M17 12h-1v3h1"/><path d="M17 13.5h-1"/>');
+export const FileTextIcon=({size=16,color='currentColor',strokeWidth=2}:P)=>D(size,color,strokeWidth,'<path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><line x1="10" y1="9" x2="8" y2="9"/>');
+export const SunIcon=({size=16,color='currentColor',strokeWidth=2}:P)=>D(size,color,strokeWidth,'<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/>');
+export const MoonIcon=({size=16,color='currentColor',strokeWidth=2}:P)=>D(size,color,strokeWidth,'<path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/>');
+export const MonitorIcon=({size=16,color='currentColor',strokeWidth=2}:P)=>D(size,color,strokeWidth,'<rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/>');
+export const UserIcon=({size=16,color='currentColor',strokeWidth=2}:P)=>D(size,color,strokeWidth,'<circle cx="12" cy="8" r="4"/><path d="M20 21a8 8 0 1 0-16 0"/>');
+export const BuildingIcon=({size=16,color='currentColor',strokeWidth=2}:P)=>D(size,color,strokeWidth,'<rect x="4" y="2" width="16" height="20" rx="1"/><path d="M9 22v-4h6v4"/><path d="M8 6h.01M16 6h.01M12 6h.01M12 10h.01M8 10h.01M16 10h.01M12 14h.01M8 14h.01M16 14h.01"/>');
+export const MapPinIcon=({size=16,color='currentColor',strokeWidth=2}:P)=>D(size,color,strokeWidth,'<path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/>');
+export const TagIcon=({size=16,color='currentColor',strokeWidth=2}:P)=>D(size,color,strokeWidth,'<path d="M12 2H2v10l9.29 9.29a1 1 0 0 0 1.42 0l6.58-6.58a1 1 0 0 0 0-1.42L12 2Z"/><path d="M7 7h.01"/>');
+export const CalendarIcon=({size=16,color='currentColor',strokeWidth=2}:P)=>D(size,color,strokeWidth,'<rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>');
+export const ClockIcon=({size=16,color='currentColor',strokeWidth=2}:P)=>D(size,color,strokeWidth,'<circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>');
+export const HistoryIcon=({size=16,color='currentColor',strokeWidth=2}:P)=>D(size,color,strokeWidth,'<path d="M3 3v5h5"/><path d="M3.05 13A9 9 0 1 0 6 5.3L3 8"/><path d="M12 7v5l4 2"/>');
+export const InfoIcon=({size=16,color='currentColor',strokeWidth=2}:P)=>D(size,color,strokeWidth,'<circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/>');
+export const LayersIcon=({size=16,color='currentColor',strokeWidth=2}:P)=>D(size,color,strokeWidth,'<path d="m12.83 2.18a2 2 0 0 0-1.66 0L2.6 6.08a1 1 0 0 0 0 1.83l8.58 3.91a2 2 0 0 0 1.66 0l8.58-3.9a1 1 0 0 0 0-1.83Z"/><path d="m22 12.65-8.56 3.89a2 2 0 0 1-1.66 0L3.22 12.5"/><path d="m22 17.65-8.56 3.89a2 2 0 0 1-1.66 0L3.22 17.5"/>');
+export const TargetIcon=({size=16,color='currentColor',strokeWidth=2}:P)=>D(size,color,strokeWidth,'<circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/>');
+export const FlameIcon=({size=16,color='currentColor',strokeWidth=2}:P)=>D(size,color,strokeWidth,'<path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z"/>');
+export const WrenchIcon=({size=16,color='currentColor',strokeWidth=2}:P)=>D(size,color,strokeWidth,'<path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/>');
+export const ArrowRightIcon=({size=16,color='currentColor',strokeWidth=2}:P)=>D(size,color,strokeWidth,'<path d="M5 12h14"/><path d="m12 5 7 7-7 7"/>');
