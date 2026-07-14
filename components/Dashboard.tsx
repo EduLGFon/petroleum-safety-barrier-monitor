@@ -16,9 +16,9 @@ import { LoadingScreen }     from './LoadingScreen';
 import { SettingsPanel }     from './SettingsPanel';
 import { AlertTriangleIcon, ArrowRightIcon } from './ui/Icons';
 
-interface Props { barriers: Barrier[]; }
+interface Props { initialBarriers: Barrier[]; }
 
-export function Dashboard({ barriers }: Props) {
+export function Dashboard({ initialBarriers: barriers }: Props) {
   const [loading,      setLoading]      = useState(true);
   const [visible,      setVisible]      = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
