@@ -19,6 +19,16 @@ export const LOCATION_DIST = [
   {code:'SPL',tipo:'Base Operacional SP',    count:2100},
 ];
 
+// id-keyed variant used by the mock data generator (mirrors LOCATION_CODES in lib/enums.ts)
+export const LOCATION_DIST_BY_ID: { id: number; code: string; count: number }[] = [
+  { id: 1, code: 'FAL', count: 800  },
+  { id: 2, code: 'CNC', count: 1200 },
+  { id: 3, code: 'CNS', count: 900  },
+  { id: 4, code: 'FAP', count: 700  },
+  { id: 5, code: 'RJO', count: 1100 },
+  { id: 6, code: 'SPL', count: 2100 },
+];
+
 const CONFORME_STATUSES: Disponibilidade[] = [
   'Disponível','Fora de Operação',
   'Indisponível Contingenciado','Degradado Contingenciado',
