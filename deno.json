@@ -2,7 +2,9 @@
   "tasks": {
     "dev":   "deno run -A --unstable-byonm npm:next@15 dev",
     "build": "deno run -A --unstable-byonm npm:next@15 build",
-    "start": "deno run -A --unstable-byonm npm:next@15 start"
+    "start": "deno run -A --unstable-byonm npm:next@15 start",
+    "db:migrate": "deno run -A --unstable-sloppy-imports --env-file=.env.local scripts/migrate.ts",
+    "db:seed":    "deno run -A --unstable-sloppy-imports --env-file=.env.local scripts/seed.ts"
   },
   "nodeModulesDir": "auto",
   "compilerOptions": {

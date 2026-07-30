@@ -14,7 +14,9 @@
     "recharts":         "^2.15.0",
     "exceljs":          "^4.4.0",
     "jspdf":            "^2.5.2",
-    "jspdf-autotable":  "^3.8.4"
+    "jspdf-autotable":  "^3.8.4",
+    "postgres":         "^3.4.5",
+    "server-only":      "^0.0.1"
   },
   "devDependencies": {
     "@types/node":      "^22",
