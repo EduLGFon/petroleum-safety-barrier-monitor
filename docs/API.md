@@ -66,20 +66,33 @@ Importante: `conformidade` **nunca** vem do backend — é sempre derivada de
 `disponibilidadeId` via `isConforme()`, tanto no mock quanto no resolver.
 Isso evita que os dois campos fiquem inconsistentes.
 
-## Trocando para uma API real
+## Usando a API real (Postgres)
 
-1. Implemente os três endpoints REST esperados por `httpAdapterFactory`:
-   - `GET /api/barriers?locationId=1&disponibilidadeId=4&page=1&pageSize=25`
-     → `BarriersResponse { items: WireBarrier[], total, page, pageSize, totalPages }`
-   - `GET /api/barriers/:id` → `WireBarrier`
-   - `GET /api/kpi?locationId=1` → `WireKpiSnapshot`
+Os três endpoints que `httpAdapterFactory` espera já estão implementados em
+`app/api/`, sobre PostgreSQL (sem ORM — SQL puro via `postgres.js`):
+
+- `GET /api/barriers?locationId=1&disponibilidadeId=4&page=1&pageSize=25`
+  → `BarriersResponse { items: WireBarrier[], total, page, pageSize, totalPages }`
+- `GET /api/barriers/:id` → `WireBarrier`
+- `GET /api/kpi?locationId=1` → `WireKpiSnapshot`
+- `PATCH /api/barriers/:id/status` → `WireBarrier` (bonus: único caminho de
+  escrita, ainda não chamado pela UI — veja docs/DATABASE.md)
+
+Para ativar:
+1. Suba um Postgres e rode as migrações + seed (veja **docs/DATABASE.md**
+   para o passo a passo completo).
 2. Defina as variáveis de ambiente (veja `.env.example`):
    ```
    NEXT_PUBLIC_API_MODE=http
-   NEXT_PUBLIC_API_BASE_URL=https://seu-backend.com
+   NEXT_PUBLIC_API_BASE_URL=http://localhost:3000
+   DATABASE_URL=postgres://user:password@localhost:5432/seacrest_barreiras
    ```
 3. Nenhum componente precisa mudar. `api` em `lib/api.ts` passa a apontar
-   para `httpAdapter` automaticamente.
+   para `httpAdapter` automaticamente, que agora conversa com essas rotas.
+
+Toda a camada SQL (`lib/server/db.ts`, `lib/server/sql/barriers.ts`) é
+server-only (guardada pelo pacote `server-only`) — a connection string do
+Postgres nunca chega ao bundle do cliente.
 
 ## Query de filtros (string -> wire)
 
@@ -102,3 +115,10 @@ toWireQuery({ location:'FAL', disponibilidade:'Degradado', page:1 })
 | `lib/data.ts`         | Gerador mock determinístico — produz `WireBarrier[]`       |
 | `lib/api.ts`          | Cliente unificado — expõe `api.*`, escolhe mock ou HTTP    |
 | `lib/constants.ts`    | Constantes de exibição (cores, listas) + `LOCATION_DIST_BY_ID` |
+| `lib/server/db.ts`    | Cliente Postgres (server-only)                            |
+| `lib/server/sql/barriers.ts` | Queries SQL: listagem, filtro, sort, KPI, transição de status |
+| `app/api/`            | Route handlers Next.js que expõem as queries acima via HTTP |
+| `db/schema.sql`       | DDL: tabelas de lookup, `barriers`, `barrier_status_history` |
+| `db/seed_lookups.sql` | Seed das tabelas de lookup, espelhando `lib/enums.ts`      |
+
+Veja **docs/DATABASE.md** para o schema completo e o passo a passo de setup.
