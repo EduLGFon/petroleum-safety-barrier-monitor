@@ -4,7 +4,8 @@
 import { useCallback, useEffect, useState } from "preact/hooks";
 import type { Barrier } from "../lib/types.ts";
 import { useDashboard } from "../hooks/useDashboard.ts";
-import { useSettings } from "../context/SettingsContext.tsx";
+import { SettingsProvider, useSettings } from "../context/SettingsContext.tsx";
+import { ThemeProvider } from "../context/ThemeContext.tsx";
 import { Header } from "../components/Header.tsx";
 import { LocationFilter } from "../components/LocationFilter.tsx";
 import { StatusBand } from "../components/StatusBand.tsx";
@@ -22,7 +23,19 @@ interface Props {
   initialBarriers: Barrier[];
 }
 
-export function Dashboard({ initialBarriers: barriers }: Props) {
+export function Dashboard({ initialBarriers }: Props) {
+  // Providers must wrap the island content itself: context from a server
+  // route does not reach island code when it hydrates in the browser.
+  return (
+    <SettingsProvider>
+      <ThemeProvider>
+        <DashboardView initialBarriers={initialBarriers} />
+      </ThemeProvider>
+    </SettingsProvider>
+  );
+}
+
+function DashboardView({ initialBarriers: barriers }: Props) {
   const [loading, setLoading] = useState(true);
   const [visible, setVisible] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
