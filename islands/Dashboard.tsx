@@ -1,19 +1,22 @@
+// Dashboard island - interactive monitor wired to filters, table and exports.
+// This is why it exists: the only hydrated root; everything static stays
+// in components/ so the client ships JS for this subtree alone.
 import { useCallback, useEffect, useState } from "preact/hooks";
 import type { Barrier } from "../lib/types.ts";
 import { useDashboard } from "../hooks/useDashboard.ts";
 import { useSettings } from "../context/SettingsContext.tsx";
-import { Header } from "./Header.tsx";
-import { LocationFilter } from "./LocationFilter.tsx";
-import { StatusBand } from "./StatusBand.tsx";
-import { KpiGrid } from "./KpiGrid.tsx";
-import { ConformidadeChart } from "./ConformidadeChart.tsx";
-import { FilterBar } from "./FilterBar.tsx";
-import { ExportToolbar } from "./ExportToolbar.tsx";
-import { BarriersTable } from "./BarriersTable.tsx";
-import { BarrierModal } from "./BarrierModal.tsx";
-import { LoadingScreen } from "./LoadingScreen.tsx";
-import { SettingsPanel } from "./SettingsPanel.tsx";
-import { AlertTriangleIcon, ArrowRightIcon } from "./ui/Icons.tsx";
+import { Header } from "../components/Header.tsx";
+import { LocationFilter } from "../components/LocationFilter.tsx";
+import { StatusBand } from "../components/StatusBand.tsx";
+import { KpiGrid } from "../components/KpiGrid.tsx";
+import { ConformidadeChart } from "../components/ConformidadeChart.tsx";
+import { FilterBar } from "../components/FilterBar.tsx";
+import { ExportToolbar } from "../components/ExportToolbar.tsx";
+import { BarriersTable } from "../components/BarriersTable.tsx";
+import { BarrierModal } from "../components/BarrierModal.tsx";
+import { LoadingScreen } from "../components/LoadingScreen.tsx";
+import { SettingsPanel } from "../components/SettingsPanel.tsx";
+import { AlertTriangleIcon, ArrowRightIcon } from "../components/ui/Icons.tsx";
 
 interface Props {
   initialBarriers: Barrier[];
