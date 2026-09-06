@@ -1,5 +1,5 @@
 -- ═══════════════════════════════════════════════════════════════════════════
--- SCHEMA — Seacrest Monitor de Barreiras
+-- SCHEMA — Monitor de Barreiras
 -- ═══════════════════════════════════════════════════════════════════════════
 -- Every lookup table's ids are a hard contract with the frontend's
 -- lib/enums.ts resolvers (fromXId/toXId) — a given id must mean the exact

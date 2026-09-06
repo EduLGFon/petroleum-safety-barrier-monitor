@@ -117,7 +117,7 @@ const DEFAULTS: SettingsState = {
   members: [],
 };
 
-const KEY = "seacrest-settings";
+const KEY = "barrier-settings";
 
 interface Ctx {
   settings: SettingsState;

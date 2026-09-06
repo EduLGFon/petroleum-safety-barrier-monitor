@@ -16,7 +16,7 @@ import {
   paginate,
 } from "../lib/utils.ts";
 
-const STORE_KEY = "seacrest-dashboard";
+const STORE_KEY = "barrier-dashboard";
 
 interface Persisted {
   location: string;

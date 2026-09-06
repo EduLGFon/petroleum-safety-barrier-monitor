@@ -1,8 +1,8 @@
 {
-  // Seacrest barriers monitor - Deno-only config (Fresh 2 + Deno-native libs).
+  // Barrier monitor - Deno-only config (Fresh 2 + Deno-native libs).
   // Single source of truth: tasks, import map, TS, lint and fmt live here.
   // No package.json / tsconfig.json / next.config.mjs - all removed.
-  "name": "seacrest-barriers",
+  "name": "barrier-monitor",
   "version": "0.4.0",
   "exports": "./main.ts",
   "nodeModulesDir": "manual",

@@ -5,7 +5,7 @@
 import { Pool } from "@db/postgres";
 
 declare global {
-  var __seacrestPool: Pool | undefined;
+  var __barrierPool: Pool | undefined;
 }
 
 function createPool(): Pool {
@@ -20,11 +20,11 @@ function createPool(): Pool {
 }
 
 // Reuse the pool across dev reloads and across route invocations.
-export const pool: Pool = globalThis.__seacrestPool ?? createPool();
+export const pool: Pool = globalThis.__barrierPool ?? createPool();
 
 const denoEnv = Deno.env.get("DENO_ENV") ?? Deno.env.get("NODE_ENV");
 if (denoEnv !== "production") {
-  globalThis.__seacrestPool = pool;
+  globalThis.__barrierPool = pool;
 }
 
 // Run a parameterized query and return typed rows. Values are always bound

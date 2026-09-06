@@ -6,7 +6,7 @@ import { getCompanyName, withBrand } from "../lib/company.ts";
 
 // Runs before island hydration: restores theme/accent to prevent FOUC.
 const INIT = `(function(){try{
-  var s=JSON.parse(localStorage.getItem('seacrest-settings')||'{}');
+  var s=JSON.parse(localStorage.getItem('barrier-settings')||'{}');
   var t=s.theme||'dark';
   document.documentElement.dataset.theme=(t==='light'||t==='dark'||t==='amoled')?t:'dark';
   if(s.reduceMotion) document.documentElement.classList.add('no-anim');
