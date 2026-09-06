@@ -15,17 +15,17 @@ interface Props {
   onSelectAll: () => void;
   onClearAll: () => void;
 }
-type Fmt = "xlsx" | "pdf" | "csv";
+type Fmt = "xls" | "pdf" | "csv";
 type I = FunctionComponent<
   { size?: number; color?: string; strokeWidth?: number }
 >;
 const FMTS: { key: Fmt; Icon: I; label: string; ext: string; color: string }[] =
   [
     {
-      key: "xlsx",
+      key: "xls",
       Icon: FileSpreadsheetIcon,
       label: "Excel",
-      ext: ".xlsx",
+      ext: ".xls",
       color: "#16a34a",
     },
     {
@@ -56,7 +56,7 @@ export function ExportToolbar(
     const name = `seacrest-barreiras-${new Date().toISOString().slice(0, 10)}`;
     setLoading(fmt);
     try {
-      if (fmt === "xlsx") await exportToExcel(bs, name);
+      if (fmt === "xls") await exportToExcel(bs, name);
       if (fmt === "pdf") await exportToPDF(bs, name);
       if (fmt === "csv") exportToCSV(bs, name);
     } finally {

@@ -1,7 +1,8 @@
 // Client export helpers - download barriers as spreadsheet, PDF or CSV.
 // This is why it exists: zero-dependency browser exports. The spreadsheet
-// is an HTML table saved as .xls (opens in Excel/LibreOffice), PDF uses
-// the browser print dialog (save as PDF), CSV is manual with BOM.
+// is an HTML table saved as .xls (opens in Excel/LibreOffice) with brand
+// header, styled columns and a summary table. PDF prints a dedicated
+// landscape report (never the whole page). CSV uses ; with BOM.
 import { CONF_COLORS, DISP_COLORS } from "./constants.ts";
 import type { Barrier } from "./types.ts";
 import { daysSince, fmtDate, humanDuration } from "./utils.ts";
@@ -69,17 +70,51 @@ const HEADERS = [
   "TAG",
   "Inst.",
   "Tipologia",
-  "Localizacao",
+  "Localização",
   "Categoria",
   "Agrupamento",
   "Criticidade",
   "Dono",
   "Disponibilidade",
-  "Sem Conting. ha",
+  "Sem Conting. há",
   "Conformidade",
-  "Comentarios",
-  "Plano de Acao",
+  "Comentários",
+  "Plano de Ação",
 ];
+
+// Approx column widths in characters, as in the original workbook.
+const COLS_W = [7, 24, 9, 22, 28, 30, 26, 14, 22, 26, 24, 17, 36, 36];
+
+function summaryRows(barriers: Barrier[]): Array<[string, string]> {
+  const count = (fn: (b: Barrier) => boolean) =>
+    barriers.filter(fn).length.toLocaleString("pt-BR");
+  const conformes =
+    barriers.filter((b) => b.conformidade === "Conforme").length;
+  const pct = barriers.length > 0
+    ? `${Math.round(conformes / barriers.length * 100)}%`
+    : "0%";
+  return [
+    ["Total", barriers.length.toLocaleString("pt-BR")],
+    ["Disponíveis", count((b) => b.disponibilidade === "Disponível")],
+    [
+      "Fora de Operação",
+      count((b) => b.disponibilidade === "Fora de Operação"),
+    ],
+    [
+      "Ind. Contingenciado",
+      count((b) => b.disponibilidade === "Indisponível Contingenciado"),
+    ],
+    [
+      "Degr. Contingenciado",
+      count((b) => b.disponibilidade === "Degradado Contingenciado"),
+    ],
+    ["Degradado (NC)", count((b) => b.disponibilidade === "Degradado")],
+    ["Indisponível (NC)", count((b) => b.disponibilidade === "Indisponível")],
+    ["Conformes", conformes.toLocaleString("pt-BR")],
+    ["Não Conformes", count((b) => b.conformidade === "Não Conforme")],
+    ["% Conformidade", pct],
+  ];
+}
 
 // ── Spreadsheet (.xls as HTML table) ───────────────────────────────────────
 
@@ -88,43 +123,144 @@ export function exportToExcel(
   filename = "seacrest-barreiras",
 ): void {
   assertBrowser();
-  const title =
-    `SEACREST PETROLEO - Monitor de Barreiras de Seguranca (${ts()} | ${
-      barriers.length.toLocaleString("pt-BR")
-    } registros)`;
+  const subtitle = `Exportado em ${ts()}  |  ${
+    barriers.length.toLocaleString("pt-BR")
+  } registros`;
+  const cols = COLS_W.map((w) => `<col width="${w * 7}">`).join("");
   const head = HEADERS.map((h) =>
-    `<th style="background:#1E3A5F;color:#fff;">${escHtml(h)}</th>`
+    `<th style="background:#1E3A5F;color:#fff;font-size:9pt;font-weight:bold;text-align:center;">${
+      escHtml(h)
+    }</th>`
   ).join("");
   const body = barriers.map((b, idx) => {
     const bg = idx % 2 === 0 ? "#F8FAFC" : "#FFFFFF";
     const disp = DISP_COLORS[String(b.disponibilidade)]?.solid ?? "#64748b";
     const conf = CONF_COLORS[String(b.conformidade)]?.solid ?? "#64748b";
+    const isCrit = b.criticidade === "Crítica";
     const cells = row(b).map((v, ci) => {
-      let style = "";
-      if (ci === 9) style = `color:${disp};font-weight:bold;`;
-      if (ci === 11) style = `color:${conf};font-weight:bold;`;
+      let style = "font-size:9pt;color:#1E293B;";
+      if (ci === 1) {
+        style =
+          "font-family:'Courier New';font-size:8pt;font-weight:bold;color:#1D4ED8;";
+      }
+      if (ci === 9) {
+        style +=
+          `background:${disp}22;color:${disp};font-weight:bold;text-align:center;`;
+      }
+      if (ci === 11) {
+        style +=
+          `background:${conf}1A;color:${conf};font-weight:bold;text-align:center;`;
+      }
+      if (ci === 7) {
+        style += `text-align:center;font-weight:${
+          isCrit ? "bold" : "normal"
+        };color:${isCrit ? "#F97316" : "#64748B"};`;
+      }
+      if (ci === 10 && v) style += "font-style:italic;color:#EA580C;";
       return `<td style="${style}">${escHtml(v)}</td>`;
     }).join("");
-    return `<tr style="background:${bg};">${cells}</tr>`;
+    return `<tr style="background:${bg};height:16pt;">${cells}</tr>`;
   }).join("");
+  const summary = summaryRows(barriers).map(([k, v]) =>
+    `<tr><td style="font-size:10pt;">${
+      escHtml(k)
+    }</td><td style="font-size:10pt;">${escHtml(v)}</td></tr>`
+  ).join("");
   const html =
-    `<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel"><head><meta charset="UTF-8"></head><body><h2>${
-      escHtml(title)
-    }</h2><table border="1"><thead><tr>${head}</tr></thead><tbody>${body}</tbody></table></body></html>`;
+    `<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel"><head><meta charset="UTF-8"></head><body>` +
+    `<table border="1"><colgroup>${cols}</colgroup>` +
+    `<tr><td colspan="14" style="background:#0A1628;color:#fff;font-size:14pt;font-weight:bold;height:28pt;">SEACREST PETRÓLEO — Monitor de Barreiras de Segurança</td></tr>` +
+    `<tr><td colspan="14" style="background:#0E2036;color:#94A3B8;font-size:9pt;font-style:italic;height:17pt;">${
+      escHtml(subtitle)
+    }</td></tr>` +
+    `<tr style="height:22pt;">${head}</tr>${body}</table>` +
+    `<h3>SEACREST PETRÓLEO — Resumo Monitor de Barreiras</h3>` +
+    `<table border="1"><tr><th style="background:#1E3A5F;color:#fff;">Indicador</th><th style="background:#1E3A5F;color:#fff;">Qtd.</th></tr>${summary}</table>` +
+    `</body></html>`;
   download(
     new Blob(["\uFEFF" + html], { type: "application/vnd.ms-excel" }),
     `${filename}.xls`,
   );
 }
 
-// ── PDF (browser print dialog, save as PDF) ────────────────────────────────
+// ── PDF (dedicated landscape print report) ─────────────────────────────────
+// Builds a report-only DOM node, hides the app with print CSS (see
+// static/styles.css) and opens the print dialog so the user saves a PDF.
+
+const REPORT_ID = "print-report";
+
+export function buildPrintReport(barriers: Barrier[]): string {
+  const head = [
+    "#",
+    "TAG",
+    "Inst.",
+    "Categoria",
+    "Criticidade",
+    "Disponibilidade",
+    "Sem Cont. há",
+    "Conformidade",
+    "Plano",
+  ]
+    .map((h) =>
+      `<th style="background:#1E3A5F;color:#E2E8F0;font-size:8pt;padding:6px 5px;text-align:left;">${
+        escHtml(h)
+      }</th>`
+    ).join("");
+  const body = barriers.map((b, idx) => {
+    const bg = idx % 2 === 0 ? "#F8FAFC" : "#FFFFFF";
+    const disp = DISP_COLORS[String(b.disponibilidade)]?.solid ?? "#94a3b8";
+    const conf = CONF_COLORS[String(b.conformidade)]?.solid ?? "#94a3b8";
+    const dur = b.conformidade === "Não Conforme" && b.statusSince
+      ? humanDuration(daysSince(b.statusSince))
+      : "—";
+    const cell = (v: string, style = "") =>
+      `<td style="font-size:7.5pt;padding:5px;color:#0F172A;${style}">${
+        escHtml(v)
+      }</td>`;
+    return `<tr style="background:${bg};">` +
+      cell(String(b.id)) +
+      cell(b.tag, "font-family:Courier,monospace;") +
+      cell(b.instalacao) +
+      cell(b.categoria) +
+      cell(b.criticidade) +
+      cell(b.disponibilidade, `color:${disp};font-weight:bold;`) +
+      cell(dur, dur === "—" ? "" : "color:#EA580C;") +
+      cell(b.conformidade, `color:${conf};font-weight:bold;`) +
+      cell(b.planoAcao || "—") +
+      `</tr>`;
+  }).join("");
+  return `<div style="font-family:Inter,Helvetica,Arial,sans-serif;">` +
+    `<div style="background:#0A1628;color:#fff;padding:14px 16px;border-bottom:2px solid #3B82F6;">` +
+    `<div style="font-size:13pt;font-weight:bold;">SEACREST PETRÓLEO</div>` +
+    `<div style="font-size:9pt;color:#94A3B8;">Monitor de Barreiras de Segurança</div>` +
+    `<div style="font-size:9pt;color:#94A3B8;">${escHtml(ts())}  |  ${
+      barriers.length.toLocaleString("pt-BR")
+    } registros</div></div>` +
+    `<table style="width:100%;border-collapse:collapse;margin-top:10px;"><thead><tr>${head}</tr></thead><tbody>${body}</tbody></table>` +
+    `<div style="font-size:7pt;color:#94A3B8;margin-top:10px;">Seacrest Petróleo · Monitor de Barreiras</div></div>`;
+}
 
 export function exportToPDF(
   barriers: Barrier[],
-  _filename = "seacrest-barreiras",
+  filename = "seacrest-barreiras",
 ): void {
   assertBrowser();
-  void barriers;
+  let node = document.getElementById(REPORT_ID);
+  if (!node) {
+    node = document.createElement("div");
+    node.id = REPORT_ID;
+    document.body.appendChild(node);
+  }
+  node.innerHTML = buildPrintReport(barriers);
+  const prevTitle = document.title;
+  document.title = filename;
+  document.body.classList.add("printing-report");
+  const cleanup = () => {
+    document.body.classList.remove("printing-report");
+    document.title = prevTitle;
+    node!.innerHTML = "";
+  };
+  globalThis.addEventListener("afterprint", cleanup, { once: true });
   globalThis.print();
 }
 
@@ -138,18 +274,18 @@ export function exportToCSV(
   const hdrs = [
     "ID",
     "TAG",
-    "Instalacao",
+    "Instalação",
     "Tipologia",
-    "Localizacao",
+    "Localização",
     "Categoria",
     "Agrupamento",
     "Criticidade",
     "Dono",
     "Disponibilidade",
-    "Sem Cont. ha",
+    "Sem Cont. há",
     "Conformidade",
-    "Comentarios",
-    "Plano de Acao",
+    "Comentários",
+    "Plano de Ação",
   ];
   const esc = (v: unknown) => `"${String(v ?? "").replace(/"/g, '""')}"`;
   const csv = [

@@ -448,3 +448,29 @@ html.no-anim *::after {
     transition-duration: 0.01ms !important;
   }
 }
+
+/* ── Print report (exportToPDF) ─────────────────────────────────────────────
+   The report node is hidden on screen. While printing, the app is hidden
+   and only the report prints, landscape with page numbers. */
+#print-report {
+  display: none;
+}
+
+@media print {
+  body.printing-report > *:not(#print-report) {
+    display: none !important;
+  }
+  body.printing-report #print-report {
+    display: block !important;
+  }
+  @page {
+    size: A4 landscape;
+    margin: 12mm 10mm 14mm 10mm;
+    @bottom-center {
+      content: "Seacrest Petróleo · Monitor de Barreiras · Página "
+        counter(page) " de " counter(pages);
+      font-size: 7pt;
+      color: #94a3b8;
+    }
+  }
+}
