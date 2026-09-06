@@ -1,4 +1,4 @@
-# Camada de API — Monitor de Barreiras Seacrest
+# Camada de API — Monitor de Barreiras
 
 ## Visão geral
 
@@ -97,7 +97,7 @@ Para ativar:
    ```
    PUBLIC_API_MODE=http
    PUBLIC_API_BASE_URL=http://localhost:8000
-   DATABASE_URL=postgres://user:password@localhost:5432/seacrest_barreiras
+   DATABASE_URL=postgres://user:password@localhost:5432/barreiras
    ```
 3. Nenhum componente precisa mudar. `api` em `lib/api.ts` passa a apontar para
    `httpAdapter` automaticamente, que agora conversa com essas rotas.

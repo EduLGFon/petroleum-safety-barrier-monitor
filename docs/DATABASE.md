@@ -1,4 +1,4 @@
-# Banco de Dados — Monitor de Barreiras Seacrest
+# Banco de Dados — Monitor de Barreiras
 
 Sem Prisma, sem ORM: SQL puro via
 [`postgres`](https://github.com/porsager/postgres) (Deno-native driver), com queries
@@ -9,7 +9,7 @@ parametrizadas por tagged templates.
 ```bash
 # 1. Suba um Postgres (local, Docker, RDS, Supabase, o que preferir)
 #    e crie o banco:
-createdb seacrest_barreiras
+createdb barreiras
 
 # 2. Configure a connection string
 cp .env.example .env.local
