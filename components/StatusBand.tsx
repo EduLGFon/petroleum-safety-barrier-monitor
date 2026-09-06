@@ -25,18 +25,18 @@ export function StatusBand({ kpi, activeFilter, onFilter }: Props) {
   };
   const total = kpi.total || 1;
   return (
-    <div style={{ marginBottom: 20 }}>
+    <div style={{ marginBottom: "var(--d-section)" }}>
       <div
         style={{
           display: "flex",
           alignItems: "center",
-          gap: 6,
-          fontSize: 11,
+          gap: "var(--d-gap-xs)",
+          fontSize: "var(--d-caption)",
           fontWeight: 700,
           color: "var(--text-muted)",
           textTransform: "uppercase",
           letterSpacing: "0.1em",
-          marginBottom: 8,
+          marginBottom: "var(--d-opt-gap)",
         }}
       >
         <ActivityIcon size={13} color="var(--accent)" strokeWidth={2} />{" "}
@@ -45,11 +45,11 @@ export function StatusBand({ kpi, activeFilter, onFilter }: Props) {
       <div
         style={{
           display: "flex",
-          gap: 4,
-          height: 68,
+          gap: "var(--d-gap-2xs)",
+          height: "var(--d-band-h)",
           background: "var(--bg-elevated)",
-          borderRadius: 14,
-          padding: 4,
+          borderRadius: "var(--d-hero-radius)",
+          padding: "var(--d-band-pad)",
           border: "1px solid var(--border)",
           boxShadow: "var(--shadow-sm)",
         }}
@@ -73,20 +73,20 @@ export function StatusBand({ kpi, activeFilter, onFilter }: Props) {
                 border: isA
                   ? "2px solid rgba(255,255,255,.6)"
                   : "2px solid transparent",
-                borderRadius: 10,
+                borderRadius: "var(--d-row-radius)",
                 cursor: "pointer",
                 display: "flex",
                 flexDirection: "column",
                 alignItems: "center",
                 justifyContent: "center",
                 gap: 1,
-                padding: "0 5px",
+                padding: "var(--d-seg-pad)",
                 opacity: isDim ? 0.16 : 1,
                 transform: isA ? "scale(1.025)" : "scale(1)",
                 transition:
                   "opacity .22s var(--ease-std), transform .22s var(--ease-std), box-shadow .22s var(--ease-std), border .15s",
                 overflow: "hidden",
-                minWidth: 54,
+                minWidth: "var(--d-seg-min)",
                 boxShadow: isA ? `0 0 18px ${cfg.solid}55` : "none",
                 position: "relative",
                 animation: `cardAppear .3s ${i * 40}ms var(--ease-out) both`,
@@ -118,7 +118,7 @@ export function StatusBand({ kpi, activeFilter, onFilter }: Props) {
               />
               <span
                 style={{
-                  fontSize: 9,
+                  fontSize: "var(--d-tiny)",
                   fontWeight: 700,
                   color: "rgba(255,255,255,.82)",
                   letterSpacing: "0.07em",
@@ -134,7 +134,7 @@ export function StatusBand({ kpi, activeFilter, onFilter }: Props) {
               </span>
               <span
                 style={{
-                  fontSize: 20,
+                  fontSize: "var(--d-band-num)",
                   fontWeight: 800,
                   color: "#fff",
                   lineHeight: 1,
@@ -146,7 +146,7 @@ export function StatusBand({ kpi, activeFilter, onFilter }: Props) {
               </span>
               <span
                 style={{
-                  fontSize: 9,
+                  fontSize: "var(--d-tiny)",
                   color: "rgba(255,255,255,.6)",
                   fontWeight: 600,
                   position: "relative",

@@ -30,10 +30,10 @@ export function FilterBar(
     <div
       style={{
         display: "flex",
-        gap: 8,
+        gap: "var(--d-opt-gap)",
         flexWrap: "wrap",
         alignItems: "center",
-        marginBottom: 12,
+        marginBottom: "var(--d-stack-sm)",
       }}
     >
       {/* Search */}
@@ -41,7 +41,7 @@ export function FilterBar(
         <span
           style={{
             position: "absolute",
-            left: 11,
+            left: "var(--d-search-icon)",
             top: "50%",
             transform: "translateY(-50%)",
             pointerEvents: "none",
@@ -66,13 +66,14 @@ export function FilterBar(
           onBlur={() => setFocused(false)}
           style={{
             width: "100%",
-            padding: "9px 12px 9px 34px",
-            fontSize: 14,
+            padding:
+              "var(--d-input-y) var(--d-input-x) var(--d-input-y) var(--d-search-l)",
+            fontSize: "var(--d-lead)",
             background: "var(--bg-surface)",
             border: focused || filters.query
               ? "1.5px solid var(--accent)"
               : "1.5px solid var(--border)",
-            borderRadius: 9,
+            borderRadius: "var(--d-input-radius)",
             color: "var(--text-primary)",
             outline: "none",
             boxSizing: "border-box",
@@ -109,13 +110,13 @@ export function FilterBar(
           style={{
             display: "flex",
             alignItems: "center",
-            gap: 5,
-            padding: "9px 12px",
-            fontSize: 13,
+            gap: "var(--d-mini-gap)",
+            padding: "var(--d-input-y) var(--d-input-x)",
+            fontSize: "var(--d-body)",
             fontWeight: 600,
             background: "rgba(239,68,68,.07)",
             border: "1.5px solid rgba(239,68,68,.22)",
-            borderRadius: 9,
+            borderRadius: "var(--d-input-radius)",
             color: "#ef4444",
             cursor: "pointer",
             whiteSpace: "nowrap",
@@ -129,7 +130,7 @@ export function FilterBar(
         style={{
           display: "flex",
           alignItems: "center",
-          gap: 5,
+          gap: "var(--d-mini-gap)",
           marginLeft: "auto",
         }}
       >
@@ -139,7 +140,7 @@ export function FilterBar(
         />
         <span
           style={{
-            fontSize: 13,
+            fontSize: "var(--d-body)",
             color: hasActiveFilters ? "var(--accent)" : "var(--text-muted)",
             fontWeight: hasActiveFilters ? 600 : 400,
             whiteSpace: "nowrap",
@@ -169,13 +170,13 @@ function Sel(
       onChange={(e) => onChange(e.currentTarget.value)}
       className={a ? "animate-filter-on" : ""}
       style={{
-        padding: "9px 10px",
-        fontSize: 13,
+        padding: "var(--d-sel-pad)",
+        fontSize: "var(--d-body)",
         background: a
           ? "color-mix(in srgb,var(--accent) 7%,var(--bg-surface))"
           : "var(--bg-surface)",
         border: a ? "1.5px solid var(--accent)" : "1.5px solid var(--border)",
-        borderRadius: 9,
+        borderRadius: "var(--d-input-radius)",
         color: a ? "var(--accent)" : "var(--text-muted)",
         outline: "none",
         cursor: "pointer",

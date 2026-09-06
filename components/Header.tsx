@@ -29,13 +29,13 @@ export function Header({ onOpenSettings }: Props) {
     <header
       style={{
         background: "var(--hero-grad)",
-        borderRadius: 14,
-        padding: "20px 26px",
-        marginBottom: 20,
+        borderRadius: "var(--d-hero-radius)",
+        padding: "var(--d-hero-pad)",
+        marginBottom: "var(--d-section)",
         display: "flex",
         justifyContent: "space-between",
         alignItems: "center",
-        gap: 16,
+        gap: "var(--d-gap-lg)",
         flexWrap: "wrap",
         position: "relative",
         overflow: "hidden",
@@ -105,7 +105,7 @@ export function Header({ onOpenSettings }: Props) {
         style={{
           display: "flex",
           alignItems: "center",
-          gap: 18,
+          gap: "var(--d-hero-gap)",
           position: "relative",
         }}
       >
@@ -113,7 +113,7 @@ export function Header({ onOpenSettings }: Props) {
         <div
           style={{
             width: 1,
-            height: 42,
+            height: "var(--d-hero-div)",
             background: "rgba(255,255,255,.12)",
             flexShrink: 0,
           }}
@@ -123,8 +123,8 @@ export function Header({ onOpenSettings }: Props) {
             style={{
               display: "flex",
               alignItems: "center",
-              gap: 6,
-              marginBottom: 4,
+              gap: "var(--d-gap-xs)",
+              marginBottom: "var(--d-gap-2xs)",
             }}
           >
             <ShieldIcon
@@ -134,7 +134,7 @@ export function Header({ onOpenSettings }: Props) {
             />
             <span
               style={{
-                fontSize: 9,
+                fontSize: "var(--d-tiny)",
                 fontWeight: 800,
                 letterSpacing: "0.16em",
                 textTransform: "uppercase",
@@ -150,7 +150,7 @@ export function Header({ onOpenSettings }: Props) {
           <h1
             style={{
               margin: 0,
-              fontSize: 19,
+              fontSize: "var(--d-hero)",
               fontWeight: 900,
               color: "#fff",
               letterSpacing: "-0.025em",
@@ -168,7 +168,7 @@ export function Header({ onOpenSettings }: Props) {
         style={{
           display: "flex",
           alignItems: "center",
-          gap: 12,
+          gap: "var(--d-gap)",
           position: "relative",
           flexWrap: "wrap",
         }}
@@ -176,7 +176,7 @@ export function Header({ onOpenSettings }: Props) {
         <div
           style={{
             textAlign: "right",
-            fontSize: 11,
+            fontSize: "var(--d-caption)",
             color: "rgba(148,163,184,.8)",
             lineHeight: 1.7,
           }}
@@ -185,7 +185,7 @@ export function Header({ onOpenSettings }: Props) {
             style={{
               fontFamily: 'ui-monospace,"Cascadia Code",monospace',
               letterSpacing: "0.05em",
-              fontSize: 10,
+              fontSize: "var(--d-micro)",
             }}
           >
             Todas as Concessões
@@ -204,14 +204,14 @@ export function Header({ onOpenSettings }: Props) {
           className="lift"
           title="Configurações"
           style={{
-            width: 38,
-            height: 38,
+            width: "var(--d-gear)",
+            height: "var(--d-gear)",
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
             background: "rgba(255,255,255,.1)",
             border: "1px solid rgba(255,255,255,.15)",
-            borderRadius: 10,
+            borderRadius: "var(--d-row-radius)",
             cursor: "pointer",
             backdropFilter: "blur(4px)",
           }}

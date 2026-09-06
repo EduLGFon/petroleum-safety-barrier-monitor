@@ -104,10 +104,10 @@ function DashboardView({ initialBarriers: barriers, companyName }: Props) {
             "-apple-system,BlinkMacSystemFont,'Inter','Segoe UI',sans-serif",
           background: "var(--bg-page)",
           minHeight: "100dvh",
-          padding: "18px 22px",
+          padding: "var(--d-page)",
           boxSizing: "border-box",
           color: "var(--text-primary)",
-          fontSize: 15,
+          fontSize: "var(--d-page-fs)",
           opacity: visible ? 1 : 0,
           transform: visible ? "none" : "translateY(6px)",
           transition:
@@ -150,12 +150,12 @@ function DashboardView({ initialBarriers: barriers, companyName }: Props) {
             style={{
               display: "flex",
               alignItems: "center",
-              gap: 12,
-              padding: "13px 18px",
-              marginBottom: 14,
+              gap: "var(--d-gap)",
+              padding: "var(--d-alert-pad)",
+              marginBottom: "var(--d-stack)",
               background: "var(--alert-nc-bg)",
               border: "1px solid var(--alert-nc-border)",
-              borderRadius: 12,
+              borderRadius: "var(--d-card-radius)",
               animationDelay: ".32s",
             }}
           >
@@ -167,7 +167,7 @@ function DashboardView({ initialBarriers: barriers, companyName }: Props) {
             <div style={{ flex: 1 }}>
               <div
                 style={{
-                  fontSize: 14,
+                  fontSize: "var(--d-lead)",
                   fontWeight: 700,
                   color: "var(--alert-nc-text)",
                 }}
@@ -177,7 +177,7 @@ function DashboardView({ initialBarriers: barriers, companyName }: Props) {
               </div>
               <div
                 style={{
-                  fontSize: 12,
+                  fontSize: "var(--d-small)",
                   color: "var(--alert-nc-sub)",
                   marginTop: 2,
                 }}
@@ -192,11 +192,11 @@ function DashboardView({ initialBarriers: barriers, companyName }: Props) {
               style={{
                 display: "flex",
                 alignItems: "center",
-                gap: 6,
-                fontSize: 12,
+                gap: "var(--d-gap-xs)",
+                fontSize: "var(--d-small)",
                 fontWeight: 700,
-                padding: "7px 14px",
-                borderRadius: 8,
+                padding: "var(--d-alert-btn)",
+                borderRadius: "var(--d-btn-radius)",
                 background:
                   "color-mix(in srgb,var(--alert-nc-text) 12%,transparent)",
                 border:
@@ -255,9 +255,9 @@ function DashboardView({ initialBarriers: barriers, companyName }: Props) {
 
         <div
           style={{
-            marginTop: 28,
+            marginTop: "var(--d-foot-gap)",
             textAlign: "center",
-            fontSize: 11,
+            fontSize: "var(--d-caption)",
             color: "var(--border)",
             letterSpacing: "0.08em",
             animation: "fadeInFast .4s .5s both",

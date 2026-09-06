@@ -69,17 +69,17 @@ export function ExportToolbar(
       style={{
         display: "flex",
         alignItems: "center",
-        gap: 10,
+        gap: "var(--d-bar-gap)",
         flexWrap: "wrap",
-        padding: "11px 14px",
-        marginBottom: 10,
+        padding: "var(--d-bar-pad)",
+        marginBottom: "var(--d-bar-gap)",
         background: hasAny
           ? "color-mix(in srgb,var(--accent) 5%,var(--bg-elevated))"
           : "var(--bg-elevated)",
         border: hasAny
           ? "1px solid color-mix(in srgb,var(--accent) 30%,var(--border))"
           : "1px solid var(--border)",
-        borderRadius: 11,
+        borderRadius: "var(--d-bar-radius)",
         transition: "all .25s var(--ease-std)",
       }}
     >
@@ -88,7 +88,7 @@ export function ExportToolbar(
         style={{
           display: "flex",
           alignItems: "center",
-          gap: 9,
+          gap: "var(--d-check-gap)",
           cursor: "pointer",
         }}
       >
@@ -99,7 +99,7 @@ export function ExportToolbar(
         />
         <span
           style={{
-            fontSize: 13,
+            fontSize: "var(--d-body)",
             fontWeight: 600,
             color: "var(--text-secondary)",
             whiteSpace: "nowrap",
@@ -121,10 +121,10 @@ export function ExportToolbar(
           style={{
             display: "flex",
             alignItems: "center",
-            gap: 4,
-            fontSize: 12,
-            padding: "4px 9px",
-            borderRadius: 6,
+            gap: "var(--d-gap-2xs)",
+            fontSize: "var(--d-small)",
+            padding: "var(--d-mini-pad)",
+            borderRadius: "var(--d-mini-radius)",
             background: "transparent",
             border: "1px solid var(--border)",
             color: "var(--text-muted)",
@@ -138,19 +138,25 @@ export function ExportToolbar(
       <div style={{ flex: 1 }} />
       {hasAny
         ? (
-          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: "var(--d-gap-xs)",
+            }}
+          >
             <div
               style={{
                 display: "flex",
                 alignItems: "center",
-                gap: 5,
+                gap: "var(--d-mini-gap)",
                 marginRight: 4,
               }}
             >
               <DownloadIcon size={13} color="var(--text-muted)" />
               <span
                 style={{
-                  fontSize: 13,
+                  fontSize: "var(--d-body)",
                   color: "var(--text-muted)",
                   whiteSpace: "nowrap",
                 }}
@@ -168,11 +174,11 @@ export function ExportToolbar(
                 style={{
                   display: "flex",
                   alignItems: "center",
-                  gap: 5,
-                  padding: "7px 13px",
-                  fontSize: 12,
+                  gap: "var(--d-mini-gap)",
+                  padding: "var(--d-btn-pad)",
+                  fontSize: "var(--d-small)",
                   fontWeight: 700,
-                  borderRadius: 8,
+                  borderRadius: "var(--d-btn-radius)",
                   cursor: loading ? "wait" : "pointer",
                   border: `1px solid ${color}44`,
                   background: `${color}0e`,
@@ -186,7 +192,7 @@ export function ExportToolbar(
                     <span
                       style={{
                         animation: "pulse 1s infinite",
-                        fontSize: 12,
+                        fontSize: "var(--d-small)",
                         display: "inline-block",
                         width: 13,
                         height: 13,
@@ -200,7 +206,9 @@ export function ExportToolbar(
                   )
                   : <Icon size={14} color={color} strokeWidth={2} />}
                 {label}
-                <span style={{ fontSize: 10, opacity: .6 }}>{ext}</span>
+                <span style={{ fontSize: "var(--d-micro)", opacity: .6 }}>
+                  {ext}
+                </span>
               </button>
             ))}
           </div>
@@ -208,7 +216,7 @@ export function ExportToolbar(
         : (
           <span
             style={{
-              fontSize: 12,
+              fontSize: "var(--d-small)",
               color: "var(--text-muted)",
               fontStyle: "italic",
             }}
@@ -231,8 +239,8 @@ function Chk(
     <div
       onClick={onChange}
       style={{
-        width: 16,
-        height: 16,
+        width: "var(--d-chk)",
+        height: "var(--d-chk)",
         borderRadius: 4,
         flexShrink: 0,
         border: a ? "2px solid var(--accent)" : "2px solid var(--border)",

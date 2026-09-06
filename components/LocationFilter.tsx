@@ -9,7 +9,12 @@ export function LocationFilter({ selected, allBarriers, onChange }: Props) {
   return (
     <nav
       aria-label="Filtro por instalação"
-      style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 20 }}
+      style={{
+        display: "flex",
+        gap: "var(--d-gap-xs)",
+        flexWrap: "wrap",
+        marginBottom: "var(--d-section)",
+      }}
     >
       {LOCATIONS.map((loc, i) => {
         const count = loc.code === "ALL"
@@ -26,11 +31,11 @@ export function LocationFilter({ selected, allBarriers, onChange }: Props) {
             style={{
               display: "flex",
               alignItems: "center",
-              gap: 7,
-              padding: "8px 14px",
-              fontSize: 13,
+              gap: "var(--d-pill-gap)",
+              padding: "var(--d-pill-pad)",
+              fontSize: "var(--d-body)",
               fontWeight: a ? 700 : 500,
-              borderRadius: 10,
+              borderRadius: "var(--d-pill-radius)",
               border: a ? "1px solid transparent" : "1px solid var(--border)",
               background: a
                 ? "linear-gradient(135deg,var(--accent),var(--accent-2))"
@@ -58,10 +63,10 @@ export function LocationFilter({ selected, allBarriers, onChange }: Props) {
             {loc.name}
             <span
               style={{
-                fontSize: 11,
+                fontSize: "var(--d-caption)",
                 fontWeight: 600,
-                padding: "1px 7px",
-                borderRadius: 5,
+                padding: "var(--d-count-pad)",
+                borderRadius: "var(--d-pill-sm-radius)",
                 background: a ? "rgba(255,255,255,.2)" : "var(--bg-elevated)",
                 color: a ? "rgba(255,255,255,.9)" : "var(--text-muted)",
                 transition: "all .2s",

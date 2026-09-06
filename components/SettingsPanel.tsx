@@ -102,11 +102,11 @@ export function SettingsPanel({ open, onClose, companyName }: Props) {
   };
 
   const selSt = {
-    padding: "9px 12px",
-    fontSize: 13,
+    padding: "var(--d-input-y) var(--d-input-x)",
+    fontSize: "var(--d-body)",
     background: "var(--bg-elevated)",
     border: "1.5px solid var(--border)",
-    borderRadius: 9,
+    borderRadius: "var(--d-input-radius)",
     color: "var(--text-primary)",
     outline: "none",
     cursor: "pointer",
@@ -140,7 +140,7 @@ export function SettingsPanel({ open, onClose, companyName }: Props) {
           top: 0,
           right: 0,
           height: "100dvh",
-          width: 420,
+          width: "var(--d-panel-w)",
           maxWidth: "96vw",
           background: "var(--bg-surface)",
           borderLeft: "1px solid var(--border)",
@@ -156,7 +156,7 @@ export function SettingsPanel({ open, onClose, companyName }: Props) {
         {/* Header */}
         <div
           style={{
-            padding: "20px 22px 16px",
+            padding: "var(--d-dialog-head)",
             borderBottom: "1px solid var(--border)",
             flexShrink: 0,
             background: "var(--bg-elevated)",
@@ -183,19 +183,19 @@ export function SettingsPanel({ open, onClose, companyName }: Props) {
           <div>
             <div
               style={{
-                fontSize: 10,
+                fontSize: "var(--d-micro)",
                 fontWeight: 800,
                 letterSpacing: "0.16em",
                 textTransform: "uppercase",
                 color: "var(--accent)",
-                marginBottom: 4,
+                marginBottom: "var(--d-gap-2xs)",
               }}
             >
               {companyName || "Configurações"}
             </div>
             <div
               style={{
-                fontSize: 18,
+                fontSize: "var(--d-panel-title)",
                 fontWeight: 800,
                 color: "var(--text-primary)",
                 letterSpacing: "-0.02em",
@@ -209,14 +209,14 @@ export function SettingsPanel({ open, onClose, companyName }: Props) {
             onClick={onClose}
             className="lift"
             style={{
-              width: 34,
-              height: 34,
+              width: "var(--d-close-btn)",
+              height: "var(--d-close-btn)",
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
               background: "var(--bg-surface)",
               border: "1.5px solid var(--border)",
-              borderRadius: 9,
+              borderRadius: "var(--d-input-radius)",
               cursor: "pointer",
             }}
           >
@@ -249,9 +249,9 @@ export function SettingsPanel({ open, onClose, companyName }: Props) {
                 display: "flex",
                 flexDirection: "column",
                 alignItems: "center",
-                gap: 4,
-                padding: "10px 8px",
-                fontSize: 11,
+                gap: "var(--d-gap-2xs)",
+                padding: "var(--d-panel-tab)",
+                fontSize: "var(--d-caption)",
                 fontWeight: 600,
                 border: "none",
                 cursor: "pointer",
@@ -279,10 +279,10 @@ export function SettingsPanel({ open, onClose, companyName }: Props) {
           <div
             className="animate-settings-in"
             style={{
-              padding: "22px",
+              padding: "var(--d-panel-body)",
               display: "flex",
               flexDirection: "column",
-              gap: 26,
+              gap: "var(--d-panel-gap-lg)",
             }}
           >
             {/* Theme */}
@@ -292,7 +292,7 @@ export function SettingsPanel({ open, onClose, companyName }: Props) {
                 style={{
                   display: "grid",
                   gridTemplateColumns: "1fr 1fr 1fr",
-                  gap: 8,
+                  gap: "var(--d-opt-gap)",
                 }}
               >
                 {THEMES.map(({ value, Icon, label }) => {
@@ -308,9 +308,9 @@ export function SettingsPanel({ open, onClose, companyName }: Props) {
                         display: "flex",
                         flexDirection: "column",
                         alignItems: "center",
-                        gap: 8,
-                        padding: "14px 8px",
-                        borderRadius: 12,
+                        gap: "var(--d-opt-gap)",
+                        padding: "var(--d-opt-pad)",
+                        borderRadius: "var(--d-opt-radius)",
                         border: isA
                           ? "2px solid var(--accent)"
                           : "2px solid var(--border)",
@@ -322,9 +322,9 @@ export function SettingsPanel({ open, onClose, companyName }: Props) {
                     >
                       <div
                         style={{
-                          width: 40,
-                          height: 40,
-                          borderRadius: 10,
+                          width: "var(--d-thumb)",
+                          height: "var(--d-thumb)",
+                          borderRadius: "var(--d-thumb-radius)",
                           display: "flex",
                           alignItems: "center",
                           justifyContent: "center",
@@ -345,7 +345,7 @@ export function SettingsPanel({ open, onClose, companyName }: Props) {
                       </div>
                       <span
                         style={{
-                          fontSize: 12,
+                          fontSize: "var(--d-small)",
                           fontWeight: isA ? 700 : 500,
                           color: isA
                             ? "var(--accent)"
@@ -377,7 +377,7 @@ export function SettingsPanel({ open, onClose, companyName }: Props) {
                 style={{
                   display: "grid",
                   gridTemplateColumns: "1fr 1fr 1fr",
-                  gap: 8,
+                  gap: "var(--d-opt-gap)",
                 }}
               >
                 {(Object.entries(DENSITY_PRESETS) as [
@@ -397,9 +397,9 @@ export function SettingsPanel({ open, onClose, companyName }: Props) {
                         display: "flex",
                         flexDirection: "column",
                         alignItems: "center",
-                        gap: 7,
-                        padding: "14px 6px 12px",
-                        borderRadius: 12,
+                        gap: "var(--d-pill-gap)",
+                        padding: "var(--d-density-pad)",
+                        borderRadius: "var(--d-opt-radius)",
                         border: isA
                           ? "2px solid var(--accent)"
                           : "2px solid var(--border)",
@@ -412,7 +412,7 @@ export function SettingsPanel({ open, onClose, companyName }: Props) {
                       <DensityGlyph value={value} active={isA} />
                       <span
                         style={{
-                          fontSize: 12,
+                          fontSize: "var(--d-small)",
                           fontWeight: isA ? 700 : 500,
                           color: isA
                             ? "var(--accent)"
@@ -423,7 +423,7 @@ export function SettingsPanel({ open, onClose, companyName }: Props) {
                       </span>
                       <span
                         style={{
-                          fontSize: 9.5,
+                          fontSize: "var(--d-density-hint)",
                           lineHeight: 1.4,
                           color: "var(--text-muted)",
                           textAlign: "center",
@@ -441,7 +441,7 @@ export function SettingsPanel({ open, onClose, companyName }: Props) {
                         {value === "comfortable" && (
                           <span
                             style={{
-                              fontSize: 9,
+                              fontSize: "var(--d-tiny)",
                               fontWeight: 800,
                               letterSpacing: "0.1em",
                               textTransform: "uppercase",
@@ -450,8 +450,8 @@ export function SettingsPanel({ open, onClose, companyName }: Props) {
                                 "color-mix(in srgb,var(--accent) 12%,transparent)",
                               border:
                                 "1px solid color-mix(in srgb,var(--accent) 30%,transparent)",
-                              borderRadius: 5,
-                              padding: "1px 7px",
+                              borderRadius: "var(--d-pill-sm-radius)",
+                              padding: "var(--d-count-pad)",
                             }}
                           >
                             Padrão
@@ -481,7 +481,7 @@ export function SettingsPanel({ open, onClose, companyName }: Props) {
                 style={{
                   display: "grid",
                   gridTemplateColumns: "repeat(7,1fr)",
-                  gap: 10,
+                  gap: "var(--d-bar-gap)",
                 }}
               >
                 {(Object.entries(ACCENT_PRESETS) as [
@@ -497,7 +497,7 @@ export function SettingsPanel({ open, onClose, companyName }: Props) {
                         display: "flex",
                         flexDirection: "column",
                         alignItems: "center",
-                        gap: 5,
+                        gap: "var(--d-mini-gap)",
                       }}
                     >
                       <button
@@ -505,9 +505,9 @@ export function SettingsPanel({ open, onClose, companyName }: Props) {
                         onClick={() => handleAccent(key)}
                         className={isAnim ? "animate-swatch" : ""}
                         style={{
-                          width: 36,
-                          height: 36,
-                          borderRadius: 10,
+                          width: "var(--d-swatch)",
+                          height: "var(--d-swatch)",
+                          borderRadius: "var(--d-thumb-radius)",
                           background: p.swatch,
                           border: isA
                             ? "3px solid var(--text-primary)"
@@ -542,7 +542,7 @@ export function SettingsPanel({ open, onClose, companyName }: Props) {
                       </button>
                       <span
                         style={{
-                          fontSize: 9,
+                          fontSize: "var(--d-tiny)",
                           color: "var(--text-muted)",
                           fontWeight: 500,
                           textAlign: "center",
@@ -564,16 +564,16 @@ export function SettingsPanel({ open, onClose, companyName }: Props) {
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "space-between",
-                  padding: "12px 14px",
+                  padding: "var(--d-row-pad)",
                   background: "var(--bg-elevated)",
                   border: "1.5px solid var(--border)",
-                  borderRadius: 10,
+                  borderRadius: "var(--d-row-radius)",
                 }}
               >
                 <div>
                   <div
                     style={{
-                      fontSize: 14,
+                      fontSize: "var(--d-lead)",
                       fontWeight: 600,
                       color: "var(--text-primary)",
                     }}
@@ -582,7 +582,7 @@ export function SettingsPanel({ open, onClose, companyName }: Props) {
                   </div>
                   <div
                     style={{
-                      fontSize: 12,
+                      fontSize: "var(--d-small)",
                       color: "var(--text-muted)",
                       marginTop: 2,
                     }}
@@ -600,33 +600,39 @@ export function SettingsPanel({ open, onClose, companyName }: Props) {
             {/* Preview */}
             <div
               style={{
-                padding: "14px 16px",
+                padding: "var(--d-preview-pad)",
                 background:
                   "color-mix(in srgb,var(--accent) 7%,var(--bg-elevated))",
                 border: "1.5px solid var(--border)",
-                borderRadius: 10,
+                borderRadius: "var(--d-row-radius)",
               }}
             >
               <div
                 style={{
-                  fontSize: 11,
+                  fontSize: "var(--d-caption)",
                   fontWeight: 700,
                   color: "var(--accent)",
                   textTransform: "uppercase",
                   letterSpacing: "0.1em",
-                  marginBottom: 8,
+                  marginBottom: "var(--d-opt-gap)",
                 }}
               >
                 Prévia
               </div>
-              <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+              <div
+                style={{
+                  display: "flex",
+                  gap: "var(--d-opt-gap)",
+                  flexWrap: "wrap",
+                }}
+              >
                 <span
                   style={{
-                    padding: "5px 12px",
+                    padding: "var(--d-chip-pad)",
                     background: "var(--accent)",
                     color: "#fff",
-                    borderRadius: 7,
-                    fontSize: 12,
+                    borderRadius: "var(--d-chip-radius)",
+                    fontSize: "var(--d-small)",
                     fontWeight: 700,
                   }}
                 >
@@ -634,12 +640,12 @@ export function SettingsPanel({ open, onClose, companyName }: Props) {
                 </span>
                 <span
                   style={{
-                    padding: "5px 12px",
+                    padding: "var(--d-chip-pad)",
                     background: "transparent",
                     border: "1.5px solid var(--accent)",
                     color: "var(--accent)",
-                    borderRadius: 7,
-                    fontSize: 12,
+                    borderRadius: "var(--d-chip-radius)",
+                    fontSize: "var(--d-small)",
                     fontWeight: 600,
                   }}
                 >
@@ -647,12 +653,12 @@ export function SettingsPanel({ open, onClose, companyName }: Props) {
                 </span>
                 <span
                   style={{
-                    padding: "5px 12px",
+                    padding: "var(--d-chip-pad)",
                     background: "var(--bg-surface)",
                     border: "1.5px solid var(--border)",
                     color: "var(--text-secondary)",
-                    borderRadius: 7,
-                    fontSize: 12,
+                    borderRadius: "var(--d-chip-radius)",
+                    fontSize: "var(--d-small)",
                   }}
                 >
                   Neutro
@@ -667,17 +673,17 @@ export function SettingsPanel({ open, onClose, companyName }: Props) {
           <div
             className="animate-settings-in"
             style={{
-              padding: "22px",
+              padding: "var(--d-panel-body)",
               display: "flex",
               flexDirection: "column",
-              gap: 18,
+              gap: "var(--d-panel-gap)",
             }}
           >
             <SectTitle>Filtros Padrão ao Carregar</SectTitle>
             <p
               style={{
                 margin: 0,
-                fontSize: 13,
+                fontSize: "var(--d-body)",
                 color: "var(--text-muted)",
                 lineHeight: 1.6,
               }}
@@ -736,7 +742,7 @@ export function SettingsPanel({ open, onClose, companyName }: Props) {
                 style={{
                   display: "grid",
                   gridTemplateColumns: "1fr 1fr",
-                  gap: 8,
+                  gap: "var(--d-opt-gap)",
                 }}
               >
                 <select
@@ -776,12 +782,12 @@ export function SettingsPanel({ open, onClose, companyName }: Props) {
                 setDefaultLoc("ALL");
               }}
               style={{
-                padding: "10px 16px",
+                padding: "var(--d-reset-pad)",
                 background: "rgba(239,68,68,.07)",
                 border: "1.5px solid rgba(239,68,68,.22)",
-                borderRadius: 9,
+                borderRadius: "var(--d-input-radius)",
                 color: "#ef4444",
-                fontSize: 13,
+                fontSize: "var(--d-body)",
                 fontWeight: 600,
                 cursor: "pointer",
                 transition: "all .2s",
@@ -797,36 +803,36 @@ export function SettingsPanel({ open, onClose, companyName }: Props) {
           <div
             className="animate-settings-in"
             style={{
-              padding: "22px",
+              padding: "var(--d-panel-body)",
               display: "flex",
               flexDirection: "column",
-              gap: 18,
+              gap: "var(--d-panel-gap)",
             }}
           >
             <SectTitle>Gerenciamento de Membros</SectTitle>
             <div
               style={{
-                padding: "20px",
+                padding: "var(--d-soon-pad)",
                 background:
                   "color-mix(in srgb,var(--accent) 6%,var(--bg-elevated))",
                 border: "1.5px solid var(--border)",
-                borderRadius: 12,
+                borderRadius: "var(--d-opt-radius)",
                 textAlign: "center",
               }}
             >
               <div
                 style={{
-                  fontSize: 13,
+                  fontSize: "var(--d-body)",
                   fontWeight: 700,
                   color: "var(--text-primary)",
-                  marginBottom: 8,
+                  marginBottom: "var(--d-opt-gap)",
                 }}
               >
                 Disponível em breve
               </div>
               <div
                 style={{
-                  fontSize: 12,
+                  fontSize: "var(--d-small)",
                   color: "var(--text-muted)",
                   lineHeight: 1.65,
                 }}
@@ -845,7 +851,7 @@ export function SettingsPanel({ open, onClose, companyName }: Props) {
             {/* Preview members UI */}
             <div style={{ opacity: .45, pointerEvents: "none" }}>
               <FieldLabel>Adicionar membro</FieldLabel>
-              <div style={{ display: "flex", gap: 8 }}>
+              <div style={{ display: "flex", gap: "var(--d-opt-gap)" }}>
                 <input
                   disabled
                   placeholder="nome@empresa.com.br"
@@ -876,10 +882,10 @@ export function SettingsPanel({ open, onClose, companyName }: Props) {
         <div
           style={{
             marginTop: "auto",
-            padding: "14px 22px",
+            padding: "var(--d-foot-pad)",
             borderTop: "1px solid var(--border)",
             background: "var(--bg-elevated)",
-            fontSize: 11,
+            fontSize: "var(--d-caption)",
             color: "var(--text-muted)",
             textAlign: "center",
             letterSpacing: "0.05em",
@@ -898,12 +904,12 @@ function SectTitle({ children }: { children: ComponentChildren }) {
   return (
     <div
       style={{
-        fontSize: 12,
+        fontSize: "var(--d-small)",
         fontWeight: 800,
         color: "var(--text-primary)",
         textTransform: "uppercase",
         letterSpacing: "0.1em",
-        marginBottom: 14,
+        marginBottom: "var(--d-sect-title-gap)",
       }}
     >
       {children}
@@ -914,12 +920,12 @@ function FieldLabel({ children }: { children: ComponentChildren }) {
   return (
     <div
       style={{
-        fontSize: 11,
+        fontSize: "var(--d-caption)",
         fontWeight: 700,
         color: "var(--text-muted)",
         textTransform: "uppercase",
         letterSpacing: "0.1em",
-        marginBottom: 7,
+        marginBottom: "var(--d-field-gap)",
       }}
     >
       {children}
@@ -942,7 +948,7 @@ function DensityGlyph(
       style={{
         width: 46,
         height: 30,
-        borderRadius: 7,
+        borderRadius: "var(--d-chip-radius)",
         background: "var(--bg-surface)",
         border: "1.5px solid var(--border)",
         display: "flex",
@@ -981,9 +987,9 @@ function Toggle(
       role="switch"
       aria-checked={checked}
       style={{
-        width: 44,
-        height: 24,
-        borderRadius: 12,
+        width: "var(--d-toggle-w)",
+        height: "var(--d-toggle-h)",
+        borderRadius: "var(--d-toggle-h)",
         border: "none",
         cursor: "pointer",
         position: "relative",
@@ -997,9 +1003,11 @@ function Toggle(
         style={{
           position: "absolute",
           top: 3,
-          left: checked ? 22 : 3,
-          width: 18,
-          height: 18,
+          left: checked
+            ? "calc(var(--d-toggle-w) - var(--d-toggle-knob) - 4px)"
+            : "3px",
+          width: "var(--d-toggle-knob)",
+          height: "var(--d-toggle-knob)",
           borderRadius: "50%",
           background: "#fff",
           transition: "left .25s var(--ease-out)",

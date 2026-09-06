@@ -16,6 +16,15 @@ body {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
+/* Page canvas — html/body carry the theme background so no unpainted
+   (white) area can ever show around the app on any density or theme. */
+html,
+body {
+  background: var(--bg-page);
+}
+body {
+  min-height: 100dvh;
+}
 button,
 select,
 input {
@@ -162,6 +171,386 @@ body,
   --ease-out: cubic-bezier(0.16,1,0.3,1);
   --ease-std: cubic-bezier(0.4,0,0.2,1);
   --ease-in: cubic-bezier(0.4,0,1,1);
+}
+
+/* ── Interface density ────────────────────────────────────────────────────
+   Type scale + spacing rhythm per mode. Comfortable is the reference
+   design; compact tightens every metric, spacious opens them up.
+   Components consume these via var(--d-*) so a single data-density
+   switch re-rhythms the entire UI (no zoom hacks). */
+:root,
+[data-density="comfortable"] {
+  /* Type scale */
+  --d-hero: 19px;
+  --d-display: 27px;
+  --d-band-num: 20px;
+  --d-dialog-title: 21px;
+  --d-arrow: 16px;
+  --d-lead: 14px;
+  --d-body: 13px;
+  --d-small: 12px;
+  --d-caption: 11px;
+  --d-micro: 10px;
+  --d-tiny: 9px;
+  --d-page-fs: 15px;
+  /* Page rhythm */
+  --d-page: 18px 22px;
+  --d-shell: 20px 18px 40px;
+  --d-section: 20px;
+  --d-stack: 14px;
+  --d-stack-sm: 12px;
+  --d-bar-gap: 10px;
+  --d-foot-gap: 28px;
+  /* Gaps */
+  --d-gap-lg: 16px;
+  --d-gap: 12px;
+  --d-opt-gap: 8px;
+  --d-gap-xs: 6px;
+  --d-mini-gap: 5px;
+  --d-gap-2xs: 4px;
+  /* Hero header */
+  --d-hero-pad: 20px 26px;
+  --d-hero-radius: 14px;
+  --d-hero-gap: 18px;
+  --d-hero-div: 42px;
+  --d-gear: 38px;
+  /* Location pills */
+  --d-pill-pad: 8px 14px;
+  --d-pill-gap: 7px;
+  --d-pill-radius: 10px;
+  --d-count-pad: 1px 7px;
+  --d-pill-sm-radius: 5px;
+  /* Status band */
+  --d-band-h: 68px;
+  --d-band-pad: 4px;
+  --d-seg-min: 54px;
+  --d-seg-pad: 0 5px;
+  /* KPI cards */
+  --d-kpi-gap: 10px;
+  --d-kpi-min: 150px;
+  --d-kpi-pad: 15px 17px 13px;
+  /* Cards */
+  --d-card-radius: 12px;
+  --d-chart-pad: 18px 18px 10px;
+  --d-sect-title-gap: 14px;
+  --d-field-gap: 7px;
+  /* Export toolbar */
+  --d-bar-pad: 11px 14px;
+  --d-bar-radius: 11px;
+  --d-btn-pad: 7px 13px;
+  --d-btn-radius: 8px;
+  --d-mini-pad: 4px 9px;
+  --d-mini-radius: 6px;
+  --d-check-gap: 9px;
+  --d-chk: 16px;
+  /* Inputs */
+  --d-input-y: 9px;
+  --d-input-x: 12px;
+  --d-search-l: 34px;
+  --d-search-icon: 11px;
+  --d-sel-pad: 9px 10px;
+  --d-input-radius: 9px;
+  /* Table */
+  --d-cell-pad: 10px 14px;
+  --d-arrow-pad: 10px 12px;
+  --d-nc-pad: 3px 8px;
+  --d-empty-pad: 52px;
+  --d-page-btn: 32px;
+  --d-rowchk: 15px;
+  /* Badges */
+  --d-badge-xs-fs: 10px;
+  --d-badge-xs-pad: 2px 7px;
+  --d-badge-sm-fs: 11px;
+  --d-badge-sm-pad: 3px 8px;
+  --d-badge-md-fs: 12px;
+  --d-badge-md-pad: 4px 11px;
+  --d-badge-dot: 6px;
+  --d-badge-dot-xs: 5px;
+  /* Dialog (modal + settings panel) */
+  --d-dialog-w: 580px;
+  --d-dialog-radius: 20px;
+  --d-dialog-head: 20px 22px 16px;
+  --d-dialog-body: 20px 22px;
+  --d-dialog-tab: 11px 20px;
+  --d-details-gap: 16px 20px;
+  --d-status-gap: 14px 20px;
+  --d-block-gap: 22px;
+  --d-div-gap: 18px;
+  --d-row-pad: 12px 14px;
+  --d-row-radius: 10px;
+  --d-close-btn: 34px;
+  --d-history-gap: 16px;
+  /* Settings panel */
+  --d-panel-w: 420px;
+  --d-panel-title: 18px;
+  --d-panel-body: 22px;
+  --d-panel-gap-lg: 26px;
+  --d-panel-gap: 18px;
+  --d-panel-tab: 10px 8px;
+  --d-opt-pad: 14px 8px;
+  --d-opt-radius: 12px;
+  --d-thumb: 40px;
+  --d-thumb-radius: 10px;
+  --d-swatch: 36px;
+  --d-preview-pad: 14px 16px;
+  --d-soon-pad: 20px;
+  --d-chip-pad: 5px 12px;
+  --d-chip-radius: 7px;
+  --d-reset-pad: 10px 16px;
+  --d-foot-pad: 14px 22px;
+  --d-toggle-w: 44px;
+  --d-toggle-h: 24px;
+  --d-toggle-knob: 18px;
+  --d-density-pad: 14px 6px 12px;
+  --d-density-hint: 9.5px;
+  /* NC alert (dashboard) */
+  --d-alert-pad: 13px 18px;
+  --d-alert-btn: 7px 14px;
+  /* Chart tooltip */
+  --d-tip-pad: 10px 14px;
+  /* Loading splash */
+  --d-splash-pad: 48px 56px;
+  --d-splash-radius: 24px;
+  --d-splash-gap: 30px;
+  --d-splash-div: 24px;
+}
+
+[data-density="compact"] {
+  --d-hero: 17px;
+  --d-display: 23px;
+  --d-band-num: 18px;
+  --d-dialog-title: 19px;
+  --d-arrow: 14px;
+  --d-lead: 13px;
+  --d-body: 12px;
+  --d-small: 11px;
+  --d-caption: 10px;
+  --d-micro: 9px;
+  --d-tiny: 8px;
+  --d-page-fs: 14px;
+  --d-page: 12px 14px;
+  --d-shell: 14px 12px 28px;
+  --d-section: 14px;
+  --d-stack: 10px;
+  --d-stack-sm: 9px;
+  --d-bar-gap: 8px;
+  --d-foot-gap: 20px;
+  --d-gap-lg: 12px;
+  --d-gap: 9px;
+  --d-opt-gap: 6px;
+  --d-gap-xs: 4px;
+  --d-mini-gap: 4px;
+  --d-gap-2xs: 3px;
+  --d-hero-pad: 14px 18px;
+  --d-hero-radius: 12px;
+  --d-hero-gap: 14px;
+  --d-hero-div: 36px;
+  --d-gear: 34px;
+  --d-pill-pad: 6px 10px;
+  --d-pill-gap: 5px;
+  --d-pill-radius: 8px;
+  --d-count-pad: 1px 5px;
+  --d-pill-sm-radius: 4px;
+  --d-band-h: 56px;
+  --d-band-pad: 3px;
+  --d-seg-min: 46px;
+  --d-seg-pad: 0 4px;
+  --d-kpi-gap: 7px;
+  --d-kpi-min: 130px;
+  --d-kpi-pad: 11px 13px 10px;
+  --d-card-radius: 10px;
+  --d-chart-pad: 13px 13px 8px;
+  --d-sect-title-gap: 11px;
+  --d-field-gap: 5px;
+  --d-bar-pad: 8px 10px;
+  --d-bar-radius: 9px;
+  --d-btn-pad: 5px 10px;
+  --d-btn-radius: 7px;
+  --d-mini-pad: 3px 7px;
+  --d-mini-radius: 5px;
+  --d-check-gap: 7px;
+  --d-chk: 14px;
+  --d-input-y: 7px;
+  --d-input-x: 10px;
+  --d-search-l: 30px;
+  --d-search-icon: 9px;
+  --d-sel-pad: 7px 8px;
+  --d-input-radius: 8px;
+  --d-cell-pad: 7px 10px;
+  --d-arrow-pad: 7px 9px;
+  --d-nc-pad: 2px 6px;
+  --d-empty-pad: 38px;
+  --d-page-btn: 28px;
+  --d-rowchk: 13px;
+  --d-badge-xs-fs: 9px;
+  --d-badge-xs-pad: 1px 6px;
+  --d-badge-sm-fs: 10px;
+  --d-badge-sm-pad: 2px 7px;
+  --d-badge-md-fs: 11px;
+  --d-badge-md-pad: 3px 9px;
+  --d-badge-dot: 5px;
+  --d-badge-dot-xs: 4px;
+  --d-dialog-w: 520px;
+  --d-dialog-radius: 16px;
+  --d-dialog-head: 15px 18px 12px;
+  --d-dialog-body: 15px 18px;
+  --d-dialog-tab: 9px 16px;
+  --d-details-gap: 12px 15px;
+  --d-status-gap: 11px 15px;
+  --d-block-gap: 17px;
+  --d-div-gap: 14px;
+  --d-row-pad: 10px 11px;
+  --d-row-radius: 8px;
+  --d-close-btn: 30px;
+  --d-history-gap: 12px;
+  --d-panel-w: 380px;
+  --d-panel-title: 16px;
+  --d-panel-body: 16px;
+  --d-panel-gap-lg: 19px;
+  --d-panel-gap: 13px;
+  --d-panel-tab: 8px 6px;
+  --d-opt-pad: 11px 6px;
+  --d-opt-radius: 10px;
+  --d-thumb: 34px;
+  --d-thumb-radius: 8px;
+  --d-swatch: 30px;
+  --d-preview-pad: 11px 13px;
+  --d-soon-pad: 16px;
+  --d-chip-pad: 4px 10px;
+  --d-chip-radius: 6px;
+  --d-reset-pad: 8px 13px;
+  --d-foot-pad: 11px 18px;
+  --d-toggle-w: 40px;
+  --d-toggle-h: 22px;
+  --d-toggle-knob: 16px;
+  --d-density-pad: 11px 5px 10px;
+  --d-density-hint: 8.5px;
+  --d-alert-pad: 10px 14px;
+  --d-alert-btn: 5px 11px;
+  --d-tip-pad: 8px 11px;
+  --d-splash-pad: 36px 42px;
+  --d-splash-radius: 20px;
+  --d-splash-gap: 22px;
+  --d-splash-div: 18px;
+}
+
+[data-density="spacious"] {
+  --d-hero: 21px;
+  --d-display: 31px;
+  --d-band-num: 22px;
+  --d-dialog-title: 23px;
+  --d-arrow: 18px;
+  --d-lead: 15px;
+  --d-body: 14px;
+  --d-small: 13px;
+  --d-caption: 12px;
+  --d-micro: 11px;
+  --d-tiny: 10px;
+  --d-page-fs: 16px;
+  --d-page: 26px 32px;
+  --d-shell: 28px 24px 52px;
+  --d-section: 26px;
+  --d-stack: 18px;
+  --d-stack-sm: 15px;
+  --d-bar-gap: 12px;
+  --d-foot-gap: 36px;
+  --d-gap-lg: 20px;
+  --d-gap: 15px;
+  --d-opt-gap: 10px;
+  --d-gap-xs: 8px;
+  --d-mini-gap: 6px;
+  --d-gap-2xs: 5px;
+  --d-hero-pad: 26px 34px;
+  --d-hero-radius: 16px;
+  --d-hero-gap: 22px;
+  --d-hero-div: 48px;
+  --d-gear: 42px;
+  --d-pill-pad: 10px 18px;
+  --d-pill-gap: 9px;
+  --d-pill-radius: 12px;
+  --d-count-pad: 2px 9px;
+  --d-pill-sm-radius: 6px;
+  --d-band-h: 80px;
+  --d-band-pad: 5px;
+  --d-seg-min: 62px;
+  --d-seg-pad: 0 6px;
+  --d-kpi-gap: 14px;
+  --d-kpi-min: 170px;
+  --d-kpi-pad: 19px 21px 17px;
+  --d-card-radius: 14px;
+  --d-chart-pad: 23px 23px 13px;
+  --d-sect-title-gap: 17px;
+  --d-field-gap: 9px;
+  --d-bar-pad: 14px 18px;
+  --d-bar-radius: 13px;
+  --d-btn-pad: 9px 16px;
+  --d-btn-radius: 9px;
+  --d-mini-pad: 5px 11px;
+  --d-mini-radius: 7px;
+  --d-check-gap: 11px;
+  --d-chk: 18px;
+  --d-input-y: 11px;
+  --d-input-x: 14px;
+  --d-search-l: 38px;
+  --d-search-icon: 13px;
+  --d-sel-pad: 11px 12px;
+  --d-input-radius: 10px;
+  --d-cell-pad: 13px 18px;
+  --d-arrow-pad: 13px 15px;
+  --d-nc-pad: 4px 10px;
+  --d-empty-pad: 66px;
+  --d-page-btn: 36px;
+  --d-rowchk: 17px;
+  --d-badge-xs-fs: 11px;
+  --d-badge-xs-pad: 3px 8px;
+  --d-badge-sm-fs: 12px;
+  --d-badge-sm-pad: 4px 10px;
+  --d-badge-md-fs: 13px;
+  --d-badge-md-pad: 5px 13px;
+  --d-badge-dot: 7px;
+  --d-badge-dot-xs: 6px;
+  --d-dialog-w: 640px;
+  --d-dialog-radius: 24px;
+  --d-dialog-head: 25px 27px 20px;
+  --d-dialog-body: 25px 27px;
+  --d-dialog-tab: 13px 24px;
+  --d-details-gap: 20px 25px;
+  --d-status-gap: 17px 25px;
+  --d-block-gap: 27px;
+  --d-div-gap: 22px;
+  --d-row-pad: 14px 17px;
+  --d-row-radius: 12px;
+  --d-close-btn: 38px;
+  --d-history-gap: 20px;
+  --d-panel-w: 460px;
+  --d-panel-title: 20px;
+  --d-panel-body: 28px;
+  --d-panel-gap-lg: 32px;
+  --d-panel-gap: 23px;
+  --d-panel-tab: 12px 10px;
+  --d-opt-pad: 17px 10px;
+  --d-opt-radius: 14px;
+  --d-thumb: 46px;
+  --d-thumb-radius: 12px;
+  --d-swatch: 42px;
+  --d-preview-pad: 17px 19px;
+  --d-soon-pad: 24px;
+  --d-chip-pad: 6px 14px;
+  --d-chip-radius: 8px;
+  --d-reset-pad: 12px 19px;
+  --d-foot-pad: 17px 26px;
+  --d-toggle-w: 48px;
+  --d-toggle-h: 26px;
+  --d-toggle-knob: 20px;
+  --d-density-pad: 17px 7px 14px;
+  --d-density-hint: 10.5px;
+  --d-alert-pad: 16px 22px;
+  --d-alert-btn: 9px 17px;
+  --d-tip-pad: 12px 17px;
+  --d-splash-pad: 60px 70px;
+  --d-splash-radius: 28px;
+  --d-splash-gap: 38px;
+  --d-splash-div: 30px;
 }
 
 /* Core keyframes */
@@ -457,10 +846,6 @@ html.no-anim *::after {
 }
 
 @media print {
-  /* Density zoom rescales the app for screens — reports print at 100%. */
-  html {
-    zoom: 1 !important;
-  }
   body.printing-report > *:not(#print-report) {
     display: none !important;
   }

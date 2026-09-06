@@ -94,11 +94,11 @@ export function LoadingScreen({ onDone, companyName }: Props) {
           display: "flex",
           flexDirection: "column",
           alignItems: "center",
-          padding: "48px 56px",
+          padding: "var(--d-splash-pad)",
           background: "rgba(9,24,40,0.82)",
           backdropFilter: "blur(24px)",
           border: "1px solid rgba(59,130,246,.12)",
-          borderRadius: 24,
+          borderRadius: "var(--d-splash-radius)",
           boxShadow:
             "0 32px 80px rgba(0,0,0,.55),inset 0 1px 0 rgba(255,255,255,.05)",
           minWidth: 360,
@@ -121,7 +121,7 @@ export function LoadingScreen({ onDone, companyName }: Props) {
         {/* Logo */}
         <div
           style={{
-            marginBottom: 30,
+            marginBottom: "var(--d-splash-gap)",
             filter: "drop-shadow(0 4px 20px rgba(59,130,246,.28))",
           }}
         >
@@ -133,11 +133,11 @@ export function LoadingScreen({ onDone, companyName }: Props) {
           {companyName && (
             <div
               style={{
-                fontSize: 10,
+                fontSize: "var(--d-micro)",
                 fontWeight: 800,
                 letterSpacing: "0.2em",
                 textTransform: "uppercase",
-                marginBottom: 8,
+                marginBottom: "var(--d-opt-gap)",
                 background: "linear-gradient(90deg,#60a5fa,#a78bfa)",
                 WebkitBackgroundClip: "text",
                 WebkitTextFillColor: "transparent",
@@ -149,7 +149,7 @@ export function LoadingScreen({ onDone, companyName }: Props) {
           )}
           <div
             style={{
-              fontSize: 20,
+              fontSize: "var(--d-band-num)",
               fontWeight: 800,
               letterSpacing: "-0.025em",
               color: "#fff",
@@ -165,7 +165,7 @@ export function LoadingScreen({ onDone, companyName }: Props) {
           style={{
             width: "100%",
             height: 1,
-            margin: "24px 0",
+            margin: "var(--d-splash-div) 0",
             background:
               "linear-gradient(90deg,transparent,rgba(59,130,246,.3),transparent)",
           }}
@@ -177,11 +177,11 @@ export function LoadingScreen({ onDone, companyName }: Props) {
             style={{
               display: "flex",
               justifyContent: "space-between",
-              fontSize: 11,
+              fontSize: "var(--d-caption)",
               fontWeight: 600,
               color: "rgba(148,163,184,.65)",
               letterSpacing: "0.06em",
-              marginBottom: 8,
+              marginBottom: "var(--d-opt-gap)",
             }}
           >
             <span style={{ transition: "all .3s" }}>{msg}</span>
@@ -238,7 +238,7 @@ export function LoadingScreen({ onDone, companyName }: Props) {
         style={{
           position: "absolute",
           bottom: 24,
-          fontSize: 10,
+          fontSize: "var(--d-micro)",
           color: "rgba(71,85,105,.55)",
           letterSpacing: "0.12em",
           textTransform: "uppercase",

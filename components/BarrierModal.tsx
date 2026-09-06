@@ -75,10 +75,10 @@ export function BarrierModal({ barrier, onClose }: Props) {
           className={isOpen ? "animate-scale-in" : ""}
           style={{
             width: "100%",
-            maxWidth: 580,
+            maxWidth: "var(--d-dialog-w)",
             maxHeight: "90dvh",
             background: "var(--bg-surface)",
-            borderRadius: 20,
+            borderRadius: "var(--d-dialog-radius)",
             border: "1px solid var(--border)",
             display: "flex",
             flexDirection: "column",
@@ -116,7 +116,7 @@ function Content(
       {/* Header */}
       <div
         style={{
-          padding: "20px 22px 16px",
+          padding: "var(--d-dialog-head)",
           background: "var(--bg-elevated)",
           borderBottom: "1px solid var(--border)",
           position: "relative",
@@ -156,7 +156,7 @@ function Content(
             display: "flex",
             justifyContent: "space-between",
             alignItems: "flex-start",
-            gap: 12,
+            gap: "var(--d-gap)",
           }}
         >
           <div style={{ minWidth: 0, flex: 1 }}>
@@ -164,14 +164,14 @@ function Content(
               style={{
                 display: "flex",
                 alignItems: "center",
-                gap: 6,
-                marginBottom: 6,
+                gap: "var(--d-gap-xs)",
+                marginBottom: "var(--d-gap-xs)",
               }}
             >
               <TagIcon size={11} color="var(--text-muted)" strokeWidth={2} />
               <span
                 style={{
-                  fontSize: 11,
+                  fontSize: "var(--d-caption)",
                   fontWeight: 700,
                   letterSpacing: "0.12em",
                   textTransform: "uppercase",
@@ -184,7 +184,7 @@ function Content(
             <div
               style={{
                 fontFamily: 'ui-monospace,"Cascadia Code",Menlo,monospace',
-                fontSize: 21,
+                fontSize: "var(--d-dialog-title)",
                 fontWeight: 800,
                 color: "var(--text-primary)",
                 wordBreak: "break-all",
@@ -197,12 +197,17 @@ function Content(
               style={{
                 display: "flex",
                 alignItems: "center",
-                gap: 5,
-                marginTop: 5,
+                gap: "var(--d-mini-gap)",
+                marginTop: "var(--d-mini-gap)",
               }}
             >
               <MapPinIcon size={11} color="var(--text-muted)" strokeWidth={2} />
-              <span style={{ fontSize: 13, color: "var(--text-muted)" }}>
+              <span
+                style={{
+                  fontSize: "var(--d-body)",
+                  color: "var(--text-muted)",
+                }}
+              >
                 {b.locDesc}
               </span>
             </div>
@@ -212,15 +217,15 @@ function Content(
             onClick={onClose}
             className="lift"
             style={{
-              width: 34,
-              height: 34,
+              width: "var(--d-close-btn)",
+              height: "var(--d-close-btn)",
               flexShrink: 0,
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
               background: "var(--bg-surface)",
               border: "1.5px solid var(--border)",
-              borderRadius: 9,
+              borderRadius: "var(--d-input-radius)",
               cursor: "pointer",
             }}
           >
@@ -228,7 +233,12 @@ function Content(
           </button>
         </div>
         <div
-          style={{ display: "flex", gap: 6, marginTop: 14, flexWrap: "wrap" }}
+          style={{
+            display: "flex",
+            gap: "var(--d-gap-xs)",
+            marginTop: "var(--d-stack)",
+            flexWrap: "wrap",
+          }}
         >
           <Badge label={b.disponibilidade} {...dc} />
           <Badge label={b.conformidade} {...cc} />
@@ -237,14 +247,14 @@ function Content(
         {isNC && b.statusSince && (
           <div
             style={{
-              marginTop: 12,
-              padding: "10px 14px",
+              marginTop: "var(--d-stack-sm)",
+              padding: "var(--d-row-pad)",
               background: "var(--alert-nc-bg)",
               border: "1px solid var(--alert-nc-border)",
-              borderRadius: 10,
+              borderRadius: "var(--d-row-radius)",
               display: "flex",
               alignItems: "center",
-              gap: 10,
+              gap: "var(--d-bar-gap)",
             }}
           >
             <AlertTriangleIcon
@@ -255,7 +265,7 @@ function Content(
             <div style={{ flex: 1 }}>
               <div
                 style={{
-                  fontSize: 13,
+                  fontSize: "var(--d-body)",
                   fontWeight: 700,
                   color: "var(--alert-nc-text)",
                 }}
@@ -264,7 +274,7 @@ function Content(
               </div>
               <div
                 style={{
-                  fontSize: 12,
+                  fontSize: "var(--d-small)",
                   color: "var(--alert-nc-sub)",
                   marginTop: 2,
                 }}
@@ -293,9 +303,9 @@ function Content(
             style={{
               display: "flex",
               alignItems: "center",
-              gap: 6,
-              padding: "11px 20px",
-              fontSize: 13,
+              gap: "var(--d-gap-xs)",
+              padding: "var(--d-dialog-tab)",
+              fontSize: "var(--d-body)",
               fontWeight: 600,
               border: "none",
               cursor: "pointer",
@@ -344,13 +354,13 @@ function Details({ b }: { b: Barrier }) {
     cc = CONF_COLORS[b.conformidade],
     crc = CRIT_COLORS[b.criticidade];
   return (
-    <div style={{ padding: "20px 22px" }}>
+    <div style={{ padding: "var(--d-dialog-body)" }}>
       <div
         style={{
           display: "grid",
           gridTemplateColumns: "1fr 1fr",
-          gap: "16px 20px",
-          marginBottom: 22,
+          gap: "var(--d-details-gap)",
+          marginBottom: "var(--d-block-gap)",
         }}
       >
         <FR Icon={BuildingIcon} label="Instalação" value={b.instalacao} />
@@ -377,8 +387,8 @@ function Details({ b }: { b: Barrier }) {
         style={{
           display: "grid",
           gridTemplateColumns: "1fr 1fr",
-          gap: "14px 20px",
-          marginBottom: 22,
+          gap: "var(--d-status-gap)",
+          marginBottom: "var(--d-block-gap)",
         }}
       >
         <div>
@@ -395,14 +405,14 @@ function Details({ b }: { b: Barrier }) {
               gridColumn: "1 / -1",
               display: "flex",
               alignItems: "center",
-              gap: 8,
+              gap: "var(--d-opt-gap)",
             }}
           >
             <ClockIcon size={14} color="var(--text-muted)" strokeWidth={2} />
             <div>
               <div
                 style={{
-                  fontSize: 14,
+                  fontSize: "var(--d-lead)",
                   fontWeight: 700,
                   color: b.conformidade === "Não Conforme"
                     ? "var(--alert-nc-text)"
@@ -417,7 +427,7 @@ function Details({ b }: { b: Barrier }) {
               </div>
               <div
                 style={{
-                  fontSize: 12,
+                  fontSize: "var(--d-small)",
                   color: "var(--text-muted)",
                   marginTop: 1,
                 }}
@@ -447,7 +457,7 @@ function Details({ b }: { b: Barrier }) {
 function History({ b }: { b: Barrier }) {
   const history = [...b.statusHistory].reverse();
   return (
-    <div style={{ padding: "20px 22px" }}>
+    <div style={{ padding: "var(--d-dialog-body)" }}>
       <Sec>Histórico de Status</Sec>
       <div style={{ position: "relative", marginTop: 8 }}>
         <div
@@ -469,8 +479,8 @@ function History({ b }: { b: Barrier }) {
               key={i}
               style={{
                 display: "flex",
-                gap: 16,
-                marginBottom: i < history.length - 1 ? 22 : 0,
+                gap: "var(--d-history-gap)",
+                marginBottom: i < history.length - 1 ? "var(--d-block-gap)" : 0,
                 position: "relative",
               }}
             >
@@ -505,14 +515,14 @@ function History({ b }: { b: Barrier }) {
                 style={{
                   flex: 1,
                   minWidth: 0,
-                  padding: "10px 14px",
+                  padding: "var(--d-row-pad)",
                   background: isFirst
                     ? cfg?.bg ?? "var(--bg-elevated)"
                     : "var(--bg-elevated)",
                   border: `1px solid ${
                     isFirst ? cfg?.border ?? "var(--border)" : "var(--border)"
                   }`,
-                  borderRadius: 10,
+                  borderRadius: "var(--d-row-radius)",
                   boxShadow: isFirst ? "var(--shadow-sm)" : "none",
                 }}
               >
@@ -521,8 +531,8 @@ function History({ b }: { b: Barrier }) {
                     display: "flex",
                     justifyContent: "space-between",
                     alignItems: "center",
-                    gap: 8,
-                    marginBottom: 7,
+                    gap: "var(--d-opt-gap)",
+                    marginBottom: "var(--d-field-gap)",
                   }}
                 >
                   <Badge
@@ -536,7 +546,11 @@ function History({ b }: { b: Barrier }) {
                     size="sm"
                   />
                   <div
-                    style={{ display: "flex", alignItems: "center", gap: 4 }}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "var(--d-gap-2xs)",
+                    }}
                   >
                     <CalendarIcon
                       size={11}
@@ -545,7 +559,7 @@ function History({ b }: { b: Barrier }) {
                     />
                     <span
                       style={{
-                        fontSize: 12,
+                        fontSize: "var(--d-small)",
                         color: "var(--text-muted)",
                         whiteSpace: "nowrap",
                       }}
@@ -557,7 +571,7 @@ function History({ b }: { b: Barrier }) {
                 <p
                   style={{
                     margin: 0,
-                    fontSize: 13,
+                    fontSize: "var(--d-body)",
                     color: "var(--text-secondary)",
                     lineHeight: 1.6,
                   }}
@@ -568,8 +582,8 @@ function History({ b }: { b: Barrier }) {
                   style={{
                     display: "flex",
                     alignItems: "center",
-                    gap: 5,
-                    marginTop: 7,
+                    gap: "var(--d-mini-gap)",
+                    marginTop: "var(--d-field-gap)",
                   }}
                 >
                   <UserIcon
@@ -577,7 +591,12 @@ function History({ b }: { b: Barrier }) {
                     color="var(--text-muted)"
                     strokeWidth={2}
                   />
-                  <span style={{ fontSize: 12, color: "var(--text-muted)" }}>
+                  <span
+                    style={{
+                      fontSize: "var(--d-small)",
+                      color: "var(--text-muted)",
+                    }}
+                  >
                     {entry.author}
                   </span>
                 </div>
@@ -612,14 +631,14 @@ function FR({
         style={{
           display: "flex",
           alignItems: "center",
-          gap: 5,
-          marginBottom: 5,
+          gap: "var(--d-mini-gap)",
+          marginBottom: "var(--d-mini-gap)",
         }}
       >
         <Icon size={10} color="var(--text-muted)" strokeWidth={2} />
         <span
           style={{
-            fontSize: 10,
+            fontSize: "var(--d-micro)",
             fontWeight: 700,
             color: "var(--text-muted)",
             textTransform: "uppercase",
@@ -631,7 +650,7 @@ function FR({
       </div>
       <div
         style={{
-          fontSize: 14,
+          fontSize: "var(--d-lead)",
           color: accent ?? "var(--text-secondary)",
           fontWeight: accent ? 700 : 400,
           fontStyle: italic ? "italic" : "normal",
@@ -647,12 +666,12 @@ function Sec({ children }: { children: ComponentChildren }) {
   return (
     <div
       style={{
-        fontSize: 11,
+        fontSize: "var(--d-caption)",
         fontWeight: 800,
         color: "var(--text-muted)",
         textTransform: "uppercase",
         letterSpacing: "0.1em",
-        marginBottom: 12,
+        marginBottom: "var(--d-stack-sm)",
       }}
     >
       {children}
@@ -663,12 +682,12 @@ function Lbl({ children }: { children: ComponentChildren }) {
   return (
     <div
       style={{
-        fontSize: 10,
+        fontSize: "var(--d-micro)",
         fontWeight: 700,
         color: "var(--text-muted)",
         textTransform: "uppercase",
         letterSpacing: "0.1em",
-        marginBottom: 6,
+        marginBottom: "var(--d-gap-xs)",
       }}
     >
       {children}
@@ -681,7 +700,7 @@ function Div() {
       style={{
         border: "none",
         borderTop: "1px solid var(--border)",
-        margin: "18px 0",
+        margin: "var(--d-div-gap) 0",
       }}
     />
   );
@@ -693,7 +712,7 @@ function Txt(
     <p
       style={{
         margin: 0,
-        fontSize: 14,
+        fontSize: "var(--d-lead)",
         color: accent ??
           (muted ? "var(--text-muted)" : "var(--text-secondary)"),
         lineHeight: 1.65,

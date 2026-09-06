@@ -15,7 +15,7 @@ export default define.page(async function Home() {
       style={{
         maxWidth: 1400,
         margin: "0 auto",
-        padding: "20px 18px 40px",
+        padding: "var(--d-shell)",
         background: "var(--bg-page)",
         minHeight: "100vh",
       }}
@@ -23,9 +23,9 @@ export default define.page(async function Home() {
       <Dashboard initialBarriers={barriers} companyName={companyName} />
       <footer
         style={{
-          marginTop: 28,
+          marginTop: "var(--d-foot-gap)",
           textAlign: "center",
-          fontSize: 12,
+          fontSize: "var(--d-small)",
           color: "var(--text-muted)",
         }}
       >

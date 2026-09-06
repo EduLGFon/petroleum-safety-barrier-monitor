@@ -10,21 +10,16 @@ interface P {
 export function Badge(
   { label, solid, bg, border, size = "md", dot = true }: P,
 ) {
-  const fs = size === "xs" ? 10 : size === "sm" ? 11 : 12;
-  const pad = size === "xs"
-    ? "2px 7px"
-    : size === "sm"
-    ? "3px 8px"
-    : "4px 11px";
-  const ds = size === "xs" ? 5 : 6;
+  // Type + padding come from density tokens (--d-badge-<size>-*), so
+  // badges re-rhythm with the interface density without prop drilling.
   const s: CSSProperties = {
     display: "inline-flex",
     alignItems: "center",
-    gap: 5,
-    fontSize: fs,
+    gap: "var(--d-mini-gap)",
+    fontSize: `var(--d-badge-${size}-fs)`,
     fontWeight: 700,
-    padding: pad,
-    borderRadius: 6,
+    padding: `var(--d-badge-${size}-pad)`,
+    borderRadius: "var(--d-mini-radius)",
     background: bg,
     border: `1px solid ${border}`,
     color: solid,
@@ -37,8 +32,12 @@ export function Badge(
       {dot && (
         <span
           style={{
-            width: ds,
-            height: ds,
+            width: size === "xs"
+              ? "var(--d-badge-dot-xs)"
+              : "var(--d-badge-dot)",
+            height: size === "xs"
+              ? "var(--d-badge-dot-xs)"
+              : "var(--d-badge-dot)",
             borderRadius: "50%",
             background: solid,
             flexShrink: 0,

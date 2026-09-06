@@ -131,9 +131,9 @@ export function KpiGrid({ kpi, location }: Props) {
     <div
       style={{
         display: "grid",
-        gridTemplateColumns: "repeat(auto-fit,minmax(150px,1fr))",
-        gap: 10,
-        marginBottom: 20,
+        gridTemplateColumns: "repeat(auto-fit,minmax(var(--d-kpi-min),1fr))",
+        gap: "var(--d-kpi-gap)",
+        marginBottom: "var(--d-section)",
       }}
     >
       {cards.map((c) => (
@@ -142,8 +142,8 @@ export function KpiGrid({ kpi, location }: Props) {
           className="animate-card-in"
           style={{
             background: c.grad,
-            borderRadius: 14,
-            padding: "15px 17px 13px",
+            borderRadius: "var(--d-hero-radius)",
+            padding: "var(--d-kpi-pad)",
             position: "relative",
             overflow: "hidden",
             boxShadow: "var(--shadow-sm)",
@@ -175,7 +175,7 @@ export function KpiGrid({ kpi, location }: Props) {
               height: "50%",
               background:
                 "linear-gradient(180deg,rgba(255,255,255,.1) 0%,transparent 100%)",
-              borderRadius: "14px 14px 0 0",
+              borderRadius: "var(--d-hero-radius) var(--d-hero-radius) 0 0",
               pointerEvents: "none",
             }}
           />
@@ -202,37 +202,37 @@ export function KpiGrid({ kpi, location }: Props) {
               />
             </div>
           )}
-          <div style={{ marginBottom: 8 }}>
+          <div style={{ marginBottom: "var(--d-opt-gap)" }}>
             <c.Icon size={17} color="rgba(255,255,255,.72)" strokeWidth={1.8} />
           </div>
           <div
             style={{
-              fontSize: 10,
+              fontSize: "var(--d-micro)",
               fontWeight: 700,
               letterSpacing: "0.1em",
               textTransform: "uppercase",
               color: "rgba(255,255,255,.6)",
-              marginBottom: 5,
+              marginBottom: "var(--d-mini-gap)",
             }}
           >
             {c.label}
           </div>
           <div
             style={{
-              fontSize: 27,
+              fontSize: "var(--d-display)",
               fontWeight: 800,
               color: "#fff",
               lineHeight: 1,
               letterSpacing: "-0.02em",
               textShadow: "0 2px 8px rgba(0,0,0,.28)",
-              marginBottom: 5,
+              marginBottom: "var(--d-mini-gap)",
             }}
           >
             <AnimVal n={c.rawNum} isPercent={c.isPercent} />
           </div>
           <div
             style={{
-              fontSize: 11,
+              fontSize: "var(--d-caption)",
               color: "rgba(255,255,255,.5)",
               fontWeight: 500,
             }}

@@ -5,18 +5,23 @@
 // (never textAnchor/fontSize props) so hydration keeps it intact.
 import { useState } from "preact/hooks";
 import type { CategoryConformidade } from "../lib/types.ts";
+import { useSettings } from "../context/SettingsContext.tsx";
 
 interface Props {
   data: CategoryConformidade[];
 }
 
-const ROW_H = 26;
-const LABEL_W = 200;
 const COUNT_W = 56;
-const BAR_H = 18;
 const TOP = 6;
 const AXIS_H = 26;
 const PLOT_W = 440;
+
+/* Bar geometry per density — tighter rows on compact, roomier on spacious. */
+const GEO = {
+  compact: { ROW_H: 21, BAR_H: 14, LABEL_W: 180 },
+  comfortable: { ROW_H: 26, BAR_H: 18, LABEL_W: 200 },
+  spacious: { ROW_H: 31, BAR_H: 22, LABEL_W: 220 },
+} as const;
 
 export default function ConformidadeChartInner({ data }: Props) {
   const [hover, setHover] = useState<
@@ -24,6 +29,8 @@ export default function ConformidadeChartInner({ data }: Props) {
   >(
     null,
   );
+  const { settings } = useSettings();
+  const { ROW_H, BAR_H, LABEL_W } = GEO[settings.density] ?? GEO.comfortable;
   const max = Math.max(1, ...data.map((d) => d.Conforme + d["Não Conforme"]));
   const height = TOP + data.length * ROW_H + AXIS_H;
   const width = LABEL_W + PLOT_W + COUNT_W;
@@ -57,7 +64,7 @@ export default function ConformidadeChartInner({ data }: Props) {
               y={TOP + data.length * ROW_H + 18}
               style={{
                 textAnchor: "middle",
-                fontSize: 12,
+                fontSize: "var(--d-small)",
                 fill: "var(--text-muted)",
               }}
             >
@@ -81,7 +88,7 @@ export default function ConformidadeChartInner({ data }: Props) {
                 y={y + 14}
                 style={{
                   textAnchor: "end",
-                  fontSize: 12,
+                  fontSize: "var(--d-small)",
                   fill: "var(--text-secondary)",
                 }}
               >
@@ -119,7 +126,10 @@ export default function ConformidadeChartInner({ data }: Props) {
                 <text
                   x={LABEL_W + w(total) + 8}
                   y={y + 14}
-                  style={{ fontSize: 12, fill: "var(--text-muted)" }}
+                  style={{
+                    fontSize: "var(--d-small)",
+                    fill: "var(--text-muted)",
+                  }}
                 >
                   {total.toLocaleString("pt-BR")}
                 </text>
@@ -137,9 +147,9 @@ export default function ConformidadeChartInner({ data }: Props) {
             zIndex: 1200,
             background: "var(--bg-elevated)",
             border: "1px solid var(--border)",
-            borderRadius: 9,
-            padding: "10px 14px",
-            fontSize: 13,
+            borderRadius: "var(--d-input-radius)",
+            padding: "var(--d-tip-pad)",
+            fontSize: "var(--d-body)",
             boxShadow: "var(--shadow-md)",
             pointerEvents: "none",
             maxWidth: 260,
@@ -158,7 +168,7 @@ export default function ConformidadeChartInner({ data }: Props) {
           <div
             style={{
               display: "flex",
-              gap: 8,
+              gap: "var(--d-opt-gap)",
               color: "#22c55e",
               fontWeight: 600,
               marginBottom: 3,
@@ -170,7 +180,7 @@ export default function ConformidadeChartInner({ data }: Props) {
           <div
             style={{
               display: "flex",
-              gap: 8,
+              gap: "var(--d-opt-gap)",
               color: "#ef4444",
               fontWeight: 600,
             }}
@@ -183,10 +193,10 @@ export default function ConformidadeChartInner({ data }: Props) {
       <div
         style={{
           display: "flex",
-          gap: 16,
-          fontSize: 12,
+          gap: "var(--d-gap-lg)",
+          fontSize: "var(--d-small)",
           color: "var(--text-muted)",
-          paddingTop: 10,
+          paddingTop: "var(--d-bar-gap)",
         }}
       >
         <span>

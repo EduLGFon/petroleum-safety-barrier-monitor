@@ -96,11 +96,11 @@ export type Density = "compact" | "comfortable" | "spacious";
 
 export const DENSITY_PRESETS: Record<
   Density,
-  { label: string; hint: string; zoom: number }
+  { label: string; hint: string }
 > = {
-  compact: { label: "Compacto", hint: "Telas menores de 16″", zoom: 0.87 },
-  comfortable: { label: "Confortável", hint: "Padrão · telas de 16″", zoom: 1 },
-  spacious: { label: "Amplo", hint: "Monitores maiores de 16″", zoom: 1.12 },
+  compact: { label: "Compacto", hint: "Telas menores de 16″" },
+  comfortable: { label: "Confortável", hint: "Padrão · telas de 16″" },
+  spacious: { label: "Amplo", hint: "Monitores maiores de 16″" },
 };
 
 export type MemberRole = "admin" | "viewer";
@@ -183,18 +183,12 @@ function applyTheme(t: Theme) {
 function applyMotion(reduce: boolean) {
   document.documentElement.classList.toggle("no-anim", reduce);
 }
-
 function applyDensity(d: Density) {
   const key: Density = d === "compact" || d === "spacious" ? d : "comfortable";
+  // Density only switches tokens: every component sizes itself from
+  // var(--d-*) (see styles.css), so the whole UI re-rhythms at once.
   document.documentElement.dataset.density = key;
-  // Root zoom rescales the whole UI (inline px styles included) like
-  // browser zoom; reset to 1 for print via CSS so reports stay exact.
-  document.documentElement.style.setProperty(
-    "zoom",
-    String(DENSITY_PRESETS[key].zoom),
-  );
 }
-
 export function SettingsProvider(
   { children }: { children: ComponentChildren },
 ) {

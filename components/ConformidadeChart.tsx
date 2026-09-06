@@ -14,20 +14,20 @@ export function ConformidadeChart({ data }: Props) {
       style={{
         background: "var(--bg-surface)",
         border: "1px solid var(--border)",
-        borderRadius: 12,
-        padding: "18px 18px 10px",
-        marginBottom: 20,
+        borderRadius: "var(--d-card-radius)",
+        padding: "var(--d-chart-pad)",
+        marginBottom: "var(--d-section)",
         boxShadow: "var(--shadow-sm)",
       }}
     >
       <div
         style={{
-          fontSize: 10,
+          fontSize: "var(--d-micro)",
           fontWeight: 800,
           color: "var(--text-muted)",
           textTransform: "uppercase",
           letterSpacing: "0.12em",
-          marginBottom: 14,
+          marginBottom: "var(--d-sect-title-gap)",
         }}
       >
         Conformidade por Categoria

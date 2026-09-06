@@ -36,9 +36,9 @@ const COLS: { col: SortableColumn; label: string; w?: string }[] = [
 ];
 
 const thSt: CSSProperties = {
-  padding: "10px 14px",
+  padding: "var(--d-cell-pad)",
   textAlign: "left",
-  fontSize: 11,
+  fontSize: "var(--d-caption)",
   fontWeight: 700,
   textTransform: "uppercase",
   letterSpacing: "0.1em",
@@ -69,9 +69,9 @@ export function BarriersTable(
         style={{
           background: "var(--bg-surface)",
           border: "1px solid var(--border)",
-          borderRadius: 12,
+          borderRadius: "var(--d-card-radius)",
           overflow: "hidden",
-          marginBottom: 12,
+          marginBottom: "var(--d-stack-sm)",
           boxShadow: "var(--shadow-sm)",
         }}
       >
@@ -130,10 +130,10 @@ export function BarriersTable(
                     <td
                       colSpan={COLS.length + 2}
                       style={{
-                        padding: 52,
+                        padding: "var(--d-empty-pad)",
                         textAlign: "center",
                         color: "var(--text-muted)",
-                        fontSize: 14,
+                        fontSize: "var(--d-lead)",
                       }}
                     >
                       Nenhuma barreira encontrada.
@@ -183,7 +183,7 @@ export function BarriersTable(
                     >
                       {/* Checkbox */}
                       <td
-                        style={{ padding: "10px 14px" }}
+                        style={{ padding: "var(--d-cell-pad)" }}
                         onClick={(e) => {
                           e.stopPropagation();
                           onToggleSelect(b.id);
@@ -196,8 +196,8 @@ export function BarriersTable(
                       <td
                         onClick={() => onSelect(b)}
                         style={{
-                          padding: "10px 14px",
-                          fontSize: 13,
+                          padding: "var(--d-cell-pad)",
+                          fontSize: "var(--d-body)",
                           color: "var(--text-muted)",
                           fontWeight: 600,
                         }}
@@ -208,14 +208,14 @@ export function BarriersTable(
                       {/* TAG + NC badge */}
                       <td
                         onClick={() => onSelect(b)}
-                        style={{ padding: "10px 14px" }}
+                        style={{ padding: "var(--d-cell-pad)" }}
                       >
                         <div
                           style={{
                             fontFamily:
                               'ui-monospace,"Cascadia Code",Menlo,monospace',
                             fontWeight: 700,
-                            fontSize: 13,
+                            fontSize: "var(--d-body)",
                             color: "var(--text-primary)",
                           }}
                         >
@@ -223,7 +223,7 @@ export function BarriersTable(
                         </div>
                         <div
                           style={{
-                            fontSize: 12,
+                            fontSize: "var(--d-small)",
                             color: "var(--text-muted)",
                             marginTop: 2,
                           }}
@@ -236,13 +236,13 @@ export function BarriersTable(
                             style={{
                               display: "inline-flex",
                               alignItems: "center",
-                              gap: 5,
-                              marginTop: 6,
-                              padding: "3px 8px",
+                              gap: "var(--d-mini-gap)",
+                              marginTop: "var(--d-gap-xs)",
+                              padding: "var(--d-nc-pad)",
                               background: "rgba(239,68,68,.09)",
                               border: "1px solid rgba(239,68,68,.22)",
-                              borderRadius: 5,
-                              fontSize: 11,
+                              borderRadius: "var(--d-pill-sm-radius)",
+                              fontSize: "var(--d-caption)",
                               fontWeight: 600,
                               color: "#ef4444",
                             }}
@@ -260,7 +260,7 @@ export function BarriersTable(
                       {/* Criticidade */}
                       <td
                         onClick={() => onSelect(b)}
-                        style={{ padding: "10px 14px" }}
+                        style={{ padding: "var(--d-cell-pad)" }}
                       >
                         <Badge
                           label={b.criticidade}
@@ -273,8 +273,8 @@ export function BarriersTable(
                       <td
                         onClick={() => onSelect(b)}
                         style={{
-                          padding: "10px 14px",
-                          fontSize: 13,
+                          padding: "var(--d-cell-pad)",
+                          fontSize: "var(--d-body)",
                           color: "var(--text-secondary)",
                         }}
                       >
@@ -284,7 +284,7 @@ export function BarriersTable(
                       {/* Disponibilidade */}
                       <td
                         onClick={() => onSelect(b)}
-                        style={{ padding: "10px 14px" }}
+                        style={{ padding: "var(--d-cell-pad)" }}
                       >
                         <Badge
                           label={b.disponibilidade}
@@ -295,7 +295,7 @@ export function BarriersTable(
                       {/* Conformidade */}
                       <td
                         onClick={() => onSelect(b)}
-                        style={{ padding: "10px 14px" }}
+                        style={{ padding: "var(--d-cell-pad)" }}
                       >
                         <Badge
                           label={b.conformidade}
@@ -307,9 +307,9 @@ export function BarriersTable(
                       <td
                         onClick={() => onSelect(b)}
                         style={{
-                          padding: "10px 12px",
+                          padding: "var(--d-arrow-pad)",
                           textAlign: "center",
-                          fontSize: 16,
+                          fontSize: "var(--d-arrow)",
                           color: "var(--text-muted)",
                           transition: "color .15s,transform .15s",
                         }}
@@ -354,8 +354,8 @@ function RowChk({ checked }: { checked: boolean }) {
     <div
       className={checked ? "animate-check" : ""}
       style={{
-        width: 15,
-        height: 15,
+        width: "var(--d-rowchk)",
+        height: "var(--d-rowchk)",
         borderRadius: 4,
         flexShrink: 0,
         border: checked ? "2px solid var(--accent)" : "2px solid var(--border)",
@@ -394,16 +394,16 @@ function Pagination(
   const from = ((page - 1) * pageSize) + 1,
     to = Math.min(page * pageSize, total);
   const bs = (active: boolean, disabled: boolean): CSSProperties => ({
-    minWidth: 32,
-    height: 32,
+    minWidth: "var(--d-page-btn)",
+    height: "var(--d-page-btn)",
     display: "flex",
     alignItems: "center",
     justifyContent: "center",
-    padding: "0 8px",
-    fontSize: 13,
+    padding: "0 var(--d-opt-gap)",
+    fontSize: "var(--d-body)",
     fontWeight: active ? 700 : 500,
     border: active ? "1px solid transparent" : "1px solid var(--border)",
-    borderRadius: 7,
+    borderRadius: "var(--d-chip-radius)",
     background: active
       ? "linear-gradient(135deg,var(--accent),var(--accent-2))"
       : "var(--bg-surface)",
@@ -424,15 +424,17 @@ function Pagination(
         display: "flex",
         alignItems: "center",
         justifyContent: "space-between",
-        gap: 8,
+        gap: "var(--d-opt-gap)",
         flexWrap: "wrap",
       }}
     >
-      <span style={{ fontSize: 13, color: "var(--text-muted)" }}>
+      <span
+        style={{ fontSize: "var(--d-body)", color: "var(--text-muted)" }}
+      >
         {from.toLocaleString("pt-BR")}–{to.toLocaleString("pt-BR")} de{" "}
         {total.toLocaleString("pt-BR")}
       </span>
-      <div style={{ display: "flex", gap: 4 }}>
+      <div style={{ display: "flex", gap: "var(--d-gap-2xs)" }}>
         <button
           type="button"
           onClick={() => onChange(1)}
