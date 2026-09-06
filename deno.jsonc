@@ -5,6 +5,7 @@
   "name": "seacrest-barriers",
   "version": "0.4.0",
   "exports": "./main.ts",
+  "nodeModulesDir": "manual",
   "tasks": {
     "check": "deno fmt --check . && deno lint . && deno check",
     "dev": "vite",

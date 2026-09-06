@@ -9,6 +9,9 @@ out/
 build/
 dist/
 
+# Fresh
+_fresh/
+
 # Deno
 .deno/
 
