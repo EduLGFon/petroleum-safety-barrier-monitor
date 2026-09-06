@@ -14,6 +14,7 @@ interface Props {
   allFiltered: Barrier[];
   onSelectAll: () => void;
   onClearAll: () => void;
+  companyName: string;
 }
 type Fmt = "xls" | "pdf" | "csv";
 type I = FunctionComponent<
@@ -44,7 +45,7 @@ const FMTS: { key: Fmt; Icon: I; label: string; ext: string; color: string }[] =
     },
   ];
 export function ExportToolbar(
-  { selectedIds, allFiltered, onSelectAll, onClearAll }: Props,
+  { selectedIds, allFiltered, onSelectAll, onClearAll, companyName }: Props,
 ) {
   const [loading, setLoading] = useState<Fmt | null>(null);
   const count = selectedIds.size, hasAny = count > 0;
@@ -53,11 +54,11 @@ export function ExportToolbar(
   async function doExport(fmt: Fmt) {
     if (!hasAny || loading) return;
     const bs = allFiltered.filter((b) => selectedIds.has(b.id));
-    const name = `seacrest-barreiras-${new Date().toISOString().slice(0, 10)}`;
+    const name = `barreiras-${new Date().toISOString().slice(0, 10)}`;
     setLoading(fmt);
     try {
-      if (fmt === "xls") await exportToExcel(bs, name);
-      if (fmt === "pdf") await exportToPDF(bs, name);
+      if (fmt === "xls") await exportToExcel(bs, name, companyName);
+      if (fmt === "pdf") await exportToPDF(bs, name, companyName);
       if (fmt === "csv") exportToCSV(bs, name);
     } finally {
       setLoading(null);

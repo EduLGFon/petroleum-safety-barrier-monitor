@@ -5,6 +5,7 @@
 // dedicated landscape report (never the whole page). CSV uses ; with BOM.
 import { CONF_COLORS, DISP_COLORS } from "./constants.ts";
 import type { Barrier } from "./types.ts";
+import { withBrand } from "./company.ts";
 import { daysSince, fmtDate, humanDuration } from "./utils.ts";
 
 function row(b: Barrier): string[] {
@@ -175,9 +176,12 @@ function summaryRows(barriers: Barrier[]): Array<[string, string]> {
 
 export function exportToExcel(
   barriers: Barrier[],
-  filename = "seacrest-barreiras",
+  filename = "barreiras",
+  companyName = "",
 ): void {
   assertBrowser();
+  const brand = companyName.toUpperCase() ||
+    "MONITOR DE BARREIRAS DE SEGURANÇA";
   const stats = kpiStats(barriers);
   const subtitle = `Exportado em ${ts()}  |  ${stats.total} registros`;
   const data = barriers.map(row);
@@ -265,19 +269,30 @@ export function exportToExcel(
       hl ? "color:#1D4ED8;font-size:11pt;" : ""
     }">${escHtml(v)}</td></tr>`;
   }).join("");
+  const productRow = companyName
+    ? `<tr><td colspan="14" style="background:#0A1628;color:#93C5FD;font-size:10pt;letter-spacing:.14em;padding:0 12px 4px 12px;">MONITOR DE BARREIRAS DE SEGURANÇA</td></tr>`
+    : "";
   const html =
     `<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel"><head><meta charset="UTF-8"></head><body>` +
     `<table border="0" cellpadding="0" cellspacing="0" style="border-collapse:collapse;table-layout:auto;font-family:Calibri,Arial,sans-serif;"><colgroup>${cols}</colgroup>` +
-    `<tr><td colspan="14" style="background:#0A1628;color:#fff;font-size:16pt;font-weight:bold;padding:12px 12px 2px 12px;white-space:normal;vertical-align:middle;">SEACREST PETRÓLEO</td></tr>` +
-    `<tr><td colspan="14" style="background:#0A1628;color:#93C5FD;font-size:10pt;letter-spacing:.14em;padding:0 12px 4px 12px;">MONITOR DE BARREIRAS DE SEGURANÇA</td></tr>` +
+    `<tr><td colspan="14" style="background:#0A1628;color:#fff;font-size:16pt;font-weight:bold;padding:12px 12px 2px 12px;white-space:normal;vertical-align:middle;">${
+      escHtml(brand)
+    }</td></tr>` +
+    productRow +
     `<tr><td colspan="14" style="background:#0E2036;color:#94A3B8;font-size:9pt;font-style:italic;padding:5px 12px;white-space:normal;vertical-align:middle;">${
       escHtml(subtitle)
     }</td></tr>` +
     `<tr><td colspan="14" style="background:#3B82F6;font-size:2pt;padding:0;">&nbsp;</td></tr>` +
     kpiStrip +
     `<tr>${head}</tr>${body}` +
-    `<tr><td colspan="14" style="color:#94A3B8;font-size:8pt;font-style:italic;padding:6px 4px;">Gerado pelo Monitor de Barreiras de Segurança · Seacrest Petróleo</td></tr></table>` +
-    `<h3 style="font-family:Calibri,Arial,sans-serif;color:#0A1628;">SEACREST PETRÓLEO — Resumo Monitor de Barreiras</h3>` +
+    `<tr><td colspan="14" style="color:#94A3B8;font-size:8pt;font-style:italic;padding:6px 4px;">${
+      escHtml(
+        withBrand(companyName, "Gerado pelo Monitor de Barreiras de Segurança"),
+      )
+    }</td></tr></table>` +
+    `<h3 style="font-family:Calibri,Arial,sans-serif;color:#0A1628;">${
+      escHtml(withBrand(companyName, "Resumo Monitor de Barreiras"))
+    }</h3>` +
     `<table border="1" cellpadding="0" cellspacing="0" style="border-collapse:collapse;font-family:Calibri,Arial,sans-serif;"><tr><th style="background:#1E3A5F;color:#fff;padding:5px 12px;text-align:left;border-bottom:2pt solid #3B82F6;">Indicador</th><th style="background:#1E3A5F;color:#fff;padding:5px 12px;text-align:right;border-bottom:2pt solid #3B82F6;">Qtd.</th></tr>${summary}</table>` +
     `</body></html>`;
   download(
@@ -292,7 +307,10 @@ export function exportToExcel(
 
 const REPORT_ID = "print-report";
 
-export function buildPrintReport(barriers: Barrier[]): string {
+export function buildPrintReport(
+  barriers: Barrier[],
+  companyName = "",
+): string {
   const stats = kpiStats(barriers);
   const head = [
     "#",
@@ -354,23 +372,29 @@ export function buildPrintReport(barriers: Barrier[]): string {
       cell(b.planoAcao || "—") +
       `</tr>`;
   }).join("");
+  const eyebrow = companyName
+    ? `<div style="font-size:10pt;letter-spacing:.18em;color:#93C5FD;">${
+      escHtml(companyName.toUpperCase())
+    }</div>`
+    : "";
   return `<div style="font-family:Inter,Helvetica,Arial,sans-serif;color:#0F172A;">` +
     `<div style="background:linear-gradient(135deg,#0A1628 0%,#1E3A5F 100%);color:#fff;padding:16px 18px 12px 18px;border-bottom:3px solid #3B82F6;">` +
-    `<div style="font-size:10pt;letter-spacing:.18em;color:#93C5FD;">SEACREST PETRÓLEO</div>` +
+    eyebrow +
     `<div style="font-size:16pt;font-weight:bold;margin-top:2px;">Monitor de Barreiras de Segurança</div>` +
     `<div style="font-size:9pt;color:#CBD5E1;margin-top:4px;">${
       escHtml(ts())
     }  |  ${stats.total} registros  ·  ${stats.pct} conformes</div></div>` +
     chips +
     `<table style="width:100%;border-collapse:collapse;margin-top:6px;"><thead style="display:table-header-group;"><tr>${head}</tr></thead><tbody>${body}</tbody></table>` +
-    `<div style="font-size:7pt;color:#94A3B8;margin-top:10px;">Seacrest Petróleo · Monitor de Barreiras · gerado em ${
-      escHtml(ts())
-    }</div></div>`;
+    `<div style="font-size:7pt;color:#94A3B8;margin-top:10px;">${
+      escHtml(withBrand(companyName, "Monitor de Barreiras"))
+    } · gerado em ${escHtml(ts())}</div></div>`;
 }
 
 export function exportToPDF(
   barriers: Barrier[],
-  filename = "seacrest-barreiras",
+  filename = "barreiras",
+  companyName = "",
 ): void {
   assertBrowser();
   let node = document.getElementById(REPORT_ID);
@@ -379,7 +403,7 @@ export function exportToPDF(
     node.id = REPORT_ID;
     document.body.appendChild(node);
   }
-  node.innerHTML = buildPrintReport(barriers);
+  node.innerHTML = buildPrintReport(barriers, companyName);
   const prevTitle = document.title;
   document.title = filename;
   document.body.classList.add("printing-report");
@@ -397,7 +421,7 @@ export function exportToPDF(
 
 export function exportToCSV(
   barriers: Barrier[],
-  filename = "seacrest-barreiras",
+  filename = "barreiras",
 ): void {
   assertBrowser();
   const hdrs = [

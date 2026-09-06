@@ -227,6 +227,7 @@ function DashboardView({ initialBarriers: barriers, companyName }: Props) {
             allFiltered={allFiltered}
             onSelectAll={selectAll}
             onClearAll={clearAll}
+            companyName={companyName}
           />
           <FilterBar
             filters={filters}
