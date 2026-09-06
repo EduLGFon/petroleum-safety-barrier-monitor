@@ -1,0 +1,450 @@
+/* ── Reset ─────────────────────────────────────────────────────────────────── */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+html,
+body {
+  margin: 0;
+  padding: 0;
+}
+body {
+  font-family: 'Inter',ui-sans-serif,-apple-system,BlinkMacSystemFont,'Segoe UI','Helvetica Neue',Arial,sans-serif;
+  font-size: 15px;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+button,
+select,
+input {
+  font-family: inherit;
+  font-size: inherit;
+}
+input[type="search"]::-webkit-search-cancel-button {
+  -webkit-appearance: none;
+}
+
+/* ── Themes ────────────────────────────────────────────────────────────────── */
+[data-theme="light"] {
+  --bg-page: #f0f4f8;
+  --bg-surface: #ffffff;
+  --bg-elevated: #f5f8fc;
+  --bg-hover: #eaeff5;
+  --bg-stripe: #f7f9fc;
+  --border: #d1dae6;
+  --border-subtle: #e4eaf2;
+  --text-primary: #0d1829;
+  --text-secondary: #2d3a4f;
+  --text-muted: #64748b;
+  --accent: #2563eb;
+  --accent-2: #7c3aed;
+  --glow: rgba(37,99,235,.15);
+  --hero-grad: linear-gradient(135deg,#1e3a5f 0%,#2d6aa0 50%,#1a4f7a 100%);
+  --kpi-grad-1: linear-gradient(135deg,#1e40af,#3b82f6);
+  --kpi-grad-2: linear-gradient(135deg,#15803d,#22c55e);
+  --kpi-grad-3: linear-gradient(135deg,#b91c1c,#ef4444);
+  --kpi-grad-4: linear-gradient(135deg,#1e40af,#6366f1);
+  --kpi-grad-5: linear-gradient(135deg,#065f46,#10b981);
+  --kpi-grad-6: linear-gradient(135deg,#7c2d12,#f97316);
+  --shadow-sm: 0 1px 3px rgba(0,0,0,.07),0 1px 2px rgba(0,0,0,.04);
+  --shadow-md: 0 4px 16px rgba(0,0,0,.09);
+  --shadow-lg: 0 20px 60px rgba(0,0,0,.14),0 4px 16px rgba(0,0,0,.08);
+  /* Alert colours – high contrast on light bg */
+  --alert-nc-bg: rgba(185,28,28,.08);
+  --alert-nc-border: rgba(185,28,28,.25);
+  --alert-nc-text: #7f1d1d;
+  --alert-nc-sub: #991b1b;
+}
+
+[data-theme="dark"] {
+  --bg-page: #04111d;
+  --bg-surface: #091828;
+  --bg-elevated: #0e2036;
+  --bg-hover: #112540;
+  --bg-stripe: #070f1a;
+  --border: #1a3450;
+  --border-subtle: #0d1e2e;
+  --text-primary: #e8edf3;
+  --text-secondary: #9fb3c8;
+  --text-muted: #4a6080;
+  --accent: #3b82f6;
+  --accent-2: #a78bfa;
+  --glow: rgba(59,130,246,.18);
+  --hero-grad: linear-gradient(135deg,#041422 0%,#0a2544 50%,#071c38 100%);
+  --kpi-grad-1: linear-gradient(135deg,#1e3a8a,#2563eb);
+  --kpi-grad-2: linear-gradient(135deg,#14532d,#16a34a);
+  --kpi-grad-3: linear-gradient(135deg,#7f1d1d,#dc2626);
+  --kpi-grad-4: linear-gradient(135deg,#1e3a8a,#4f46e5);
+  --kpi-grad-5: linear-gradient(135deg,#064e3b,#059669);
+  --kpi-grad-6: linear-gradient(135deg,#7c2d12,#ea580c);
+  --shadow-sm: 0 1px 4px rgba(0,0,0,.28);
+  --shadow-md: 0 4px 20px rgba(0,0,0,.45);
+  --shadow-lg: 0 20px 60px rgba(0,0,0,.65),0 0 0 1px rgba(255,255,255,.04);
+  --alert-nc-bg: rgba(239,68,68,.07);
+  --alert-nc-border: rgba(239,68,68,.2);
+  --alert-nc-text: #fca5a5;
+  --alert-nc-sub: rgba(252,165,165,.65);
+}
+
+[data-theme="amoled"] {
+  --bg-page: #000;
+  --bg-surface: #080808;
+  --bg-elevated: #111;
+  --bg-hover: #1a1a1a;
+  --bg-stripe: #040404;
+  --border: rgba(255,255,255,.07);
+  --border-subtle: rgba(255,255,255,.04);
+  --text-primary: #fff;
+  --text-secondary: #b0b8c4;
+  --text-muted: #4a5568;
+  --accent: #60a5fa;
+  --accent-2: #c4b5fd;
+  --glow: rgba(96,165,250,.14);
+  --hero-grad: linear-gradient(135deg,#000 0%,#0a0a0a 100%);
+  --kpi-grad-1: linear-gradient(135deg,#172554,#1d4ed8);
+  --kpi-grad-2: linear-gradient(135deg,#052e16,#15803d);
+  --kpi-grad-3: linear-gradient(135deg,#450a0a,#b91c1c);
+  --kpi-grad-4: linear-gradient(135deg,#1e1b4b,#4338ca);
+  --kpi-grad-5: linear-gradient(135deg,#022c22,#047857);
+  --kpi-grad-6: linear-gradient(135deg,#431407,#c2410c);
+  --shadow-sm: 0 1px 6px rgba(0,0,0,.55);
+  --shadow-md: 0 4px 24px rgba(0,0,0,.75);
+  --shadow-lg: 0 20px 60px rgba(0,0,0,.9),0 0 0 1px rgba(255,255,255,.06);
+  --alert-nc-bg: rgba(239,68,68,.07);
+  --alert-nc-border: rgba(239,68,68,.2);
+  --alert-nc-text: #fca5a5;
+  --alert-nc-sub: rgba(252,165,165,.6);
+}
+
+/* ── Smooth theme/colour transitions ───────────────────────────────────────── */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+body,
+[data-theme] * {
+  transition:
+    background-color 0.3s cubic-bezier(0.4,0,0.2,1),
+    border-color 0.3s cubic-bezier(0.4,0,0.2,1),
+    color 0.2s cubic-bezier(0.4,0,0.2,1),
+    box-shadow 0.25s cubic-bezier(0.4,0,0.2,1);
+}
+
+/* ── Scrollbar ─────────────────────────────────────────────────────────────── */
+::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--text-muted);
+}
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* ══════════════════════════════════════════════════════════════════════════════
+   PROFESSIONAL ANIMATIONS — no springs, no bounces
+══════════════════════════════════════════════════════════════════════════════ */
+/* Easing variables (CSS custom props for reference in JS) */
+:root {
+  --ease-out: cubic-bezier(0.16,1,0.3,1);
+  --ease-std: cubic-bezier(0.4,0,0.2,1);
+  --ease-in: cubic-bezier(0.4,0,1,1);
+}
+
+/* Core keyframes */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(5px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes fadeInFast {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@keyframes scaleIn {
+  from {
+    opacity: 0;
+    transform: scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes slideInL {
+  from {
+    opacity: 0;
+    transform: translateX(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes slideInR {
+  from {
+    transform: translateX(100%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+@keyframes slideOutR {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(100%);
+  }
+}
+@keyframes rowAppear {
+  from {
+    opacity: 0;
+    transform: translateY(3px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes cardAppear {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes numChange {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes panelIn {
+  from {
+    opacity: 0;
+    transform: translateX(20px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: .45;
+  }
+}
+@keyframes shimmer {
+  from {
+    background-position: -200% 0;
+  }
+  to {
+    background-position: 200% 0;
+  }
+}
+@keyframes orb {
+  0%,
+  100% {
+    transform: translate(0,0) scale(1);
+  }
+  50% {
+    transform: translate(8px,-6px) scale(1.04);
+  }
+}
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+@keyframes swatchSel {
+  from {
+    opacity: .7;
+    transform: scale(0.92);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1.08);
+  }
+}
+@keyframes themeSel {
+  from {
+    opacity: .5;
+    transform: scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+@keyframes filterOn {
+  from {
+    opacity: .6;
+    transform: scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+@keyframes checkIn {
+  from {
+    opacity: 0;
+    transform: scale(0.7);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+@keyframes progressFill {
+  from {
+    width: 0;
+  }
+  to {
+    width: 100%;
+  }
+}
+@keyframes metricIn {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes glowAnim {
+  0%,
+  100% {
+    box-shadow: 0 0 12px var(--glow);
+  }
+  50% {
+    box-shadow: 0 0 24px var(--glow);
+  }
+}
+
+/* Utility classes */
+.animate-fade-in {
+  animation: fadeIn 0.28s var(--ease-out) both;
+}
+.animate-scale-in {
+  animation: scaleIn 0.25s var(--ease-out) both;
+}
+.animate-slide-up {
+  animation: slideUp 0.3s var(--ease-out) both;
+}
+.animate-card-in {
+  animation: cardAppear 0.32s var(--ease-out) both;
+}
+.animate-row-in {
+  animation: rowAppear 0.22s var(--ease-out) both;
+}
+.animate-settings-in {
+  animation: panelIn 0.3s var(--ease-out) both;
+}
+.animate-filter-on {
+  animation: filterOn 0.2s var(--ease-std) both;
+}
+.animate-swatch {
+  animation: swatchSel 0.2s var(--ease-out) both;
+}
+.animate-theme {
+  animation: themeSel 0.2s var(--ease-out) both;
+}
+.animate-num {
+  animation: numChange 0.35s var(--ease-out) both;
+}
+.animate-check {
+  animation: checkIn 0.18s var(--ease-out) both;
+}
+
+/* ── Button lift — professional hover with NO bounce ──────────────────────── */
+.lift {
+  transition:
+    transform 0.18s var(--ease-std),
+    box-shadow 0.18s var(--ease-std) !important;
+}
+.lift:hover {
+  transform: translateY(-1px) !important;
+  box-shadow: 0 6px 20px var(--glow) !important;
+}
+.lift:active {
+  transform: translateY(0) scale(0.98) !important;
+  transition-duration: 0.08s !important;
+}
+
+/* Mouse-glow effect class (applied by JS) */
+.mouse-glow {
+  transition: box-shadow 0.25s var(--ease-std);
+}
+.mouse-glow:hover {
+  box-shadow: 0 0 30px var(--glow), var(--shadow-sm);
+}
+
+/* ── Disable all animations ─────────────────────────────────────────────────── */
+html.no-anim *,
+html.no-anim *::before,
+html.no-anim *::after {
+  animation-duration: 0.01ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.01ms !important;
+  scroll-behavior: auto !important;
+}
+
+/* Honour OS preference */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
