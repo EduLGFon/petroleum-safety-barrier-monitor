@@ -1,8 +1,8 @@
 // Client export helpers - download barriers as spreadsheet, PDF or CSV.
 // This is why it exists: zero-dependency browser exports. The spreadsheet
 // is an HTML table saved as .xls (opens in Excel/LibreOffice) with brand
-// header, styled columns and a summary table. PDF prints a dedicated
-// landscape report (never the whole page). CSV uses ; with BOM.
+// header, KPI strip, styled columns and a summary table. PDF prints a
+// dedicated landscape report (never the whole page). CSV uses ; with BOM.
 import { CONF_COLORS, DISP_COLORS } from "./constants.ts";
 import type { Barrier } from "./types.ts";
 import { daysSince, fmtDate, humanDuration } from "./utils.ts";
@@ -65,6 +65,43 @@ function assertBrowser(): void {
   }
 }
 
+// Rounded status pill: tinted background with bold colored text. Renders
+// in Excel HTML, LibreOffice and print alike (radius ignored where
+// unsupported, tint always shows).
+function pill(text: string, color: string): string {
+  return `<span style="display:inline-block;padding:1px 9px;border-radius:999px;background:${color}1F;color:${color};font-weight:bold;">${
+    escHtml(text)
+  }</span>`;
+}
+
+interface KpiStats {
+  total: string;
+  conformes: string;
+  naoConformes: string;
+  pct: string;
+  criticas: string;
+}
+
+function kpiStats(barriers: Barrier[]): KpiStats {
+  const n = (xs: Barrier[]) => xs.length.toLocaleString("pt-BR");
+  const conformes = barriers.filter((b) => b.conformidade === "Conforme");
+  const criticas = barriers.filter((b) =>
+    b.conformidade === "Não Conforme" && b.criticidade === "Crítica"
+  );
+  const pct = barriers.length > 0
+    ? `${Math.round(conformes.length / barriers.length * 100)}%`
+    : "0%";
+  return {
+    total: n(barriers),
+    conformes: n(conformes),
+    naoConformes: n(
+      barriers.filter((b) => b.conformidade === "Não Conforme"),
+    ),
+    pct,
+    criticas: n(criticas),
+  };
+}
+
 const HEADERS = [
   "#",
   "TAG",
@@ -107,15 +144,11 @@ function fitColWidths(headers: string[], rows: string[][]): number[] {
 }
 
 function summaryRows(barriers: Barrier[]): Array<[string, string]> {
+  const s = kpiStats(barriers);
   const count = (fn: (b: Barrier) => boolean) =>
     barriers.filter(fn).length.toLocaleString("pt-BR");
-  const conformes =
-    barriers.filter((b) => b.conformidade === "Conforme").length;
-  const pct = barriers.length > 0
-    ? `${Math.round(conformes / barriers.length * 100)}%`
-    : "0%";
   return [
-    ["Total", barriers.length.toLocaleString("pt-BR")],
+    ["Total", s.total],
     ["Disponíveis", count((b) => b.disponibilidade === "Disponível")],
     [
       "Fora de Operação",
@@ -131,9 +164,10 @@ function summaryRows(barriers: Barrier[]): Array<[string, string]> {
     ],
     ["Degradado (NC)", count((b) => b.disponibilidade === "Degradado")],
     ["Indisponível (NC)", count((b) => b.disponibilidade === "Indisponível")],
-    ["Conformes", conformes.toLocaleString("pt-BR")],
-    ["Não Conformes", count((b) => b.conformidade === "Não Conforme")],
-    ["% Conformidade", pct],
+    ["Conformes", s.conformes],
+    ["Não Conformes", s.naoConformes],
+    ["Críticas NC", s.criticas],
+    ["% Conformidade", s.pct],
   ];
 }
 
@@ -144,62 +178,107 @@ export function exportToExcel(
   filename = "seacrest-barreiras",
 ): void {
   assertBrowser();
-  const subtitle = `Exportado em ${ts()}  |  ${
-    barriers.length.toLocaleString("pt-BR")
-  } registros`;
+  const stats = kpiStats(barriers);
+  const subtitle = `Exportado em ${ts()}  |  ${stats.total} registros`;
   const data = barriers.map(row);
   const widths = fitColWidths(HEADERS, data);
   const cols = widths.map((w) => `<col style="width:${w}pt;">`).join("");
   const head = HEADERS.map((h) =>
-    `<th style="background:#1E3A5F;color:#fff;font-size:9pt;font-weight:bold;text-align:center;padding:5px 4px;white-space:normal;vertical-align:middle;">${
+    `<th style="background:#1E3A5F;color:#fff;font-size:9pt;font-weight:bold;text-align:center;padding:6px 4px;white-space:normal;vertical-align:middle;border-bottom:2pt solid #3B82F6;">${
       escHtml(h)
     }</th>`
   ).join("");
+  const kpiCell = (
+    label: string,
+    value: string,
+    bg: string,
+    color: string,
+    span: number,
+  ) =>
+    `<td colspan="${span}" style="background:${bg};padding:7px 10px;vertical-align:middle;">` +
+    `<div style="font-size:8pt;color:#64748B;letter-spacing:.06em;">${
+      escHtml(label.toUpperCase())
+    }</div>` +
+    `<div style="font-size:13pt;font-weight:bold;color:${color};">${
+      escHtml(value)
+    }</div></td>`;
+  const kpiStrip = `<tr>` +
+    kpiCell("Total", stats.total, "#EFF6FF", "#1E3A5F", 4) +
+    kpiCell(
+      "Conformes",
+      `${stats.conformes} · ${stats.pct}`,
+      "#ECFDF5",
+      "#15803D",
+      4,
+    ) +
+    kpiCell("Não conformes", stats.naoConformes, "#FEF2F2", "#B91C1C", 3) +
+    kpiCell("Críticas NC", stats.criticas, "#FFF7ED", "#C2410C", 3) +
+    `</tr>`;
   const body = barriers.map((b, idx) => {
     const bg = idx % 2 === 0 ? "#F8FAFC" : "#FFFFFF";
     const disp = DISP_COLORS[String(b.disponibilidade)]?.solid ?? "#64748b";
     const conf = CONF_COLORS[String(b.conformidade)]?.solid ?? "#64748b";
     const isCrit = b.criticidade === "Crítica";
     const cells = data[idx].map((v, ci) => {
-      let style =
-        "font-size:9pt;color:#1E293B;padding:3px 4px;white-space:normal;word-wrap:break-word;vertical-align:top;";
+      const base =
+        "font-size:9pt;color:#1E293B;padding:3px 5px;white-space:normal;word-wrap:break-word;vertical-align:top;border:1pt solid #E2E8F0;";
+      if (ci === 0) {
+        return `<td style="${base}text-align:right;color:#64748B;">${
+          escHtml(v)
+        }</td>`;
+      }
       if (ci === 1) {
-        style =
-          "font-family:'Courier New';font-size:8pt;font-weight:bold;color:#1D4ED8;";
+        return `<td style="${base}font-family:'Courier New';font-size:8pt;font-weight:bold;color:#1D4ED8;">${
+          escHtml(v)
+        }</td>`;
       }
       if (ci === 9) {
-        style +=
-          `background:${disp}22;color:${disp};font-weight:bold;text-align:center;`;
+        return `<td style="${base}text-align:center;">${pill(v, disp)}</td>`;
       }
       if (ci === 11) {
-        style +=
-          `background:${conf}1A;color:${conf};font-weight:bold;text-align:center;`;
+        return `<td style="${base}text-align:center;">${pill(v, conf)}</td>`;
       }
       if (ci === 7) {
-        style += `text-align:center;font-weight:${
-          isCrit ? "bold" : "normal"
-        };color:${isCrit ? "#F97316" : "#64748B"};`;
+        const c = isCrit ? "#F97316" : "#64748B";
+        const extra = isCrit ? `background:${c}1F;font-weight:bold;` : "";
+        return `<td style="${base}text-align:center;color:${c};${extra}">${
+          escHtml(v)
+        }</td>`;
       }
-      if (ci === 10 && v) style += "font-style:italic;color:#EA580C;";
-      return `<td style="${style}">${escHtml(v)}</td>`;
+      if (ci === 10 && v) {
+        return `<td style="${base}font-style:italic;color:#EA580C;">${
+          escHtml(v)
+        }</td>`;
+      }
+      return `<td style="${base}">${escHtml(v)}</td>`;
     }).join("");
     return `<tr style="background:${bg};">${cells}</tr>`;
   }).join("");
-  const summary = summaryRows(barriers).map(([k, v]) =>
-    `<tr><td style="font-size:10pt;padding:3px 8px;white-space:normal;vertical-align:top;">${
+  const summary = summaryRows(barriers).map(([k, v], i) => {
+    const hl = k === "% Conformidade";
+    const bg = hl ? "#EFF6FF" : i % 2 === 0 ? "#F8FAFC" : "#FFFFFF";
+    return `<tr style="background:${bg};"><td style="font-size:10pt;padding:4px 10px;white-space:normal;vertical-align:top;${
+      hl ? "font-weight:bold;color:#1E3A5F;" : ""
+    }">${
       escHtml(k)
-    }</td><td style="font-size:10pt;padding:3px 8px;">${escHtml(v)}</td></tr>`
-  ).join("");
+    }</td><td style="font-size:10pt;font-weight:bold;text-align:right;padding:4px 10px;${
+      hl ? "color:#1D4ED8;font-size:11pt;" : ""
+    }">${escHtml(v)}</td></tr>`;
+  }).join("");
   const html =
     `<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel"><head><meta charset="UTF-8"></head><body>` +
-    `<table border="1" style="border-collapse:collapse;table-layout:auto;"><colgroup>${cols}</colgroup>` +
-    `<tr><td colspan="14" style="background:#0A1628;color:#fff;font-size:14pt;font-weight:bold;padding:8px;white-space:normal;vertical-align:middle;">SEACREST PETRÓLEO — Monitor de Barreiras de Segurança</td></tr>` +
-    `<tr><td colspan="14" style="background:#0E2036;color:#94A3B8;font-size:9pt;font-style:italic;padding:5px 8px;white-space:normal;vertical-align:middle;">${
+    `<table border="0" cellpadding="0" cellspacing="0" style="border-collapse:collapse;table-layout:auto;font-family:Calibri,Arial,sans-serif;"><colgroup>${cols}</colgroup>` +
+    `<tr><td colspan="14" style="background:#0A1628;color:#fff;font-size:16pt;font-weight:bold;padding:12px 12px 2px 12px;white-space:normal;vertical-align:middle;">SEACREST PETRÓLEO</td></tr>` +
+    `<tr><td colspan="14" style="background:#0A1628;color:#93C5FD;font-size:10pt;letter-spacing:.14em;padding:0 12px 4px 12px;">MONITOR DE BARREIRAS DE SEGURANÇA</td></tr>` +
+    `<tr><td colspan="14" style="background:#0E2036;color:#94A3B8;font-size:9pt;font-style:italic;padding:5px 12px;white-space:normal;vertical-align:middle;">${
       escHtml(subtitle)
     }</td></tr>` +
-    `<tr>${head}</tr>${body}</table>` +
-    `<h3>SEACREST PETRÓLEO — Resumo Monitor de Barreiras</h3>` +
-    `<table border="1" style="border-collapse:collapse;"><tr><th style="background:#1E3A5F;color:#fff;padding:4px 8px;">Indicador</th><th style="background:#1E3A5F;color:#fff;padding:4px 8px;">Qtd.</th></tr>${summary}</table>` +
+    `<tr><td colspan="14" style="background:#3B82F6;font-size:2pt;padding:0;">&nbsp;</td></tr>` +
+    kpiStrip +
+    `<tr>${head}</tr>${body}` +
+    `<tr><td colspan="14" style="color:#94A3B8;font-size:8pt;font-style:italic;padding:6px 4px;">Gerado pelo Monitor de Barreiras de Segurança · Seacrest Petróleo</td></tr></table>` +
+    `<h3 style="font-family:Calibri,Arial,sans-serif;color:#0A1628;">SEACREST PETRÓLEO — Resumo Monitor de Barreiras</h3>` +
+    `<table border="1" cellpadding="0" cellspacing="0" style="border-collapse:collapse;font-family:Calibri,Arial,sans-serif;"><tr><th style="background:#1E3A5F;color:#fff;padding:5px 12px;text-align:left;border-bottom:2pt solid #3B82F6;">Indicador</th><th style="background:#1E3A5F;color:#fff;padding:5px 12px;text-align:right;border-bottom:2pt solid #3B82F6;">Qtd.</th></tr>${summary}</table>` +
     `</body></html>`;
   download(
     new Blob(["\uFEFF" + html], { type: "application/vnd.ms-excel" }),
@@ -214,6 +293,7 @@ export function exportToExcel(
 const REPORT_ID = "print-report";
 
 export function buildPrintReport(barriers: Barrier[]): string {
+  const stats = kpiStats(barriers);
   const head = [
     "#",
     "TAG",
@@ -226,10 +306,24 @@ export function buildPrintReport(barriers: Barrier[]): string {
     "Plano",
   ]
     .map((h) =>
-      `<th style="background:#1E3A5F;color:#E2E8F0;font-size:8pt;padding:6px 5px;text-align:left;">${
+      `<th style="background:#1E3A5F;color:#E2E8F0;font-size:8pt;padding:7px 5px;text-align:left;border-bottom:2pt solid #3B82F6;white-space:nowrap;">${
         escHtml(h)
       }</th>`
     ).join("");
+  const chip = (label: string, value: string, bg: string, color: string) =>
+    `<div style="flex:1;background:${bg};border-radius:8px;padding:8px 12px;">` +
+    `<div style="font-size:7pt;color:#64748B;letter-spacing:.08em;">${
+      escHtml(label.toUpperCase())
+    }</div>` +
+    `<div style="font-size:15pt;font-weight:bold;color:${color};">${
+      escHtml(value)
+    }</div></div>`;
+  const chips = `<div style="display:flex;gap:8px;margin:10px 0 2px 0;">` +
+    chip("Total", stats.total, "#EFF6FF", "#1E3A5F") +
+    chip(`Conformes · ${stats.pct}`, stats.conformes, "#ECFDF5", "#15803D") +
+    chip("Não conformes", stats.naoConformes, "#FEF2F2", "#B91C1C") +
+    chip("Críticas NC", stats.criticas, "#FFF7ED", "#C2410C") +
+    `</div>`;
   const body = barriers.map((b, idx) => {
     const bg = idx % 2 === 0 ? "#F8FAFC" : "#FFFFFF";
     const disp = DISP_COLORS[String(b.disponibilidade)]?.solid ?? "#94a3b8";
@@ -238,30 +332,40 @@ export function buildPrintReport(barriers: Barrier[]): string {
       ? humanDuration(daysSince(b.statusSince))
       : "—";
     const cell = (v: string, style = "") =>
-      `<td style="font-size:7.5pt;padding:5px;color:#0F172A;${style}">${
+      `<td style="font-size:7.5pt;padding:5px;color:#0F172A;border-bottom:1pt solid #E2E8F0;vertical-align:top;${style}">${
         escHtml(v)
       }</td>`;
     return `<tr style="background:${bg};">` +
-      cell(String(b.id)) +
-      cell(b.tag, "font-family:Courier,monospace;") +
+      cell(String(b.id), "text-align:right;color:#64748B;") +
+      cell(b.tag, "font-family:Courier,monospace;font-weight:bold;") +
       cell(b.instalacao) +
       cell(b.categoria) +
       cell(b.criticidade) +
-      cell(b.disponibilidade, `color:${disp};font-weight:bold;`) +
-      cell(dur, dur === "—" ? "" : "color:#EA580C;") +
-      cell(b.conformidade, `color:${conf};font-weight:bold;`) +
+      `<td style="font-size:7.5pt;padding:5px;border-bottom:1pt solid #E2E8F0;text-align:center;">${
+        pill(b.disponibilidade, disp)
+      }</td>` +
+      cell(
+        dur,
+        dur === "—" ? "text-align:center;" : "color:#EA580C;font-style:italic;",
+      ) +
+      `<td style="font-size:7.5pt;padding:5px;border-bottom:1pt solid #E2E8F0;text-align:center;">${
+        pill(b.conformidade, conf)
+      }</td>` +
       cell(b.planoAcao || "—") +
       `</tr>`;
   }).join("");
-  return `<div style="font-family:Inter,Helvetica,Arial,sans-serif;">` +
-    `<div style="background:#0A1628;color:#fff;padding:14px 16px;border-bottom:2px solid #3B82F6;">` +
-    `<div style="font-size:13pt;font-weight:bold;">SEACREST PETRÓLEO</div>` +
-    `<div style="font-size:9pt;color:#94A3B8;">Monitor de Barreiras de Segurança</div>` +
-    `<div style="font-size:9pt;color:#94A3B8;">${escHtml(ts())}  |  ${
-      barriers.length.toLocaleString("pt-BR")
-    } registros</div></div>` +
-    `<table style="width:100%;border-collapse:collapse;margin-top:10px;"><thead><tr>${head}</tr></thead><tbody>${body}</tbody></table>` +
-    `<div style="font-size:7pt;color:#94A3B8;margin-top:10px;">Seacrest Petróleo · Monitor de Barreiras</div></div>`;
+  return `<div style="font-family:Inter,Helvetica,Arial,sans-serif;color:#0F172A;">` +
+    `<div style="background:linear-gradient(135deg,#0A1628 0%,#1E3A5F 100%);color:#fff;padding:16px 18px 12px 18px;border-bottom:3px solid #3B82F6;">` +
+    `<div style="font-size:10pt;letter-spacing:.18em;color:#93C5FD;">SEACREST PETRÓLEO</div>` +
+    `<div style="font-size:16pt;font-weight:bold;margin-top:2px;">Monitor de Barreiras de Segurança</div>` +
+    `<div style="font-size:9pt;color:#CBD5E1;margin-top:4px;">${
+      escHtml(ts())
+    }  |  ${stats.total} registros  ·  ${stats.pct} conformes</div></div>` +
+    chips +
+    `<table style="width:100%;border-collapse:collapse;margin-top:6px;"><thead style="display:table-header-group;"><tr>${head}</tr></thead><tbody>${body}</tbody></table>` +
+    `<div style="font-size:7pt;color:#94A3B8;margin-top:10px;">Seacrest Petróleo · Monitor de Barreiras · gerado em ${
+      escHtml(ts())
+    }</div></div>`;
 }
 
 export function exportToPDF(
@@ -289,6 +393,7 @@ export function exportToPDF(
 }
 
 // ── CSV ────────────────────────────────────────────────────────────────────
+// Plain-text format: no styling applies. Headers and pt-BR formatting only.
 
 export function exportToCSV(
   barriers: Barrier[],
