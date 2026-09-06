@@ -1,14 +1,10 @@
-"use client";
-import {
-  createContext,
-  type ReactNode,
-  useCallback,
-  useContext,
-  useEffect,
-  useState,
-} from "react";
-import type { FilterState, Theme } from "@/lib/types";
-import { defaultFilters } from "@/lib/utils";
+// Settings context - persists theme, accent, defaults and members.
+// This is why it exists: single store for appearance and filter defaults,
+// hydrated from localStorage after mount for SSR consistency.
+import { createContext } from "preact";
+import type { ComponentChildren } from "preact";
+import { useCallback, useContext, useEffect, useState } from "preact/hooks";
+import type { FilterState, Theme } from "../lib/types.ts";
 
 export type AccentColor =
   | "blue"
@@ -173,10 +169,11 @@ function applyMotion(reduce: boolean) {
   document.documentElement.classList.toggle("no-anim", reduce);
 }
 
-export function SettingsProvider({ children }: { children: ReactNode }) {
+export function SettingsProvider(
+  { children }: { children: ComponentChildren },
+) {
   // Start with DEFAULTS for SSR consistency — hydrate from localStorage after mount
   const [settings, setSettings] = useState<SettingsState>(DEFAULTS);
-  const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
     const s = loadSettings();
@@ -184,14 +181,15 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
     applyTheme(s.theme);
     applyAccent(s.accentColor);
     applyMotion(s.reduceMotion);
-    setMounted(true);
   }, []);
 
   const save = useCallback((next: SettingsState) => {
     setSettings(next);
     try {
       localStorage.setItem(KEY, JSON.stringify(next));
-    } catch {}
+    } catch {
+      // Storage may be unavailable (private mode) - settings still apply live.
+    }
   }, []);
 
   const setTheme = useCallback((t: Theme) => {
