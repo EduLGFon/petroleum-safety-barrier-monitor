@@ -1,4 +1,4 @@
-import type { CSSProperties } from "react";
+import type { CSSProperties } from "preact";
 interface P {
   label: string;
   solid: string;

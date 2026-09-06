@@ -1,7 +1,12 @@
-"use client";
-import { useCallback, useEffect, useMemo, useReducer, useState } from "react";
-import type { Barrier, FilterState, SortableColumn } from "@/lib/types";
-import { LOCATIONS } from "@/lib/constants";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useReducer,
+  useState,
+} from "preact/hooks";
+import type { Barrier, FilterState, SortableColumn } from "../lib/types.ts";
+import { LOCATIONS } from "../lib/constants.ts";
 import {
   applyFilters,
   applySorting,
@@ -9,7 +14,7 @@ import {
   computeKpi,
   defaultFilters,
   paginate,
-} from "@/lib/utils";
+} from "../lib/utils.ts";
 
 const STORE_KEY = "seacrest-dashboard";
 
@@ -33,7 +38,9 @@ function loadDash(): Partial<Persisted> {
 function saveDash(d: Persisted) {
   try {
     localStorage.setItem(STORE_KEY, JSON.stringify(d));
-  } catch {}
+  } catch {
+    // Storage may be unavailable - dashboard still works in memory.
+  }
 }
 
 type Action =

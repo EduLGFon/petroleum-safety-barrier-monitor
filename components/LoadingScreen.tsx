@@ -1,6 +1,5 @@
-"use client";
-import { useCallback, useEffect, useState } from "react";
-import { SeacrestLogo } from "./ui/SeacrestLogo";
+import { useCallback, useEffect, useState } from "preact/hooks";
+import { SeacrestLogo } from "./ui/SeacrestLogo.tsx";
 
 interface Props {
   onDone: () => void;

@@ -1,9 +1,9 @@
-"use client";
-import { type ReactNode, useCallback, useEffect, useState } from "react";
-import type { Barrier } from "@/lib/types";
-import { CONF_COLORS, CRIT_COLORS, DISP_COLORS } from "@/lib/constants";
-import { Badge } from "./ui/Badge";
-import { daysSince, fmtDate, humanDuration } from "@/lib/utils";
+import type { ComponentChildren, FunctionComponent } from "preact";
+import { useCallback, useEffect, useState } from "preact/hooks";
+import type { Barrier } from "../lib/types.ts";
+import { CONF_COLORS, CRIT_COLORS, DISP_COLORS } from "../lib/constants.ts";
+import { Badge } from "./ui/Badge.tsx";
+import { daysSince, fmtDate, humanDuration } from "../lib/utils.ts";
 import {
   AlertTriangleIcon,
   BuildingIcon,
@@ -17,7 +17,7 @@ import {
   ShieldCheckIcon,
   TagIcon,
   UserIcon,
-} from "./ui/Icons";
+} from "./ui/Icons.tsx";
 interface Props {
   barrier: Barrier | null;
   onClose: () => void;
@@ -208,6 +208,7 @@ function Content(
             </div>
           </div>
           <button
+            type="button"
             onClick={onClose}
             className="lift"
             style={{
@@ -286,6 +287,7 @@ function Content(
       >
         {(["details", "history"] as const).map((t) => (
           <button
+            type="button"
             key={t}
             onClick={() => setTab(t)}
             style={{
@@ -595,7 +597,9 @@ function FR({
   italic,
   full,
 }: {
-  Icon: React.FC<{ size?: number; color?: string; strokeWidth?: number }>;
+  Icon: FunctionComponent<
+    { size?: number; color?: string; strokeWidth?: number }
+  >;
   label: string;
   value: string;
   accent?: string;
@@ -639,7 +643,7 @@ function FR({
     </div>
   );
 }
-function Sec({ children }: { children: ReactNode }) {
+function Sec({ children }: { children: ComponentChildren }) {
   return (
     <div
       style={{
@@ -655,7 +659,7 @@ function Sec({ children }: { children: ReactNode }) {
     </div>
   );
 }
-function Lbl({ children }: { children: ReactNode }) {
+function Lbl({ children }: { children: ComponentChildren }) {
   return (
     <div
       style={{

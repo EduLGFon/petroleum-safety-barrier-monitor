@@ -1,6 +1,5 @@
-"use client";
-import { LOCATIONS } from "@/lib/constants";
-import type { Barrier } from "@/lib/types";
+import { LOCATIONS } from "../lib/constants.ts";
+import type { Barrier } from "../lib/types.ts";
 interface Props {
   selected: string;
   allBarriers: Barrier[];
@@ -19,6 +18,7 @@ export function LocationFilter({ selected, allBarriers, onChange }: Props) {
         const a = selected === loc.code;
         return (
           <button
+            type="button"
             key={loc.code}
             onClick={() => onChange(loc.code)}
             aria-pressed={a}

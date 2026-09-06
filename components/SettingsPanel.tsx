@@ -1,18 +1,12 @@
-"use client";
-import {
-  type ReactNode,
-  useCallback,
-  useEffect,
-  useRef,
-  useState,
-} from "react";
+import type { ComponentChildren, FunctionComponent } from "preact";
+import { useEffect, useState } from "preact/hooks";
 import {
   ACCENT_PRESETS,
   type AccentColor,
   useSettings,
-} from "@/context/SettingsContext";
-import type { Theme } from "@/lib/types";
-import { CATEGORIES, LOCATIONS } from "@/lib/constants";
+} from "../context/SettingsContext.tsx";
+import type { Theme } from "../lib/types.ts";
+import { CATEGORIES, LOCATIONS } from "../lib/constants.ts";
 import {
   CloseIcon,
   FilterIcon,
@@ -20,11 +14,13 @@ import {
   MoonIcon,
   SunIcon,
   UserIcon,
-} from "./ui/Icons";
+} from "./ui/Icons.tsx";
 
 const THEMES: {
   value: Theme;
-  Icon: React.FC<{ size?: number; color?: string; strokeWidth?: number }>;
+  Icon: FunctionComponent<
+    { size?: number; color?: string; strokeWidth?: number }
+  >;
   label: string;
 }[] = [
   { value: "light", Icon: SunIcon, label: "Claro" },
@@ -198,6 +194,7 @@ export function SettingsPanel({ open, onClose }: Props) {
             </div>
           </div>
           <button
+            type="button"
             onClick={onClose}
             className="lift"
             style={{
@@ -233,6 +230,7 @@ export function SettingsPanel({ open, onClose }: Props) {
             { key, label, Icon },
           ) => (
             <button
+              type="button"
               key={key}
               onClick={() => setSection(key as never)}
               style={{
@@ -291,6 +289,7 @@ export function SettingsPanel({ open, onClose }: Props) {
                   const isAnim = activeTheme === value;
                   return (
                     <button
+                      type="button"
                       key={value}
                       onClick={() => handleTheme(value)}
                       className={isAnim ? "animate-theme" : ""}
@@ -387,6 +386,7 @@ export function SettingsPanel({ open, onClose }: Props) {
                       }}
                     >
                       <button
+                        type="button"
                         onClick={() => handleAccent(key)}
                         className={isAnim ? "animate-swatch" : ""}
                         style={{
@@ -575,7 +575,7 @@ export function SettingsPanel({ open, onClose }: Props) {
               <FieldLabel>Instalação (localização)</FieldLabel>
               <select
                 value={settings.defaultLocation}
-                onChange={(e) => setDefaultLoc(e.target.value)}
+                onChange={(e) => setDefaultLoc(e.currentTarget.value)}
                 style={selSt}
               >
                 {LOCATIONS.map((l) => (
@@ -605,7 +605,7 @@ export function SettingsPanel({ open, onClose }: Props) {
                   onChange={(e) =>
                     setDefaults({
                       ...settings.defaultFilters,
-                      [key]: e.target.value,
+                      [key]: e.currentTarget.value,
                     })}
                   style={selSt}
                 >
@@ -630,7 +630,7 @@ export function SettingsPanel({ open, onClose }: Props) {
                   onChange={(e) =>
                     setDefaults({
                       ...settings.defaultFilters,
-                      sortCol: e.target.value as never,
+                      sortCol: e.currentTarget.value as never,
                     })}
                   style={selSt}
                 >
@@ -644,7 +644,7 @@ export function SettingsPanel({ open, onClose }: Props) {
                   onChange={(e) =>
                     setDefaults({
                       ...settings.defaultFilters,
-                      sortDir: e.target.value as never,
+                      sortDir: e.currentTarget.value as never,
                     })}
                   style={selSt}
                 >
@@ -655,6 +655,7 @@ export function SettingsPanel({ open, onClose }: Props) {
             </div>
 
             <button
+              type="button"
               onClick={() => {
                 setDefaults({});
                 setDefaultLoc("ALL");
@@ -736,6 +737,7 @@ export function SettingsPanel({ open, onClose }: Props) {
                   style={{ ...selSt, flex: 1 }}
                 />
                 <button
+                  type="button"
                   disabled
                   style={{
                     padding: "9px 14px",
@@ -777,7 +779,7 @@ export function SettingsPanel({ open, onClose }: Props) {
 }
 
 /* ── Helpers ──────────────────────────────────────────────────────────────── */
-function SectTitle({ children }: { children: ReactNode }) {
+function SectTitle({ children }: { children: ComponentChildren }) {
   return (
     <div
       style={{
@@ -793,7 +795,7 @@ function SectTitle({ children }: { children: ReactNode }) {
     </div>
   );
 }
-function FieldLabel({ children }: { children: ReactNode }) {
+function FieldLabel({ children }: { children: ComponentChildren }) {
   return (
     <div
       style={{
@@ -815,6 +817,7 @@ function Toggle(
 ) {
   return (
     <button
+      type="button"
       onClick={() => onChange(!checked)}
       role="switch"
       aria-checked={checked}

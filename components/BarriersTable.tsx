@@ -1,9 +1,8 @@
-"use client";
-import type { CSSProperties } from "react";
-import type { Barrier, FilterState, SortableColumn } from "@/lib/types";
-import { CONF_COLORS, CRIT_COLORS, DISP_COLORS } from "@/lib/constants";
-import { daysSince, humanDuration } from "@/lib/utils";
-import { Badge } from "./ui/Badge";
+import type { CSSProperties } from "preact";
+import type { Barrier, FilterState, SortableColumn } from "../lib/types.ts";
+import { CONF_COLORS, CRIT_COLORS, DISP_COLORS } from "../lib/constants.ts";
+import { daysSince, humanDuration } from "../lib/utils.ts";
+import { Badge } from "./ui/Badge.tsx";
 import {
   ChevronDownIcon,
   ChevronLeftIcon,
@@ -13,7 +12,7 @@ import {
   ChevronUpIcon,
   ClockIcon,
   SortIcon,
-} from "./ui/Icons";
+} from "./ui/Icons.tsx";
 
 interface Props {
   rows: Barrier[];
@@ -435,6 +434,7 @@ function Pagination(
       </span>
       <div style={{ display: "flex", gap: 4 }}>
         <button
+          type="button"
           onClick={() => onChange(1)}
           disabled={page === 1}
           style={bs(false, page === 1)}
@@ -442,6 +442,7 @@ function Pagination(
           <ChevronsLeftIcon size={14} />
         </button>
         <button
+          type="button"
           onClick={() => onChange(page - 1)}
           disabled={page === 1}
           style={bs(false, page === 1)}
@@ -460,6 +461,7 @@ function Pagination(
             )
             : (
               <button
+                type="button"
                 key={p}
                 onClick={() => onChange(p as number)}
                 style={bs(page === p, false)}
@@ -469,6 +471,7 @@ function Pagination(
             )
         )}
         <button
+          type="button"
           onClick={() => onChange(page + 1)}
           disabled={page === totalPages}
           style={bs(false, page === totalPages)}
@@ -476,6 +479,7 @@ function Pagination(
           <ChevronRightIcon size={14} />
         </button>
         <button
+          type="button"
           onClick={() => onChange(totalPages)}
           disabled={page === totalPages}
           style={bs(false, page === totalPages)}

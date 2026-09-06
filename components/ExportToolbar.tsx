@@ -1,14 +1,14 @@
-"use client";
-import { useState } from "react";
-import type { Barrier } from "@/lib/types";
-import { exportToCSV, exportToExcel, exportToPDF } from "@/lib/export";
+import type { FunctionComponent } from "preact";
+import { useState } from "preact/hooks";
+import type { Barrier } from "../lib/types.ts";
+import { exportToCSV, exportToExcel, exportToPDF } from "../lib/export.ts";
 import {
   CloseIcon,
   DownloadIcon,
   FilePdfIcon,
   FileSpreadsheetIcon,
   FileTextIcon,
-} from "./ui/Icons";
+} from "./ui/Icons.tsx";
 interface Props {
   selectedIds: Set<number>;
   allFiltered: Barrier[];
@@ -16,7 +16,9 @@ interface Props {
   onClearAll: () => void;
 }
 type Fmt = "xlsx" | "pdf" | "csv";
-type I = React.FC<{ size?: number; color?: string; strokeWidth?: number }>;
+type I = FunctionComponent<
+  { size?: number; color?: string; strokeWidth?: number }
+>;
 const FMTS: { key: Fmt; Icon: I; label: string; ext: string; color: string }[] =
   [
     {
@@ -113,6 +115,7 @@ export function ExportToolbar(
       </label>
       {someSel && (
         <button
+          type="button"
           onClick={onClearAll}
           style={{
             display: "flex",
@@ -156,6 +159,7 @@ export function ExportToolbar(
             </div>
             {FMTS.map(({ key, Icon, label, ext, color }) => (
               <button
+                type="button"
                 key={key}
                 onClick={() => doExport(key)}
                 disabled={!!loading}

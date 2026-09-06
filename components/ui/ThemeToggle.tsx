@@ -1,8 +1,10 @@
-"use client";
-import { useSettings } from "@/context/SettingsContext";
-import type { Theme } from "@/lib/types";
-import { MonitorIcon, MoonIcon, SunIcon } from "./Icons";
-type I = React.FC<{ size?: number; color?: string; strokeWidth?: number }>;
+import type { FunctionComponent } from "preact";
+import { useSettings } from "../../context/SettingsContext.tsx";
+import type { Theme } from "../../lib/types.ts";
+import { MonitorIcon, MoonIcon, SunIcon } from "./Icons.tsx";
+type I = FunctionComponent<
+  { size?: number; color?: string; strokeWidth?: number }
+>;
 const OPTS: { value: Theme; Icon: I; label: string }[] = [
   { value: "light", Icon: SunIcon, label: "Claro" },
   { value: "dark", Icon: MoonIcon, label: "Escuro" },
@@ -26,6 +28,7 @@ export function ThemeToggle() {
         const a = theme === value;
         return (
           <button
+            type="button"
             key={value}
             onClick={() => setTheme(value)}
             title={label}

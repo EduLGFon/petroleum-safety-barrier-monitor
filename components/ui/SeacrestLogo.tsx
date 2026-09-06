@@ -1,3 +1,4 @@
+// Brand logo - path data is a static constant, never user input.
 interface P {
   variant?: "full" | "icon" | "adaptive";
   height?: number;
@@ -28,6 +29,7 @@ function WaveSVG(
         transform="translate(0,322) scale(0.1,-0.1)"
         fill={fill}
         stroke="none"
+        // deno-lint-ignore react-no-danger
         dangerouslySetInnerHTML={{
           __html: SVG_PATHS.replace(/<g[^>]*>|<\/g>/g, ""),
         }}
@@ -66,6 +68,7 @@ export function SeacrestLogo(
           transform="translate(0,322) scale(0.1,-0.1)"
           fill="var(--text-primary)"
           stroke="none"
+          // deno-lint-ignore react-no-danger
           dangerouslySetInnerHTML={{
             __html: SVG_PATHS.replace(/<g[^>]*>|<\/g>/g, ""),
           }}

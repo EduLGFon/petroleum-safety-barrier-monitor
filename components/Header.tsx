@@ -1,5 +1,5 @@
-import { SeacrestLogo } from "./ui/SeacrestLogo";
-import { ShieldIcon } from "./ui/Icons";
+import { SeacrestLogo } from "./ui/SeacrestLogo.tsx";
+import { ShieldIcon } from "./ui/Icons.tsx";
 
 interface Props {
   onOpenSettings: () => void;
@@ -199,6 +199,7 @@ export function Header({ onOpenSettings }: Props) {
           </div>
         </div>
         <button
+          type="button"
           onClick={onOpenSettings}
           className="lift"
           title="Configurações"

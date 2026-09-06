@@ -1,8 +1,7 @@
-"use client";
-import { useState } from "react";
-import type { FilterState } from "@/lib/types";
-import { CATEGORIES } from "@/lib/constants";
-import { CloseIcon, FilterIcon, SearchIcon } from "./ui/Icons";
+import { useState } from "preact/hooks";
+import type { FilterState } from "../lib/types.ts";
+import { CATEGORIES } from "../lib/constants.ts";
+import { CloseIcon, FilterIcon, SearchIcon } from "./ui/Icons.tsx";
 
 interface Props {
   filters: FilterState;
@@ -62,7 +61,7 @@ export function FilterBar(
           type="search"
           placeholder="TAG, localização, categoria…"
           value={filters.query}
-          onChange={(e) => onFilter({ query: e.target.value })}
+          onChange={(e) => onFilter({ query: e.currentTarget.value })}
           onFocus={() => setFocused(true)}
           onBlur={() => setFocused(false)}
           style={{
@@ -104,6 +103,7 @@ export function FilterBar(
 
       {hasActiveFilters && (
         <button
+          type="button"
           onClick={onReset}
           className="lift animate-filter-on"
           style={{
@@ -166,7 +166,7 @@ function Sel(
   return (
     <select
       value={value}
-      onChange={(e) => onChange(e.target.value)}
+      onChange={(e) => onChange(e.currentTarget.value)}
       className={a ? "animate-filter-on" : ""}
       style={{
         padding: "9px 10px",

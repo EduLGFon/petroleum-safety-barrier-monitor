@@ -1,3 +1,4 @@
+// Static icon set - paths are compile-time constants, never user input.
 interface P {
   size?: number;
   color?: string;
@@ -13,6 +14,7 @@ const D = (s: number, c: string, w: number, ch: string) => (
     strokeWidth={w}
     strokeLinecap="round"
     strokeLinejoin="round"
+    // deno-lint-ignore react-no-danger
     dangerouslySetInnerHTML={{ __html: ch }}
   />
 );

@@ -1,7 +1,6 @@
-"use client";
-import type { KpiSnapshot } from "@/lib/types";
-import { DISP_COLORS } from "@/lib/constants";
-import { ActivityIcon } from "./ui/Icons";
+import type { KpiSnapshot } from "../lib/types.ts";
+import { DISP_COLORS } from "../lib/constants.ts";
+import { ActivityIcon } from "./ui/Icons.tsx";
 const SEGS = [
   { key: "Disponível", short: "Disponível" },
   { key: "Fora de Operação", short: "Fora de Op." },
@@ -63,6 +62,7 @@ export function StatusBand({ kpi, activeFilter, onFilter }: Props) {
             isDim = !!activeFilter && !isA;
           return (
             <button
+              type="button"
               key={seg.key}
               onClick={() => onFilter(isA ? "" : seg.key)}
               title={seg.key}

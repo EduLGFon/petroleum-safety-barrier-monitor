@@ -1,20 +1,19 @@
-"use client";
-import { useCallback, useEffect, useState } from "react";
-import type { Barrier } from "@/lib/types";
-import { useDashboard } from "@/hooks/useDashboard";
-import { useSettings } from "@/context/SettingsContext";
-import { Header } from "./Header";
-import { LocationFilter } from "./LocationFilter";
-import { StatusBand } from "./StatusBand";
-import { KpiGrid } from "./KpiGrid";
-import { ConformidadeChart } from "./ConformidadeChart";
-import { FilterBar } from "./FilterBar";
-import { ExportToolbar } from "./ExportToolbar";
-import { BarriersTable } from "./BarriersTable";
-import { BarrierModal } from "./BarrierModal";
-import { LoadingScreen } from "./LoadingScreen";
-import { SettingsPanel } from "./SettingsPanel";
-import { AlertTriangleIcon, ArrowRightIcon } from "./ui/Icons";
+import { useCallback, useEffect, useState } from "preact/hooks";
+import type { Barrier } from "../lib/types.ts";
+import { useDashboard } from "../hooks/useDashboard.ts";
+import { useSettings } from "../context/SettingsContext.tsx";
+import { Header } from "./Header.tsx";
+import { LocationFilter } from "./LocationFilter.tsx";
+import { StatusBand } from "./StatusBand.tsx";
+import { KpiGrid } from "./KpiGrid.tsx";
+import { ConformidadeChart } from "./ConformidadeChart.tsx";
+import { FilterBar } from "./FilterBar.tsx";
+import { ExportToolbar } from "./ExportToolbar.tsx";
+import { BarriersTable } from "./BarriersTable.tsx";
+import { BarrierModal } from "./BarrierModal.tsx";
+import { LoadingScreen } from "./LoadingScreen.tsx";
+import { SettingsPanel } from "./SettingsPanel.tsx";
+import { AlertTriangleIcon, ArrowRightIcon } from "./ui/Icons.tsx";
 
 interface Props {
   initialBarriers: Barrier[];
@@ -164,6 +163,7 @@ export function Dashboard({ initialBarriers: barriers }: Props) {
               </div>
             </div>
             <button
+              type="button"
               className="lift"
               onClick={() => isUrgentesActive ? resetFilters() : showUrgentes()}
               style={{

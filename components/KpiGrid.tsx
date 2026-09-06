@@ -1,7 +1,7 @@
-"use client";
-import { useCallback, useEffect, useRef, useState } from "react";
-import type { KpiSnapshot } from "@/lib/types";
-import { fmt, pct } from "@/lib/utils";
+import type { FunctionComponent } from "preact";
+import { useEffect, useRef, useState } from "preact/hooks";
+import type { KpiSnapshot } from "../lib/types.ts";
+import { fmt, pct } from "../lib/utils.ts";
 import {
   AlertOctagonIcon,
   CheckCircleIcon,
@@ -9,9 +9,11 @@ import {
   ShieldIcon,
   TargetIcon,
   WrenchIcon,
-} from "./ui/Icons";
+} from "./ui/Icons.tsx";
 
-type I = React.FC<{ size?: number; color?: string; strokeWidth?: number }>;
+type I = FunctionComponent<
+  { size?: number; color?: string; strokeWidth?: number }
+>;
 interface Props {
   kpi: KpiSnapshot;
   location: string;
