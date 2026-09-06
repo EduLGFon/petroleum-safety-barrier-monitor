@@ -22,6 +22,11 @@ const INIT = `(function(){try{
     r.style.setProperty('--accent',c.p);
     r.style.setProperty('--accent-2',c.s);
     r.style.setProperty('--glow',c.g);}
+  var dn=s.density;
+  dn=(dn==='compact'||dn==='spacious')?dn:'comfortable';
+  document.documentElement.dataset.density=dn;
+  var Z={compact:'0.87',comfortable:'1',spacious:'1.12'};
+  document.documentElement.style.setProperty('zoom',Z[dn]);
 }catch(e){}})();`;
 
 export default define.page(function App({ Component }) {

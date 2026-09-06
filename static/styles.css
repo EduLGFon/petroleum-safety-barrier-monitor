@@ -457,6 +457,10 @@ html.no-anim *::after {
 }
 
 @media print {
+  /* Density zoom rescales the app for screens — reports print at 100%. */
+  html {
+    zoom: 1 !important;
+  }
   body.printing-report > *:not(#print-report) {
     display: none !important;
   }

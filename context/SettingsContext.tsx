@@ -92,6 +92,17 @@ export const ACCENT_PRESETS: Record<
   },
 };
 
+export type Density = "compact" | "comfortable" | "spacious";
+
+export const DENSITY_PRESETS: Record<
+  Density,
+  { label: string; hint: string; zoom: number }
+> = {
+  compact: { label: "Compacto", hint: "Telas menores de 16″", zoom: 0.87 },
+  comfortable: { label: "Confortável", hint: "Padrão · telas de 16″", zoom: 1 },
+  spacious: { label: "Amplo", hint: "Monitores maiores de 16″", zoom: 1.12 },
+};
+
 export type MemberRole = "admin" | "viewer";
 export interface Member {
   email: string;
@@ -102,6 +113,7 @@ export interface Member {
 export interface SettingsState {
   theme: Theme;
   accentColor: AccentColor;
+  density: Density;
   defaultFilters: Partial<FilterState>;
   defaultLocation: string;
   reduceMotion: boolean;
@@ -111,6 +123,7 @@ export interface SettingsState {
 const DEFAULTS: SettingsState = {
   theme: "dark",
   accentColor: "blue",
+  density: "comfortable",
   defaultFilters: {},
   defaultLocation: "ALL",
   reduceMotion: false,
@@ -123,6 +136,7 @@ interface Ctx {
   settings: SettingsState;
   setTheme: (t: Theme) => void;
   setAccent: (c: AccentColor) => void;
+  setDensity: (d: Density) => void;
   setDefaults: (f: Partial<FilterState>) => void;
   setDefaultLoc: (l: string) => void;
   setReduceMotion: (v: boolean) => void;
@@ -134,6 +148,7 @@ const SettingsCtx = createContext<Ctx>({
   settings: DEFAULTS,
   setTheme: () => {},
   setAccent: () => {},
+  setDensity: () => {},
   setDefaults: () => {},
   setDefaultLoc: () => {},
   setReduceMotion: () => {},
@@ -169,6 +184,17 @@ function applyMotion(reduce: boolean) {
   document.documentElement.classList.toggle("no-anim", reduce);
 }
 
+function applyDensity(d: Density) {
+  const key: Density = d === "compact" || d === "spacious" ? d : "comfortable";
+  document.documentElement.dataset.density = key;
+  // Root zoom rescales the whole UI (inline px styles included) like
+  // browser zoom; reset to 1 for print via CSS so reports stay exact.
+  document.documentElement.style.setProperty(
+    "zoom",
+    String(DENSITY_PRESETS[key].zoom),
+  );
+}
+
 export function SettingsProvider(
   { children }: { children: ComponentChildren },
 ) {
@@ -180,6 +206,7 @@ export function SettingsProvider(
     setSettings(s);
     applyTheme(s.theme);
     applyAccent(s.accentColor);
+    applyDensity(s.density);
     applyMotion(s.reduceMotion);
   }, []);
 
@@ -199,6 +226,10 @@ export function SettingsProvider(
   const setAccent = useCallback((c: AccentColor) => {
     applyAccent(c);
     save({ ...settings, accentColor: c });
+  }, [settings, save]);
+  const setDensity = useCallback((d: Density) => {
+    applyDensity(d);
+    save({ ...settings, density: d });
   }, [settings, save]);
   const setDefaults = useCallback((f: Partial<FilterState>) => {
     save({ ...settings, defaultFilters: f });
@@ -234,6 +265,7 @@ export function SettingsProvider(
         settings,
         setTheme,
         setAccent,
+        setDensity,
         setDefaults,
         setDefaultLoc,
         setReduceMotion,

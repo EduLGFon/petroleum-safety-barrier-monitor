@@ -3,6 +3,8 @@ import { useEffect, useState } from "preact/hooks";
 import {
   ACCENT_PRESETS,
   type AccentColor,
+  type Density,
+  DENSITY_PRESETS,
   useSettings,
 } from "../context/SettingsContext.tsx";
 import type { Theme } from "../lib/types.ts";
@@ -56,6 +58,7 @@ export function SettingsPanel({ open, onClose, companyName }: Props) {
     settings,
     setTheme,
     setAccent,
+    setDensity,
     setDefaults,
     setDefaultLoc,
     setReduceMotion,
@@ -65,6 +68,7 @@ export function SettingsPanel({ open, onClose, companyName }: Props) {
   );
   const [activeTheme, setActiveTheme] = useState<Theme | null>(null);
   const [activeAccent, setActiveAccent] = useState<AccentColor | null>(null);
+  const [activeDensity, setActiveDensity] = useState<Density | null>(null);
 
   useEffect(() => {
     const h = (e: KeyboardEvent) => {
@@ -90,6 +94,11 @@ export function SettingsPanel({ open, onClose, companyName }: Props) {
     setActiveAccent(c);
     setAccent(c);
     setTimeout(() => setActiveAccent(null), 350);
+  };
+  const handleDensity = (d: Density) => {
+    setActiveDensity(d);
+    setDensity(d);
+    setTimeout(() => setActiveDensity(null), 350);
   };
 
   const selSt = {
@@ -345,6 +354,110 @@ export function SettingsPanel({ open, onClose, companyName }: Props) {
                       >
                         {label}
                       </span>
+                      {isA && (
+                        <div
+                          style={{
+                            width: 20,
+                            height: 2,
+                            borderRadius: 1,
+                            background: "var(--accent)",
+                          }}
+                        />
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Density */}
+            <div>
+              <SectTitle>Densidade da Interface</SectTitle>
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "1fr 1fr 1fr",
+                  gap: 8,
+                }}
+              >
+                {(Object.entries(DENSITY_PRESETS) as [
+                  Density,
+                  typeof DENSITY_PRESETS[Density],
+                ][]).map(([value, p]) => {
+                  const isA = settings.density === value;
+                  const isAnim = activeDensity === value;
+                  return (
+                    <button
+                      type="button"
+                      key={value}
+                      onClick={() => handleDensity(value)}
+                      className={isAnim ? "animate-theme" : ""}
+                      aria-pressed={isA}
+                      style={{
+                        display: "flex",
+                        flexDirection: "column",
+                        alignItems: "center",
+                        gap: 7,
+                        padding: "14px 6px 12px",
+                        borderRadius: 12,
+                        border: isA
+                          ? "2px solid var(--accent)"
+                          : "2px solid var(--border)",
+                        background: "var(--bg-elevated)",
+                        cursor: "pointer",
+                        transition: "all .2s var(--ease-std)",
+                        boxShadow: isA ? "0 0 12px var(--glow)" : "none",
+                      }}
+                    >
+                      <DensityGlyph value={value} active={isA} />
+                      <span
+                        style={{
+                          fontSize: 12,
+                          fontWeight: isA ? 700 : 500,
+                          color: isA
+                            ? "var(--accent)"
+                            : "var(--text-secondary)",
+                        }}
+                      >
+                        {p.label}
+                      </span>
+                      <span
+                        style={{
+                          fontSize: 9.5,
+                          lineHeight: 1.4,
+                          color: "var(--text-muted)",
+                          textAlign: "center",
+                        }}
+                      >
+                        {p.hint}
+                      </span>
+                      <div
+                        style={{
+                          minHeight: 18,
+                          display: "flex",
+                          alignItems: "center",
+                        }}
+                      >
+                        {value === "comfortable" && (
+                          <span
+                            style={{
+                              fontSize: 9,
+                              fontWeight: 800,
+                              letterSpacing: "0.1em",
+                              textTransform: "uppercase",
+                              color: "var(--accent)",
+                              background:
+                                "color-mix(in srgb,var(--accent) 12%,transparent)",
+                              border:
+                                "1px solid color-mix(in srgb,var(--accent) 30%,transparent)",
+                              borderRadius: 5,
+                              padding: "1px 7px",
+                            }}
+                          >
+                            Padrão
+                          </span>
+                        )}
+                      </div>
                       {isA && (
                         <div
                           style={{
@@ -810,6 +923,50 @@ function FieldLabel({ children }: { children: ComponentChildren }) {
       }}
     >
       {children}
+    </div>
+  );
+}
+
+/* Miniature content-rows preview: bar height/gap mirror the density mode. */
+function DensityGlyph(
+  { value, active }: { value: Density; active: boolean },
+) {
+  const dims = value === "compact"
+    ? { bar: 3, gap: 2 }
+    : value === "spacious"
+    ? { bar: 5, gap: 4 }
+    : { bar: 4, gap: 3 };
+  return (
+    <div
+      aria-hidden="true"
+      style={{
+        width: 46,
+        height: 30,
+        borderRadius: 7,
+        background: "var(--bg-surface)",
+        border: "1.5px solid var(--border)",
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "stretch",
+        justifyContent: "center",
+        gap: dims.gap,
+        padding: "5px 6px",
+        boxShadow: "var(--shadow-sm)",
+      }}
+    >
+      {[0, 1, 2].map((i) => (
+        <div
+          key={i}
+          style={{
+            height: dims.bar,
+            borderRadius: 2,
+            width: i === 2 ? "62%" : "100%",
+            background: active
+              ? "linear-gradient(90deg,var(--accent),var(--accent-2))"
+              : "var(--border)",
+          }}
+        />
+      ))}
     </div>
   );
 }
