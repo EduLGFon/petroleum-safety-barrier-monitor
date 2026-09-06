@@ -6,6 +6,7 @@ import {
   useSettings,
 } from "../context/SettingsContext.tsx";
 import type { Theme } from "../lib/types.ts";
+import { withBrand } from "../lib/company.ts";
 import { CATEGORIES, LOCATIONS } from "../lib/constants.ts";
 import {
   CloseIcon,
@@ -47,9 +48,10 @@ const SORT_OPTS = [
 interface Props {
   open: boolean;
   onClose: () => void;
+  companyName: string;
 }
 
-export function SettingsPanel({ open, onClose }: Props) {
+export function SettingsPanel({ open, onClose, companyName }: Props) {
   const {
     settings,
     setTheme,
@@ -180,7 +182,7 @@ export function SettingsPanel({ open, onClose }: Props) {
                 marginBottom: 4,
               }}
             >
-              Seacrest Petróleo
+              {companyName || "Configurações"}
             </div>
             <div
               style={{
@@ -771,7 +773,7 @@ export function SettingsPanel({ open, onClose }: Props) {
             flexShrink: 0,
           }}
         >
-          Seacrest Petróleo · Monitor de Barreiras · v0.4
+          {withBrand(companyName, "Monitor de Barreiras")} · v0.4
         </div>
       </aside>
     </>

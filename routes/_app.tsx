@@ -2,6 +2,7 @@
 // This is why it exists: ports Next layout (lang, title, fonts, FOUC guard)
 // without React providers (added back when context is ported to preact).
 import { define } from "../utils.ts";
+import { getCompanyName, withBrand } from "../lib/company.ts";
 
 // Runs before island hydration: restores theme/accent to prevent FOUC.
 const INIT = `(function(){try{
@@ -24,15 +25,19 @@ const INIT = `(function(){try{
 }catch(e){}})();`;
 
 export default define.page(function App({ Component }) {
+  const title = withBrand(
+    getCompanyName(),
+    "Monitor de Barreiras de Segurança",
+  );
   return (
     <html lang="pt-BR">
       <head>
         <meta charset="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-        <title>Seacrest Petroleo - Monitor de Barreiras de Seguranca</title>
+        <title>{title}</title>
         <meta
           name="description"
-          content="Monitor de Barreiras de Seguranca - Seacrest Petroleo"
+          content={title}
         />
         <link rel="icon" href="/favicon.svg" />
         <script>{INIT}</script>

@@ -6,6 +6,7 @@ import type { Barrier } from "../lib/types.ts";
 import { useDashboard } from "../hooks/useDashboard.ts";
 import { SettingsProvider, useSettings } from "../context/SettingsContext.tsx";
 import { ThemeProvider } from "../context/ThemeContext.tsx";
+import { withBrand } from "../lib/company.ts";
 import { Header } from "../components/Header.tsx";
 import { LocationFilter } from "../components/LocationFilter.tsx";
 import { StatusBand } from "../components/StatusBand.tsx";
@@ -21,21 +22,25 @@ import { AlertTriangleIcon, ArrowRightIcon } from "../components/ui/Icons.tsx";
 
 interface Props {
   initialBarriers: Barrier[];
+  companyName: string;
 }
 
-export function Dashboard({ initialBarriers }: Props) {
+export function Dashboard({ initialBarriers, companyName }: Props) {
   // Providers must wrap the island content itself: context from a server
   // route does not reach island code when it hydrates in the browser.
   return (
     <SettingsProvider>
       <ThemeProvider>
-        <DashboardView initialBarriers={initialBarriers} />
+        <DashboardView
+          initialBarriers={initialBarriers}
+          companyName={companyName}
+        />
       </ThemeProvider>
     </SettingsProvider>
   );
 }
 
-function DashboardView({ initialBarriers: barriers }: Props) {
+function DashboardView({ initialBarriers: barriers, companyName }: Props) {
   const [loading, setLoading] = useState(true);
   const [visible, setVisible] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -89,7 +94,9 @@ function DashboardView({ initialBarriers: barriers }: Props) {
 
   return (
     <>
-      {loading && <LoadingScreen onDone={handleLoadDone} />}
+      {loading && (
+        <LoadingScreen onDone={handleLoadDone} companyName={companyName} />
+      )}
 
       <div
         style={{
@@ -255,7 +262,7 @@ function DashboardView({ initialBarriers: barriers }: Props) {
             animation: "fadeInFast .4s .5s both",
           }}
         >
-          Seacrest Petróleo · Monitor de Barreiras de Segurança
+          {withBrand(companyName, "Monitor de Barreiras de Segurança")}
         </div>
       </div>
 
@@ -263,6 +270,7 @@ function DashboardView({ initialBarriers: barriers }: Props) {
       <SettingsPanel
         open={settingsOpen}
         onClose={() => setSettingsOpen(false)}
+        companyName={companyName}
       />
     </>
   );

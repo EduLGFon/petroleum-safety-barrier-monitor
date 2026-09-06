@@ -4,10 +4,12 @@
 // (context does not cross the island boundary on the client).
 import { Dashboard } from "../islands/Dashboard.tsx";
 import { mockApi } from "../lib/api.ts";
+import { getCompanyName, withBrand } from "../lib/company.ts";
 import { define } from "../utils.ts";
 
 export default define.page(async function Home() {
   const barriers = await mockApi.getAllBarriers({});
+  const companyName = getCompanyName();
   return (
     <main
       style={{
@@ -18,7 +20,7 @@ export default define.page(async function Home() {
         minHeight: "100vh",
       }}
     >
-      <Dashboard initialBarriers={barriers} />
+      <Dashboard initialBarriers={barriers} companyName={companyName} />
       <footer
         style={{
           marginTop: 28,
@@ -27,7 +29,7 @@ export default define.page(async function Home() {
           color: "var(--text-muted)",
         }}
       >
-        Seacrest Petroleo - Monitor de Barreiras de Seguranca
+        {withBrand(companyName, "Monitor de Barreiras de Segurança")}
       </footer>
     </main>
   );

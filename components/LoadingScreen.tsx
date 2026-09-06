@@ -1,11 +1,14 @@
+// Loading screen - branded splash shown while the island hydrates.
+// This is why it exists: covers first paint with progress until onDone.
 import { useCallback, useEffect, useState } from "preact/hooks";
 import { BrandMark } from "./ui/BrandMark.tsx";
 
 interface Props {
   onDone: () => void;
+  companyName: string;
 }
 
-export function LoadingScreen({ onDone }: Props) {
+export function LoadingScreen({ onDone, companyName }: Props) {
   const [progress, setProgress] = useState(0);
   const [ready, setReady] = useState(false);
   const [exit, setExit] = useState(false);
@@ -127,21 +130,23 @@ export function LoadingScreen({ onDone }: Props) {
 
         {/* Brand text */}
         <div style={{ textAlign: "center", marginBottom: 6 }}>
-          <div
-            style={{
-              fontSize: 10,
-              fontWeight: 800,
-              letterSpacing: "0.2em",
-              textTransform: "uppercase",
-              marginBottom: 8,
-              background: "linear-gradient(90deg,#60a5fa,#a78bfa)",
-              WebkitBackgroundClip: "text",
-              WebkitTextFillColor: "transparent",
-              backgroundClip: "text",
-            }}
-          >
-            Seacrest Petróleo
-          </div>
+          {companyName && (
+            <div
+              style={{
+                fontSize: 10,
+                fontWeight: 800,
+                letterSpacing: "0.2em",
+                textTransform: "uppercase",
+                marginBottom: 8,
+                background: "linear-gradient(90deg,#60a5fa,#a78bfa)",
+                WebkitBackgroundClip: "text",
+                WebkitTextFillColor: "transparent",
+                backgroundClip: "text",
+              }}
+            >
+              {companyName}
+            </div>
+          )}
           <div
             style={{
               fontSize: 20,
@@ -240,7 +245,9 @@ export function LoadingScreen({ onDone }: Props) {
           animation: "fadeInFast .8s .4s both",
         }}
       >
-        Seacrest Petróleo · Segurança Operacional
+        {companyName
+          ? `${companyName} · Segurança Operacional`
+          : "Segurança Operacional"}
       </div>
     </div>
   );
