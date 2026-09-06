@@ -1,5 +1,5 @@
-import { mockApi } from '@/lib/api';
-import { Dashboard } from '@/components/Dashboard';
+import { mockApi } from "@/lib/api";
+import { Dashboard } from "@/components/Dashboard";
 
 // Server Component: fetches the full unfiltered dataset once at request time
 // through the SAME api client the rest of the app uses (see lib/api.ts).

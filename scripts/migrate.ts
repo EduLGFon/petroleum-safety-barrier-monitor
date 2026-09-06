@@ -10,12 +10,14 @@
  * so this is idempotent against an already-migrated database.
  */
 
-import postgres from 'npm:postgres@3.4.5';
-import { fileURLToPath } from 'node:url';
+import postgres from "npm:postgres@3.4.5";
+import { fileURLToPath } from "node:url";
 
-const connectionString = Deno.env.get('DATABASE_URL');
+const connectionString = Deno.env.get("DATABASE_URL");
 if (!connectionString) {
-  console.error('DATABASE_URL is not set. Copy .env.example to .env.local first.');
+  console.error(
+    "DATABASE_URL is not set. Copy .env.example to .env.local first.",
+  );
   Deno.exit(1);
 }
 
@@ -28,11 +30,13 @@ async function applyFile(path: string) {
 }
 
 try {
-  await applyFile(fileURLToPath(new URL('../db/schema.sql', import.meta.url)));
-  await applyFile(fileURLToPath(new URL('../db/seed_lookups.sql', import.meta.url)));
-  console.log('\nMigration complete.');
+  await applyFile(fileURLToPath(new URL("../db/schema.sql", import.meta.url)));
+  await applyFile(
+    fileURLToPath(new URL("../db/seed_lookups.sql", import.meta.url)),
+  );
+  console.log("\nMigration complete.");
 } catch (err) {
-  console.error('\nMigration failed:', err);
+  console.error("\nMigration failed:", err);
   Deno.exit(1);
 } finally {
   await sql.end();

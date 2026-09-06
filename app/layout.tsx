@@ -1,12 +1,12 @@
-import type { Metadata } from 'next';
-import { ThemeProvider }    from '@/context/ThemeContext';
-import { SettingsProvider } from '@/context/SettingsContext';
-import './globals.css';
+import type { Metadata } from "next";
+import { ThemeProvider } from "@/context/ThemeContext";
+import { SettingsProvider } from "@/context/SettingsContext";
+import "./globals.css";
 
 export const metadata: Metadata = {
-  title: 'Seacrest Petróleo · Monitor de Barreiras de Segurança',
-  description: 'Monitor de Barreiras de Segurança — Seacrest Petróleo',
-  icons: { icon: '/favicon.svg' },
+  title: "Seacrest Petróleo · Monitor de Barreiras de Segurança",
+  description: "Monitor de Barreiras de Segurança — Seacrest Petróleo",
+  icons: { icon: "/favicon.svg" },
 };
 
 // Runs before React hydration: apply theme + accent to prevent FOUC
@@ -29,14 +29,23 @@ const INIT = `(function(){try{
     r.style.setProperty('--glow',c.g);}
 }catch(e){}})();`;
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default function RootLayout(
+  { children }: { children: React.ReactNode },
+) {
   return (
     <html lang="pt-BR" suppressHydrationWarning>
       <head>
-        <script dangerouslySetInnerHTML={{ __html: INIT }}/>
-        <link rel="preconnect" href="https://fonts.googleapis.com"/>
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous"/>
-        <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet"/>
+        <script dangerouslySetInnerHTML={{ __html: INIT }} />
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link
+          rel="preconnect"
+          href="https://fonts.gstatic.com"
+          crossOrigin="anonymous"
+        />
+        <link
+          href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap"
+          rel="stylesheet"
+        />
       </head>
       <body suppressHydrationWarning>
         <SettingsProvider>

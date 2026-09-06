@@ -16,45 +16,66 @@
  * run scripts/migrate.ts first.
  */
 
-import postgres from 'npm:postgres@3.4.5';
-import { getWireBarriers } from '../lib/data.ts';
+import postgres from "npm:postgres@3.4.5";
+import { getWireBarriers } from "../lib/data.ts";
 
 const BATCH_SIZE = 500;
 
-const connectionString = Deno.env.get('DATABASE_URL');
+const connectionString = Deno.env.get("DATABASE_URL");
 if (!connectionString) {
-  console.error('DATABASE_URL is not set. Copy .env.example to .env.local first.');
+  console.error(
+    "DATABASE_URL is not set. Copy .env.example to .env.local first.",
+  );
   Deno.exit(1);
 }
 
-const force = Deno.args.includes('--force');
+const force = Deno.args.includes("--force");
 const sql = postgres(connectionString, { max: 1 });
 
 const BARRIER_COLS = [
-  'tag', 'tipologia_id', 'location_id', 'loc_desc_id', 'criticidade_id',
-  'categoria_id', 'agrupamento_id', 'dono_id', 'disponibilidade_id',
-  'comentarios', 'plano_acao', 'status_since',
+  "tag",
+  "tipologia_id",
+  "location_id",
+  "loc_desc_id",
+  "criticidade_id",
+  "categoria_id",
+  "agrupamento_id",
+  "dono_id",
+  "disponibilidade_id",
+  "comentarios",
+  "plano_acao",
+  "status_since",
 ] as const;
 
-const HISTORY_COLS = ['barrier_id', 'date', 'status_id', 'author_id', 'note'] as const;
+const HISTORY_COLS = [
+  "barrier_id",
+  "date",
+  "status_id",
+  "author_id",
+  "note",
+] as const;
 
 async function main() {
-  const [{ count }] = await sql<{ count: string }[]>`select count(*)::text as count from barriers`;
+  const [{ count }] = await sql<
+    { count: string }[]
+  >`select count(*)::text as count from barriers`;
   const existing = Number(count);
 
   if (existing > 0 && !force) {
     console.error(
-      `barriers already has ${existing} rows. Re-run with --force to truncate and reseed.`
+      `barriers already has ${existing} rows. Re-run with --force to truncate and reseed.`,
     );
     Deno.exit(1);
   }
 
   if (existing > 0 && force) {
-    console.log(`→ truncating barriers (${existing} rows) and barrier_status_history…`);
+    console.log(
+      `→ truncating barriers (${existing} rows) and barrier_status_history…`,
+    );
     await sql`truncate table barrier_status_history, barriers restart identity cascade`;
   }
 
-  console.log('→ generating mock barrier set…');
+  console.log("→ generating mock barrier set…");
   const barriers = getWireBarriers();
   console.log(`  generated ${barriers.length} barriers`);
 
@@ -64,19 +85,19 @@ async function main() {
   for (let i = 0; i < barriers.length; i += BATCH_SIZE) {
     const chunk = barriers.slice(i, i + BATCH_SIZE);
 
-    const barrierRows = chunk.map(b => ({
-      tag:                b.tag,
-      tipologia_id:       b.tipologiaId,
-      location_id:        b.locationId,
-      loc_desc_id:        b.locDescId,
-      criticidade_id:     b.criticidadeId,
-      categoria_id:        b.categoriaId,
-      agrupamento_id:     b.agrupamentoId,
-      dono_id:            b.donoId < 0 ? null : b.donoId,
+    const barrierRows = chunk.map((b) => ({
+      tag: b.tag,
+      tipologia_id: b.tipologiaId,
+      location_id: b.locationId,
+      loc_desc_id: b.locDescId,
+      criticidade_id: b.criticidadeId,
+      categoria_id: b.categoriaId,
+      agrupamento_id: b.agrupamentoId,
+      dono_id: b.donoId < 0 ? null : b.donoId,
       disponibilidade_id: b.disponibilidadeId,
-      comentarios:        b.comentarios,
-      plano_acao:         b.planoAcao,
-      status_since:       b.statusSince,
+      comentarios: b.comentarios,
+      plano_acao: b.planoAcao,
+      status_since: b.statusSince,
     }));
 
     // Multi-row insert; Postgres guarantees RETURNING preserves input order
@@ -87,17 +108,19 @@ async function main() {
     `;
 
     const historyRows = returned.flatMap((row, idx) =>
-      chunk[idx].statusHistory.map(h => ({
+      chunk[idx].statusHistory.map((h) => ({
         barrier_id: row.id,
-        date:       h.date,
-        status_id:  h.statusId,
-        author_id:  h.authorId,
-        note:       h.note,
+        date: h.date,
+        status_id: h.statusId,
+        author_id: h.authorId,
+        note: h.note,
       }))
     );
 
     if (historyRows.length > 0) {
-      await sql`insert into barrier_status_history ${sql(historyRows, ...HISTORY_COLS)}`;
+      await sql`insert into barrier_status_history ${
+        sql(historyRows, ...HISTORY_COLS)
+      }`;
       historyInserted += historyRows.length;
     }
 
@@ -105,13 +128,15 @@ async function main() {
     console.log(`  inserted ${inserted}/${barriers.length} barriers…`);
   }
 
-  console.log(`\n✓ ${inserted} barriers, ${historyInserted} history entries inserted.`);
+  console.log(
+    `\n✓ ${inserted} barriers, ${historyInserted} history entries inserted.`,
+  );
 }
 
 try {
   await main();
 } catch (err) {
-  console.error('\nSeed failed:', err);
+  console.error("\nSeed failed:", err);
   Deno.exit(1);
 } finally {
   await sql.end();

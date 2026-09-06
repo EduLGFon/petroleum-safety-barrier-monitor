@@ -1,5 +1,5 @@
-import 'server-only';
-import postgres from 'postgres';
+import "server-only";
+import postgres from "postgres";
 
 /**
  * ══════════════════════════════════════════════════════════════════════════
@@ -24,7 +24,7 @@ function createClient() {
   const connectionString = process.env.DATABASE_URL;
   if (!connectionString) {
     throw new Error(
-      'DATABASE_URL is not set. Copy .env.example to .env.local and point it at your Postgres instance.'
+      "DATABASE_URL is not set. Copy .env.example to .env.local and point it at your Postgres instance.",
     );
   }
   return postgres(connectionString, {
@@ -43,6 +43,6 @@ function createClient() {
 // invocations in prod (Next.js can reuse the same Node process/module cache).
 export const sql = globalThis.__seacrestSql ?? createClient();
 
-if (process.env.NODE_ENV !== 'production') {
+if (process.env.NODE_ENV !== "production") {
   globalThis.__seacrestSql = sql;
 }

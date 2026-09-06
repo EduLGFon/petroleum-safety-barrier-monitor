@@ -1,6 +1,11 @@
-interface P { variant?:"full"|"icon"|"adaptive"; height?:number; light?:boolean; }
+interface P {
+  variant?: "full" | "icon" | "adaptive";
+  height?: number;
+  light?: boolean;
+}
 
-const SVG_PATHS = `<g transform="translate(0,322) scale(0.1,-0.1)" stroke="none">
+const SVG_PATHS =
+  `<g transform="translate(0,322) scale(0.1,-0.1)" stroke="none">
 <path d="M141 3200 c-43 -10 -81 -39 -104 -79 -18 -29 -19 -63 -20 -494 l-1 -462 24 -12 c45 -21 235 -43 373 -43 274 0 561 56 1047 206 664 204 932 262 1280 280 111 5 220 -1 413 -22 l59 -7 -4 259 c-3 238 -5 262 -23 293 -26 44 -62 70 -111 81 -48 11 -2884 11 -2933 0z"/>
 <path d="M2635 2444 c-16 -2 -70 -9 -120 -15 -246 -30 -476 -86 -1000 -244 -500 -151 -709 -197 -967 -215 -143 -9 -353 0 -461 20 -33 6 -62 8 -65 5 -4 -4 -8 -119 -10 -257 -3 -199 -1 -253 10 -259 22 -14 316 -10 413 6 298 48 514 132 1135 440 425 211 580 279 795 352 242 82 451 124 685 140 98 6 109 8 75 15 -43 9 -440 19 -490 12z"/>
 <path d="M2837 2249 c-374 -65 -617 -156 -1228 -460 -217 -108 -449 -220 -515 -249 -348 -152 -689 -229 -967 -218 -99 3 -106 2 -111 -17 -3 -11 -6 -127 -6 -257 0 -197 2 -238 15 -245 20 -12 204 2 300 22 205 42 469 153 690 289 131 81 326 218 560 391 455 339 779 530 1090 643 100 37 356 105 430 115 17 2 -10 4 -60 4 -49 1 -138 -7 -198 -18z"/>
@@ -8,44 +13,92 @@ const SVG_PATHS = `<g transform="translate(0,322) scale(0.1,-0.1)" stroke="none"
 <path d="M3061 1915 c-222 -97 -414 -213 -651 -393 -190 -145 -282 -225 -629 -547 -461 -427 -585 -533 -809 -682 -143 -96 -324 -187 -472 -238 -57 -20 -105 -37 -106 -38 -1 -1 581 -1 1294 1 713 1 1322 2 1353 2 65 0 111 25 142 77 18 31 18 72 19 950 1 534 -3 918 -8 920 -5 1 -65 -22 -133 -52z"/>
 </g>`;
 
-function WaveSVG({ size, bg, fill }: { size:number; bg:string; fill:string }) {
+function WaveSVG(
+  { size, bg, fill }: { size: number; bg: string; fill: string },
+) {
   return (
-    <svg width={size} height={size} viewBox="0 0 323 322" xmlns="http://www.w3.org/2000/svg">
-      <rect width="323" height="322" rx={Math.round(size * 0.1)} fill={bg}/>
-      <g transform="translate(0,322) scale(0.1,-0.1)" fill={fill} stroke="none"
-        dangerouslySetInnerHTML={{ __html: SVG_PATHS.replace(/<g[^>]*>|<\/g>/g,'') }}/>
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 323 322"
+      xmlns="http://www.w3.org/2000/svg"
+    >
+      <rect width="323" height="322" rx={Math.round(size * 0.1)} fill={bg} />
+      <g
+        transform="translate(0,322) scale(0.1,-0.1)"
+        fill={fill}
+        stroke="none"
+        dangerouslySetInnerHTML={{
+          __html: SVG_PATHS.replace(/<g[^>]*>|<\/g>/g, ""),
+        }}
+      />
     </svg>
   );
 }
 
-export function SeacrestLogo({ variant="full", height=40, light=true }: P) {
-  const bg   = light ? "#000000" : "#ffffff";
+export function SeacrestLogo(
+  { variant = "full", height = 40, light = true }: P,
+) {
+  const bg = light ? "#000000" : "#ffffff";
   const wave = light ? "#ffffff" : "#0a1628";
   const textColor = light ? "#ffffff" : "#0f172a";
-  const subColor  = light ? "rgba(148,163,184,0.8)" : "#64748b";
+  const subColor = light ? "rgba(148,163,184,0.8)" : "#64748b";
 
-  if (variant === "icon") return <WaveSVG size={height} bg={bg} fill={wave}/>;
+  if (variant === "icon") return <WaveSVG size={height} bg={bg} fill={wave} />;
 
   if (variant === "adaptive") {
     // Uses CSS currentColor — adapts to theme automatically
     return (
-      <svg width={height} height={height} viewBox="0 0 323 322" xmlns="http://www.w3.org/2000/svg"
-        style={{ borderRadius: Math.round(height * 0.1) }}>
-        <rect width="323" height="322" rx={Math.round(323 * 0.1)} fill="var(--bg-page)"/>
-        <g transform="translate(0,322) scale(0.1,-0.1)" fill="var(--text-primary)" stroke="none"
-          dangerouslySetInnerHTML={{ __html: SVG_PATHS.replace(/<g[^>]*>|<\/g>/g,'') }}/>
+      <svg
+        width={height}
+        height={height}
+        viewBox="0 0 323 322"
+        xmlns="http://www.w3.org/2000/svg"
+        style={{ borderRadius: Math.round(height * 0.1) }}
+      >
+        <rect
+          width="323"
+          height="322"
+          rx={Math.round(323 * 0.1)}
+          fill="var(--bg-page)"
+        />
+        <g
+          transform="translate(0,322) scale(0.1,-0.1)"
+          fill="var(--text-primary)"
+          stroke="none"
+          dangerouslySetInnerHTML={{
+            __html: SVG_PATHS.replace(/<g[^>]*>|<\/g>/g, ""),
+          }}
+        />
       </svg>
     );
   }
 
   return (
-    <div style={{ display:"flex", alignItems:"center", gap:12 }}>
-      <WaveSVG size={height} bg={bg} fill={wave}/>
-      <div style={{ lineHeight:1 }}>
-        <div style={{ fontSize:height*0.43, fontWeight:900, letterSpacing:"-0.025em", color:textColor, lineHeight:1.1 }}>
+    <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+      <WaveSVG size={height} bg={bg} fill={wave} />
+      <div style={{ lineHeight: 1 }}>
+        <div
+          style={{
+            fontSize: height * 0.43,
+            fontWeight: 900,
+            letterSpacing: "-0.025em",
+            color: textColor,
+            lineHeight: 1.1,
+          }}
+        >
           Seacrest
         </div>
-        <div style={{ fontSize:height*0.22, fontWeight:600, letterSpacing:"0.2em", textTransform:"uppercase", color:subColor, marginTop:2 }}>
+        <div
+          style={{
+            fontSize: height * 0.22,
+            fontWeight: 600,
+            letterSpacing: "0.2em",
+            textTransform: "uppercase",
+            color: subColor,
+            marginTop: 2,
+          }}
+        >
           Petróleo
         </div>
       </div>

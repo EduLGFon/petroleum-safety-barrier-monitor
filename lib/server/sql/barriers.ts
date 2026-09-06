@@ -1,6 +1,11 @@
-import 'server-only';
-import { sql } from '../db';
-import type { WireBarrier, BarriersQuery, BarriersResponse, WireKpiSnapshot } from '@/lib/wireTypes';
+import "server-only";
+import { sql } from "../db";
+import type {
+  BarriersQuery,
+  BarriersResponse,
+  WireBarrier,
+  WireKpiSnapshot,
+} from "@/lib/wireTypes";
 
 /**
  * ══════════════════════════════════════════════════════════════════════════
@@ -19,18 +24,18 @@ import type { WireBarrier, BarriersQuery, BarriersResponse, WireKpiSnapshot } fr
 // hardcoded SQL expression. Never derive this from user input.
 
 const SORTABLE: Record<string, string> = {
-  id:              'b.id',
-  tag:             'b.tag',
-  criticidade:     'b.criticidade_id',
-  categoria:       'b.categoria_id',
-  disponibilidade: 'b.disponibilidade_id',
-  conformidade:    'b.conformidade_id',
-  statusSince:     'b.status_since',
+  id: "b.id",
+  tag: "b.tag",
+  criticidade: "b.criticidade_id",
+  categoria: "b.categoria_id",
+  disponibilidade: "b.disponibilidade_id",
+  conformidade: "b.conformidade_id",
+  statusSince: "b.status_since",
 };
 
 function resolveOrderBy(sortCol?: string, sortDir?: string) {
-  const col = SORTABLE[sortCol ?? 'id'] ?? SORTABLE.id;
-  const dir = sortDir === 'desc' ? 'desc' : 'asc';
+  const col = SORTABLE[sortCol ?? "id"] ?? SORTABLE.id;
+  const dir = sortDir === "desc" ? "desc" : "asc";
   // Safe: `col` only ever comes from the SORTABLE map above (fixed strings
   // we wrote), `dir` is constrained to a two-value literal check — neither
   // can carry attacker-controlled SQL, so sql.unsafe() here isn't unsafe.
@@ -48,30 +53,35 @@ interface BarrierRow {
   criticidade_id: number;
   categoria_id: number;
   agrupamento_id: number;
-  dono_id: number;        // coalesced to -1 in SQL when NULL
+  dono_id: number; // coalesced to -1 in SQL when NULL
   disponibilidade_id: number;
   comentarios: string;
   plano_acao: string;
-  status_since: string;   // ISO date string as returned by postgres.js
-  status_history: { date: string; statusId: number; authorId: number; note: string }[];
+  status_since: string; // ISO date string as returned by postgres.js
+  status_history: {
+    date: string;
+    statusId: number;
+    authorId: number;
+    note: string;
+  }[];
 }
 
 function toWireBarrier(r: BarrierRow): WireBarrier {
   return {
-    id:                r.id,
-    tag:               r.tag,
-    tipologiaId:       r.tipologia_id,
-    locationId:        r.location_id,
-    locDescId:         r.loc_desc_id,
-    criticidadeId:     r.criticidade_id,
-    categoriaId:       r.categoria_id,
-    agrupamentoId:     r.agrupamento_id,
-    donoId:            r.dono_id,
+    id: r.id,
+    tag: r.tag,
+    tipologiaId: r.tipologia_id,
+    locationId: r.location_id,
+    locDescId: r.loc_desc_id,
+    criticidadeId: r.criticidade_id,
+    categoriaId: r.categoria_id,
+    agrupamentoId: r.agrupamento_id,
+    donoId: r.dono_id,
     disponibilidadeId: r.disponibilidade_id,
-    comentarios:       r.comentarios,
-    planoAcao:         r.plano_acao,
-    statusSince:       r.status_since,
-    statusHistory:     r.status_history ?? [],
+    comentarios: r.comentarios,
+    planoAcao: r.plano_acao,
+    statusSince: r.status_since,
+    statusHistory: r.status_history ?? [],
   };
 }
 
@@ -117,22 +127,46 @@ const HISTORY_JOIN = sql`
 function buildWhere(q: BarriersQuery) {
   return sql`
     where true
-    ${q.locationId !== undefined && q.locationId !== 0 ? sql`and b.location_id = ${q.locationId}` : sql``}
-    ${q.disponibilidadeId !== undefined ? sql`and b.disponibilidade_id = ${q.disponibilidadeId}` : sql``}
-    ${q.conformidadeId !== undefined ? sql`and b.conformidade_id = ${q.conformidadeId}` : sql``}
-    ${q.categoriaId !== undefined ? sql`and b.categoria_id = ${q.categoriaId}` : sql``}
-    ${q.query ? sql`and (b.tag ilike ${'%' + q.query + '%'} or loc.code ilike ${'%' + q.query + '%'})` : sql``}
+    ${
+    q.locationId !== undefined && q.locationId !== 0
+      ? sql`and b.location_id = ${q.locationId}`
+      : sql``
+  }
+    ${
+    q.disponibilidadeId !== undefined
+      ? sql`and b.disponibilidade_id = ${q.disponibilidadeId}`
+      : sql``
+  }
+    ${
+    q.conformidadeId !== undefined
+      ? sql`and b.conformidade_id = ${q.conformidadeId}`
+      : sql``
+  }
+    ${
+    q.categoriaId !== undefined
+      ? sql`and b.categoria_id = ${q.categoriaId}`
+      : sql``
+  }
+    ${
+    q.query
+      ? sql`and (b.tag ilike ${"%" + q.query + "%"} or loc.code ilike ${
+        "%" + q.query + "%"
+      })`
+      : sql``
+  }
   `;
 }
 
 // ─── Public queries ───────────────────────────────────────────────────────
 
-export async function listBarriers(q: BarriersQuery): Promise<BarriersResponse> {
-  const page     = Math.max(1, q.page ?? 1);
+export async function listBarriers(
+  q: BarriersQuery,
+): Promise<BarriersResponse> {
+  const page = Math.max(1, q.page ?? 1);
   const pageSize = Math.min(100_000, Math.max(1, q.pageSize ?? 25));
-  const offset   = (page - 1) * pageSize;
-  const where    = buildWhere(q);
-  const orderBy  = resolveOrderBy(q.sortCol, q.sortDir);
+  const offset = (page - 1) * pageSize;
+  const where = buildWhere(q);
+  const orderBy = resolveOrderBy(q.sortCol, q.sortDir);
 
   const [rows, countRows] = await Promise.all([
     sql<BarrierRow[]>`
@@ -174,15 +208,21 @@ export async function getBarrierById(id: number): Promise<WireBarrier | null> {
 }
 
 export async function getKpi(locationId?: number): Promise<WireKpiSnapshot> {
-  const where =
-    locationId !== undefined && locationId !== 0
-      ? sql`where b.location_id = ${locationId}`
-      : sql``;
+  const where = locationId !== undefined && locationId !== 0
+    ? sql`where b.location_id = ${locationId}`
+    : sql``;
 
   const rows = await sql<{
-    total: string; disponivel: string; fora_de_op: string; indisp_cont: string;
-    degr_cont: string; degradado: string; indisponivel: string;
-    conforme: string; nao_conforme: string; criticas_nc: string;
+    total: string;
+    disponivel: string;
+    fora_de_op: string;
+    indisp_cont: string;
+    degr_cont: string;
+    degradado: string;
+    indisponivel: string;
+    conforme: string;
+    nao_conforme: string;
+    criticas_nc: string;
   }[]>`
     select
       count(*)::text                                                             as total,
@@ -205,16 +245,16 @@ export async function getKpi(locationId?: number): Promise<WireKpiSnapshot> {
 
   return {
     total,
-    disponivel:   Number(r?.disponivel ?? 0),
-    foraDeOp:     Number(r?.fora_de_op ?? 0),
-    indispCont:   Number(r?.indisp_cont ?? 0),
-    degrCont:     Number(r?.degr_cont ?? 0),
-    degradado:    Number(r?.degradado ?? 0),
+    disponivel: Number(r?.disponivel ?? 0),
+    foraDeOp: Number(r?.fora_de_op ?? 0),
+    indispCont: Number(r?.indisp_cont ?? 0),
+    degrCont: Number(r?.degr_cont ?? 0),
+    degradado: Number(r?.degradado ?? 0),
     indisponivel: Number(r?.indisponivel ?? 0),
     conforme,
-    naoConforme:  Number(r?.nao_conforme ?? 0),
-    criticasNC:   Number(r?.criticas_nc ?? 0),
-    pctConforme:  total > 0 ? Math.round((conforme / total) * 100) : 0,
+    naoConforme: Number(r?.nao_conforme ?? 0),
+    criticasNC: Number(r?.criticas_nc ?? 0),
+    pctConforme: total > 0 ? Math.round((conforme / total) * 100) : 0,
   };
 }
 
@@ -229,7 +269,7 @@ export async function transitionBarrierStatus(
   barrierId: number,
   statusId: number,
   authorId: number,
-  note = ''
+  note = "",
 ): Promise<WireBarrier | null> {
   await sql`select record_status_change(${barrierId}, ${statusId}, ${authorId}, ${note})`;
   return getBarrierById(barrierId);

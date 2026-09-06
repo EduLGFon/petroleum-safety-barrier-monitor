@@ -1,18 +1,51 @@
-import type { CSSProperties } from 'react';
-interface P { label:string; solid:string; bg:string; border:string; size?:'xs'|'sm'|'md'; dot?:boolean; }
-export function Badge({ label, solid, bg, border, size='md', dot=true }: P) {
-  const fs  = size==='xs'?10:size==='sm'?11:12;
-  const pad = size==='xs'?'2px 7px':size==='sm'?'3px 8px':'4px 11px';
-  const ds  = size==='xs'?5:6;
+import type { CSSProperties } from "react";
+interface P {
+  label: string;
+  solid: string;
+  bg: string;
+  border: string;
+  size?: "xs" | "sm" | "md";
+  dot?: boolean;
+}
+export function Badge(
+  { label, solid, bg, border, size = "md", dot = true }: P,
+) {
+  const fs = size === "xs" ? 10 : size === "sm" ? 11 : 12;
+  const pad = size === "xs"
+    ? "2px 7px"
+    : size === "sm"
+    ? "3px 8px"
+    : "4px 11px";
+  const ds = size === "xs" ? 5 : 6;
   const s: CSSProperties = {
-    display:'inline-flex', alignItems:'center', gap:5,
-    fontSize:fs, fontWeight:700, padding:pad, borderRadius:6,
-    background:bg, border:`1px solid ${border}`, color:solid,
-    whiteSpace:'nowrap', letterSpacing:'0.025em', textTransform:'uppercase',
+    display: "inline-flex",
+    alignItems: "center",
+    gap: 5,
+    fontSize: fs,
+    fontWeight: 700,
+    padding: pad,
+    borderRadius: 6,
+    background: bg,
+    border: `1px solid ${border}`,
+    color: solid,
+    whiteSpace: "nowrap",
+    letterSpacing: "0.025em",
+    textTransform: "uppercase",
   };
   return (
     <span style={s}>
-      {dot&&<span style={{width:ds,height:ds,borderRadius:'50%',background:solid,flexShrink:0,boxShadow:`0 0 4px ${solid}88`}}/>}
+      {dot && (
+        <span
+          style={{
+            width: ds,
+            height: ds,
+            borderRadius: "50%",
+            background: solid,
+            flexShrink: 0,
+            boxShadow: `0 0 4px ${solid}88`,
+          }}
+        />
+      )}
       {label}
     </span>
   );

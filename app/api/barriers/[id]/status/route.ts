@@ -1,5 +1,5 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { transitionBarrierStatus } from '@/lib/server/sql/barriers';
+import { NextRequest, NextResponse } from "next/server";
+import { transitionBarrierStatus } from "@/lib/server/sql/barriers";
 
 /**
  * PATCH /api/barriers/:id/status
@@ -16,38 +16,45 @@ import { transitionBarrierStatus } from '@/lib/server/sql/barriers';
  */
 export async function PATCH(
   req: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: Promise<{ id: string }> },
 ) {
   const { id } = await params;
   const barrierId = Number(id);
 
   if (!Number.isInteger(barrierId) || barrierId <= 0) {
-    return NextResponse.json({ error: 'Invalid barrier id' }, { status: 400 });
+    return NextResponse.json({ error: "Invalid barrier id" }, { status: 400 });
   }
 
   let body: { statusId?: number; authorId?: number; note?: string };
   try {
     body = await req.json();
   } catch {
-    return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
+    return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
   }
 
   const { statusId, authorId, note } = body;
   if (!Number.isInteger(statusId) || !Number.isInteger(authorId)) {
     return NextResponse.json(
-      { error: 'statusId and authorId are required integers' },
-      { status: 400 }
+      { error: "statusId and authorId are required integers" },
+      { status: 400 },
     );
   }
 
   try {
-    const updated = await transitionBarrierStatus(barrierId, statusId!, authorId!, note ?? '');
+    const updated = await transitionBarrierStatus(
+      barrierId,
+      statusId!,
+      authorId!,
+      note ?? "",
+    );
     if (!updated) {
-      return NextResponse.json({ error: 'Barrier not found' }, { status: 404 });
+      return NextResponse.json({ error: "Barrier not found" }, { status: 404 });
     }
     return NextResponse.json(updated);
   } catch (err) {
     console.error(`[PATCH /api/barriers/${id}/status]`, err);
-    return NextResponse.json({ error: 'Failed to update barrier status' }, { status: 500 });
+    return NextResponse.json({ error: "Failed to update barrier status" }, {
+      status: 500,
+    });
   }
 }

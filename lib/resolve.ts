@@ -4,45 +4,57 @@
  * ══════════════════════════════════════════════════════════════════════════
  */
 
-import type { Barrier, StatusHistoryEntry } from './types';
-import type { WireBarrier, WireStatusHistoryEntry, WireKpiSnapshot } from './wireTypes';
-import type { KpiSnapshot } from './types';
+import type { Barrier, StatusHistoryEntry } from "./types";
+import type {
+  WireBarrier,
+  WireKpiSnapshot,
+  WireStatusHistoryEntry,
+} from "./wireTypes";
+import type { KpiSnapshot } from "./types";
 import {
-  fromLocationId, fromDisponibilidadeId, fromCriticidadeId,
-  fromCategoriaId, fromAgrupamentoId, fromTipologiaId,
-  fromDonoId, fromLocDescId, fromAuthorId,
-} from './enums';
-import { isConforme } from './constants';
+  fromAgrupamentoId,
+  fromAuthorId,
+  fromCategoriaId,
+  fromCriticidadeId,
+  fromDisponibilidadeId,
+  fromDonoId,
+  fromLocationId,
+  fromLocDescId,
+  fromTipologiaId,
+} from "./enums";
+import { isConforme } from "./constants";
 
-export function resolveHistoryEntry(w: WireStatusHistoryEntry): StatusHistoryEntry {
+export function resolveHistoryEntry(
+  w: WireStatusHistoryEntry,
+): StatusHistoryEntry {
   return {
-    date:   w.date,
+    date: w.date,
     status: fromDisponibilidadeId(w.statusId),
     author: fromAuthorId(w.authorId),
-    note:   w.note,
+    note: w.note,
   };
 }
 
 export function resolveBarrier(w: WireBarrier): Barrier {
   const disponibilidade = fromDisponibilidadeId(w.disponibilidadeId);
   return {
-    id:              w.id,
-    tag:             w.tag,
-    tipologia:       fromTipologiaId(w.tipologiaId),
-    instalacao:      fromLocationId(w.locationId),
-    locDesc:         fromLocDescId(w.locDescId),
-    criticidade:     fromCriticidadeId(w.criticidadeId),
-    categoria:       fromCategoriaId(w.categoriaId),
-    agrupamento:     fromAgrupamentoId(w.agrupamentoId),
-    dono:            fromDonoId(w.donoId),
+    id: w.id,
+    tag: w.tag,
+    tipologia: fromTipologiaId(w.tipologiaId),
+    instalacao: fromLocationId(w.locationId),
+    locDesc: fromLocDescId(w.locDescId),
+    criticidade: fromCriticidadeId(w.criticidadeId),
+    categoria: fromCategoriaId(w.categoriaId),
+    agrupamento: fromAgrupamentoId(w.agrupamentoId),
+    dono: fromDonoId(w.donoId),
     disponibilidade,
     // Conformidade is always DERIVED from disponibilidade — never trusted
     // from the wire — so the two values can never disagree.
-    conformidade:    isConforme(disponibilidade) ? 'Conforme' : 'Não Conforme',
-    comentarios:     w.comentarios,
-    planoAcao:       w.planoAcao,
-    statusSince:     w.statusSince,
-    statusHistory:   w.statusHistory.map(resolveHistoryEntry),
+    conformidade: isConforme(disponibilidade) ? "Conforme" : "Não Conforme",
+    comentarios: w.comentarios,
+    planoAcao: w.planoAcao,
+    statusSince: w.statusSince,
+    statusHistory: w.statusHistory.map(resolveHistoryEntry),
   };
 }
 
