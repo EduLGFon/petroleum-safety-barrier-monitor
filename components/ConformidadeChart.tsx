@@ -1,24 +1,13 @@
-"use client";
-import dynamic from "next/dynamic";
-import type { CategoryConformidade } from "@/lib/types";
-const Chart = dynamic(() => import("./ConformidadeChartInner"), {
-  ssr: false,
-  loading: () => (
-    <div
-      style={{
-        height: 240,
-        background:
-          "linear-gradient(90deg,var(--bg-elevated) 25%,var(--bg-surface) 50%,var(--bg-elevated) 75%)",
-        backgroundSize: "200% 100%",
-        borderRadius: 8,
-        animation: "shimmer 1.5s linear infinite",
-      }}
-    />
-  ),
-});
+// Conformidade chart card - section wrapper around the SVG bars.
+// This is why it exists: keeps the card frame stable while the inner
+// chart stays dependency-free (no dynamic import needed in Fresh).
+import Chart from "./ConformidadeChartInner.tsx";
+import type { CategoryConformidade } from "../lib/types.ts";
+
 interface Props {
   data: CategoryConformidade[];
 }
+
 export function ConformidadeChart({ data }: Props) {
   return (
     <div
