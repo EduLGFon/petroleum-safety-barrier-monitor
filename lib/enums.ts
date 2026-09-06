@@ -14,7 +14,7 @@
  * to change.
  */
 
-import type { Conformidade, Criticidade, Disponibilidade } from "./types";
+import type { Conformidade, Criticidade, Disponibilidade } from "./types.ts";
 
 // ─── Generic helpers ──────────────────────────────────────────────────────
 

@@ -3,8 +3,8 @@ import type {
   CategoryConformidade,
   FilterState,
   KpiSnapshot,
-} from "./types";
-import { CATEGORIES, SIM_DATE } from "./constants";
+} from "./types.ts";
+import { CATEGORIES, SIM_DATE } from "./constants.ts";
 
 export function computeKpi(b: Barrier[]): KpiSnapshot {
   const t = b.length;

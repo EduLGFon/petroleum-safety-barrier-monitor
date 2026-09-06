@@ -8,9 +8,6 @@
  * contract is `WireBarrier[]`, resolved later by lib/resolve.ts.
  */
 
-import type { WireBarrier, WireStatusHistoryEntry } from "./wireTypes";
-import type { Disponibilidade } from "./types";
-import { LOCATION_DIST_BY_ID, SIM_DATE } from "./constants";
 import {
   AGRUPAMENTO_CODES,
   AUTHOR_CODES,
@@ -18,16 +15,9 @@ import {
   DONO_CODES,
   LOC_DESC_CODES,
   TIPOLOGIA_CODES,
-  toAgrupamentoId,
-  toAuthorId,
-  toCategoriaId,
-  toDisponibilidadeId,
-  toDonoId,
-  toLocationId,
-  toLocDescId,
-  toTipologiaId,
-} from "./enums";
-import { isConforme } from "./constants";
+} from "./enums.ts";
+import type { WireBarrier, WireStatusHistoryEntry } from "./wireTypes.ts";
+import { LOCATION_DIST_BY_ID, SIM_DATE } from "./constants.ts";
 
 // ─── Seeded PRNG ──────────────────────────────────────────────────────────
 

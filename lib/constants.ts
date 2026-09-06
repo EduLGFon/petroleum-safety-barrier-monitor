@@ -1,4 +1,4 @@
-import type { Disponibilidade, Location } from "./types";
+import type { Disponibilidade, Location } from "./types.ts";
 
 export const LOCATIONS: Location[] = [
   { code: "ALL", name: "Todas", tipo: "Todas as Instalações" },

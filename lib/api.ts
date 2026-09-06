@@ -21,23 +21,23 @@
  * consumer calls `api.*` exclusively.
  */
 
-import type { Barrier, KpiSnapshot } from "./types";
+import type { Barrier, KpiSnapshot } from "./types.ts";
 import type {
   BarriersQuery,
   BarriersResponse,
   WireBarrier,
   WireKpiSnapshot,
-} from "./wireTypes";
-import { resolveBarriers, resolveKpi } from "./resolve";
-import { getWireBarriers } from "./data";
+} from "./wireTypes.ts";
+import { resolveBarriers, resolveKpi } from "./resolve.ts";
+import { getWireBarriers } from "./data.ts";
 import {
   fromLocationId,
   toCategoriaId,
   toConformidadeId,
   toDisponibilidadeId,
   toLocationId,
-} from "./enums";
-import { computeKpi as computeKpiLocal } from "./utils";
+} from "./enums.ts";
+import { computeKpi as computeKpiLocal } from "./utils.ts";
 
 // ─── Public contract ──────────────────────────────────────────────────────
 

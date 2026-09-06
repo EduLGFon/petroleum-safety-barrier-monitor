@@ -1,6 +1,6 @@
-import type { Barrier } from "./types";
-import { daysSince, fmtDate, humanDuration } from "./utils";
-import { CONF_COLORS, DISP_COLORS } from "./constants";
+import type { Barrier } from "./types.ts";
+import { daysSince, fmtDate, humanDuration } from "./utils.ts";
+import { CONF_COLORS, DISP_COLORS } from "./constants.ts";
 
 function row(b: Barrier) {
   const nc = b.conformidade === "Não Conforme";

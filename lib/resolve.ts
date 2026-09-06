@@ -4,13 +4,13 @@
  * ══════════════════════════════════════════════════════════════════════════
  */
 
-import type { Barrier, StatusHistoryEntry } from "./types";
+import type { Barrier, StatusHistoryEntry } from "./types.ts";
 import type {
   WireBarrier,
   WireKpiSnapshot,
   WireStatusHistoryEntry,
-} from "./wireTypes";
-import type { KpiSnapshot } from "./types";
+} from "./wireTypes.ts";
+import type { KpiSnapshot } from "./types.ts";
 import {
   fromAgrupamentoId,
   fromAuthorId,
@@ -21,8 +21,8 @@ import {
   fromLocationId,
   fromLocDescId,
   fromTipologiaId,
-} from "./enums";
-import { isConforme } from "./constants";
+} from "./enums.ts";
+import { isConforme } from "./constants.ts";
 
 export function resolveHistoryEntry(
   w: WireStatusHistoryEntry,
