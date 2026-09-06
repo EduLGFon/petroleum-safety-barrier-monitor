@@ -1,4 +1,4 @@
-import { SeacrestLogo } from "./ui/SeacrestLogo.tsx";
+import { BrandMark } from "./ui/BrandMark.tsx";
 import { ShieldIcon } from "./ui/Icons.tsx";
 
 interface Props {
@@ -109,7 +109,7 @@ export function Header({ onOpenSettings }: Props) {
           position: "relative",
         }}
       >
-        <SeacrestLogo variant="icon" height={44} light />
+        <BrandMark variant="icon" height={44} light />
         <div
           style={{
             width: 1,

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "preact/hooks";
-import { SeacrestLogo } from "./ui/SeacrestLogo.tsx";
+import { BrandMark } from "./ui/BrandMark.tsx";
 
 interface Props {
   onDone: () => void;
@@ -122,7 +122,7 @@ export function LoadingScreen({ onDone }: Props) {
             filter: "drop-shadow(0 4px 20px rgba(59,130,246,.28))",
           }}
         >
-          <SeacrestLogo variant="icon" height={76} light />
+          <BrandMark variant="icon" height={76} light />
         </div>
 
         {/* Brand text */}

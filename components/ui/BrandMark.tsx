@@ -1,6 +1,9 @@
-// Brand logo - path data is a static constant, never user input.
+// Brand mark - neutral wave icon with no company identification.
+// This is why it exists: decorative logo used by the header (icon) and
+// loading screen. Company text, when configured, renders beside it from
+// the COMPANY_NAME env var instead of living inside the artwork.
 interface P {
-  variant?: "full" | "icon" | "adaptive";
+  variant?: "icon" | "adaptive";
   height?: number;
   light?: boolean;
 }
@@ -38,15 +41,11 @@ function WaveSVG(
   );
 }
 
-export function SeacrestLogo(
-  { variant = "full", height = 40, light = true }: P,
+export function BrandMark(
+  { variant = "icon", height = 40, light = true }: P,
 ) {
   const bg = light ? "#000000" : "#ffffff";
   const wave = light ? "#ffffff" : "#0a1628";
-  const textColor = light ? "#ffffff" : "#0f172a";
-  const subColor = light ? "rgba(148,163,184,0.8)" : "#64748b";
-
-  if (variant === "icon") return <WaveSVG size={height} bg={bg} fill={wave} />;
 
   if (variant === "adaptive") {
     // Uses CSS currentColor — adapts to theme automatically
@@ -77,34 +76,5 @@ export function SeacrestLogo(
     );
   }
 
-  return (
-    <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-      <WaveSVG size={height} bg={bg} fill={wave} />
-      <div style={{ lineHeight: 1 }}>
-        <div
-          style={{
-            fontSize: height * 0.43,
-            fontWeight: 900,
-            letterSpacing: "-0.025em",
-            color: textColor,
-            lineHeight: 1.1,
-          }}
-        >
-          Seacrest
-        </div>
-        <div
-          style={{
-            fontSize: height * 0.22,
-            fontWeight: 600,
-            letterSpacing: "0.2em",
-            textTransform: "uppercase",
-            color: subColor,
-            marginTop: 2,
-          }}
-        >
-          Petróleo
-        </div>
-      </div>
-    </div>
-  );
+  return <WaveSVG size={height} bg={bg} fill={wave} />;
 }
