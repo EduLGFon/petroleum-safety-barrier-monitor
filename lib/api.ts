@@ -12,11 +12,11 @@
  *   - `httpAdapter`  — talks to a real REST backend using the wire format
  *                      defined in lib/wireTypes.ts (numeric ids everywhere).
  *
- * Active adapter is controlled by `NEXT_PUBLIC_API_MODE`:
+ * Active adapter is controlled by `PUBLIC_API_MODE`:
  *   - "mock" (default) -> mockAdapter
- *   - "http"            -> httpAdapter, using NEXT_PUBLIC_API_BASE_URL
+ *   - "http"            -> httpAdapter, using PUBLIC_API_BASE_URL
  *
- * To go live: set NEXT_PUBLIC_API_MODE=http and NEXT_PUBLIC_API_BASE_URL to
+ * To go live: set PUBLIC_API_MODE=http and PUBLIC_API_BASE_URL to
  * your backend root. No other file in the app needs to change — every
  * consumer calls `api.*` exclusively.
  */
@@ -154,37 +154,37 @@ function sortWire(
 }
 
 const mockAdapter: BarriersApi = {
-  async getBarriers(query) {
+  getBarriers(query) {
     const all = getWireBarriers().filter((w) => matchesQuery(w, query));
     const total = all.length;
     const page = query.page ?? 1;
     const pageSize = query.pageSize ?? 25;
     const sorted = sortWire(all, query.sortCol ?? "id", query.sortDir ?? "asc");
     const pageItems = sorted.slice((page - 1) * pageSize, page * pageSize);
-    return {
+    return Promise.resolve({
       items: resolveBarriers(pageItems),
       total,
       totalPages: Math.max(1, Math.ceil(total / pageSize)),
-    };
+    });
   },
 
-  async getAllBarriers(query) {
+  getAllBarriers(query) {
     const all = getWireBarriers().filter((w) => matchesQuery(w, query));
     const sorted = sortWire(all, query.sortCol ?? "id", query.sortDir ?? "asc");
-    return resolveBarriers(sorted);
+    return Promise.resolve(resolveBarriers(sorted));
   },
 
-  async getBarrierById(id) {
+  getBarrierById(id) {
     const w = getWireBarriers().find((b) => b.id === id);
-    return w ? resolveBarriers([w])[0] : null;
+    return Promise.resolve(w ? resolveBarriers([w])[0] : null);
   },
 
-  async getKpi(query) {
+  getKpi(query) {
     const all = getWireBarriers().filter((w) =>
       query.locationId === undefined || query.locationId === 0 ||
       w.locationId === query.locationId
     );
-    return computeKpiLocal(resolveBarriers(all));
+    return Promise.resolve(computeKpiLocal(resolveBarriers(all)));
   },
 };
 
@@ -240,10 +240,21 @@ function httpAdapterFactory(baseUrl: string): BarriersApi {
 
 // ─── Adapter selection ────────────────────────────────────────────────────
 
-const API_MODE = (process.env.NEXT_PUBLIC_API_MODE ?? "mock") as
+// Reads env on the server via Deno. On the client (island) Deno is absent,
+// so this falls back to undefined and the mock adapter is used by default.
+function getEnv(key: string): string | undefined {
+  try {
+    if (typeof Deno !== "undefined") return Deno.env.get(key);
+  } catch {
+    // --deny-env or non-Deno runtime: fall through to default.
+  }
+  return undefined;
+}
+
+const API_MODE = (getEnv("PUBLIC_API_MODE") ?? "mock") as
   | "mock"
   | "http";
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "";
+const API_BASE_URL = getEnv("PUBLIC_API_BASE_URL") ?? "";
 
 export const api: BarriersApi = API_MODE === "http" && API_BASE_URL
   ? httpAdapterFactory(API_BASE_URL)
