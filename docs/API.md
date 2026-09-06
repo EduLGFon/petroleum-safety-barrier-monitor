@@ -80,7 +80,7 @@ evita que os dois campos fiquem inconsistentes.
 ## Usando a API real (Postgres)
 
 Os três endpoints que `httpAdapterFactory` espera já estão implementados em
-`app/api/`, sobre PostgreSQL (sem ORM — SQL puro via `postgres.js`):
+`routes/api/`, sobre PostgreSQL (sem ORM — SQL puro via the Deno-native driver):
 
 - `GET /api/barriers?locationId=1&disponibilidadeId=4&page=1&pageSize=25` →
   `BarriersResponse { items: WireBarrier[], total, page, pageSize, totalPages }`
@@ -95,15 +95,15 @@ Para ativar:
    passo a passo completo).
 2. Defina as variáveis de ambiente (veja `.env.example`):
    ```
-   NEXT_PUBLIC_API_MODE=http
-   NEXT_PUBLIC_API_BASE_URL=http://localhost:3000
+   PUBLIC_API_MODE=http
+   PUBLIC_API_BASE_URL=http://localhost:8000
    DATABASE_URL=postgres://user:password@localhost:5432/seacrest_barreiras
    ```
 3. Nenhum componente precisa mudar. `api` em `lib/api.ts` passa a apontar para
    `httpAdapter` automaticamente, que agora conversa com essas rotas.
 
 Toda a camada SQL (`lib/server/db.ts`, `lib/server/sql/barriers.ts`) é
-server-only (guardada pelo pacote `server-only`) — a connection string do
+server-only (guardada pelo limite server/routes (nunca importada em islands)) — a connection string do
 Postgres nunca chega ao bundle do cliente.
 
 ## Query de filtros (string -> wire)
@@ -127,9 +127,9 @@ toWireQuery({ location: "FAL", disponibilidade: "Degradado", page: 1 });
 | `lib/data.ts`                | Gerador mock determinístico — produz `WireBarrier[]`           |
 | `lib/api.ts`                 | Cliente unificado — expõe `api.*`, escolhe mock ou HTTP        |
 | `lib/constants.ts`           | Constantes de exibição (cores, listas) + `LOCATION_DIST_BY_ID` |
-| `lib/server/db.ts`           | Cliente Postgres (server-only)                                 |
+| `lib/server/db.ts`           | Cliente Postgres (server routes only)                          |
 | `lib/server/sql/barriers.ts` | Queries SQL: listagem, filtro, sort, KPI, transição de status  |
-| `app/api/`                   | Route handlers Next.js que expõem as queries acima via HTTP    |
+| `routes/api/`                | Route handlers Fresh que expõem as queries acima via HTTP    |
 | `db/schema.sql`              | DDL: tabelas de lookup, `barriers`, `barrier_status_history`   |
 | `db/seed_lookups.sql`        | Seed das tabelas de lookup, espelhando `lib/enums.ts`          |
 

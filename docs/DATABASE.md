@@ -1,7 +1,7 @@
 # Banco de Dados — Monitor de Barreiras Seacrest
 
 Sem Prisma, sem ORM: SQL puro via
-[`postgres`](https://github.com/porsager/postgres) (postgres.js), com queries
+[`postgres`](https://github.com/porsager/postgres) (Deno-native driver), com queries
 parametrizadas por tagged templates.
 
 ## Setup rápido
@@ -23,8 +23,8 @@ deno task db:seed
 
 # 5. Aponte o app para a API real
 #    em .env.local:
-#    NEXT_PUBLIC_API_MODE=http
-#    NEXT_PUBLIC_API_BASE_URL=http://localhost:3000
+#    PUBLIC_API_MODE=http
+#    PUBLIC_API_BASE_URL=http://localhost:8000
 
 deno task dev
 ```
@@ -40,7 +40,7 @@ exatamente que forma um `WireBarrier` tem (ids numéricos, ver `lib/enums.ts`), 
 `lib/api.ts` já sabia como consumir esse formato via `httpAdapter`. Um ORM como
 Prisma imporia seu próprio dialeto de schema e geraria os tipos por cima — aqui,
 as queries já sabem exatamente qual formato produzir porque esse formato foi
-definido primeiro, do lado do frontend. SQL direto com `postgres.js` deixa essa
+definido primeiro, do lado do frontend. SQL direto com driver Deno-native deixa essa
 camada fina: schema.sql declara a verdade, as queries em
 `lib/server/sql/barriers.ts` a moldam no formato wire, sem geração de código no
 meio do caminho.
@@ -134,20 +134,20 @@ for implementada.
 `getWireBarriers()` de `lib/data.ts` (o mesmo gerador determinístico que
 alimenta o modo "mock" do app) e insere o resultado no Postgres em lotes de 500
 linhas. Isso garante que os dados de demonstração no banco sejam idênticos, id a
-id, ao que o app mostraria em `NEXT_PUBLIC_API_MODE=mock` — útil para
+id, ao que o app mostraria em `PUBLIC_API_MODE=mock` — útil para
 comparar/depurar os dois modos lado a lado.
 
 ## Arquivos desta camada
 
-| Arquivo                                 | Responsabilidade                                                  |
-| --------------------------------------- | ----------------------------------------------------------------- |
-| `db/schema.sql`                         | DDL completo: tabelas, índices, triggers, funções                 |
-| `db/seed_lookups.sql`                   | Popula as tabelas de lookup a partir de `lib/enums.ts`            |
-| `scripts/migrate.ts`                    | Aplica os dois arquivos acima contra `DATABASE_URL`               |
-| `scripts/seed.ts`                       | Popula `barriers`/`barrier_status_history` com dados mock         |
-| `lib/server/db.ts`                      | Cliente `postgres.js` singleton (server-only)                     |
-| `lib/server/sql/barriers.ts`            | Queries: listagem/filtro/sort/paginação, KPI, transição de status |
-| `app/api/barriers/route.ts`             | `GET /api/barriers`                                               |
-| `app/api/barriers/[id]/route.ts`        | `GET /api/barriers/:id`                                           |
-| `app/api/barriers/[id]/status/route.ts` | `PATCH /api/barriers/:id/status` (bonus)                          |
-| `app/api/kpi/route.ts`                  | `GET /api/kpi`                                                    |
+| Arquivo                                    | Responsabilidade                                                  |
+| ------------------------------------------ | ----------------------------------------------------------------- |
+| `db/schema.sql`                            | DDL completo: tabelas, índices, triggers, funções                 |
+| `db/seed_lookups.sql`                      | Popula as tabelas de lookup a partir de `lib/enums.ts`            |
+| `scripts/migrate.ts`                       | Aplica os dois arquivos acima contra `DATABASE_URL`               |
+| `scripts/seed.ts`                          | Popula `barriers`/`barrier_status_history` com dados mock         |
+| `lib/server/db.ts`                         | Cliente Postgres Deno-native singleton (server routes only)       |
+| `lib/server/sql/barriers.ts`               | Queries: listagem/filtro/sort/paginação, KPI, transição de status |
+| `routes/api/barriers/route.ts`             | `GET /api/barriers`                                               |
+| `routes/api/barriers/[id]/route.ts`        | `GET /api/barriers/:id`                                           |
+| `routes/api/barriers/[id]/status/route.ts` | `PATCH /api/barriers/:id/status` (bonus)                          |
+| `routes/api/kpi/route.ts`                  | `GET /api/kpi`                                                    |
