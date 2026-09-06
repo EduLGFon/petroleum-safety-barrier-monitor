@@ -82,8 +82,29 @@ const HEADERS = [
   "Plano de Ação",
 ];
 
-// Approx column widths in characters, as in the original workbook.
-const COLS_W = [7, 24, 9, 22, 28, 30, 26, 14, 22, 26, 24, 17, 36, 36];
+// Approx width per character in points at 9pt, plus cell padding.
+const PT_PER_CHAR = 5.5;
+const CELL_PAD_PT = 12;
+// Columns that may hold long free text wrap at this width instead of
+// stretching the table.
+const WRAP_COLS = new Set([4, 12, 13]);
+const MAX_WRAP_CHARS = 55;
+const MIN_COL_PT = 40;
+const MAX_COL_PT = 320;
+
+// Measures content and returns one width per column so every cell fits.
+// Long free-text columns are capped and wrap onto multiple lines.
+function fitColWidths(headers: string[], rows: string[][]): number[] {
+  return headers.map((h, ci) => {
+    let max = h.length;
+    for (const r of rows) max = Math.max(max, (r[ci] ?? "").length);
+    if (WRAP_COLS.has(ci)) max = Math.min(max, MAX_WRAP_CHARS);
+    return Math.min(
+      MAX_COL_PT,
+      Math.max(MIN_COL_PT, Math.round(max * PT_PER_CHAR + CELL_PAD_PT)),
+    );
+  });
+}
 
 function summaryRows(barriers: Barrier[]): Array<[string, string]> {
   const count = (fn: (b: Barrier) => boolean) =>
@@ -126,9 +147,11 @@ export function exportToExcel(
   const subtitle = `Exportado em ${ts()}  |  ${
     barriers.length.toLocaleString("pt-BR")
   } registros`;
-  const cols = COLS_W.map((w) => `<col width="${w * 7}">`).join("");
+  const data = barriers.map(row);
+  const widths = fitColWidths(HEADERS, data);
+  const cols = widths.map((w) => `<col style="width:${w}pt;">`).join("");
   const head = HEADERS.map((h) =>
-    `<th style="background:#1E3A5F;color:#fff;font-size:9pt;font-weight:bold;text-align:center;">${
+    `<th style="background:#1E3A5F;color:#fff;font-size:9pt;font-weight:bold;text-align:center;padding:5px 4px;white-space:normal;vertical-align:middle;">${
       escHtml(h)
     }</th>`
   ).join("");
@@ -137,8 +160,9 @@ export function exportToExcel(
     const disp = DISP_COLORS[String(b.disponibilidade)]?.solid ?? "#64748b";
     const conf = CONF_COLORS[String(b.conformidade)]?.solid ?? "#64748b";
     const isCrit = b.criticidade === "Crítica";
-    const cells = row(b).map((v, ci) => {
-      let style = "font-size:9pt;color:#1E293B;";
+    const cells = data[idx].map((v, ci) => {
+      let style =
+        "font-size:9pt;color:#1E293B;padding:3px 4px;white-space:normal;word-wrap:break-word;vertical-align:top;";
       if (ci === 1) {
         style =
           "font-family:'Courier New';font-size:8pt;font-weight:bold;color:#1D4ED8;";
@@ -159,23 +183,23 @@ export function exportToExcel(
       if (ci === 10 && v) style += "font-style:italic;color:#EA580C;";
       return `<td style="${style}">${escHtml(v)}</td>`;
     }).join("");
-    return `<tr style="background:${bg};height:16pt;">${cells}</tr>`;
+    return `<tr style="background:${bg};">${cells}</tr>`;
   }).join("");
   const summary = summaryRows(barriers).map(([k, v]) =>
-    `<tr><td style="font-size:10pt;">${
+    `<tr><td style="font-size:10pt;padding:3px 8px;white-space:normal;vertical-align:top;">${
       escHtml(k)
-    }</td><td style="font-size:10pt;">${escHtml(v)}</td></tr>`
+    }</td><td style="font-size:10pt;padding:3px 8px;">${escHtml(v)}</td></tr>`
   ).join("");
   const html =
     `<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel"><head><meta charset="UTF-8"></head><body>` +
-    `<table border="1"><colgroup>${cols}</colgroup>` +
-    `<tr><td colspan="14" style="background:#0A1628;color:#fff;font-size:14pt;font-weight:bold;height:28pt;">SEACREST PETRÓLEO — Monitor de Barreiras de Segurança</td></tr>` +
-    `<tr><td colspan="14" style="background:#0E2036;color:#94A3B8;font-size:9pt;font-style:italic;height:17pt;">${
+    `<table border="1" style="border-collapse:collapse;table-layout:auto;"><colgroup>${cols}</colgroup>` +
+    `<tr><td colspan="14" style="background:#0A1628;color:#fff;font-size:14pt;font-weight:bold;padding:8px;white-space:normal;vertical-align:middle;">SEACREST PETRÓLEO — Monitor de Barreiras de Segurança</td></tr>` +
+    `<tr><td colspan="14" style="background:#0E2036;color:#94A3B8;font-size:9pt;font-style:italic;padding:5px 8px;white-space:normal;vertical-align:middle;">${
       escHtml(subtitle)
     }</td></tr>` +
-    `<tr style="height:22pt;">${head}</tr>${body}</table>` +
+    `<tr>${head}</tr>${body}</table>` +
     `<h3>SEACREST PETRÓLEO — Resumo Monitor de Barreiras</h3>` +
-    `<table border="1"><tr><th style="background:#1E3A5F;color:#fff;">Indicador</th><th style="background:#1E3A5F;color:#fff;">Qtd.</th></tr>${summary}</table>` +
+    `<table border="1" style="border-collapse:collapse;"><tr><th style="background:#1E3A5F;color:#fff;padding:4px 8px;">Indicador</th><th style="background:#1E3A5F;color:#fff;padding:4px 8px;">Qtd.</th></tr>${summary}</table>` +
     `</body></html>`;
   download(
     new Blob(["\uFEFF" + html], { type: "application/vnd.ms-excel" }),
