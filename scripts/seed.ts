@@ -1,22 +1,7 @@
-/**
- * ══════════════════════════════════════════════════════════════════════════
- * SEED — populates barriers + barrier_status_history with demo data
- * ══════════════════════════════════════════════════════════════════════════
- * Reuses the exact same deterministic generator (lib/data.ts's
- * getWireBarriers) the app used for its in-memory mock adapter, so local
- * Postgres data matches what you'd see in "mock" mode: 6,800 barriers with
- * realistic distributions and status histories, resolvable back to display
- * strings via the same lib/enums.ts every other part of the app uses.
- *
- * Run with:
- *   deno task db:seed             # refuses if barriers already exist
- *   deno task db:seed -- --force  # wipes and reseeds
- *
- * Requires db/schema.sql and db/seed_lookups.sql to already be applied —
- * run scripts/migrate.ts first.
- */
-
-import postgres from "npm:postgres@3.4.5";
+// Seed - populates barriers + barrier_status_history with demo data.
+// This is why it exists: reuses the deterministic mock generator so local
+// Postgres matches mock mode. Run: deno task db:seed [-- --force]
+import { Pool } from "@db/postgres";
 import { getWireBarriers } from "../lib/data.ts";
 
 const BATCH_SIZE = 500;
@@ -30,7 +15,7 @@ if (!connectionString) {
 }
 
 const force = Deno.args.includes("--force");
-const sql = postgres(connectionString, { max: 1 });
+const pool = new Pool(connectionString, 1, true);
 
 const BARRIER_COLS = [
   "tag",
@@ -55,11 +40,55 @@ const HISTORY_COLS = [
   "note",
 ] as const;
 
+type BarrierInsert = Record<(typeof BARRIER_COLS)[number], unknown>;
+type HistoryInsert = Record<(typeof HISTORY_COLS)[number], unknown>;
+
+// Builds a multi-row INSERT with numbered placeholders and flat args.
+function buildInsert(
+  table: string,
+  cols: readonly string[],
+  rows: Array<Record<string, unknown>>,
+  returning = "",
+): { text: string; args: unknown[] } {
+  const args: unknown[] = [];
+  const groups = rows.map((row) => {
+    const marks = cols.map((col) => {
+      args.push(row[col] ?? null);
+      return `$${args.length}`;
+    });
+    return `(${marks.join(", ")})`;
+  });
+  const suffix = returning ? ` ${returning}` : "";
+  return {
+    text: `insert into ${table} (${cols.join(", ")}) values ${
+      groups.join(", ")
+    }${suffix}`,
+    args,
+  };
+}
+
+async function queryRows<T>(
+  text: string,
+  args: unknown[] = [],
+): Promise<T[]> {
+  const client = await pool.connect();
+  try {
+    const result = await client.queryObject<T>(text, args);
+    return result.rows;
+  } finally {
+    client.release();
+  }
+}
+
+async function exec(text: string, args: unknown[] = []): Promise<void> {
+  await queryRows(text, args);
+}
+
 async function main() {
-  const [{ count }] = await sql<
-    { count: string }[]
-  >`select count(*)::text as count from barriers`;
-  const existing = Number(count);
+  const countRows = await queryRows<{ count: string }>(
+    "select count(*)::text as count from barriers",
+  );
+  const existing = Number(countRows[0]?.count ?? 0);
 
   if (existing > 0 && !force) {
     console.error(
@@ -70,12 +99,14 @@ async function main() {
 
   if (existing > 0 && force) {
     console.log(
-      `→ truncating barriers (${existing} rows) and barrier_status_history…`,
+      `-> truncating barriers (${existing} rows) and barrier_status_history...`,
     );
-    await sql`truncate table barrier_status_history, barriers restart identity cascade`;
+    await exec(
+      "truncate table barrier_status_history, barriers restart identity cascade",
+    );
   }
 
-  console.log("→ generating mock barrier set…");
+  console.log("-> generating mock barrier set...");
   const barriers = getWireBarriers();
   console.log(`  generated ${barriers.length} barriers`);
 
@@ -85,7 +116,7 @@ async function main() {
   for (let i = 0; i < barriers.length; i += BATCH_SIZE) {
     const chunk = barriers.slice(i, i + BATCH_SIZE);
 
-    const barrierRows = chunk.map((b) => ({
+    const barrierRows: BarrierInsert[] = chunk.map((b) => ({
       tag: b.tag,
       tipologia_id: b.tipologiaId,
       location_id: b.locationId,
@@ -100,14 +131,16 @@ async function main() {
       status_since: b.statusSince,
     }));
 
-    // Multi-row insert; Postgres guarantees RETURNING preserves input order
-    // for a single INSERT ... VALUES (...), (...) statement like this one.
-    const returned = await sql<{ id: number }[]>`
-      insert into barriers ${sql(barrierRows, ...BARRIER_COLS)}
-      returning id
-    `;
+    // Postgres preserves input order for RETURNING on a single INSERT.
+    const insert = buildInsert(
+      "barriers",
+      BARRIER_COLS,
+      barrierRows,
+      "returning id",
+    );
+    const returned = await queryRows<{ id: number }>(insert.text, insert.args);
 
-    const historyRows = returned.flatMap((row, idx) =>
+    const historyRows: HistoryInsert[] = returned.flatMap((row, idx) =>
       chunk[idx].statusHistory.map((h) => ({
         barrier_id: row.id,
         date: h.date,
@@ -118,18 +151,21 @@ async function main() {
     );
 
     if (historyRows.length > 0) {
-      await sql`insert into barrier_status_history ${
-        sql(historyRows, ...HISTORY_COLS)
-      }`;
+      const hist = buildInsert(
+        "barrier_status_history",
+        HISTORY_COLS,
+        historyRows,
+      );
+      await exec(hist.text, hist.args);
       historyInserted += historyRows.length;
     }
 
     inserted += returned.length;
-    console.log(`  inserted ${inserted}/${barriers.length} barriers…`);
+    console.log(`  inserted ${inserted}/${barriers.length} barriers...`);
   }
 
   console.log(
-    `\n✓ ${inserted} barriers, ${historyInserted} history entries inserted.`,
+    `\nDone: ${inserted} barriers, ${historyInserted} history entries inserted.`,
   );
 }
 
@@ -139,5 +175,5 @@ try {
   console.error("\nSeed failed:", err);
   Deno.exit(1);
 } finally {
-  await sql.end();
+  await pool.end();
 }

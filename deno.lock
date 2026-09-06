@@ -1,11 +1,17 @@
 {
   "version": "5",
   "specifiers": {
+    "jsr:@db/postgres@~0.19.5": "0.19.5",
     "jsr:@fresh/build-id@1": "1.0.1",
     "jsr:@fresh/core@*": "2.3.3",
+    "jsr:@fresh/core@^2.3.3": "2.3.3",
     "jsr:@fresh/init@*": "2.3.3",
+    "jsr:@std/bytes@^1.0.5": "1.0.6",
     "jsr:@std/cli@^1.0.19": "1.0.32",
+    "jsr:@std/crypto@^1.0.4": "1.1.0",
     "jsr:@std/encoding@^1.0.10": "1.0.11",
+    "jsr:@std/encoding@^1.0.9": "1.0.11",
+    "jsr:@std/fmt@^1.0.6": "1.0.10",
     "jsr:@std/fmt@^1.0.7": "1.0.10",
     "jsr:@std/fmt@^1.0.8": "1.0.10",
     "jsr:@std/fs@^1.0.19": "1.0.24",
@@ -15,6 +21,7 @@
     "jsr:@std/net@^1.0.6": "1.0.6",
     "jsr:@std/path@*": "1.1.6",
     "jsr:@std/path@1": "1.1.6",
+    "jsr:@std/path@^1.0.8": "1.1.6",
     "jsr:@std/path@^1.1.2": "1.1.6",
     "jsr:@std/path@^1.1.5": "1.1.6",
     "jsr:@std/semver@1": "1.0.8",
@@ -38,10 +45,20 @@
     "npm:typescript@^7.0.2": "7.0.2"
   },
   "jsr": {
+    "@db/postgres@0.19.5": {
+      "integrity": "afdbe608bd066cda2ee5dba37c416d332098b9238c51aec223331108e281954c",
+      "dependencies": [
+        "jsr:@std/bytes",
+        "jsr:@std/crypto",
+        "jsr:@std/encoding@^1.0.9",
+        "jsr:@std/fmt@^1.0.6",
+        "jsr:@std/path@^1.0.8"
+      ]
+    },
     "@fresh/build-id@1.0.1": {
       "integrity": "12a2ec25fd52ae9ec68c26848a5696cd1c9b537f7c983c7e56e4fb1e7e816c20",
       "dependencies": [
-        "jsr:@std/encoding"
+        "jsr:@std/encoding@^1.0.10"
       ]
     },
     "@fresh/core@2.3.3": {
@@ -69,8 +86,14 @@
         "jsr:@std/semver"
       ]
     },
+    "@std/bytes@1.0.6": {
+      "integrity": "f6ac6adbd8ccd99314045f5703e23af0a68d7f7e58364b47d2c7f408aeb5820a"
+    },
     "@std/cli@1.0.32": {
       "integrity": "188b3a100d6202d64e3f5bd3d799c7fa4f6d77f92cc65eb7f641c1fa0aa92a66"
+    },
+    "@std/crypto@1.1.0": {
+      "integrity": "b8d6d0a6377a32b213af2661ed7bf1062d94feac0c57def5526a8e74a95c3ec8"
     },
     "@std/encoding@1.0.11": {
       "integrity": "e7cef2f0b3153bccc17431e7c864a1de03a4b6d9647389c43e08aaa775d37385"
@@ -1425,6 +1448,17 @@
     }
   },
   "workspace": {
+    "dependencies": [
+      "jsr:@db/postgres@~0.19.5",
+      "jsr:@fresh/core@^2.3.3",
+      "jsr:@fresh/plugin-vite@^1.1.2",
+      "jsr:@std/csv@1",
+      "jsr:@std/path@1",
+      "npm:@preact/signals@^2.9.0",
+      "npm:@types/babel__core@^7.20.5",
+      "npm:preact@^10.29.1",
+      "npm:vite@^7.1.3"
+    ],
     "packageJson": {
       "dependencies": [
         "npm:@types/node@^26.4.1",
