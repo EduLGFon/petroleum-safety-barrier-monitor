@@ -129,7 +129,7 @@ toWireQuery({ location: "FAL", disponibilidade: "Degradado", page: 1 });
 | `lib/constants.ts`           | Constantes de exibição (cores, listas) + `LOCATION_DIST_BY_ID` |
 | `lib/server/db.ts`           | Cliente Postgres (server routes only)                          |
 | `lib/server/sql/barriers.ts` | Queries SQL: listagem, filtro, sort, KPI, transição de status  |
-| `routes/api/`                | Route handlers Fresh que expõem as queries acima via HTTP    |
+| `routes/api/`                | Route handlers Fresh que expõem as queries acima via HTTP      |
 | `db/schema.sql`              | DDL: tabelas de lookup, `barriers`, `barrier_status_history`   |
 | `db/seed_lookups.sql`        | Seed das tabelas de lookup, espelhando `lib/enums.ts`          |
 
