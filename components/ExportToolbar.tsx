@@ -1,7 +1,12 @@
-import type { FunctionComponent } from "preact";
-import { useState } from "preact/hooks";
-import type { Barrier } from "../lib/types.ts";
+// Export toolbar - Aurora glass selection/export bar.
+// This is why it exists: row selection needs a visible anchor and the
+// export actions need one home; idle and active states share the same
+// glass bar language as the rest of the identity.
 import { exportToCSV, exportToExcel, exportToPDF } from "../lib/export.ts";
+import type { FunctionComponent } from "preact";
+import type { Barrier } from "../lib/types.ts";
+import { useState } from "preact/hooks";
+import { AURORA } from "../lib/aurora.ts";
 import {
   CloseIcon,
   DownloadIcon,
@@ -27,21 +32,21 @@ const FMTS: { key: Fmt; Icon: I; label: string; ext: string; color: string }[] =
       Icon: FileSpreadsheetIcon,
       label: "Excel",
       ext: ".xls",
-      color: "#16a34a",
+      color: "#34d399",
     },
     {
       key: "pdf",
       Icon: FilePdfIcon,
       label: "PDF",
       ext: ".pdf",
-      color: "#dc2626",
+      color: "#f87171",
     },
     {
       key: "csv",
       Icon: FileTextIcon,
       label: "CSV",
       ext: ".csv",
-      color: "#2563eb",
+      color: "#6366f1",
     },
   ];
 export function ExportToolbar(
@@ -66,6 +71,7 @@ export function ExportToolbar(
   }
   return (
     <div
+      className="glass-card"
       style={{
         display: "flex",
         alignItems: "center",
@@ -73,13 +79,12 @@ export function ExportToolbar(
         flexWrap: "wrap",
         padding: "var(--d-bar-pad)",
         marginBottom: "var(--d-bar-gap)",
-        background: hasAny
-          ? "color-mix(in srgb,var(--accent) 5%,var(--bg-elevated))"
-          : "var(--bg-elevated)",
+        background: AURORA.data,
         border: hasAny
-          ? "1px solid color-mix(in srgb,var(--accent) 30%,var(--border))"
-          : "1px solid var(--border)",
-        borderRadius: "var(--d-bar-radius)",
+          ? "1px solid rgba(99,102,241,.4)"
+          : `1px solid ${AURORA.dataBorder}`,
+        borderRadius: AURORA.dataRadius,
+        boxShadow: hasAny ? AURORA.auroraGlow : "none",
         transition: "all .25s var(--ease-std)",
       }}
     >
@@ -98,10 +103,11 @@ export function ExportToolbar(
           onChange={() => allSel ? onClearAll() : onSelectAll()}
         />
         <span
+          className="tnum"
           style={{
             fontSize: "var(--d-body)",
             fontWeight: 600,
-            color: "var(--text-secondary)",
+            color: AURORA.pillText,
             whiteSpace: "nowrap",
           }}
         >
@@ -124,15 +130,15 @@ export function ExportToolbar(
             gap: "var(--d-gap-2xs)",
             fontSize: "var(--d-small)",
             padding: "var(--d-mini-pad)",
-            borderRadius: "var(--d-mini-radius)",
+            borderRadius: 6,
             background: "transparent",
-            border: "1px solid var(--border)",
-            color: "var(--text-muted)",
+            border: `1px solid ${AURORA.dataBorder}`,
+            color: AURORA.label,
             cursor: "pointer",
             transition: "all .2s",
           }}
         >
-          <CloseIcon size={11} color="var(--text-muted)" />Limpar
+          <CloseIcon size={11} color={AURORA.label} />Limpar
         </button>
       )}
       <div style={{ flex: 1 }} />
@@ -153,11 +159,12 @@ export function ExportToolbar(
                 marginRight: 4,
               }}
             >
-              <DownloadIcon size={13} color="var(--text-muted)" />
+              <DownloadIcon size={13} color={AURORA.label} />
               <span
+                className="tnum"
                 style={{
                   fontSize: "var(--d-body)",
-                  color: "var(--text-muted)",
+                  color: AURORA.label,
                   whiteSpace: "nowrap",
                 }}
               >
@@ -178,10 +185,10 @@ export function ExportToolbar(
                   padding: "var(--d-btn-pad)",
                   fontSize: "var(--d-small)",
                   fontWeight: 700,
-                  borderRadius: "var(--d-btn-radius)",
+                  borderRadius: 7,
                   cursor: loading ? "wait" : "pointer",
-                  border: `1px solid ${color}44`,
-                  background: `${color}0e`,
+                  border: `1px solid ${color}55`,
+                  background: `${color}1a`,
                   color,
                   opacity: loading && loading !== key ? 0.4 : 1,
                   whiteSpace: "nowrap",
@@ -217,7 +224,7 @@ export function ExportToolbar(
           <span
             style={{
               fontSize: "var(--d-small)",
-              color: "var(--text-muted)",
+              color: AURORA.sub,
               fontStyle: "italic",
             }}
           >
@@ -243,14 +250,16 @@ function Chk(
         height: "var(--d-chk)",
         borderRadius: 4,
         flexShrink: 0,
-        border: a ? "2px solid var(--accent)" : "2px solid var(--border)",
-        background: a ? "var(--accent)" : "transparent",
+        border: a
+          ? "2px solid var(--accent)"
+          : `2px solid ${AURORA.dataBorder}`,
+        background: a ? AURORA.grad : "transparent",
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
         cursor: "pointer",
         transition: "all .18s var(--ease-std)",
-        boxShadow: a ? "0 0 7px var(--glow)" : "none",
+        boxShadow: a ? AURORA.auroraGlow : "none",
       }}
     >
       {checked && (
