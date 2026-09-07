@@ -574,7 +574,10 @@ function Pagination(
             title={`Ir para a página (1–${totalPages})`}
             placeholder={String(page)}
             value={draft ?? ""}
-            onChange={(e) => setDraft(e.currentTarget.value)}
+            // NOTE: onInput, not onChange. Preact 10 binds onChange to the
+            // native `change` event, which text fields only fire on blur -
+            // with onChange the draft would lag one Enter behind.
+            onInput={(e) => setDraft(e.currentTarget.value)}
             onBlur={commitDraft}
             onKeyDown={(e) => {
               if (e.key === "Enter") {

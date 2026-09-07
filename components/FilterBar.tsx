@@ -81,7 +81,8 @@ export function FilterBar(
           type="search"
           placeholder="TAG, localização, categoria…"
           value={filters.query}
-          onChange={(e) => onFilter({ query: e.currentTarget.value })}
+          // NOTE: onInput, not onChange (see BarriersTable goto field).
+          onInput={(e) => onFilter({ query: e.currentTarget.value })}
           onFocus={() => setFocused(true)}
           onBlur={() => setFocused(false)}
           style={{
