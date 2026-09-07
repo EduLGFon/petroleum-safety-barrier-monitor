@@ -11,7 +11,7 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "deno serve -A _fresh/server.js",
-    "start": "deno serve -A _fresh/server.js",
+    "start": "deno serve --env-file=.env -A _fresh/server.js",
     "db:migrate": "deno run -A --env-file=.env.local scripts/migrate.ts",
     "db:seed": "deno run -A --env-file=.env.local scripts/seed.ts"
   },
@@ -29,7 +29,10 @@
   },
   "lint": {
     "rules": {
-      "tags": ["fresh", "recommended"]
+      "tags": [
+        "fresh",
+        "recommended"
+      ]
     }
   },
   "fmt": {
@@ -37,11 +40,27 @@
     "indentWidth": 2,
     "singleQuote": false,
     "proseWrap": "preserve",
-    "exclude": ["**/_fresh/*", "node_modules", ".next"]
+    "exclude": [
+      "**/_fresh/*",
+      "node_modules",
+      ".next"
+    ]
   },
-  "exclude": ["**/_fresh/*", "node_modules", ".next", "out", "build", "dist"],
+  "exclude": [
+    "**/_fresh/*",
+    "node_modules",
+    ".next",
+    "out",
+    "build",
+    "dist"
+  ],
   "compilerOptions": {
-    "lib": ["dom", "dom.asynciterable", "dom.iterable", "deno.ns"],
+    "lib": [
+      "dom",
+      "dom.asynciterable",
+      "dom.iterable",
+      "deno.ns"
+    ],
     "strict": true,
     "jsx": "precompile",
     "jsxImportSource": "preact",
@@ -61,6 +80,8 @@
       "noscript",
       "template"
     ],
-    "types": ["vite/client"]
+    "types": [
+      "vite/client"
+    ]
   }
 }
