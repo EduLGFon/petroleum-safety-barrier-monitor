@@ -1,6 +1,8 @@
-// Loading screen - branded splash shown while the island hydrates.
-// This is why it exists: covers first paint with progress until onDone.
+// Loading screen - Aurora mesh splash shown while the island hydrates.
+// This is why it exists: covers first paint with progress until onDone,
+// already dressed in the interface identity so there is no visual pop.
 import { useCallback, useEffect, useState } from "preact/hooks";
+import { AURORA } from "../lib/aurora.ts";
 import { BrandMark } from "./ui/BrandMark.tsx";
 
 interface Props {
@@ -53,7 +55,8 @@ export function LoadingScreen({ onDone, companyName }: Props) {
         flexDirection: "column",
         alignItems: "center",
         justifyContent: "center",
-        background: "#020c18",
+        background: AURORA.page,
+        backgroundColor: AURORA.pageBase,
         opacity: exit ? 0 : 1,
         transition: "opacity .55s cubic-bezier(0.4,0,1,1)",
         pointerEvents: exit ? "none" : "auto",
@@ -89,18 +92,17 @@ export function LoadingScreen({ onDone, companyName }: Props) {
 
       {/* Card */}
       <div
+        className="glass-card"
         style={{
           position: "relative",
           display: "flex",
           flexDirection: "column",
           alignItems: "center",
           padding: "var(--d-splash-pad)",
-          background: "rgba(9,24,40,0.82)",
-          backdropFilter: "blur(24px)",
-          border: "1px solid rgba(59,130,246,.12)",
+          background: AURORA.card,
+          border: `1px solid ${AURORA.cardBorder}`,
           borderRadius: "var(--d-splash-radius)",
-          boxShadow:
-            "0 32px 80px rgba(0,0,0,.55),inset 0 1px 0 rgba(255,255,255,.05)",
+          boxShadow: "0 32px 80px rgba(0,0,0,.55)",
           minWidth: 360,
           animation: "scaleIn .45s var(--ease-out) both",
         }}
@@ -113,7 +115,7 @@ export function LoadingScreen({ onDone, companyName }: Props) {
             right: "8%",
             height: 1,
             background:
-              "linear-gradient(90deg,transparent,rgba(59,130,246,.4),rgba(167,139,250,.3),transparent)",
+              "linear-gradient(90deg,transparent,rgba(99,102,241,.5),rgba(34,211,238,.4),transparent)",
             borderRadius: 1,
           }}
         />
@@ -122,10 +124,10 @@ export function LoadingScreen({ onDone, companyName }: Props) {
         <div
           style={{
             marginBottom: "var(--d-splash-gap)",
-            filter: "drop-shadow(0 4px 20px rgba(59,130,246,.28))",
+            filter: "drop-shadow(0 4px 20px rgba(99,102,241,.35))",
           }}
         >
-          <BrandMark variant="icon" height={76} light />
+          <BrandMark variant="adaptive" height={76} light />
         </div>
 
         {/* Brand text */}
@@ -138,7 +140,8 @@ export function LoadingScreen({ onDone, companyName }: Props) {
                 letterSpacing: "0.2em",
                 textTransform: "uppercase",
                 marginBottom: "var(--d-opt-gap)",
-                background: "linear-gradient(90deg,#60a5fa,#a78bfa)",
+                background:
+                  "linear-gradient(90deg,var(--accent),var(--accent-2))",
                 WebkitBackgroundClip: "text",
                 WebkitTextFillColor: "transparent",
                 backgroundClip: "text",
@@ -152,7 +155,7 @@ export function LoadingScreen({ onDone, companyName }: Props) {
               fontSize: "var(--d-band-num)",
               fontWeight: 800,
               letterSpacing: "-0.025em",
-              color: "#fff",
+              color: AURORA.value,
               lineHeight: 1.25,
             }}
           >
@@ -167,7 +170,7 @@ export function LoadingScreen({ onDone, companyName }: Props) {
             height: 1,
             margin: "var(--d-splash-div) 0",
             background:
-              "linear-gradient(90deg,transparent,rgba(59,130,246,.3),transparent)",
+              "linear-gradient(90deg,transparent,var(--glow),transparent)",
           }}
         />
 
@@ -179,15 +182,16 @@ export function LoadingScreen({ onDone, companyName }: Props) {
               justifyContent: "space-between",
               fontSize: "var(--d-caption)",
               fontWeight: 600,
-              color: "rgba(148,163,184,.65)",
+              color: AURORA.sub,
               letterSpacing: "0.06em",
               marginBottom: "var(--d-opt-gap)",
             }}
           >
             <span style={{ transition: "all .3s" }}>{msg}</span>
             <span
+              className="tnum"
               style={{
-                color: ready ? "rgba(148,184,163,.9)" : "rgba(148,163,184,.65)",
+                color: ready ? "#34d399" : AURORA.sub,
                 transition: "color .3s",
               }}
             >
@@ -199,7 +203,7 @@ export function LoadingScreen({ onDone, companyName }: Props) {
               width: "100%",
               height: 4,
               borderRadius: 2,
-              background: "rgba(255,255,255,.06)",
+              background: AURORA.track,
               overflow: "hidden",
             }}
           >
@@ -207,12 +211,10 @@ export function LoadingScreen({ onDone, companyName }: Props) {
               style={{
                 height: "100%",
                 width: `${progress}%`,
-                background: "linear-gradient(90deg,#1d4ed8,#3b82f6,#60a5fa)",
+                background: AURORA.grad,
                 borderRadius: 2,
                 transition: "width .07s linear",
-                boxShadow: `0 0 ${progress > 90 ? 16 : 8}px rgba(96,165,250,.${
-                  progress > 90 ? 7 : 5
-                })`,
+                boxShadow: AURORA.auroraGlow,
                 position: "relative",
               }}
             >
@@ -239,7 +241,7 @@ export function LoadingScreen({ onDone, companyName }: Props) {
           position: "absolute",
           bottom: 24,
           fontSize: "var(--d-micro)",
-          color: "rgba(71,85,105,.55)",
+          color: AURORA.sub,
           letterSpacing: "0.12em",
           textTransform: "uppercase",
           animation: "fadeInFast .8s .4s both",
