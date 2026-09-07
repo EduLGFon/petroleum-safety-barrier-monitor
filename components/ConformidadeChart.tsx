@@ -1,7 +1,8 @@
-// Conformidade chart card - section wrapper around the SVG bars.
+// Conformidade chart card - Aurora glass section around the SVG bars.
 // This is why it exists: keeps the card frame stable while the inner
 // chart stays dependency-free (no dynamic import needed in Fresh).
 import Chart from "./ConformidadeChartInner.tsx";
+import { AURORA } from "../lib/aurora.ts";
 import type { CategoryConformidade } from "../lib/types.ts";
 
 interface Props {
@@ -16,22 +17,23 @@ export function ConformidadeChart({ data }: Props) {
   const scroll = data.length > SCROLL_AFTER_ROWS;
   return (
     <div
+      className="glass-card"
       style={{
-        background: "var(--bg-surface)",
-        border: "1px solid var(--border)",
-        borderRadius: "var(--d-card-radius)",
+        background: AURORA.data,
+        border: `1px solid ${AURORA.dataBorder}`,
+        borderRadius: AURORA.dataRadius,
         padding: "var(--d-chart-pad)",
         marginBottom: "var(--d-section)",
-        boxShadow: "var(--shadow-sm)",
       }}
     >
       <div
+        className="tnum"
         style={{
-          fontSize: "var(--d-micro)",
+          fontSize: 10,
           fontWeight: 800,
-          color: "var(--text-muted)",
+          color: AURORA.label,
           textTransform: "uppercase",
-          letterSpacing: "0.12em",
+          letterSpacing: "0.14em",
           marginBottom: "var(--d-sect-title-gap)",
         }}
       >
