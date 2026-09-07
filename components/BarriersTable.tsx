@@ -1,5 +1,7 @@
-import type { CSSProperties } from "preact";
-import { useRef, useState } from "preact/hooks";
+// Barriers table - Aurora glass ledger.
+// This is why it exists: the tabular inventory itself; rows read as dark
+// list items (mono tag, dim location, glass pills) while
+// sorting, selection and pagination keep working underneath.
 import type { Barrier, FilterState, SortableColumn } from "../lib/types.ts";
 import {
   confColorFor,
@@ -8,6 +10,9 @@ import {
   PAGE_SIZE_OPTS,
 } from "../lib/constants.ts";
 import { daysSince, humanDuration } from "../lib/utils.ts";
+import { useRef, useState } from "preact/hooks";
+import type { CSSProperties } from "preact";
+import { AURORA, AURORA_TYPE } from "../lib/aurora.ts";
 import { Badge } from "./ui/Badge.tsx";
 import {
   ChevronDownIcon,
@@ -45,16 +50,16 @@ const COLS: { col: SortableColumn; label: string; w?: string }[] = [
 const thSt: CSSProperties = {
   padding: "var(--d-cell-pad)",
   textAlign: "left",
-  fontSize: "var(--d-caption)",
+  fontSize: 10,
   fontWeight: 700,
   textTransform: "uppercase",
-  letterSpacing: "0.1em",
+  letterSpacing: "0.14em",
   cursor: "pointer",
   userSelect: "none",
-  background: "var(--bg-elevated)",
-  borderBottom: "1px solid var(--border)",
+  background: "transparent",
+  borderBottom: `1px solid ${AURORA.rowDivider}`,
   whiteSpace: "nowrap",
-  color: "var(--text-muted)",
+  color: AURORA.sub,
 };
 
 export function BarriersTable(
@@ -74,13 +79,13 @@ export function BarriersTable(
   return (
     <div>
       <div
+        className="glass-card"
         style={{
-          background: "var(--bg-surface)",
-          border: "1px solid var(--border)",
-          borderRadius: "var(--d-card-radius)",
+          background: AURORA.data,
+          border: `1px solid ${AURORA.dataBorder}`,
+          borderRadius: AURORA.dataRadius,
           overflow: "hidden",
           marginBottom: "var(--d-stack-sm)",
-          boxShadow: "var(--shadow-sm)",
         }}
       >
         <div style={{ overflowX: "auto" }}>
@@ -150,8 +155,6 @@ export function BarriersTable(
                 )
                 : rows.map((b, i) => {
                   const isSel = selectedIds.has(b.id);
-                  // Hashed fallback keeps unseen statuses visible, never gray.
-                  const dc = dispColorFor(b.disponibilidade).solid;
                   const isNC = b.conformidade === "Não Conforme";
                   const ncDays = isNC && b.statusSince
                     ? daysSince(b.statusSince)
@@ -161,14 +164,10 @@ export function BarriersTable(
                     <tr
                       key={b.id}
                       style={{
-                        borderBottom: "1px solid var(--border-subtle)",
-                        // FIX: boxShadow on <tr> for the left color stripe — appears on ALL rows regardless of bg
-                        boxShadow: `inset 3px 0 0 ${dc}`,
+                        borderBottom: `1px solid ${AURORA.rowDivider}`,
                         background: isSel
-                          ? "rgba(59,130,246,.06)"
-                          : i % 2 === 0
-                          ? "transparent"
-                          : "var(--bg-stripe)",
+                          ? "rgba(99,102,241,.12)"
+                          : "transparent",
                         cursor: "pointer",
                         transition: "background .15s var(--ease-std)",
                         animation: `rowAppear .22s ${
@@ -184,10 +183,8 @@ export function BarriersTable(
                       onMouseLeave={(e) => {
                         (e.currentTarget as HTMLTableRowElement).style
                           .background = isSel
-                            ? "rgba(59,130,246,.06)"
-                            : i % 2 === 0
-                            ? "transparent"
-                            : "var(--bg-stripe)";
+                            ? "rgba(99,102,241,.12)"
+                            : "transparent";
                       }}
                     >
                       {/* Checkbox */}
@@ -207,7 +204,7 @@ export function BarriersTable(
                         style={{
                           padding: "var(--d-cell-pad)",
                           fontSize: "var(--d-body)",
-                          color: "var(--text-muted)",
+                          color: AURORA.sub,
                           fontWeight: 600,
                         }}
                       >
@@ -220,26 +217,26 @@ export function BarriersTable(
                         style={{ padding: "var(--d-cell-pad)" }}
                       >
                         <div
+                          className="tnum"
                           style={{
-                            fontFamily:
-                              'ui-monospace,"Cascadia Code",Menlo,monospace',
-                            fontWeight: 700,
-                            fontSize: "var(--d-body)",
-                            color: "var(--text-primary)",
+                            fontFamily: "var(--font-mono)",
+                            fontWeight: AURORA_TYPE.tag.fontWeight,
+                            fontSize: AURORA_TYPE.tag.fontSize,
+                            color: AURORA.value,
                           }}
                         >
                           {b.tag}
                         </div>
                         <div
                           style={{
-                            fontSize: "var(--d-small)",
-                            color: "var(--text-muted)",
+                            fontSize: 12,
+                            color: AURORA.loc,
                             marginTop: 2,
                           }}
                         >
                           {b.locDesc}
                         </div>
-                        {/* FIX 13: "X tempo sem contingenciamento" for NC items */}
+                        {/* "X tempo sem contingenciamento" for NC items */}
                         {isNC && b.statusSince && (
                           <div
                             style={{
@@ -248,17 +245,16 @@ export function BarriersTable(
                               gap: "var(--d-mini-gap)",
                               marginTop: "var(--d-gap-xs)",
                               padding: "var(--d-nc-pad)",
-                              background: "rgba(239,68,68,.09)",
-                              border: "1px solid rgba(239,68,68,.22)",
-                              borderRadius: "var(--d-pill-sm-radius)",
+                              background: AURORA.dangerBg,
+                              borderRadius: 7,
                               fontSize: "var(--d-caption)",
                               fontWeight: 600,
-                              color: "#ef4444",
+                              color: AURORA.dangerFg,
                             }}
                           >
                             <ClockIcon
                               size={10}
-                              color="#ef4444"
+                              color={AURORA.dangerFg}
                               strokeWidth={2.5}
                             />
                             {humanDuration(ncDays)} sem contingenciamento
@@ -368,13 +364,15 @@ function RowChk({ checked }: { checked: boolean }) {
         height: "var(--d-rowchk)",
         borderRadius: 4,
         flexShrink: 0,
-        border: checked ? "2px solid var(--accent)" : "2px solid var(--border)",
-        background: checked ? "var(--accent)" : "transparent",
+        border: checked
+          ? "2px solid var(--accent)"
+          : `2px solid ${AURORA.dataBorder}`,
+        background: checked ? AURORA.grad : "transparent",
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
         transition: "all .18s var(--ease-std)",
-        boxShadow: checked ? "0 0 8px var(--glow)" : "none",
+        boxShadow: checked ? AURORA.auroraGlow : "none",
       }}
     >
       {checked && (
@@ -413,19 +411,13 @@ function Pagination(
     padding: "0 var(--d-opt-gap)",
     fontSize: "var(--d-body)",
     fontWeight: active ? 700 : 500,
-    border: active ? "1px solid transparent" : "1px solid var(--border)",
+    border: active ? "1px solid transparent" : `1px solid ${AURORA.dataBorder}`,
     borderRadius: "var(--d-chip-radius)",
-    background: active
-      ? "linear-gradient(135deg,var(--accent),var(--accent-2))"
-      : "var(--bg-surface)",
-    color: active
-      ? "#fff"
-      : disabled
-      ? "var(--border)"
-      : "var(--text-secondary)",
+    background: active ? AURORA.grad : AURORA.data,
+    color: active ? "#fff" : disabled ? AURORA.sub : AURORA.pillText,
     cursor: disabled ? "not-allowed" : "pointer",
     opacity: disabled ? 0.35 : 1,
-    boxShadow: active ? "0 2px 8px var(--glow)" : "none",
+    boxShadow: active ? AURORA.auroraGlow : "none",
     transition: "all .2s var(--ease-std)",
   });
   const pages = buildPages(page, totalPages);
@@ -487,10 +479,10 @@ function Pagination(
             style={{
               padding: "var(--d-sel-pad)",
               fontSize: "var(--d-body)",
-              background: "var(--bg-surface)",
-              border: "1.5px solid var(--border)",
-              borderRadius: "var(--d-input-radius)",
-              color: "var(--text-secondary)",
+              background: AURORA.seg,
+              border: `1px solid ${AURORA.segBorder}`,
+              borderRadius: 10,
+              color: AURORA.pillText,
               outline: "none",
               cursor: "pointer",
             }}
