@@ -1,4 +1,5 @@
 import type { CSSProperties } from "preact";
+import { useRef, useState } from "preact/hooks";
 import type { Barrier, FilterState, SortableColumn } from "../lib/types.ts";
 import {
   confColorFor,
@@ -428,6 +429,24 @@ function Pagination(
     transition: "all .2s var(--ease-std)",
   });
   const pages = buildPages(page, totalPages);
+  // Draft for the go-to-page field: null means "follow the current page".
+  const [draft, setDraft] = useState<string | null>(null);
+  // Escape sets this so the blur it triggers reverts instead of committing
+  // (the blur handler still sees the pre-Escape draft - render is async).
+  const cancelRef = useRef(false);
+  const commitDraft = () => {
+    const cancelled = cancelRef.current;
+    cancelRef.current = false;
+    if (cancelled || draft === null) return;
+    const parsed = parseInt(draft, 10);
+    // NaN (empty/garbage) keeps the page; out-of-range clamps to 1..total.
+    const n = Math.min(
+      Math.max(Number.isNaN(parsed) ? page : parsed, 1),
+      totalPages,
+    );
+    setDraft(null);
+    if (n !== page) onChange(n);
+  };
   return (
     <div
       style={{
@@ -509,6 +528,54 @@ function Pagination(
               </button>
             )
         )}
+        <span
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: "var(--d-mini-gap)",
+            fontSize: "var(--d-body)",
+            color: "var(--text-muted)",
+            marginLeft: "var(--d-gap-2xs)",
+          }}
+        >
+          Ir
+          <input
+            type="number"
+            aria-label="Ir para a página"
+            title={`Ir para a página (1–${totalPages})`}
+            min={1}
+            max={totalPages}
+            value={draft ?? String(page)}
+            onChange={(e) => setDraft(e.currentTarget.value)}
+            onBlur={commitDraft}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                // Commit directly (not via blur) so keyboard users jump
+                // immediately even if focus moves elsewhere first.
+                commitDraft();
+                (e.currentTarget as HTMLInputElement).blur();
+              } else if (e.key === "Escape") {
+                cancelRef.current = true;
+                setDraft(null);
+                (e.currentTarget as HTMLInputElement).blur();
+              }
+            }}
+            style={{
+              width: 56,
+              height: "var(--d-page-btn)",
+              textAlign: "center",
+              fontSize: "var(--d-body)",
+              fontWeight: 600,
+              background: "var(--bg-surface)",
+              border: "1.5px solid var(--border)",
+              borderRadius: "var(--d-chip-radius)",
+              color: "var(--text-secondary)",
+              outline: "none",
+              boxSizing: "border-box",
+            }}
+          />
+          de {totalPages.toLocaleString("pt-BR")}
+        </span>
         <button
           type="button"
           onClick={() => onChange(page + 1)}
