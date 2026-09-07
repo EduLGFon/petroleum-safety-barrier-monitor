@@ -1,18 +1,62 @@
-import { BrandMark } from "./ui/BrandMark.tsx";
-import { ShieldIcon } from "./ui/Icons.tsx";
+// Aurora Executive Dark header.
+// This is why it exists: eyebrow + an extra-thin title on the left with
+// a live connection dot (emerald = connected, amber = reconnecting,
+// red = disconnected), gear button on the right. No cards, no pills, no
+// extra chrome: the header sits directly on the mesh canvas.
+import { useEffect, useState } from "preact/hooks";
+import { AURORA, AURORA_CONN, AURORA_TYPE } from "../lib/aurora.ts";
+import { useSettings } from "../context/SettingsContext.tsx";
 
 interface Props {
   onOpenSettings: () => void;
 }
 
+type Conn = "connected" | "reconnecting" | "disconnected";
+
+const CONN_LABEL: Record<Conn, string> = {
+  connected: "Conectado",
+  reconnecting: "Reconectando…",
+  disconnected: "Desconectado",
+};
+
+// Live browser connectivity: online/offline events drive the dot. A
+// fresh offline→online flip shows amber "reconnecting" briefly before
+// settling on emerald, so all three states are reachable in production.
+function useConnection(): Conn {
+  const [conn, setConn] = useState<Conn>("connected");
+  useEffect(() => {
+    if (typeof navigator !== "undefined" && !navigator.onLine) {
+      setConn("disconnected");
+    }
+    let timer = 0;
+    const onOffline = () => {
+      globalThis.clearTimeout(timer);
+      setConn("disconnected");
+    };
+    const onOnline = () => {
+      globalThis.clearTimeout(timer);
+      setConn("reconnecting");
+      timer = globalThis.setTimeout(() => setConn("connected"), 2500);
+    };
+    globalThis.addEventListener("offline", onOffline);
+    globalThis.addEventListener("online", onOnline);
+    return () => {
+      globalThis.clearTimeout(timer);
+      globalThis.removeEventListener("offline", onOffline);
+      globalThis.removeEventListener("online", onOnline);
+    };
+  }, []);
+  return conn;
+}
+
 function GearIcon() {
   return (
     <svg
-      width="16"
-      height="16"
+      width="14"
+      height="14"
       viewBox="0 0 24 24"
       fill="none"
-      stroke="rgba(255,255,255,0.85)"
+      stroke="currentColor"
       strokeWidth="2"
       strokeLinecap="round"
       strokeLinejoin="round"
@@ -25,200 +69,97 @@ function GearIcon() {
 }
 
 export function Header({ onOpenSettings }: Props) {
+  const conn = useConnection();
+  const { settings } = useSettings();
+  const isUp = conn === "connected";
+  // Connected: the palette's main color. Offline: red - or gray when the
+  // palette itself is red, so the two states never look alike.
+  const color = isUp
+    ? AURORA_CONN.connected
+    : settings.accentColor === "red"
+    ? AURORA_CONN.offlineOnRed
+    : AURORA_CONN.offline;
+  const glow = isUp ? AURORA_CONN.connectedGlow : color;
   return (
     <header
       style={{
-        background: "var(--hero-grad)",
-        borderRadius: "var(--d-hero-radius)",
-        padding: "var(--d-hero-pad)",
-        marginBottom: "var(--d-section)",
         display: "flex",
         justifyContent: "space-between",
         alignItems: "center",
-        gap: "var(--d-gap-lg)",
+        gap: 12,
         flexWrap: "wrap",
-        position: "relative",
-        overflow: "hidden",
-        boxShadow: "var(--shadow-md)",
+        marginBottom: "var(--d-section)",
         animation: "cardAppear .35s var(--ease-out) both",
       }}
     >
-      {/* Decoration */}
-      <div
-        style={{
-          position: "absolute",
-          inset: 0,
-          overflow: "hidden",
-          pointerEvents: "none",
-        }}
-      >
+      <div>
         <div
           style={{
-            position: "absolute",
-            inset: 0,
-            backgroundImage:
-              "linear-gradient(rgba(59,130,246,.04) 1px,transparent 1px),linear-gradient(90deg,rgba(59,130,246,.04) 1px,transparent 1px)",
-            backgroundSize: "36px 36px",
-          }}
-        />
-        <div
-          style={{
-            position: "absolute",
-            top: -60,
-            right: 60,
-            width: 240,
-            height: 240,
-            borderRadius: "50%",
-            background:
-              "radial-gradient(circle,rgba(59,130,246,.18) 0%,transparent 70%)",
-            animation: "orb 10s ease-in-out infinite",
-          }}
-        />
-        <div
-          style={{
-            position: "absolute",
-            bottom: -40,
-            right: 300,
-            width: 160,
-            height: 160,
-            borderRadius: "50%",
-            background:
-              "radial-gradient(circle,rgba(124,58,237,.12) 0%,transparent 70%)",
-            animation: "orb 7s ease-in-out 3s infinite",
-          }}
-        />
-        <div
-          style={{
-            position: "absolute",
-            bottom: 0,
-            left: 0,
-            right: 0,
-            height: 1,
-            background:
-              "linear-gradient(90deg,transparent,var(--accent),var(--accent-2),transparent)",
-          }}
-        />
-      </div>
-
-      {/* Brand */}
-      <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          gap: "var(--d-hero-gap)",
-          position: "relative",
-        }}
-      >
-        <BrandMark variant="icon" height={44} light />
-        <div
-          style={{
-            width: 1,
-            height: "var(--d-hero-div)",
-            background: "rgba(255,255,255,.12)",
-            flexShrink: 0,
-          }}
-        />
-        <div>
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: "var(--d-gap-xs)",
-              marginBottom: "var(--d-gap-2xs)",
-            }}
-          >
-            <ShieldIcon
-              size={11}
-              color="rgba(96,165,250,.8)"
-              strokeWidth={2.5}
-            />
-            <span
-              style={{
-                fontSize: "var(--d-tiny)",
-                fontWeight: 800,
-                letterSpacing: "0.16em",
-                textTransform: "uppercase",
-                background: "linear-gradient(90deg,#60a5fa,#a78bfa)",
-                WebkitBackgroundClip: "text",
-                WebkitTextFillColor: "transparent",
-                backgroundClip: "text",
-              }}
-            >
-              Sistema de Segurança Operacional
-            </span>
-          </div>
-          <h1
-            style={{
-              margin: 0,
-              fontSize: "var(--d-hero)",
-              fontWeight: 900,
-              color: "#fff",
-              letterSpacing: "-0.025em",
-              lineHeight: 1.15,
-              textShadow: "0 2px 12px rgba(0,0,0,.35)",
-            }}
-          >
-            Monitor de Barreiras de Segurança
-          </h1>
-        </div>
-      </div>
-
-      {/* Right */}
-      <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          gap: "var(--d-gap)",
-          position: "relative",
-          flexWrap: "wrap",
-        }}
-      >
-        <div
-          style={{
-            textAlign: "right",
-            fontSize: "var(--d-caption)",
-            color: "rgba(148,163,184,.8)",
-            lineHeight: 1.7,
+            fontFamily: "var(--font-sans)",
+            fontSize: AURORA_TYPE.eyebrow.fontSize,
+            letterSpacing: AURORA_TYPE.eyebrow.letterSpacing,
+            fontWeight: AURORA_TYPE.eyebrow.fontWeight,
+            color: AURORA.eyebrow,
           }}
         >
-          <div
-            style={{
-              fontFamily: 'ui-monospace,"Cascadia Code",monospace',
-              letterSpacing: "0.05em",
-              fontSize: "var(--d-micro)",
-            }}
-          >
-            Todas as Concessões
-          </div>
-          <div>
-            {new Date().toLocaleDateString("pt-BR", {
-              day: "2-digit",
-              month: "2-digit",
-              year: "numeric",
-            })}
-          </div>
+          OPERATIONAL SAFETY · LIVE
         </div>
-        <button
-          type="button"
-          onClick={onOpenSettings}
-          className="lift"
-          title="Configurações"
+        <div
           style={{
-            width: "var(--d-gear)",
-            height: "var(--d-gear)",
+            fontFamily: "var(--font-display)",
+            fontSize: AURORA_TYPE.hero.fontSize,
+            fontWeight: AURORA_TYPE.hero.fontWeight,
+            letterSpacing: AURORA_TYPE.hero.letterSpacing,
+            color: AURORA.value,
             display: "flex",
             alignItems: "center",
-            justifyContent: "center",
-            background: "rgba(255,255,255,.1)",
-            border: "1px solid rgba(255,255,255,.15)",
-            borderRadius: "var(--d-row-radius)",
-            cursor: "pointer",
-            backdropFilter: "blur(4px)",
+            gap: 10,
           }}
         >
-          <GearIcon />
-        </button>
+          Monitor de Barreiras
+          <span
+            title={CONN_LABEL[conn]}
+            aria-label={CONN_LABEL[conn]}
+            style={{
+              width: 12,
+              height: 12,
+              borderRadius: 99,
+              flexShrink: 0,
+              // Solid bulb in the live color + three-layer halo.
+              // Lit states breathe/flicker, the dead state holds still.
+              background: color,
+              boxShadow:
+                `0 0 3px ${color}, 0 0 10px ${glow}, 0 0 22px color-mix(in srgb, ${color} 35%, transparent)`,
+              animation: conn === "connected"
+                ? "bulbBreathe 3.5s ease-in-out infinite"
+                : conn === "reconnecting"
+                ? "bulbFlicker 1.6s linear infinite"
+                : "none",
+            }}
+          />
+        </div>
       </div>
+      <button
+        type="button"
+        onClick={onOpenSettings}
+        className="glass-pill lift"
+        title="Configurações"
+        aria-label="Configurações"
+        style={{
+          width: 32,
+          height: 32,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          background: AURORA.pill,
+          border: `1px solid ${AURORA.pillBorder}`,
+          borderRadius: 99,
+          color: AURORA.pillText,
+          cursor: "pointer",
+        }}
+      >
+        <GearIcon />
+      </button>
     </header>
   );
 }
