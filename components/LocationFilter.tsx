@@ -1,10 +1,12 @@
-// Location tabs - one pill per station present in the data.
+// Location tabs - Aurora glass pills, one per station in the data.
 // This is why it exists: stations are dynamic (30-50+), so tabs derive from
 // the loaded barriers merged with seed metadata, counted in a single pass,
-// and scroll horizontally instead of wrapping into a wall.
-import { useMemo } from "preact/hooks";
+// and scroll horizontally instead of wrapping into a wall. The active tab
+// runs the signature gradient; idle tabs are quiet glass cells.
 import { LOCATIONS } from "../lib/constants.ts";
 import type { Barrier } from "../lib/types.ts";
+import { useMemo } from "preact/hooks";
+import { AURORA } from "../lib/aurora.ts";
 interface Props {
   selected: string;
   allBarriers: Barrier[];
@@ -34,7 +36,7 @@ export function LocationFilter({ selected, allBarriers, onChange }: Props) {
       aria-label="Filtro por instalação"
       style={{
         display: "flex",
-        gap: "var(--d-gap-xs)",
+        gap: 6,
         flexWrap: "nowrap",
         overflowX: "auto",
         maxWidth: "100%",
@@ -84,18 +86,18 @@ function Tab(
       style={{
         display: "flex",
         alignItems: "center",
-        gap: "var(--d-pill-gap)",
-        padding: "var(--d-pill-pad)",
-        fontSize: "var(--d-body)",
+        gap: 8,
+        padding: "8px 14px",
+        fontSize: 13,
         fontWeight: active ? 700 : 500,
-        borderRadius: "var(--d-pill-radius)",
-        border: active ? "1px solid transparent" : "1px solid var(--border)",
-        background: active
-          ? "linear-gradient(135deg,var(--accent),var(--accent-2))"
-          : "var(--bg-surface)",
-        color: active ? "#fff" : "var(--text-secondary)",
+        borderRadius: AURORA.segRadius,
+        border: active
+          ? "1px solid transparent"
+          : `1px solid ${AURORA.segBorder}`,
+        background: active ? AURORA.grad : AURORA.seg,
+        color: active ? "#fff" : AURORA.pillText,
         cursor: "pointer",
-        boxShadow: active ? "0 3px 12px var(--glow)" : "var(--shadow-sm)",
+        boxShadow: active ? AURORA.auroraGlow : "none",
         whiteSpace: "nowrap",
         flexShrink: 0,
         transition: "all .22s var(--ease-std)",
@@ -103,29 +105,17 @@ function Tab(
           Math.min(index * 35, 400)
         }ms var(--ease-out) both`,
       }}
-      onMouseEnter={(e) => {
-        if (!active) {
-          (e.currentTarget as HTMLButtonElement).style.borderColor =
-            "var(--accent)";
-        }
-      }}
-      onMouseLeave={(e) => {
-        if (!active) {
-          (e.currentTarget as HTMLButtonElement).style.borderColor =
-            "var(--border)";
-        }
-      }}
     >
       {name}
       <span
+        className="tnum"
         style={{
-          fontSize: "var(--d-caption)",
+          fontSize: 11,
           fontWeight: 600,
-          padding: "var(--d-count-pad)",
-          borderRadius: "var(--d-pill-sm-radius)",
-          background: active ? "rgba(255,255,255,.2)" : "var(--bg-elevated)",
-          color: active ? "rgba(255,255,255,.9)" : "var(--text-muted)",
-          transition: "all .2s",
+          padding: "1px 7px",
+          borderRadius: 5,
+          background: active ? "rgba(255,255,255,.2)" : AURORA.pill,
+          color: active ? "#fff" : AURORA.label,
         }}
       >
         {count.toLocaleString("pt-BR")}

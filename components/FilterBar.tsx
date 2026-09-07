@@ -1,11 +1,12 @@
-// Filter bar - search plus faceted selects fed by the dataset.
+// Filter bar - Aurora glass search plus faceted selects fed by the data.
 // This is why it exists: vocabularies are dynamic (new statuses, 70+
 // categories), so option lists arrive as props derived from the loaded
 // barriers; the seed constants below are fallback only for empty data.
-import { useState } from "preact/hooks";
+import { CloseIcon, FilterIcon, SearchIcon } from "./ui/Icons.tsx";
 import type { FilterState } from "../lib/types.ts";
 import { CATEGORIES } from "../lib/constants.ts";
-import { CloseIcon, FilterIcon, SearchIcon } from "./ui/Icons.tsx";
+import { useState } from "preact/hooks";
+import { AURORA } from "../lib/aurora.ts";
 
 interface Props {
   filters: FilterState;
@@ -27,6 +28,14 @@ const FALLBACK_DISP = [
   "Indisponível",
 ];
 const FALLBACK_CONF = ["Conforme", "Não Conforme"];
+
+const GLASS_INPUT = {
+  background: AURORA.seg,
+  border: `1px solid ${AURORA.segBorder}`,
+  borderRadius: 10,
+  color: AURORA.pillText,
+  outline: "none",
+} as const;
 
 export function FilterBar(
   {
@@ -72,9 +81,7 @@ export function FilterBar(
         >
           <SearchIcon
             size={14}
-            color={focused || filters.query
-              ? "var(--accent)"
-              : "var(--text-muted)"}
+            color={focused || filters.query ? "var(--accent-2)" : AURORA.sub}
           />
         </span>
         <input
@@ -90,13 +97,10 @@ export function FilterBar(
             padding:
               "var(--d-input-y) var(--d-input-x) var(--d-input-y) var(--d-search-l)",
             fontSize: "var(--d-lead)",
-            background: "var(--bg-surface)",
+            ...GLASS_INPUT,
             border: focused || filters.query
-              ? "1.5px solid var(--accent)"
-              : "1.5px solid var(--border)",
-            borderRadius: "var(--d-input-radius)",
-            color: "var(--text-primary)",
-            outline: "none",
+              ? "1px solid var(--accent)"
+              : `1px solid ${AURORA.segBorder}`,
             boxSizing: "border-box",
             boxShadow: focused ? "0 0 0 3px var(--glow)" : "none",
             transition: "border .2s, box-shadow .2s",
@@ -134,16 +138,16 @@ export function FilterBar(
             gap: "var(--d-mini-gap)",
             padding: "var(--d-input-y) var(--d-input-x)",
             fontSize: "var(--d-body)",
-            fontWeight: 600,
-            background: "rgba(239,68,68,.07)",
-            border: "1.5px solid rgba(239,68,68,.22)",
-            borderRadius: "var(--d-input-radius)",
-            color: "#ef4444",
+            fontWeight: 700,
+            background: AURORA.dangerBg,
+            border: "1px solid rgba(239,68,68,.35)",
+            borderRadius: 10,
+            color: AURORA.dangerFg,
             cursor: "pointer",
             whiteSpace: "nowrap",
           }}
         >
-          <CloseIcon size={12} color="#ef4444" />Limpar filtros
+          <CloseIcon size={12} color={AURORA.dangerFg} />Limpar filtros
         </button>
       )}
 
@@ -157,12 +161,13 @@ export function FilterBar(
       >
         <FilterIcon
           size={12}
-          color={hasActiveFilters ? "var(--accent)" : "var(--text-muted)"}
+          color={hasActiveFilters ? "var(--accent-2)" : AURORA.sub}
         />
         <span
+          className="tnum"
           style={{
             fontSize: "var(--d-body)",
-            color: hasActiveFilters ? "var(--accent)" : "var(--text-muted)",
+            color: hasActiveFilters ? "var(--accent-2)" : AURORA.sub,
             fontWeight: hasActiveFilters ? 600 : 400,
             whiteSpace: "nowrap",
             transition: "color .2s",
@@ -194,13 +199,9 @@ function Sel(
       style={{
         padding: "var(--d-sel-pad)",
         fontSize: "var(--d-body)",
-        background: a
-          ? "color-mix(in srgb,var(--accent) 7%,var(--bg-surface))"
-          : "var(--bg-surface)",
-        border: a ? "1.5px solid var(--accent)" : "1.5px solid var(--border)",
-        borderRadius: "var(--d-input-radius)",
-        color: a ? "var(--accent)" : "var(--text-muted)",
-        outline: "none",
+        ...GLASS_INPUT,
+        border: a ? "1px solid var(--accent)" : `1px solid ${AURORA.segBorder}`,
+        color: a ? AURORA.value : AURORA.label,
         cursor: "pointer",
         fontWeight: a ? 700 : 400,
         boxShadow: a ? "0 0 0 3px var(--glow)" : "none",
