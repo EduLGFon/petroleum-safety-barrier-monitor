@@ -377,7 +377,7 @@ export function buildPrintReport(
       escHtml(companyName.toUpperCase())
     }</div>`
     : "";
-  return `<div style="font-family:Inter,Helvetica,Arial,sans-serif;color:#0F172A;">` +
+  return `<div style="font-family:'Inter Tight',Manrope,Inter,Helvetica,Arial,sans-serif;color:#0F172A;">` +
     `<div style="background:linear-gradient(135deg,#0A1628 0%,#1E3A5F 100%);color:#fff;padding:16px 18px 12px 18px;border-bottom:3px solid #3B82F6;">` +
     eyebrow +
     `<div style="font-size:16pt;font-weight:bold;margin-top:2px;">Monitor de Barreiras de Segurança</div>` +
