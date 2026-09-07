@@ -463,71 +463,97 @@ function Pagination(
         {from.toLocaleString("pt-BR")}–{to.toLocaleString("pt-BR")} de{" "}
         {total.toLocaleString("pt-BR")}
       </span>
-      <label
+      <div
         style={{
           display: "flex",
           alignItems: "center",
-          gap: "var(--d-mini-gap)",
-          fontSize: "var(--d-body)",
-          color: "var(--text-muted)",
+          gap: "var(--d-opt-gap)",
+          flexWrap: "wrap",
         }}
       >
-        Por página
-        <select
-          value={pageSize}
-          onChange={(e) => onPageSize(Number(e.currentTarget.value))}
+        <label
           style={{
-            padding: "var(--d-sel-pad)",
+            display: "flex",
+            alignItems: "center",
+            gap: "var(--d-mini-gap)",
             fontSize: "var(--d-body)",
-            background: "var(--bg-surface)",
-            border: "1.5px solid var(--border)",
-            borderRadius: "var(--d-input-radius)",
-            color: "var(--text-secondary)",
-            outline: "none",
-            cursor: "pointer",
+            color: "var(--text-muted)",
           }}
         >
-          {PAGE_SIZE_OPTS.map((n) => <option key={n} value={n}>{n}</option>)}
-        </select>
-      </label>
-      <div style={{ display: "flex", gap: "var(--d-gap-2xs)" }}>
-        <button
-          type="button"
-          onClick={() => onChange(1)}
-          disabled={page === 1}
-          style={bs(false, page === 1)}
-        >
-          <ChevronsLeftIcon size={14} />
-        </button>
-        <button
-          type="button"
-          onClick={() => onChange(page - 1)}
-          disabled={page === 1}
-          style={bs(false, page === 1)}
-        >
-          <ChevronLeftIcon size={14} />
-        </button>
-        {pages.map((p, i) =>
-          p === "…"
-            ? (
-              <span
-                key={`e${i}`}
-                style={{ ...bs(false, true), cursor: "default" }}
-              >
-                …
-              </span>
-            )
-            : (
-              <button
-                type="button"
-                key={p}
-                onClick={() => onChange(p as number)}
-                style={bs(page === p, false)}
-              >
-                {p}
-              </button>
-            )
-        )}
+          Por página
+          <select
+            value={pageSize}
+            onChange={(e) => onPageSize(Number(e.currentTarget.value))}
+            style={{
+              padding: "var(--d-sel-pad)",
+              fontSize: "var(--d-body)",
+              background: "var(--bg-surface)",
+              border: "1.5px solid var(--border)",
+              borderRadius: "var(--d-input-radius)",
+              color: "var(--text-secondary)",
+              outline: "none",
+              cursor: "pointer",
+            }}
+          >
+            {PAGE_SIZE_OPTS.map((n) => <option key={n} value={n}>{n}</option>)}
+          </select>
+        </label>
+        <div style={{ display: "flex", gap: "var(--d-gap-2xs)" }}>
+          <button
+            type="button"
+            onClick={() => onChange(1)}
+            disabled={page === 1}
+            style={bs(false, page === 1)}
+          >
+            <ChevronsLeftIcon size={14} />
+          </button>
+          <button
+            type="button"
+            onClick={() => onChange(page - 1)}
+            disabled={page === 1}
+            style={bs(false, page === 1)}
+          >
+            <ChevronLeftIcon size={14} />
+          </button>
+          {pages.map((p, i) =>
+            p === "…"
+              ? (
+                <span
+                  key={`e${i}`}
+                  style={{ ...bs(false, true), cursor: "default" }}
+                >
+                  …
+                </span>
+              )
+              : (
+                <button
+                  type="button"
+                  key={p}
+                  onClick={() => onChange(p as number)}
+                  style={bs(page === p, false)}
+                >
+                  {p}
+                </button>
+              )
+          )}
+          <button
+            type="button"
+            onClick={() => onChange(page + 1)}
+            disabled={page === totalPages}
+            style={bs(false, page === totalPages)}
+          >
+            <ChevronRightIcon size={14} />
+          </button>
+          <button
+            type="button"
+            onClick={() => onChange(totalPages)}
+            disabled={page === totalPages}
+            style={bs(false, page === totalPages)}
+          >
+            <ChevronsRightIcon size={14} />
+          </button>
+        </div>
+        <Divider />
         <span
           style={{
             display: "flex",
@@ -535,17 +561,19 @@ function Pagination(
             gap: "var(--d-mini-gap)",
             fontSize: "var(--d-body)",
             color: "var(--text-muted)",
-            marginLeft: "var(--d-gap-2xs)",
+            whiteSpace: "nowrap",
           }}
         >
-          Ir
+          Ir para
           <input
-            type="number"
+            type="text"
+            inputMode="numeric"
+            autoComplete="off"
+            spellcheck={false}
             aria-label="Ir para a página"
             title={`Ir para a página (1–${totalPages})`}
-            min={1}
-            max={totalPages}
-            value={draft ?? String(page)}
+            placeholder={String(page)}
+            value={draft ?? ""}
             onChange={(e) => setDraft(e.currentTarget.value)}
             onBlur={commitDraft}
             onKeyDown={(e) => {
@@ -560,40 +588,35 @@ function Pagination(
                 (e.currentTarget as HTMLInputElement).blur();
               }
             }}
+            className="goto-input"
             style={{
-              width: 56,
-              height: "var(--d-page-btn)",
-              textAlign: "center",
-              fontSize: "var(--d-body)",
-              fontWeight: 600,
-              background: "var(--bg-surface)",
-              border: "1.5px solid var(--border)",
-              borderRadius: "var(--d-chip-radius)",
-              color: "var(--text-secondary)",
-              outline: "none",
-              boxSizing: "border-box",
+              // Fits the widest page number with room to type.
+              width: `calc(${String(totalPages).length + 1}ch + 14px)`,
+              minWidth: 52,
             }}
           />
-          de {totalPages.toLocaleString("pt-BR")}
+          <span style={{ color: "var(--text-muted)" }}>
+            de {totalPages.toLocaleString("pt-BR")}
+          </span>
         </span>
-        <button
-          type="button"
-          onClick={() => onChange(page + 1)}
-          disabled={page === totalPages}
-          style={bs(false, page === totalPages)}
-        >
-          <ChevronRightIcon size={14} />
-        </button>
-        <button
-          type="button"
-          onClick={() => onChange(totalPages)}
-          disabled={page === totalPages}
-          style={bs(false, page === totalPages)}
-        >
-          <ChevronsRightIcon size={14} />
-        </button>
       </div>
     </div>
+  );
+}
+// Slim vertical separator between pagination groups (page size, nav
+// buttons, quick jumper) - the standard TablePagination grouping cue.
+function Divider() {
+  return (
+    <span
+      aria-hidden="true"
+      style={{
+        width: 1,
+        alignSelf: "stretch",
+        minHeight: "var(--d-page-btn)",
+        background: "var(--border)",
+        opacity: 0.7,
+      }}
+    />
   );
 }
 function buildPages(cur: number, tot: number): (number | "…")[] {

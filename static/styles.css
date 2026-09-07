@@ -833,6 +833,34 @@ body,
   box-shadow: 0 0 30px var(--glow), var(--shadow-sm);
 }
 
+/* ── Pagination quick jumper (TablePagination-style "go to page") ──────────── */
+.goto-input {
+  height: var(--d-page-btn);
+  text-align: center;
+  font-size: var(--d-body);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  background: var(--bg-surface);
+  border: 1.5px solid var(--border);
+  border-radius: var(--d-chip-radius);
+  color: var(--text-secondary);
+  outline: none;
+  box-sizing: border-box;
+  padding: 0 6px;
+  transition:
+    border-color 0.18s var(--ease-std),
+    box-shadow 0.18s var(--ease-std);
+}
+.goto-input::placeholder {
+  color: var(--text-muted);
+  font-weight: 400;
+}
+.goto-input:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--glow);
+  color: var(--text-primary);
+}
+
 /* ── Disable all animations ─────────────────────────────────────────────────── */
 html.no-anim *,
 html.no-anim *::before,
