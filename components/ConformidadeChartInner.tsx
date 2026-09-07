@@ -5,7 +5,8 @@
 // (never textAnchor/fontSize props) so hydration keeps it intact.
 // Bars morph via CSS transitions on geometry attributes (staggered per
 // row) when the station changes; rows play a staggered entrance on mount.
-import { useState } from "preact/hooks";
+import { useEffect, useLayoutEffect, useRef, useState } from "preact/hooks";
+import { createPortal } from "preact/compat";
 import type { CSSProperties } from "preact";
 import type { CategoryConformidade } from "../lib/types.ts";
 import { useSettings } from "../context/SettingsContext.tsx";
@@ -18,6 +19,13 @@ const COUNT_W = 56;
 const TOP = 6;
 const AXIS_H = 26;
 const PLOT_W = 440;
+
+/* Floating tooltip geometry — offset from the cursor, margin from edges. */
+const TIP_OFFSET = 14;
+const TIP_MARGIN = 8;
+// Above app overlays (barrier modal 991, settings 1000/1001) so the tip is
+// never painted underneath them, below the loading splash (9999).
+const TIP_Z = 2000;
 
 /* Bar geometry per density — tighter rows on compact, roomier on spacious. */
 const GEO = {
@@ -34,6 +42,19 @@ export default function ConformidadeChartInner({ data }: Props) {
   );
   const { settings } = useSettings();
   const { ROW_H, BAR_H, LABEL_W } = GEO[settings.density] ?? GEO.comfortable;
+  // Dismiss the floating tip when anything scrolls (page or the chart's own
+  // scroll container) or the viewport resizes: the stored clientX/clientY
+  // anchor would otherwise go stale and the tip would float detached from
+  // the cursor/row until the next mousemove.
+  useEffect(() => {
+    const hide = () => setHover(null);
+    globalThis.addEventListener("scroll", hide, true);
+    globalThis.addEventListener("resize", hide);
+    return () => {
+      globalThis.removeEventListener("scroll", hide, true);
+      globalThis.removeEventListener("resize", hide);
+    };
+  }, []);
   const max = Math.max(1, ...data.map((d) => d.Conforme + d["Não Conforme"]));
   const height = TOP + data.length * ROW_H + AXIS_H;
   const width = LABEL_W + PLOT_W + COUNT_W;
@@ -181,56 +202,13 @@ export default function ConformidadeChartInner({ data }: Props) {
         })}
       </svg>
       {hovered && hover && (
-        <div
-          style={{
-            position: "fixed",
-            left: hover.x + 14,
-            top: hover.y + 14,
-            zIndex: 1200,
-            background: "var(--bg-elevated)",
-            border: "1px solid var(--border)",
-            borderRadius: "var(--d-input-radius)",
-            padding: "var(--d-tip-pad)",
-            fontSize: "var(--d-body)",
-            boxShadow: "var(--shadow-md)",
-            pointerEvents: "none",
-            maxWidth: 260,
-          }}
-        >
-          <div
-            style={{
-              fontWeight: 700,
-              color: "var(--text-primary)",
-              marginBottom: 8,
-              lineHeight: 1.4,
-            }}
-          >
-            {hovered.name}
-          </div>
-          <div
-            style={{
-              display: "flex",
-              gap: "var(--d-opt-gap)",
-              color: "#22c55e",
-              fontWeight: 600,
-              marginBottom: 3,
-            }}
-          >
-            <span>Conforme:</span>
-            <span>{hovered.Conforme.toLocaleString("pt-BR")}</span>
-          </div>
-          <div
-            style={{
-              display: "flex",
-              gap: "var(--d-opt-gap)",
-              color: "#ef4444",
-              fontWeight: 600,
-            }}
-          >
-            <span>Não Conforme:</span>
-            <span>{hovered["Não Conforme"].toLocaleString("pt-BR")}</span>
-          </div>
-        </div>
+        <ChartTooltip
+          x={hover.x}
+          y={hover.y}
+          title={hovered.name}
+          conforme={hovered.Conforme}
+          naoConforme={hovered["Não Conforme"]}
+        />
       )}
       <div
         style={{
@@ -270,4 +248,105 @@ export default function ConformidadeChartInner({ data }: Props) {
       </div>
     </div>
   );
+}
+
+// Floating chart tooltip — portalled to document.body so no ancestor
+// stacking context (animated wrappers, scroll container) can trap it under
+// later cards/tables, and clamped to the viewport so it flips to the
+// left/above the cursor near the right/bottom edges instead of leaving
+// the screen. Hidden until measured to avoid a one-frame flash.
+function ChartTooltip(
+  { x, y, title, conforme, naoConforme }: {
+    x: number;
+    y: number;
+    title: string;
+    conforme: number;
+    naoConforme: number;
+  },
+) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [pos, setPos] = useState<{ left: number; top: number } | null>(null);
+
+  // Runs client-side only, so viewport globals are safe to read here.
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const w = el.offsetWidth || 260;
+    const h = el.offsetHeight || 110;
+    const vw = globalThis.innerWidth;
+    const vh = globalThis.innerHeight;
+    let left = x + TIP_OFFSET;
+    if (left + w + TIP_MARGIN > vw) left = x - w - TIP_OFFSET;
+    left = Math.min(
+      Math.max(TIP_MARGIN, left),
+      Math.max(TIP_MARGIN, vw - w - TIP_MARGIN),
+    );
+    let top = y + TIP_OFFSET;
+    if (top + h + TIP_MARGIN > vh) top = y - h - TIP_OFFSET;
+    top = Math.min(
+      Math.max(TIP_MARGIN, top),
+      Math.max(TIP_MARGIN, vh - h - TIP_MARGIN),
+    );
+    setPos({ left, top });
+  }, [x, y, title, conforme, naoConforme]);
+
+  // SSR: no hover exists on the server, but guard the portal anyway.
+  if (typeof document === "undefined") return null;
+
+  const tip = (
+    <div
+      ref={ref}
+      role="tooltip"
+      style={{
+        position: "fixed",
+        left: pos?.left ?? -9999,
+        top: pos?.top ?? -9999,
+        visibility: pos ? "visible" : "hidden",
+        zIndex: TIP_Z,
+        background: "var(--bg-elevated)",
+        border: "1px solid var(--border)",
+        borderRadius: "var(--d-input-radius)",
+        padding: "var(--d-tip-pad)",
+        fontSize: "var(--d-body)",
+        boxShadow: "var(--shadow-md)",
+        pointerEvents: "none",
+        maxWidth: 260,
+      }}
+    >
+      <div
+        style={{
+          fontWeight: 700,
+          color: "var(--text-primary)",
+          marginBottom: 8,
+          lineHeight: 1.4,
+        }}
+      >
+        {title}
+      </div>
+      <div
+        style={{
+          display: "flex",
+          gap: "var(--d-opt-gap)",
+          color: "#22c55e",
+          fontWeight: 600,
+          marginBottom: 3,
+        }}
+      >
+        <span>Conforme:</span>
+        <span>{conforme.toLocaleString("pt-BR")}</span>
+      </div>
+      <div
+        style={{
+          display: "flex",
+          gap: "var(--d-opt-gap)",
+          color: "#ef4444",
+          fontWeight: 600,
+        }}
+      >
+        <span>Não Conforme:</span>
+        <span>{naoConforme.toLocaleString("pt-BR")}</span>
+      </div>
+    </div>
+  );
+  return createPortal(tip, document.body);
 }
