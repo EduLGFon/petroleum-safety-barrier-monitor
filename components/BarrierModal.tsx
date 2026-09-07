@@ -183,9 +183,9 @@ function Content(
             </div>
             <div
               style={{
-                fontFamily: 'ui-monospace,"Cascadia Code",Menlo,monospace',
+                fontFamily: "var(--font-mono)",
                 fontSize: "var(--d-dialog-title)",
-                fontWeight: 800,
+                fontWeight: 600,
                 color: "var(--text-primary)",
                 wordBreak: "break-all",
                 lineHeight: 1.2,
