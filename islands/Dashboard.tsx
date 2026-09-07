@@ -115,10 +115,9 @@ function DashboardView({ initialBarriers: barriers, companyName }: Props) {
       )}
 
       <div
+        className="aurora-shell"
         style={{
-          fontFamily:
-            "-apple-system,BlinkMacSystemFont,'Inter','Segoe UI',sans-serif",
-          background: "var(--bg-page)",
+          fontFamily: "var(--font-sans)",
           minHeight: "100dvh",
           padding: "var(--d-page)",
           boxSizing: "border-box",
@@ -159,10 +158,10 @@ function DashboardView({ initialBarriers: barriers, companyName }: Props) {
           <ConformidadeChart data={chartData} />
         </div>
 
-        {/* NC alert — high-contrast in light mode via CSS vars */}
+        {/* NC alert - red glass with the signature red glow */}
         {ncCount > 0 && (
           <div
-            className="animate-fade-in"
+            className="animate-fade-in glass-card"
             style={{
               display: "flex",
               alignItems: "center",
@@ -171,7 +170,8 @@ function DashboardView({ initialBarriers: barriers, companyName }: Props) {
               marginBottom: "var(--d-stack)",
               background: "var(--alert-nc-bg)",
               border: "1px solid var(--alert-nc-border)",
-              borderRadius: "var(--d-card-radius)",
+              borderRadius: 12,
+              boxShadow: "0 0 24px rgba(239,68,68,.25)",
               animationDelay: ".32s",
             }}
           >
@@ -274,11 +274,12 @@ function DashboardView({ initialBarriers: barriers, companyName }: Props) {
         </div>
 
         <div
+          className="tnum"
           style={{
             marginTop: "var(--d-foot-gap)",
             textAlign: "center",
             fontSize: "var(--d-caption)",
-            color: "var(--border)",
+            color: "var(--text-muted)",
             letterSpacing: "0.08em",
             animation: "fadeInFast .4s .5s both",
           }}
