@@ -7,6 +7,7 @@ import { useCallback, useContext, useEffect, useState } from "preact/hooks";
 import type { FilterState, Theme } from "../lib/types.ts";
 
 export type AccentColor =
+  | "aurora"
   | "blue"
   | "green"
   | "red"
@@ -27,6 +28,15 @@ export const ACCENT_PRESETS: Record<
     grad4: string;
   }
 > = {
+  aurora: {
+    label: "Aurora",
+    swatch: "#6366f1",
+    primary: "#6366f1",
+    secondary: "#22d3ee",
+    glow: "rgba(99,102,241,.35)",
+    grad1: "linear-gradient(90deg,#6366f1,#22d3ee)",
+    grad4: "linear-gradient(90deg,#6366f1,#22d3ee)",
+  },
   blue: {
     label: "Azul",
     swatch: "#3b82f6",
@@ -122,7 +132,7 @@ export interface SettingsState {
 
 const DEFAULTS: SettingsState = {
   theme: "dark",
-  accentColor: "blue",
+  accentColor: "aurora",
   density: "comfortable",
   defaultFilters: {},
   defaultLocation: "ALL",

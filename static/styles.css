@@ -10,7 +10,7 @@ body {
   padding: 0;
 }
 body {
-  font-family: 'Inter',ui-sans-serif,-apple-system,BlinkMacSystemFont,'Segoe UI','Helvetica Neue',Arial,sans-serif;
+  font-family: var(--font-sans);
   font-size: 15px;
   line-height: 1.6;
   -webkit-font-smoothing: antialiased;
@@ -35,96 +35,176 @@ input[type="search"]::-webkit-search-cancel-button {
   -webkit-appearance: none;
 }
 
-/* ── Themes ────────────────────────────────────────────────────────────────── */
+/* ── Themes ──────────────────────────────────────────────────────────────────
+   Aurora Executive Dark is the interface identity. The
+   --au-* tokens carry it on every theme: dark is the reference,
+   light is the same language on a mist canvas, amoled on pure black.
+   The signature gradient/glow derive from --accent/--accent-2/--glow,
+   which follow the user's accent preset at runtime - so theme and color
+   switching visibly re-tints the whole interface. */
 [data-theme="light"] {
-  --bg-page: #f0f4f8;
+  --bg-page: #e9eefb;
   --bg-surface: #ffffff;
-  --bg-elevated: #f5f8fc;
-  --bg-hover: #eaeff5;
-  --bg-stripe: #f7f9fc;
-  --border: #d1dae6;
-  --border-subtle: #e4eaf2;
+  --bg-elevated: #f4f7fd;
+  --bg-hover: #e9eff9;
+  --bg-stripe: transparent;
+  --border: #d5dded;
+  --border-subtle: #e4eaf4;
   --text-primary: #0d1829;
-  --text-secondary: #2d3a4f;
+  --text-secondary: #33415c;
   --text-muted: #64748b;
-  --accent: #2563eb;
-  --accent-2: #7c3aed;
-  --glow: rgba(37,99,235,.15);
-  --hero-grad: linear-gradient(135deg,#1e3a5f 0%,#2d6aa0 50%,#1a4f7a 100%);
-  --kpi-grad-1: linear-gradient(135deg,#1e40af,#3b82f6);
-  --kpi-grad-2: linear-gradient(135deg,#15803d,#22c55e);
-  --kpi-grad-3: linear-gradient(135deg,#b91c1c,#ef4444);
-  --kpi-grad-4: linear-gradient(135deg,#1e40af,#6366f1);
-  --kpi-grad-5: linear-gradient(135deg,#065f46,#10b981);
-  --kpi-grad-6: linear-gradient(135deg,#7c2d12,#f97316);
-  --shadow-sm: 0 1px 3px rgba(0,0,0,.07),0 1px 2px rgba(0,0,0,.04);
-  --shadow-md: 0 4px 16px rgba(0,0,0,.09);
-  --shadow-lg: 0 20px 60px rgba(0,0,0,.14),0 4px 16px rgba(0,0,0,.08);
-  /* Alert colours – high contrast on light bg */
-  --alert-nc-bg: rgba(185,28,28,.08);
-  --alert-nc-border: rgba(185,28,28,.25);
-  --alert-nc-text: #7f1d1d;
+  --accent: #6366f1;
+  --accent-2: #22d3ee;
+  --glow: rgba(99,102,241,.35);
+  --hero-grad: transparent;
+  --kpi-grad-1: linear-gradient(90deg,#6366f1,#22d3ee);
+  --kpi-grad-2: linear-gradient(90deg,#6366f1,#22d3ee);
+  --kpi-grad-3: linear-gradient(90deg,#6366f1,#22d3ee);
+  --kpi-grad-4: linear-gradient(90deg,#6366f1,#22d3ee);
+  --kpi-grad-5: linear-gradient(90deg,#6366f1,#22d3ee);
+  --kpi-grad-6: linear-gradient(90deg,#6366f1,#22d3ee);
+  --shadow-sm: 0 1px 3px rgba(15,23,42,.07),0 1px 2px rgba(15,23,42,.04);
+  --shadow-md: 0 4px 16px rgba(15,23,42,.09);
+  --shadow-lg: 0 24px 70px rgba(15,23,42,.18);
+  /* Alert colours – red glass on light */
+  --alert-nc-bg: rgba(220,38,38,.06);
+  --alert-nc-border: rgba(220,38,38,.28);
+  --alert-nc-text: #b91c1c;
   --alert-nc-sub: #991b1b;
+  /* Aurora identity on light mist */
+  --au-page:
+    radial-gradient(1200px 400px at 20% 0%,#c7d2fe 0%,#e0f2fe 45%,#e9eefb 100%);
+  --au-page-base: #e9eefb;
+  --au-card: rgba(255,255,255,.78);
+  --au-card-border: rgba(15,23,42,.08);
+  --au-data: rgba(255,255,255,.68);
+  --au-data-border: rgba(15,23,42,.08);
+  --au-seg: rgba(255,255,255,.82);
+  --au-seg-border: rgba(15,23,42,.08);
+  --au-pill: rgba(255,255,255,.85);
+  --au-pill-border: rgba(15,23,42,.12);
+  --au-row: rgba(15,23,42,.07);
+  --au-eyebrow: #4f46e5;
+  --au-label: #64748b;
+  --au-value: #0f172a;
+  --au-sub: #94a3b8;
+  --au-loc: #94a3b8;
+  --au-pill-text: #334155;
+  --au-track: rgba(15,23,42,.08);
+  --au-red-glow: 0 0 24px rgba(220,38,38,.18);
+  --au-danger-bg: rgba(220,38,38,.08);
+  --au-danger-fg: #b91c1c;
+  --au-dialog: #ffffff;
 }
 
 [data-theme="dark"] {
-  --bg-page: #04111d;
-  --bg-surface: #091828;
-  --bg-elevated: #0e2036;
-  --bg-hover: #112540;
-  --bg-stripe: #070f1a;
-  --border: #1a3450;
-  --border-subtle: #0d1e2e;
-  --text-primary: #e8edf3;
-  --text-secondary: #9fb3c8;
-  --text-muted: #4a6080;
-  --accent: #3b82f6;
-  --accent-2: #a78bfa;
-  --glow: rgba(59,130,246,.18);
-  --hero-grad: linear-gradient(135deg,#041422 0%,#0a2544 50%,#071c38 100%);
-  --kpi-grad-1: linear-gradient(135deg,#1e3a8a,#2563eb);
-  --kpi-grad-2: linear-gradient(135deg,#14532d,#16a34a);
-  --kpi-grad-3: linear-gradient(135deg,#7f1d1d,#dc2626);
-  --kpi-grad-4: linear-gradient(135deg,#1e3a8a,#4f46e5);
-  --kpi-grad-5: linear-gradient(135deg,#064e3b,#059669);
-  --kpi-grad-6: linear-gradient(135deg,#7c2d12,#ea580c);
-  --shadow-sm: 0 1px 4px rgba(0,0,0,.28);
-  --shadow-md: 0 4px 20px rgba(0,0,0,.45);
-  --shadow-lg: 0 20px 60px rgba(0,0,0,.65),0 0 0 1px rgba(255,255,255,.04);
+  --bg-page: #050a18;
+  --bg-surface: rgba(255,255,255,.06);
+  --bg-elevated: rgba(255,255,255,.05);
+  --bg-hover: rgba(255,255,255,.09);
+  --bg-stripe: transparent;
+  --border: rgba(255,255,255,.1);
+  --border-subtle: rgba(255,255,255,.06);
+  --text-primary: #ffffff;
+  --text-secondary: #e2e8f0;
+  --text-muted: #94a3b8;
+  --accent: #6366f1;
+  --accent-2: #22d3ee;
+  --glow: rgba(99,102,241,.35);
+  --hero-grad: transparent;
+  --kpi-grad-1: linear-gradient(90deg,#6366f1,#22d3ee);
+  --kpi-grad-2: linear-gradient(90deg,#6366f1,#22d3ee);
+  --kpi-grad-3: linear-gradient(90deg,#6366f1,#22d3ee);
+  --kpi-grad-4: linear-gradient(90deg,#6366f1,#22d3ee);
+  --kpi-grad-5: linear-gradient(90deg,#6366f1,#22d3ee);
+  --kpi-grad-6: linear-gradient(90deg,#6366f1,#22d3ee);
+  --glass-bg: rgba(255,255,255,.055);
+  --glass-border: rgba(255,255,255,.1);
+  --shadow-sm: 0 0 0 rgba(0,0,0,0);
+  --shadow-md: 0 0 0 rgba(0,0,0,0);
+  --shadow-lg: 0 24px 70px rgba(0,0,0,.6);
   --alert-nc-bg: rgba(239,68,68,.07);
-  --alert-nc-border: rgba(239,68,68,.2);
+  --alert-nc-border: rgba(239,68,68,.25);
   --alert-nc-text: #fca5a5;
   --alert-nc-sub: rgba(252,165,165,.65);
+  /* Aurora identity */
+  --au-page:
+    radial-gradient(1200px 400px at 20% 0%,#1d2b64 0%,#0a1128 45%,#050a18 100%);
+  --au-page-base: #050a18;
+  --au-card: rgba(255,255,255,.06);
+  --au-card-border: rgba(255,255,255,.1);
+  --au-data: rgba(255,255,255,.04);
+  --au-data-border: rgba(255,255,255,.08);
+  --au-seg: rgba(255,255,255,.05);
+  --au-seg-border: rgba(255,255,255,.08);
+  --au-pill: rgba(255,255,255,.08);
+  --au-pill-border: rgba(255,255,255,.14);
+  --au-row: rgba(255,255,255,.06);
+  --au-eyebrow: #818cf8;
+  --au-label: #94a3b8;
+  --au-value: #ffffff;
+  --au-sub: #64748b;
+  --au-loc: #71717a;
+  --au-pill-text: #e2e8f0;
+  --au-track: rgba(255,255,255,.1);
+  --au-red-glow: 0 0 24px rgba(239,68,68,.25);
+  --au-danger-bg: rgba(239,68,68,.15);
+  --au-danger-fg: #fca5a5;
+  --au-dialog: #0a1128;
 }
 
 [data-theme="amoled"] {
-  --bg-page: #000;
-  --bg-surface: #080808;
-  --bg-elevated: #111;
-  --bg-hover: #1a1a1a;
-  --bg-stripe: #040404;
-  --border: rgba(255,255,255,.07);
-  --border-subtle: rgba(255,255,255,.04);
-  --text-primary: #fff;
-  --text-secondary: #b0b8c4;
-  --text-muted: #4a5568;
-  --accent: #60a5fa;
-  --accent-2: #c4b5fd;
-  --glow: rgba(96,165,250,.14);
-  --hero-grad: linear-gradient(135deg,#000 0%,#0a0a0a 100%);
-  --kpi-grad-1: linear-gradient(135deg,#172554,#1d4ed8);
-  --kpi-grad-2: linear-gradient(135deg,#052e16,#15803d);
-  --kpi-grad-3: linear-gradient(135deg,#450a0a,#b91c1c);
-  --kpi-grad-4: linear-gradient(135deg,#1e1b4b,#4338ca);
-  --kpi-grad-5: linear-gradient(135deg,#022c22,#047857);
-  --kpi-grad-6: linear-gradient(135deg,#431407,#c2410c);
-  --shadow-sm: 0 1px 6px rgba(0,0,0,.55);
-  --shadow-md: 0 4px 24px rgba(0,0,0,.75);
-  --shadow-lg: 0 20px 60px rgba(0,0,0,.9),0 0 0 1px rgba(255,255,255,.06);
+  --bg-page: #000000;
+  --bg-surface: rgba(255,255,255,.06);
+  --bg-elevated: rgba(255,255,255,.05);
+  --bg-hover: rgba(255,255,255,.09);
+  --bg-stripe: transparent;
+  --border: rgba(255,255,255,.1);
+  --border-subtle: rgba(255,255,255,.06);
+  --text-primary: #ffffff;
+  --text-secondary: #e2e8f0;
+  --text-muted: #94a3b8;
+  --accent: #6366f1;
+  --accent-2: #22d3ee;
+  --glow: rgba(99,102,241,.35);
+  --hero-grad: transparent;
+  --kpi-grad-1: linear-gradient(90deg,#6366f1,#22d3ee);
+  --kpi-grad-2: linear-gradient(90deg,#6366f1,#22d3ee);
+  --kpi-grad-3: linear-gradient(90deg,#6366f1,#22d3ee);
+  --kpi-grad-4: linear-gradient(90deg,#6366f1,#22d3ee);
+  --kpi-grad-5: linear-gradient(90deg,#6366f1,#22d3ee);
+  --kpi-grad-6: linear-gradient(90deg,#6366f1,#22d3ee);
+  --shadow-sm: 0 0 0 rgba(0,0,0,0);
+  --shadow-md: 0 0 0 rgba(0,0,0,0);
+  --shadow-lg: 0 24px 70px rgba(0,0,0,.85);
   --alert-nc-bg: rgba(239,68,68,.07);
-  --alert-nc-border: rgba(239,68,68,.2);
+  --alert-nc-border: rgba(239,68,68,.25);
   --alert-nc-text: #fca5a5;
-  --alert-nc-sub: rgba(252,165,165,.6);
+  --alert-nc-sub: rgba(252,165,165,.65);
+  /* Aurora identity on pure black */
+  --au-page:
+    radial-gradient(1200px 400px at 20% 0%,#141b4d 0%,#05070f 45%,#000000 100%);
+  --au-page-base: #000000;
+  --au-card: rgba(255,255,255,.06);
+  --au-card-border: rgba(255,255,255,.1);
+  --au-data: rgba(255,255,255,.04);
+  --au-data-border: rgba(255,255,255,.08);
+  --au-seg: rgba(255,255,255,.05);
+  --au-seg-border: rgba(255,255,255,.08);
+  --au-pill: rgba(255,255,255,.08);
+  --au-pill-border: rgba(255,255,255,.14);
+  --au-row: rgba(255,255,255,.06);
+  --au-eyebrow: #818cf8;
+  --au-label: #94a3b8;
+  --au-value: #ffffff;
+  --au-sub: #64748b;
+  --au-loc: #71717a;
+  --au-pill-text: #e2e8f0;
+  --au-track: rgba(255,255,255,.1);
+  --au-red-glow: 0 0 24px rgba(239,68,68,.25);
+  --au-danger-bg: rgba(239,68,68,.15);
+  --au-danger-fg: #fca5a5;
+  --au-dialog: #050505;
 }
 
 /* ── Smooth theme/colour transitions ───────────────────────────────────────── */
@@ -163,6 +243,47 @@ body,
   border-radius: 4px;
 }
 
+/* ── Aurora premium shell ──────────────────────────────────────────────
+   Mesh canvas + glass cards. The canvas
+   follows the active theme and the
+   signature gradient/glow follow the accent preset - switching either
+   visibly re-tints the whole interface. */
+html {
+  color-scheme: dark;
+}
+[data-theme="light"] {
+  color-scheme: light;
+}
+.aurora-shell {
+  background: var(--au-page);
+  background-color: var(--au-page-base);
+}
+.tnum {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum" 1, "cv05" 1;
+}
+.font-display {
+  font-family: var(--font-display);
+  letter-spacing: -.02em;
+  font-feature-settings: "ss01" 1, "cv05" 1;
+}
+.glass-card {
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+.glass-pill {
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+::placeholder {
+  color: var(--au-sub);
+  opacity: 1;
+}
+select option {
+  background-color: var(--au-dialog);
+  color: var(--au-pill-text);
+}
+
 /* ══════════════════════════════════════════════════════════════════════════════
    PROFESSIONAL ANIMATIONS — no springs, no bounces
 ══════════════════════════════════════════════════════════════════════════════ */
@@ -171,6 +292,15 @@ body,
   --ease-out: cubic-bezier(0.16,1,0.3,1);
   --ease-std: cubic-bezier(0.4,0,0.2,1);
   --ease-in: cubic-bezier(0.4,0,1,1);
+  /* Typefaces - thin modern premium, shared by every surface
+     (dashboard island, table/mono cells) so the font
+     stays consistent across the interface.
+     Inter Tight throughout (display AND sans resolve to the same
+     stack); JetBrains Mono for TAGs. See AURORA_TYPE in lib/aurora.ts -
+     the single source of truth the dashboard imports. */
+  --font-sans: "Inter Tight","Inter",-apple-system,"Segoe UI",sans-serif;
+  --font-display: "Inter Tight","Inter",-apple-system,"Segoe UI",sans-serif;
+  --font-mono: "JetBrains Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
 }
 
 /* ── Interface density ────────────────────────────────────────────────────
@@ -769,6 +899,43 @@ body,
   }
   50% {
     box-shadow: 0 0 24px var(--glow);
+  }
+}
+/* Incandescent connection bulb (Header hero dot). Breathing = powered,
+   flicker = sputtering/reconnecting. Both animate the halo only; the
+   white-hot core stays put. html.no-anim + prefers-reduced-motion below
+   neutralize them, leaving the static halo. */
+@keyframes bulbBreathe {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: .72;
+  }
+}
+@keyframes bulbFlicker {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  7% {
+    opacity: .55;
+  }
+  9% {
+    opacity: .95;
+  }
+  43% {
+    opacity: .7;
+  }
+  46% {
+    opacity: 1;
+  }
+  71% {
+    opacity: .82;
+  }
+  73% {
+    opacity: 1;
   }
 }
 
