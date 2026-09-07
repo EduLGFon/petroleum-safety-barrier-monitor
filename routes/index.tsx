@@ -1,10 +1,11 @@
 // Home route - renders the barrier monitor with server-loaded data.
 // This is why it exists: Fresh port of the Next page; data loads on the
 // server via the mock adapter. Providers live inside the Dashboard island
-// (context does not cross the island boundary on the client).
+// (context does not cross the island boundary on the client). The shell
+// stays transparent so the Aurora mesh canvas paints edge to edge.
 import { Dashboard } from "../islands/Dashboard.tsx";
 import { mockApi } from "../lib/api.ts";
-import { getCompanyName, withBrand } from "../lib/company.ts";
+import { getCompanyName } from "../lib/company.ts";
 import { define } from "../utils.ts";
 
 export default define.page(async function Home() {
@@ -16,21 +17,11 @@ export default define.page(async function Home() {
         maxWidth: 1400,
         margin: "0 auto",
         padding: "var(--d-shell)",
-        background: "var(--bg-page)",
+        background: "transparent",
         minHeight: "100vh",
       }}
     >
       <Dashboard initialBarriers={barriers} companyName={companyName} />
-      <footer
-        style={{
-          marginTop: "var(--d-foot-gap)",
-          textAlign: "center",
-          fontSize: "var(--d-small)",
-          color: "var(--text-muted)",
-        }}
-      >
-        {withBrand(companyName, "Monitor de Barreiras de Segurança")}
-      </footer>
     </main>
   );
 });
