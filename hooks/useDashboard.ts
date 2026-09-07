@@ -157,7 +157,12 @@ export function useDashboard(allBarriers: Barrier[], defaultLocation = "ALL") {
     () => openId ? allBarriers.find((b) => b.id === openId) ?? null : null,
     [openId, allBarriers],
   );
-  const locationDetails = LOCATIONS.find((l) => l.code === state.location);
+  // Station metadata comes from the seed list when known; stations added
+  // later fall back to their own code so details never render undefined.
+  const locationDetails = LOCATIONS.find((l) => l.code === state.location) ??
+    (state.location !== "ALL"
+      ? { code: state.location, name: state.location, tipo: "Instalação" }
+      : LOCATIONS[0]);
 
   const setLocation = useCallback((code: string) => {
     dispatch({ type: "SET_LOCATION", payload: code });

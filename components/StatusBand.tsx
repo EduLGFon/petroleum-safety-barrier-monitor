@@ -1,21 +1,29 @@
+// Status band - proportional availability segments derived from the data.
+// This is why it exists: statuses are dynamic, so segments render from the
+// KPI buckets (new statuses appear automatically with hashed colors) and
+// scroll horizontally instead of squeezing into slivers at 7+ segments.
 import type { KpiSnapshot } from "../lib/types.ts";
-import { DISP_COLORS } from "../lib/constants.ts";
+import { dispColorFor, shortStatusLabel } from "../lib/constants.ts";
 import { ActivityIcon } from "./ui/Icons.tsx";
-const SEGS = [
-  { key: "Disponível", short: "Disponível" },
-  { key: "Fora de Operação", short: "Fora de Op." },
-  { key: "Indisponível Contingenciado", short: "Indisp. Cont." },
-  { key: "Degradado Contingenciado", short: "Degr. Cont." },
-  { key: "Degradado", short: "Degradado" },
-  { key: "Indisponível", short: "Indisponível" },
-] as const;
+// Curated order for the well-known statuses; anything new sorts after them
+// by volume so the band stays stable across deploys.
+const KNOWN_ORDER = [
+  "Disponível",
+  "Fora de Operação",
+  "Indisponível Contingenciado",
+  "Degradado Contingenciado",
+  "Degradado",
+  "Indisponível",
+];
 interface Props {
   kpi: KpiSnapshot;
   activeFilter: string;
   onFilter: (k: string) => void;
 }
 export function StatusBand({ kpi, activeFilter, onFilter }: Props) {
-  const counts: Record<string, number> = {
+  // Prefer the dynamic buckets; the wire path only carries fixed fields, so
+  // reconstruct from those when buckets are absent (known statuses only).
+  const counts = kpi.byDisponibilidade ?? {
     "Disponível": kpi.disponivel,
     "Fora de Operação": kpi.foraDeOp,
     "Indisponível Contingenciado": kpi.indispCont,
@@ -23,6 +31,13 @@ export function StatusBand({ kpi, activeFilter, onFilter }: Props) {
     "Degradado": kpi.degradado,
     "Indisponível": kpi.indisponivel,
   };
+  const keys = Object.keys(counts).sort((a, b) => {
+    const ia = KNOWN_ORDER.indexOf(a), ib = KNOWN_ORDER.indexOf(b);
+    if (ia !== -1 || ib !== -1) {
+      return (ia === -1 ? 99 : ia) - (ib === -1 ? 99 : ib);
+    }
+    return counts[b] - counts[a];
+  });
   const total = kpi.total || 1;
   return (
     <div style={{ marginBottom: "var(--d-section)" }}>
@@ -52,20 +67,23 @@ export function StatusBand({ kpi, activeFilter, onFilter }: Props) {
           padding: "var(--d-band-pad)",
           border: "1px solid var(--border)",
           boxShadow: "var(--shadow-sm)",
+          overflowX: "auto",
+          maxWidth: "100%",
         }}
       >
-        {SEGS.map((seg, i) => {
-          const count = counts[seg.key] ?? 0,
+        {keys.map((key, i) => {
+          const count = counts[key] ?? 0,
             ptPct = Math.round(count / total * 100);
-          const cfg = DISP_COLORS[seg.key],
-            isA = activeFilter === seg.key,
+          const cfg = dispColorFor(key),
+            short = shortStatusLabel(key),
+            isA = activeFilter === key,
             isDim = !!activeFilter && !isA;
           return (
             <button
               type="button"
-              key={seg.key}
-              onClick={() => onFilter(isA ? "" : seg.key)}
-              title={seg.key}
+              key={key}
+              onClick={() => onFilter(isA ? "" : key)}
+              title={key}
               aria-pressed={isA}
               style={{
                 flex: Math.max(count, 1),
@@ -87,9 +105,12 @@ export function StatusBand({ kpi, activeFilter, onFilter }: Props) {
                   "opacity .22s var(--ease-std), transform .22s var(--ease-std), box-shadow .22s var(--ease-std), border .15s",
                 overflow: "hidden",
                 minWidth: "var(--d-seg-min)",
+                flexShrink: 0,
                 boxShadow: isA ? `0 0 18px ${cfg.solid}55` : "none",
                 position: "relative",
-                animation: `cardAppear .3s ${i * 40}ms var(--ease-out) both`,
+                animation: `cardAppear .3s ${
+                  Math.min(i * 40, 400)
+                }ms var(--ease-out) both`,
               }}
               onMouseEnter={(e) => {
                 if (!isA) {
@@ -130,7 +151,7 @@ export function StatusBand({ kpi, activeFilter, onFilter }: Props) {
                   position: "relative",
                 }}
               >
-                {seg.short}
+                {short}
               </span>
               <span
                 style={{

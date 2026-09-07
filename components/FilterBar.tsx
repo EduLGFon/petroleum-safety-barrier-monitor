@@ -1,3 +1,7 @@
+// Filter bar - search plus faceted selects fed by the dataset.
+// This is why it exists: vocabularies are dynamic (new statuses, 70+
+// categories), so option lists arrive as props derived from the loaded
+// barriers; the seed constants below are fallback only for empty data.
 import { useState } from "preact/hooks";
 import type { FilterState } from "../lib/types.ts";
 import { CATEGORIES } from "../lib/constants.ts";
@@ -7,11 +11,14 @@ interface Props {
   filters: FilterState;
   filteredTotal: number;
   hasActiveFilters: boolean;
+  disponibilidades: string[];
+  conformidades: string[];
+  categorias: string[];
   onFilter: (p: Partial<FilterState>) => void;
   onReset: () => void;
 }
 
-const DISP_OPTS = [
+const FALLBACK_DISP = [
   "Disponível",
   "Fora de Operação",
   "Indisponível Contingenciado",
@@ -19,12 +26,25 @@ const DISP_OPTS = [
   "Degradado",
   "Indisponível",
 ];
-const CONF_OPTS = ["Conforme", "Não Conforme"];
+const FALLBACK_CONF = ["Conforme", "Não Conforme"];
 
 export function FilterBar(
-  { filters, filteredTotal, hasActiveFilters, onFilter, onReset }: Props,
+  {
+    filters,
+    filteredTotal,
+    hasActiveFilters,
+    disponibilidades,
+    conformidades,
+    categorias,
+    onFilter,
+    onReset,
+  }: Props,
 ) {
   const [focused, setFocused] = useState(false);
+  // Props carry the live vocabulary; seed lists only fill empty datasets.
+  const dispOpts = disponibilidades.length ? disponibilidades : FALLBACK_DISP;
+  const confOpts = conformidades.length ? conformidades : FALLBACK_CONF;
+  const catOpts = categorias.length ? categorias : [...CATEGORIES];
 
   return (
     <div
@@ -87,19 +107,19 @@ export function FilterBar(
         value={filters.disponibilidade}
         onChange={(v) => onFilter({ disponibilidade: v })}
         placeholder="Disponibilidade"
-        opts={DISP_OPTS}
+        opts={dispOpts}
       />
       <Sel
         value={filters.conformidade}
         onChange={(v) => onFilter({ conformidade: v })}
         placeholder="Conformidade"
-        opts={CONF_OPTS}
+        opts={confOpts}
       />
       <Sel
         value={filters.categoria}
         onChange={(v) => onFilter({ categoria: v })}
-        placeholder="Categoria"
-        opts={[...CATEGORIES]}
+        placeholder={`Categoria (${catOpts.length})`}
+        opts={catOpts}
       />
 
       {hasActiveFilters && (
@@ -169,6 +189,7 @@ function Sel(
       value={value}
       onChange={(e) => onChange(e.currentTarget.value)}
       className={a ? "animate-filter-on" : ""}
+      title={value || placeholder}
       style={{
         padding: "var(--d-sel-pad)",
         fontSize: "var(--d-body)",
@@ -183,6 +204,8 @@ function Sel(
         fontWeight: a ? 700 : 400,
         boxShadow: a ? "0 0 0 3px var(--glow)" : "none",
         transition: "all .2s var(--ease-std)",
+        // Long vocabularies (70+ categories) must not stretch the row.
+        maxWidth: "min(320px, 100%)",
       }}
     >
       <option value="">{placeholder}</option>

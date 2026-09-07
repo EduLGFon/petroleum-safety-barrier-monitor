@@ -8,7 +8,12 @@ interface Props {
   data: CategoryConformidade[];
 }
 
+// Scroll budget: past this many rows the plot scrolls inside the card
+// instead of growing the page into a 70-row tower.
+const SCROLL_AFTER_ROWS = 18;
+
 export function ConformidadeChart({ data }: Props) {
+  const scroll = data.length > SCROLL_AFTER_ROWS;
   return (
     <div
       style={{
@@ -30,9 +35,19 @@ export function ConformidadeChart({ data }: Props) {
           marginBottom: "var(--d-sect-title-gap)",
         }}
       >
-        Conformidade por Categoria
+        Conformidade por Categoria · {data.length}
       </div>
-      <Chart data={data} />
+      <div
+        style={scroll
+          ? {
+            maxHeight: "min(60vh, 520px)",
+            overflowY: "auto",
+            paddingRight: 4,
+          }
+          : undefined}
+      >
+        <Chart data={data} />
+      </div>
     </div>
   );
 }

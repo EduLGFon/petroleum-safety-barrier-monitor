@@ -62,7 +62,16 @@ export function resolveBarriers(items: WireBarrier[]): Barrier[] {
   return items.map(resolveBarrier);
 }
 
-/** KPI snapshots are already numeric on the wire — pass-through with type narrowing */
+/** KPI snapshots are already numeric on the wire — pass-through with type narrowing.
+ *  Dynamic buckets ride along untouched when a future backend sends them. */
 export function resolveKpi(w: WireKpiSnapshot): KpiSnapshot {
-  return { ...w };
+  const { byDisponibilidade, byConformidade, byCriticidade, ...fixed } = w as
+    & WireKpiSnapshot
+    & Partial<KpiSnapshot>;
+  return {
+    ...fixed,
+    ...(byDisponibilidade ? { byDisponibilidade } : {}),
+    ...(byConformidade ? { byConformidade } : {}),
+    ...(byCriticidade ? { byCriticidade } : {}),
+  };
 }

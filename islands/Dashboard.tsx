@@ -1,8 +1,9 @@
 // Dashboard island - interactive monitor wired to filters, table and exports.
 // This is why it exists: the only hydrated root; everything static stays
 // in components/ so the client ships JS for this subtree alone.
-import { useCallback, useEffect, useState } from "preact/hooks";
+import { useCallback, useEffect, useMemo, useState } from "preact/hooks";
 import type { Barrier } from "../lib/types.ts";
+import { distinctBy } from "../lib/constants.ts";
 import { useDashboard } from "../hooks/useDashboard.ts";
 import { SettingsProvider, useSettings } from "../context/SettingsContext.tsx";
 import { ThemeProvider } from "../context/ThemeContext.tsx";
@@ -91,6 +92,21 @@ function DashboardView({ initialBarriers: barriers, companyName }: Props) {
   const ncCount = kpi.degradado + kpi.indisponivel;
   const isUrgentesActive = filters.conformidade === "Não Conforme" &&
     filters.sortCol === "statusSince";
+
+  // Live vocabularies for the filter selects - derived from the dataset so
+  // new statuses/categories become filterable with no code change.
+  const dispOpts = useMemo(
+    () => distinctBy(barriers, (b) => b.disponibilidade),
+    [barriers],
+  );
+  const confOpts = useMemo(
+    () => distinctBy(barriers, (b) => b.conformidade),
+    [barriers],
+  );
+  const catOpts = useMemo(
+    () => distinctBy(barriers, (b) => b.categoria),
+    [barriers],
+  );
 
   return (
     <>
@@ -233,6 +249,9 @@ function DashboardView({ initialBarriers: barriers, companyName }: Props) {
             filters={filters}
             filteredTotal={filteredTotal}
             hasActiveFilters={hasActiveFilters}
+            disponibilidades={dispOpts}
+            conformidades={confOpts}
+            categorias={catOpts}
             onFilter={setFilter}
             onReset={resetFilters}
           />
@@ -249,6 +268,7 @@ function DashboardView({ initialBarriers: barriers, companyName }: Props) {
             onToggleSelect={toggleSelect}
             onSort={setSort}
             onPageChange={(p) => setFilter({ page: p })}
+            onPageSize={(n) => setFilter({ pageSize: n })}
             onSelect={(b) => setOpenId(b.id)}
           />
         </div>

@@ -1,3 +1,8 @@
+// Catalog defaults - seed data and display metadata, NOT the source of truth.
+// The UI derives stations, categories, statuses and owners from the loaded
+// dataset; these lists only seed the mock/DB and label known values. Any new
+// value arriving at runtime must still render, filter and aggregate via the
+// dynamic fallbacks below (dynamic-data principle in agents.md).
 import type { Disponibilidade, Location } from "./types.ts";
 
 export const LOCATIONS: Location[] = [
@@ -241,3 +246,71 @@ export const CRIT_COLORS: Record<
 
 export const SIM_DATE = new Date("2026-06-22");
 export const PAGE_SIZE = 25;
+/** Page-size choices offered by the table pager at any scale. */
+export const PAGE_SIZE_OPTS = [25, 50, 100] as const;
+
+interface ColorSet {
+  solid: string;
+  bg: string;
+  border: string;
+  grad?: string;
+}
+
+// Deterministic fallback color for values added after deploy (new statuses,
+// criticalities, ...). Hashes the label into a hue so the same value always
+// gets the same color across renders, sessions and components.
+function hashHue(key: string): number {
+  let h = 0;
+  for (let i = 0; i < key.length; i++) h = (h * 31 + key.charCodeAt(i)) | 0;
+  return Math.abs(h) % 360;
+}
+
+export function fallbackColors(key: string): ColorSet {
+  const h = hashHue(key);
+  return {
+    solid: `hsl(${h} 70% 55%)`,
+    bg: `hsl(${h} 70% 55% / .1)`,
+    border: `hsl(${h} 70% 55% / .28)`,
+    grad: `linear-gradient(135deg,hsl(${h} 60% 28%),hsl(${h} 70% 45%))`,
+  };
+}
+
+/** Lookup with graceful fallback - never returns undefined for new values. */
+export function dispColorFor(key: string): ColorSet {
+  return { ...fallbackColors(key), ...DISP_COLORS[key] };
+}
+export function confColorFor(key: string): ColorSet {
+  return { ...fallbackColors(key), ...CONF_COLORS[key] };
+}
+export function critColorFor(key: string): ColorSet {
+  return { ...fallbackColors(key), ...CRIT_COLORS[key] };
+}
+
+/** Short label for status band segments - known values use curated shorts,
+ *  future values auto-abbreviate to their first two words. */
+export function shortStatusLabel(key: string): string {
+  const known: Record<string, string> = {
+    "Disponível": "Disponível",
+    "Fora de Operação": "Fora de Op.",
+    "Indisponível Contingenciado": "Indisp. Cont.",
+    "Degradado Contingenciado": "Degr. Cont.",
+    "Degradado": "Degradado",
+    "Indisponível": "Indisponível",
+  };
+  if (known[key]) return known[key];
+  const words = key.split(/\s+/);
+  return words.length > 2 ? words.slice(0, 2).join(" ") : key;
+}
+
+/** Distinct option values present in the data, sorted by frequency then name.
+ *  Single O(N) pass - feeds filter selects and any future faceted control. */
+export function distinctBy<T>(items: T[], pick: (t: T) => string): string[] {
+  const freq = new Map<string, number>();
+  for (const it of items) {
+    const k = pick(it);
+    freq.set(k, (freq.get(k) ?? 0) + 1);
+  }
+  return [...freq.entries()]
+    .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0], "pt-BR"))
+    .map(([k]) => k);
+}

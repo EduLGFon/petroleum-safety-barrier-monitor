@@ -1,6 +1,11 @@
 import type { CSSProperties } from "preact";
 import type { Barrier, FilterState, SortableColumn } from "../lib/types.ts";
-import { CONF_COLORS, CRIT_COLORS, DISP_COLORS } from "../lib/constants.ts";
+import {
+  confColorFor,
+  critColorFor,
+  dispColorFor,
+  PAGE_SIZE_OPTS,
+} from "../lib/constants.ts";
 import { daysSince, humanDuration } from "../lib/utils.ts";
 import { Badge } from "./ui/Badge.tsx";
 import {
@@ -23,6 +28,7 @@ interface Props {
   onToggleSelect: (id: number) => void;
   onSort: (c: SortableColumn) => void;
   onPageChange: (p: number) => void;
+  onPageSize: (n: number) => void;
   onSelect: (b: Barrier) => void;
 }
 
@@ -60,6 +66,7 @@ export function BarriersTable(
     onToggleSelect,
     onSort,
     onPageChange,
+    onPageSize,
     onSelect,
   }: Props,
 ) {
@@ -142,7 +149,8 @@ export function BarriersTable(
                 )
                 : rows.map((b, i) => {
                   const isSel = selectedIds.has(b.id);
-                  const dc = DISP_COLORS[b.disponibilidade]?.solid ?? "#475569";
+                  // Hashed fallback keeps unseen statuses visible, never gray.
+                  const dc = dispColorFor(b.disponibilidade).solid;
                   const isNC = b.conformidade === "Não Conforme";
                   const ncDays = isNC && b.statusSince
                     ? daysSince(b.statusSince)
@@ -264,7 +272,7 @@ export function BarriersTable(
                       >
                         <Badge
                           label={b.criticidade}
-                          {...CRIT_COLORS[b.criticidade]}
+                          {...critColorFor(b.criticidade)}
                           size="sm"
                         />
                       </td>
@@ -288,7 +296,7 @@ export function BarriersTable(
                       >
                         <Badge
                           label={b.disponibilidade}
-                          {...DISP_COLORS[b.disponibilidade]}
+                          {...dispColorFor(b.disponibilidade)}
                         />
                       </td>
 
@@ -299,7 +307,7 @@ export function BarriersTable(
                       >
                         <Badge
                           label={b.conformidade}
-                          {...CONF_COLORS[b.conformidade]}
+                          {...confColorFor(b.conformidade)}
                         />
                       </td>
 
@@ -343,6 +351,7 @@ export function BarriersTable(
           total={filteredTotal}
           pageSize={filters.pageSize}
           onChange={onPageChange}
+          onPageSize={onPageSize}
         />
       )}
     </div>
@@ -383,12 +392,13 @@ function RowChk({ checked }: { checked: boolean }) {
 }
 
 function Pagination(
-  { page, totalPages, total, pageSize, onChange }: {
+  { page, totalPages, total, pageSize, onChange, onPageSize }: {
     page: number;
     totalPages: number;
     total: number;
     pageSize: number;
     onChange: (p: number) => void;
+    onPageSize: (n: number) => void;
   },
 ) {
   const from = ((page - 1) * pageSize) + 1,
@@ -434,6 +444,33 @@ function Pagination(
         {from.toLocaleString("pt-BR")}–{to.toLocaleString("pt-BR")} de{" "}
         {total.toLocaleString("pt-BR")}
       </span>
+      <label
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: "var(--d-mini-gap)",
+          fontSize: "var(--d-body)",
+          color: "var(--text-muted)",
+        }}
+      >
+        Por página
+        <select
+          value={pageSize}
+          onChange={(e) => onPageSize(Number(e.currentTarget.value))}
+          style={{
+            padding: "var(--d-sel-pad)",
+            fontSize: "var(--d-body)",
+            background: "var(--bg-surface)",
+            border: "1.5px solid var(--border)",
+            borderRadius: "var(--d-input-radius)",
+            color: "var(--text-secondary)",
+            outline: "none",
+            cursor: "pointer",
+          }}
+        >
+          {PAGE_SIZE_OPTS.map((n) => <option key={n} value={n}>{n}</option>)}
+        </select>
+      </label>
       <div style={{ display: "flex", gap: "var(--d-gap-2xs)" }}>
         <button
           type="button"

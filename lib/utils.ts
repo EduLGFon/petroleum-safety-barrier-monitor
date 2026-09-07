@@ -4,45 +4,93 @@ import type {
   FilterState,
   KpiSnapshot,
 } from "./types.ts";
-import { CATEGORIES, SIM_DATE } from "./constants.ts";
+import { SIM_DATE } from "./constants.ts";
 
 export function computeKpi(b: Barrier[]): KpiSnapshot {
   const t = b.length;
+  // Single pass - counts every value actually present (dynamic buckets)
+  // alongside the well-known fast-path fields, so future statuses are
+  // included in totals instead of silently dropped.
+  const byDisponibilidade: Record<string, number> = {};
+  const byConformidade: Record<string, number> = {};
+  const byCriticidade: Record<string, number> = {};
+  let disponivel = 0,
+    foraDeOp = 0,
+    indispCont = 0,
+    degrCont = 0,
+    degradado = 0,
+    indisponivel = 0,
+    conforme = 0,
+    naoConforme = 0,
+    criticasNC = 0;
+  for (const x of b) {
+    byDisponibilidade[x.disponibilidade] =
+      (byDisponibilidade[x.disponibilidade] ?? 0) + 1;
+    byConformidade[x.conformidade] = (byConformidade[x.conformidade] ?? 0) + 1;
+    byCriticidade[x.criticidade] = (byCriticidade[x.criticidade] ?? 0) + 1;
+    switch (x.disponibilidade) {
+      case "Disponível":
+        disponivel++;
+        break;
+      case "Fora de Operação":
+        foraDeOp++;
+        break;
+      case "Indisponível Contingenciado":
+        indispCont++;
+        break;
+      case "Degradado Contingenciado":
+        degrCont++;
+        break;
+      case "Degradado":
+        degradado++;
+        break;
+      case "Indisponível":
+        indisponivel++;
+        break;
+    }
+    if (x.conformidade === "Conforme") conforme++;
+    else if (x.conformidade === "Não Conforme") {
+      naoConforme++;
+      if (x.criticidade === "Crítica") criticasNC++;
+    }
+  }
   return {
     total: t,
-    disponivel: b.filter((x) => x.disponibilidade === "Disponível").length,
-    foraDeOp: b.filter((x) => x.disponibilidade === "Fora de Operação").length,
-    indispCont:
-      b.filter((x) => x.disponibilidade === "Indisponível Contingenciado")
-        .length,
-    degrCont:
-      b.filter((x) => x.disponibilidade === "Degradado Contingenciado").length,
-    degradado: b.filter((x) => x.disponibilidade === "Degradado").length,
-    indisponivel: b.filter((x) => x.disponibilidade === "Indisponível").length,
-    conforme: b.filter((x) => x.conformidade === "Conforme").length,
-    naoConforme: b.filter((x) => x.conformidade === "Não Conforme").length,
-    criticasNC:
-      b.filter((x) =>
-        x.conformidade === "Não Conforme" && x.criticidade === "Crítica"
-      ).length,
-    pctConforme: t > 0
-      ? Math.round(
-        b.filter((x) => x.conformidade === "Conforme").length / t * 100,
-      )
-      : 0,
+    disponivel,
+    foraDeOp,
+    indispCont,
+    degrCont,
+    degradado,
+    indisponivel,
+    conforme,
+    naoConforme,
+    criticasNC,
+    pctConforme: t > 0 ? Math.round(conforme / t * 100) : 0,
+    byDisponibilidade,
+    byConformidade,
+    byCriticidade,
   };
 }
 
 export function computeChartData(b: Barrier[]): CategoryConformidade[] {
-  return CATEGORIES.map((cat) => ({
-    name: cat.length > 26 ? cat.slice(0, 26) + "…" : cat,
-    Conforme:
-      b.filter((x) => x.categoria === cat && x.conformidade === "Conforme")
-        .length,
-    "Não Conforme":
-      b.filter((x) => x.categoria === cat && x.conformidade === "Não Conforme")
-        .length,
-  }));
+  // Categories come from the data, not the CATEGORIES seed list: new
+  // categories appear automatically, removed ones vanish. Sorted by volume
+  // (biggest first) so the first screenful stays meaningful at 70+ rows.
+  // Single O(N) pass into per-category buckets.
+  const buckets = new Map<string, { c: number; nc: number }>();
+  for (const x of b) {
+    let e = buckets.get(x.categoria);
+    if (!e) buckets.set(x.categoria, e = { c: 0, nc: 0 });
+    if (x.conformidade === "Conforme") e.c++;
+    else e.nc++;
+  }
+  return [...buckets.entries()]
+    .sort((a, z) => (z[1].c + z[1].nc) - (a[1].c + a[1].nc))
+    .map(([name, v]) => ({
+      name: name.length > 26 ? name.slice(0, 26) + "…" : name,
+      Conforme: v.c,
+      "Não Conforme": v.nc,
+    }));
 }
 
 export function applyFilters(b: Barrier[], f: FilterState): Barrier[] {
