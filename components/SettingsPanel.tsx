@@ -26,9 +26,9 @@ const THEMES: {
   >;
   label: string;
 }[] = [
-  { value: "light", Icon: SunIcon, label: "Claro" },
-  { value: "dark", Icon: MoonIcon, label: "Escuro" },
-  { value: "amoled", Icon: MonitorIcon, label: "AMOLED" },
+  { value: "light", Icon: SunIcon, label: "Aurora Claro" },
+  { value: "dark", Icon: MoonIcon, label: "Aurora Escura" },
+  { value: "amoled", Icon: MonitorIcon, label: "Aurora Black" },
 ];
 const DISP_OPTS = [
   "Disponível",
@@ -144,6 +144,8 @@ export function SettingsPanel({ open, onClose, companyName }: Props) {
           maxWidth: "96vw",
           background: "var(--bg-surface)",
           borderLeft: "1px solid var(--border)",
+          backdropFilter: "blur(20px)",
+          WebkitBackdropFilter: "blur(20px)",
           zIndex: 1001,
           display: "flex",
           flexDirection: "column",
@@ -480,7 +482,8 @@ export function SettingsPanel({ open, onClose, companyName }: Props) {
               <div
                 style={{
                   display: "grid",
-                  gridTemplateColumns: "repeat(7,1fr)",
+                  gridTemplateColumns:
+                    "repeat(auto-fit,minmax(var(--d-swatch),1fr))",
                   gap: "var(--d-bar-gap)",
                 }}
               >

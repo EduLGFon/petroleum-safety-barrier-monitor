@@ -1,14 +1,15 @@
-import type { FunctionComponent } from "preact";
 import { useSettings } from "../../context/SettingsContext.tsx";
+import type { FunctionComponent } from "preact";
 import type { Theme } from "../../lib/types.ts";
+import { AURORA } from "../../lib/aurora.ts";
 import { MonitorIcon, MoonIcon, SunIcon } from "./Icons.tsx";
 type I = FunctionComponent<
   { size?: number; color?: string; strokeWidth?: number }
 >;
 const OPTS: { value: Theme; Icon: I; label: string }[] = [
-  { value: "light", Icon: SunIcon, label: "Claro" },
-  { value: "dark", Icon: MoonIcon, label: "Escuro" },
-  { value: "amoled", Icon: MonitorIcon, label: "AMOLED" },
+  { value: "light", Icon: SunIcon, label: "Aurora Claro" },
+  { value: "dark", Icon: MoonIcon, label: "Aurora Escura" },
+  { value: "amoled", Icon: MonitorIcon, label: "Aurora Black" },
 ];
 export function ThemeToggle() {
   const { settings, setTheme } = useSettings();
@@ -17,8 +18,8 @@ export function ThemeToggle() {
     <div
       style={{
         display: "flex",
-        background: "rgba(0,0,0,.22)",
-        border: "1px solid rgba(255,255,255,.1)",
+        background: AURORA.seg,
+        border: `1px solid ${AURORA.segBorder}`,
         borderRadius: 10,
         padding: 3,
         gap: 2,
@@ -44,17 +45,15 @@ export function ThemeToggle() {
               borderRadius: 7,
               border: "none",
               cursor: "pointer",
-              background: a
-                ? "linear-gradient(135deg,var(--accent),var(--accent-2))"
-                : "transparent",
-              color: a ? "#fff" : "rgba(148,163,184,.8)",
+              background: a ? AURORA.grad : "transparent",
+              color: a ? "#fff" : AURORA.label,
               boxShadow: a ? "0 2px 6px var(--glow)" : "none",
               transition: "all .22s var(--ease-std)",
             }}
           >
             <Icon
               size={12}
-              color={a ? "#fff" : "rgba(148,163,184,.8)"}
+              color={a ? "#fff" : AURORA.label}
               strokeWidth={2.5}
             />
             {label}
