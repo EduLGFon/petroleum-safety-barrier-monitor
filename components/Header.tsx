@@ -9,6 +9,7 @@ import { useSettings } from "../context/SettingsContext.tsx";
 
 interface Props {
   onOpenSettings: () => void;
+  companyName?: string;
 }
 
 type Conn = "connected" | "reconnecting" | "disconnected";
@@ -68,7 +69,7 @@ function GearIcon() {
   );
 }
 
-export function Header({ onOpenSettings }: Props) {
+export function Header({ onOpenSettings, companyName = "" }: Props) {
   const conn = useConnection();
   const { settings } = useSettings();
   const isUp = conn === "connected";
@@ -93,17 +94,19 @@ export function Header({ onOpenSettings }: Props) {
       }}
     >
       <div>
-        <div
-          style={{
-            fontFamily: "var(--font-sans)",
-            fontSize: AURORA_TYPE.eyebrow.fontSize,
-            letterSpacing: AURORA_TYPE.eyebrow.letterSpacing,
-            fontWeight: AURORA_TYPE.eyebrow.fontWeight,
-            color: AURORA.eyebrow,
-          }}
-        >
-          OPERATIONAL SAFETY · LIVE
-        </div>
+        {companyName && (
+          <div
+            style={{
+              fontFamily: "var(--font-sans)",
+              fontSize: AURORA_TYPE.eyebrow.fontSize,
+              letterSpacing: AURORA_TYPE.eyebrow.letterSpacing,
+              fontWeight: AURORA_TYPE.eyebrow.fontWeight,
+              color: AURORA.eyebrow,
+            }}
+          >
+            {companyName.toUpperCase()}
+          </div>
+        )}
         <div
           style={{
             fontFamily: "var(--font-display)",

@@ -130,7 +130,10 @@ function DashboardView({ initialBarriers: barriers, companyName }: Props) {
         }}
       >
         {/* Header */}
-        <Header onOpenSettings={() => setSettingsOpen(true)} />
+        <Header
+          onOpenSettings={() => setSettingsOpen(true)}
+          companyName={companyName}
+        />
 
         {/* Location tabs */}
         <div style={{ animation: "slideUp .3s .04s var(--ease-out) both" }}>
