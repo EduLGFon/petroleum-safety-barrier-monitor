@@ -345,7 +345,7 @@ export function buildPrintReport(
     const bg = idx % 2 === 0 ? "#F8FAFC" : "#FFFFFF";
     const disp = DISP_COLORS[String(b.disponibilidade)]?.solid ?? "#94a3b8";
     const conf = CONF_COLORS[String(b.conformidade)]?.solid ?? "#94a3b8";
-    const dur = b.conformidade === "Não Conforme" && b.statusSince
+    const dur = b.conformidade !== "Conforme" && b.statusSince
       ? humanDuration(daysSince(b.statusSince))
       : "—";
     const cell = (v: string, style = "") =>
