@@ -31,8 +31,10 @@ function buildReverse<T extends string>(
 
 // ─── Location (Instalação) ────────────────────────────────────────────────
 // 0 = ALL is intentionally reserved as the "no filter / all locations" sentinel
-// Pattern for every domain below: toXId maps display string -> wire id,
-// fromXId maps wire id -> display string (each with a safe default for unknowns).
+// Pattern for every domain below: toXId maps display string -> wire id
+// (undefined when unknown — callers must skip the filter and warn, never
+// silently substitute a wrong known id). fromXId maps wire id -> display
+// string (explicit unknown sentinel, never a plausible known label).
 
 export const LOCATION_CODES: Record<number, string> = {
   0: "ALL",
@@ -45,11 +47,11 @@ export const LOCATION_CODES: Record<number, string> = {
 };
 export const LOCATION_IDS = buildReverse(LOCATION_CODES);
 
-export function toLocationId(code: string): number {
-  return LOCATION_IDS[code] ?? 0;
+export function toLocationId(code: string): number | undefined {
+  return LOCATION_IDS[code];
 }
 export function fromLocationId(id: number): string {
-  return LOCATION_CODES[id] ?? "ALL";
+  return LOCATION_CODES[id] ?? `ST-${id}`;
 }
 
 // ─── Disponibilidade (barrier availability status) ───────────────────────
@@ -64,11 +66,11 @@ export const DISPONIBILIDADE_CODES: Record<number, Disponibilidade> = {
 };
 export const DISPONIBILIDADE_IDS = buildReverse(DISPONIBILIDADE_CODES);
 
-export function toDisponibilidadeId(v: Disponibilidade): number {
-  return DISPONIBILIDADE_IDS[v] ?? 0;
+export function toDisponibilidadeId(v: Disponibilidade): number | undefined {
+  return DISPONIBILIDADE_IDS[v];
 }
 export function fromDisponibilidadeId(id: number): Disponibilidade {
-  return DISPONIBILIDADE_CODES[id] ?? "Disponível";
+  return DISPONIBILIDADE_CODES[id] ?? `Disponibilidade (${id})`;
 }
 
 // ─── Conformidade ─────────────────────────────────────────────────────────
@@ -79,11 +81,11 @@ export const CONFORMIDADE_CODES: Record<number, Conformidade> = {
 };
 export const CONFORMIDADE_IDS = buildReverse(CONFORMIDADE_CODES);
 
-export function toConformidadeId(v: Conformidade): number {
-  return CONFORMIDADE_IDS[v] ?? 0;
+export function toConformidadeId(v: Conformidade): number | undefined {
+  return CONFORMIDADE_IDS[v];
 }
 export function fromConformidadeId(id: number): Conformidade {
-  return CONFORMIDADE_CODES[id] ?? "Conforme";
+  return CONFORMIDADE_CODES[id] ?? `Conformidade (${id})`;
 }
 
 // ─── Criticidade ──────────────────────────────────────────────────────────
@@ -94,11 +96,11 @@ export const CRITICIDADE_CODES: Record<number, Criticidade> = {
 };
 export const CRITICIDADE_IDS = buildReverse(CRITICIDADE_CODES);
 
-export function toCriticidadeId(v: Criticidade): number {
-  return CRITICIDADE_IDS[v] ?? 0;
+export function toCriticidadeId(v: Criticidade): number | undefined {
+  return CRITICIDADE_IDS[v];
 }
 export function fromCriticidadeId(id: number): Criticidade {
-  return CRITICIDADE_CODES[id] ?? "Não Crítica";
+  return CRITICIDADE_CODES[id] ?? `Criticidade (${id})`;
 }
 
 // ─── Categoria da barreira ────────────────────────────────────────────────
@@ -117,11 +119,11 @@ export const CATEGORIA_CODES: Record<number, string> = {
 };
 export const CATEGORIA_IDS = buildReverse(CATEGORIA_CODES);
 
-export function toCategoriaId(v: string): number {
-  return CATEGORIA_IDS[v] ?? 0;
+export function toCategoriaId(v: string): number | undefined {
+  return CATEGORIA_IDS[v];
 }
 export function fromCategoriaId(id: number): string {
-  return CATEGORIA_CODES[id] ?? CATEGORIA_CODES[0];
+  return CATEGORIA_CODES[id] ?? `Categoria (${id})`;
 }
 
 // ─── Agrupamento ──────────────────────────────────────────────────────────
@@ -136,11 +138,11 @@ export const AGRUPAMENTO_CODES: Record<number, string> = {
 };
 export const AGRUPAMENTO_IDS = buildReverse(AGRUPAMENTO_CODES);
 
-export function toAgrupamentoId(v: string): number {
-  return AGRUPAMENTO_IDS[v] ?? 0;
+export function toAgrupamentoId(v: string): number | undefined {
+  return AGRUPAMENTO_IDS[v];
 }
 export function fromAgrupamentoId(id: number): string {
-  return AGRUPAMENTO_CODES[id] ?? AGRUPAMENTO_CODES[0];
+  return AGRUPAMENTO_CODES[id] ?? `Agrupamento (${id})`;
 }
 
 // ─── Tipologia da instalação ──────────────────────────────────────────────
@@ -155,11 +157,11 @@ export const TIPOLOGIA_CODES: Record<number, string> = {
 };
 export const TIPOLOGIA_IDS = buildReverse(TIPOLOGIA_CODES);
 
-export function toTipologiaId(v: string): number {
-  return TIPOLOGIA_IDS[v] ?? 0;
+export function toTipologiaId(v: string): number | undefined {
+  return TIPOLOGIA_IDS[v];
 }
 export function fromTipologiaId(id: number): string {
-  return TIPOLOGIA_CODES[id] ?? TIPOLOGIA_CODES[0];
+  return TIPOLOGIA_CODES[id] ?? `Tipologia (${id})`;
 }
 
 // ─── Dono da barreira ─────────────────────────────────────────────────────
@@ -174,11 +176,12 @@ export const DONO_CODES: Record<number, string> = {
 };
 export const DONO_IDS = buildReverse(DONO_CODES);
 
-export function toDonoId(v: string): number {
-  return DONO_IDS[v] ?? -1; // -1 = "não informado" (no owner assigned)
+export function toDonoId(v: string): number | undefined {
+  return DONO_IDS[v];
 }
 export function fromDonoId(id: number): string {
-  return id < 0 ? "" : (DONO_CODES[id] ?? "");
+  if (id < 0) return "";
+  return DONO_CODES[id] ?? `Dono (${id})`;
 }
 
 // ─── Local description (physical location text) ──────────────────────────
@@ -207,11 +210,11 @@ export const LOC_DESC_CODES: Record<number, string> = {
 };
 export const LOC_DESC_IDS = buildReverse(LOC_DESC_CODES);
 
-export function toLocDescId(v: string): number {
-  return LOC_DESC_IDS[v] ?? 0;
+export function toLocDescId(v: string): number | undefined {
+  return LOC_DESC_IDS[v];
 }
 export function fromLocDescId(id: number): string {
-  return LOC_DESC_CODES[id] ?? LOC_DESC_CODES[0];
+  return LOC_DESC_CODES[id] ?? `Local (${id})`;
 }
 
 // ─── History author ───────────────────────────────────────────────────────
@@ -230,11 +233,11 @@ export const AUTHOR_CODES: Record<number, string> = {
 };
 export const AUTHOR_IDS = buildReverse(AUTHOR_CODES);
 
-export function toAuthorId(v: string): number {
-  return AUTHOR_IDS[v] ?? 0;
+export function toAuthorId(v: string): number | undefined {
+  return AUTHOR_IDS[v];
 }
 export function fromAuthorId(id: number): string {
-  return AUTHOR_CODES[id] ?? AUTHOR_CODES[0];
+  return AUTHOR_CODES[id] ?? `Autor (${id})`;
 }
 
 // ─── Theme & Accent (for settings payloads too) ──────────────────────────

@@ -61,7 +61,9 @@ CRITICIDADE_CODES = { 0: "Não Crítica", 1: "Crítica" };
 // Autor do histórico — todos seguem o mesmo padrão (veja lib/enums.ts).
 ```
 
-Cada domínio expõe `toXId(string) -> number` e `fromXId(number) -> string`.
+Cada domínio expõe `toXId(string) -> number | undefined` (undefined = valor
+desconhecido, o filtro é ignorado com warning) e `fromXId(number) -> string`
+(sentindela explícita tipo `ST-7`, nunca um rótulo conhecido plausível).
 
 ## Tipos "wire" vs tipos de domínio
 

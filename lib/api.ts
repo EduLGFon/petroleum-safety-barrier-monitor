@@ -70,19 +70,37 @@ export interface DomainQuery {
   sortDir?: "asc" | "desc";
 }
 
-/** Converts UI-facing string filters into the numeric wire query the API expects */
+/** Converts UI-facing string filters into the numeric wire query the API expects.
+ *  Unknown vocabulary values are skipped (with a warning) instead of silently
+ *  mapping to a wrong known id — the server will learn the new value first. */
 export function toWireQuery(f: DomainQuery): BarriersQuery {
   const q: BarriersQuery = {};
   if (f.location && f.location !== "ALL") {
-    q.locationId = toLocationId(f.location);
+    const id = toLocationId(f.location);
+    if (id === undefined) {
+      console.warn(`[toWireQuery] unknown location: ${f.location}`);
+    } else q.locationId = id;
   }
   if (f.disponibilidade) {
-    q.disponibilidadeId = toDisponibilidadeId(f.disponibilidade as never);
+    const id = toDisponibilidadeId(f.disponibilidade as never);
+    if (id === undefined) {
+      console.warn(
+        `[toWireQuery] unknown disponibilidade: ${f.disponibilidade}`,
+      );
+    } else q.disponibilidadeId = id;
   }
   if (f.conformidade) {
-    q.conformidadeId = toConformidadeId(f.conformidade as never);
+    const id = toConformidadeId(f.conformidade as never);
+    if (id === undefined) {
+      console.warn(`[toWireQuery] unknown conformidade: ${f.conformidade}`);
+    } else q.conformidadeId = id;
   }
-  if (f.categoria) q.categoriaId = toCategoriaId(f.categoria);
+  if (f.categoria) {
+    const id = toCategoriaId(f.categoria);
+    if (id === undefined) {
+      console.warn(`[toWireQuery] unknown categoria: ${f.categoria}`);
+    } else q.categoriaId = id;
+  }
   if (f.query) q.query = f.query;
   if (f.page) q.page = f.page;
   if (f.pageSize) q.pageSize = f.pageSize;
