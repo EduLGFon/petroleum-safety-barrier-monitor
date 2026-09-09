@@ -64,10 +64,20 @@ export interface DomainQuery {
   conformidade?: string;
   categoria?: string;
   query?: string;
+  // Inclusive ISO-date bounds (YYYY-MM-DD) on statusSince.
+  since?: string;
+  until?: string;
   page?: number;
   pageSize?: number;
   sortCol?: string;
   sortDir?: "asc" | "desc";
+}
+
+// Accepts YYYY-MM-DD (or longer ISO starting with a valid date); else undefined.
+function cleanDateParam(v: string | undefined): string | undefined {
+  if (!v) return undefined;
+  const date = v.slice(0, 10);
+  return /^\d{4}-\d{2}-\d{2}$/.test(date) ? date : undefined;
 }
 
 /** Converts UI-facing string filters into the numeric wire query the API expects.
@@ -102,6 +112,10 @@ export function toWireQuery(f: DomainQuery): BarriersQuery {
     } else q.categoriaId = id;
   }
   if (f.query) q.query = f.query;
+  const since = cleanDateParam(f.since);
+  if (since) q.since = since;
+  const until = cleanDateParam(f.until);
+  if (until) q.until = until;
   if (f.page) q.page = f.page;
   if (f.pageSize) q.pageSize = f.pageSize;
   if (f.sortCol) q.sortCol = f.sortCol;
@@ -140,6 +154,9 @@ function matchesQuery(w: WireBarrier, q: BarriersQuery): boolean {
     const locCode = fromLocationId(w.locationId).toLowerCase();
     if (!(w.tag.toLowerCase().includes(s) || locCode.includes(s))) return false;
   }
+  // ISO dates compare lexicographically; statusSince is YYYY-MM-DD.
+  if (q.since && w.statusSince < q.since) return false;
+  if (q.until && w.statusSince > q.until) return false;
   return true;
 }
 

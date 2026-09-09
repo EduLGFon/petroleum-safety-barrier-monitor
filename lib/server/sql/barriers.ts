@@ -113,6 +113,11 @@ const HISTORY_JOIN = `
   ) h on true
 `;
 
+// Escapes LIKE wildcards so search text matches literally, not as a pattern.
+function escapeLike(s: string): string {
+  return s.replace(/[\\%_]/g, (c) => `\\${c}`);
+}
+
 // Builds WHERE text plus bound args. Placeholders are numbered from $1.
 function buildWhere(q: BarriersQuery): { text: string; args: unknown[] } {
   const conds: string[] = [];
@@ -134,11 +139,16 @@ function buildWhere(q: BarriersQuery): { text: string; args: unknown[] } {
     push("and b.categoria_id = ", q.categoriaId);
   }
   if (q.query) {
-    args.push(`%${q.query}%`, `%${q.query}%`);
+    const lit = `%${escapeLike(q.query)}%`;
+    args.push(lit, lit);
     const a = args.length - 1;
     const b = args.length;
-    conds.push(`and (b.tag ilike $${a} or loc.code ilike $${b})`);
+    conds.push(
+      `and (b.tag ilike $${a} escape '\\' or loc.code ilike $${b} escape '\\')`,
+    );
   }
+  if (q.since) push("and b.status_since >= ", q.since);
+  if (q.until) push("and b.status_since <= ", q.until);
   return {
     text: conds.length > 0 ? `where true ${conds.join(" ")}` : "",
     args,
@@ -149,8 +159,13 @@ function buildWhere(q: BarriersQuery): { text: string; args: unknown[] } {
 export async function listBarriers(
   q: BarriersQuery,
 ): Promise<BarriersResponse> {
-  const page = Math.max(1, q.page ?? 1);
-  const pageSize = Math.min(100_000, Math.max(1, q.pageSize ?? 25));
+  // Floors fractional input (page=1.5 would otherwise yield fractional OFFSET);
+  // NaN falls back to defaults via ||.
+  const page = Math.max(1, Math.floor(q.page ?? 1) || 1);
+  const pageSize = Math.min(
+    100_000,
+    Math.max(1, Math.floor(q.pageSize ?? 25) || 25),
+  );
   const offset = (page - 1) * pageSize;
   const where = buildWhere(q);
   const orderBy = resolveOrderBy(q.sortCol, q.sortDir);

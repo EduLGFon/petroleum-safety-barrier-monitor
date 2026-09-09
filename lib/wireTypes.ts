@@ -68,6 +68,9 @@ export interface BarriersQuery {
   conformidadeId?: number;
   categoriaId?: number;
   query?: string;
+  // Inclusive ISO-date bounds (YYYY-MM-DD) applied to status_since.
+  since?: string;
+  until?: string;
   page?: number;
   pageSize?: number;
   sortCol?: string;
