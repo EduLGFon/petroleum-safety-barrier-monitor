@@ -7,98 +7,12 @@
  * and paged rows via lib/utils.ts; sole data source for dashboard islands.
  */
 
-import {
-  applyFilters,
-  applySorting,
-  computeChartData,
-  computeKpi,
-  defaultFilters,
-  paginate,
-  sanitizeFilters,
-} from "../lib/utils.ts";
-import {
-  useCallback,
-  useEffect,
-  useMemo,
-  useReducer,
-  useState,
-} from "preact/hooks";
+import { useCallback, useEffect, useReducer, useState } from "preact/hooks";
 import type { Barrier, FilterState, SortableColumn } from "../lib/types.ts";
-import { LOCATIONS } from "../lib/constants.ts";
-
-const STORE_KEY = "barrier-dashboard";
-
-interface Persisted {
-  location: string;
-  filters: FilterState;
-  selectedIds: number[];
-  openId: number | null;
-}
-
-// Loads persisted dashboard slice from `barrier-dashboard` key; SSR-safe, returns {} on miss/error.
-function loadDash(): Partial<Persisted> {
-  if (typeof window === "undefined") return {};
-  try {
-    const s = localStorage.getItem(STORE_KEY);
-    return s ? JSON.parse(s) : {};
-  } catch {
-    return {};
-  }
-}
-
-// Persists dashboard slice to `barrier-dashboard` key; no-op on storage failure, state stays in memory.
-function saveDash(d: Persisted) {
-  try {
-    localStorage.setItem(STORE_KEY, JSON.stringify(d));
-  } catch {
-    // Storage may be unavailable - dashboard still works in memory.
-  }
-}
-
-type Action =
-  | { type: "SET_LOCATION"; payload: string }
-  | { type: "SET_FILTER"; payload: Partial<FilterState> }
-  | { type: "SET_SORT"; payload: SortableColumn }
-  | { type: "RESET_FILTERS" }
-  | { type: "RESTORE"; payload: Partial<FilterState> & { location?: string } };
-
-interface State {
-  location: string;
-  filters: FilterState;
-}
-
-// Pure reducer for location/filters/sort; resets page to 1 except on page-only navigation.
-function reducer(s: State, a: Action): State {
-  switch (a.type) {
-    case "SET_LOCATION":
-      return { ...s, location: a.payload, filters: { ...s.filters, page: 1 } };
-    case "SET_FILTER": {
-      const keys = Object.keys(a.payload);
-      // Only reset to page 1 when a real filter changed (not a page navigation)
-      const isPageOnly = keys.length === 1 && keys[0] === "page";
-      const newPage = isPageOnly ? (a.payload.page ?? 1) : 1;
-      return { ...s, filters: { ...s.filters, ...a.payload, page: newPage } };
-    }
-    case "SET_SORT": {
-      const col = a.payload,
-        dir = s.filters.sortCol === col && s.filters.sortDir === "asc"
-          ? "desc"
-          : "asc";
-      return { ...s, filters: { ...s.filters, sortCol: col, sortDir: dir } };
-    }
-    case "RESET_FILTERS":
-      return { ...s, filters: defaultFilters() };
-    case "RESTORE": {
-      const { location, ...rest } = a.payload;
-      return {
-        location: location ?? s.location,
-        filters: { ...s.filters, ...rest },
-      };
-    }
-    default:
-      return s;
-  }
-}
+import { defaultFilters, sanitizeFilters } from "../lib/utils.ts";
+import { loadDash, saveDash } from "./dashboard/persistence.ts";
+import { useDashboardDerived } from "./dashboard/derived.ts";
+import { reducer } from "./dashboard/reducer.ts";
 
 // Central dashboard store; starts from defaults for SSR, hydrates from `barrier-dashboard` after mount.
 // Persists location/filters/selection/openId via saveDash once hydrated.
@@ -144,45 +58,15 @@ export function useDashboard(allBarriers: Barrier[], defaultLocation = "ALL") {
     });
   }, [state, selectedIds, openId, hydrated]);
 
-  const locationBarriers = useMemo(
-    () =>
-      state.location === "ALL"
-        ? allBarriers
-        : allBarriers.filter((b) => b.instalacao === state.location),
-    [allBarriers, state.location],
-  );
-
-  const kpi = useMemo(() => computeKpi(locationBarriers), [locationBarriers]);
-  const chartData = useMemo(() => computeChartData(locationBarriers), [
-    locationBarriers,
-  ]);
-  const filtered = useMemo(
-    () => applyFilters(locationBarriers, state.filters),
-    [locationBarriers, state.filters],
-  );
-  const sorted = useMemo(() => applySorting(filtered, state.filters), [
-    filtered,
-    state.filters,
-  ]);
-  const rows = useMemo(
-    () => paginate(sorted, state.filters.page, state.filters.pageSize),
-    [sorted, state.filters],
-  );
-  const totalPages = Math.max(
-    1,
-    Math.ceil(sorted.length / state.filters.pageSize),
-  );
-
-  const openBarrier = useMemo(
-    () => openId ? allBarriers.find((b) => b.id === openId) ?? null : null,
-    [openId, allBarriers],
-  );
-  // Station metadata comes from the seed list when known; stations added
-  // later fall back to their own code so details never render undefined.
-  const locationDetails = LOCATIONS.find((l) => l.code === state.location) ??
-    (state.location !== "ALL"
-      ? { code: state.location, name: state.location, tipo: "Instalação" }
-      : LOCATIONS[0]);
+  const {
+    kpi,
+    chartData,
+    sorted,
+    rows,
+    totalPages,
+    openBarrier,
+    locationDetails,
+  } = useDashboardDerived(allBarriers, state.location, state.filters, openId);
 
   // Sets location and clears selection; persisted via saveDash effect.
   const setLocation = useCallback((code: string) => {
