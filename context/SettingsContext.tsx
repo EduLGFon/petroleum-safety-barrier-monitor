@@ -3,6 +3,7 @@
 // hydrated from localStorage after mount for SSR consistency.
 import { useCallback, useContext, useEffect, useState } from "preact/hooks";
 import type { FilterState, Theme } from "../lib/types.ts";
+import { sanitizeFilterPatch } from "../lib/utils.ts";
 import type { ComponentChildren } from "preact";
 import { createContext } from "preact";
 
@@ -167,19 +168,61 @@ const SettingsCtx = createContext<Ctx>({
 });
 
 // Loads persisted settings from `barrier-settings` key; SSR-safe, merges over DEFAULTS.
+// Every field is validated so tampered or stale JSON falls back per-field
+// instead of crashing hydration (e.g. unknown accent) or wedging filters.
 function loadSettings(): SettingsState {
   if (typeof window === "undefined") return DEFAULTS;
   try {
     const s = localStorage.getItem(KEY);
-    return s ? { ...DEFAULTS, ...JSON.parse(s) } : DEFAULTS;
+    if (!s) return DEFAULTS;
+    const raw = JSON.parse(s) as Partial<SettingsState>;
+    const theme: Theme = raw.theme === "light" || raw.theme === "amoled" ||
+        raw.theme === "dark"
+      ? raw.theme
+      : DEFAULTS.theme;
+    const accentColor: AccentColor = typeof raw.accentColor === "string" &&
+        raw.accentColor in ACCENT_PRESETS
+      ? raw.accentColor as AccentColor
+      : DEFAULTS.accentColor;
+    const density: Density = raw.density === "compact" ||
+        raw.density === "spacious"
+      ? raw.density
+      : DEFAULTS.density;
+    const defaultLocation = typeof raw.defaultLocation === "string" &&
+        raw.defaultLocation.trim() !== ""
+      ? raw.defaultLocation
+      : DEFAULTS.defaultLocation;
+    const members = Array.isArray(raw.members)
+      ? raw.members.filter((m) =>
+        m && typeof m.email === "string" &&
+        (m.role === "admin" || m.role === "viewer") &&
+        typeof m.addedAt === "string"
+      )
+      : DEFAULTS.members;
+    return {
+      ...DEFAULTS,
+      ...raw,
+      theme,
+      accentColor,
+      density,
+      defaultLocation,
+      reduceMotion: typeof raw.reduceMotion === "boolean"
+        ? raw.reduceMotion
+        : DEFAULTS.reduceMotion,
+      members,
+      // defaultFilters is applied to live dashboard state: keep only
+      // well-formed keys, drop the rest instead of spreading blindly.
+      defaultFilters: sanitizeFilterPatch(raw.defaultFilters),
+    };
   } catch {
     return DEFAULTS;
   }
 }
 
 // Applies accent preset to CSS vars (--accent, --glow, --kpi-grad-*); persisted via save, not here.
+// Falls back to the default preset so a tampered accent can never crash hydration.
 function applyAccent(c: AccentColor) {
-  const p = ACCENT_PRESETS[c];
+  const p = ACCENT_PRESETS[c] ?? ACCENT_PRESETS[DEFAULTS.accentColor];
   const r = document.documentElement;
   r.style.setProperty("--accent", p.primary);
   r.style.setProperty("--accent-2", p.secondary);

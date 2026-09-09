@@ -14,6 +14,7 @@ import {
   computeKpi,
   defaultFilters,
   paginate,
+  sanitizeFilters,
 } from "../lib/utils.ts";
 import {
   useCallback,
@@ -111,18 +112,23 @@ export function useDashboard(allBarriers: Barrier[], defaultLocation = "ALL") {
   const [openId, setOpenId] = useState<number | null>(null);
   const [hydrated, setHydrated] = useState(false);
 
-  // After mount: restore persisted state
+  // After mount: restore validated persisted state (corrupt values fall back
+  // to defaults instead of wedging filters, page, or selection).
   useEffect(() => {
     const p = loadDash();
-    dispatch({
-      type: "RESTORE",
-      payload: {
-        location: p.location ?? defaultLocation,
-        ...(p.filters ?? {}),
-      },
-    });
-    if (p.selectedIds?.length) setSelectedIds(new Set(p.selectedIds));
-    if (p.openId) setOpenId(p.openId);
+    const location = typeof p.location === "string" && p.location.trim() !== ""
+      ? p.location
+      : defaultLocation;
+    const filters = sanitizeFilters(p.filters ?? {});
+    dispatch({ type: "RESTORE", payload: { location, ...filters } });
+    if (Array.isArray(p.selectedIds)) {
+      const ids = p.selectedIds.filter((n) => Number.isInteger(n) && n > 0)
+        .slice(0, 10000);
+      if (ids.length) setSelectedIds(new Set(ids));
+    }
+    if (Number.isInteger(p.openId) && (p.openId as number) > 0) {
+      setOpenId(p.openId as number);
+    }
     setHydrated(true);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -199,6 +205,14 @@ export function useDashboard(allBarriers: Barrier[], defaultLocation = "ALL") {
     dispatch({ type: "RESET_FILTERS" });
     setSelectedIds(new Set());
   }, []);
+
+  // Self-heals a stale persisted page (e.g. page 5 restored against a
+  // now-1-page result): clamps and persists the fix instead of trapping the
+  // user on an empty table with a hidden pager. Guarded, so no loop.
+  useEffect(() => {
+    if (!hydrated) return;
+    if (state.filters.page > totalPages) setFilter({ page: totalPages });
+  }, [hydrated, state.filters.page, totalPages, setFilter]);
 
   /** Show NC barriers sorted oldest-first (most urgent) */
   const showUrgentes = useCallback(() => {

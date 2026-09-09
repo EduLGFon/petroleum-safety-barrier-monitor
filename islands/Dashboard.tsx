@@ -15,6 +15,7 @@ import { ThemeProvider } from "../context/ThemeContext.tsx";
 import { StatusBand } from "../components/StatusBand.tsx";
 import { useDashboard } from "../hooks/useDashboard.ts";
 import { FilterBar } from "../components/FilterBar.tsx";
+import { sanitizeFilterPatch } from "../lib/utils.ts";
 import { KpiGrid } from "../components/KpiGrid.tsx";
 import { Header } from "../components/Header.tsx";
 import { distinctBy } from "../lib/constants.ts";
@@ -80,15 +81,16 @@ function DashboardView({ initialBarriers: barriers, companyName }: Props) {
     clearAll,
   } = useDashboard(barriers, settings.defaultLocation);
 
-  // Apply settings default filters after hydration (once)
+  // Apply settings default filters after hydration (once). The patch is
+  // sanitized so a stale or tampered preset can never wedge the grid.
   const [defaultsApplied, setDefaultsApplied] = useState(false);
   useEffect(() => {
     if (!hydrated || defaultsApplied || loading) return;
     setDefaultsApplied(true);
     // Only apply settings defaults if no persisted state existed
-    const df = settings.defaultFilters;
-    if (Object.keys(df).length > 0) {
-      setFilter(df as Parameters<typeof setFilter>[0]);
+    const patch = sanitizeFilterPatch(settings.defaultFilters);
+    if (Object.keys(patch).length > 0) {
+      setFilter(patch);
     }
   }, [hydrated, defaultsApplied, loading, settings.defaultFilters, setFilter]);
 

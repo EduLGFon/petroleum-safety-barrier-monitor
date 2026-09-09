@@ -12,8 +12,9 @@ import type {
   CategoryConformidade,
   FilterState,
   KpiSnapshot,
+  SortableColumn,
 } from "./types.ts";
-import { SIM_DATE } from "./constants.ts";
+import { PAGE_SIZE_OPTS, SIM_DATE } from "./constants.ts";
 
 // Aggregates KPI totals in one O(N) pass; empty input yields zeros, 0% and empty buckets.
 export function computeKpi(b: Barrier[]): KpiSnapshot {
@@ -187,4 +188,56 @@ export function defaultFilters(): FilterState {
     sortCol: "id",
     sortDir: "asc",
   };
+}
+
+// Sort columns the UI and SQL whitelist both accept; anything else falls back to id.
+const SORT_COLS: SortableColumn[] = [
+  "id",
+  "tag",
+  "criticidade",
+  "categoria",
+  "disponibilidade",
+  "conformidade",
+  "statusSince",
+];
+
+// Validates one persisted filter patch, keeping only well-formed keys.
+// Unknown or malformed values are dropped so corrupt localStorage or settings
+// defaults can never wedge the dashboard into an empty state.
+export function sanitizeFilterPatch(raw: unknown): Partial<FilterState> {
+  if (!raw || typeof raw !== "object") return {};
+  const r = raw as Record<string, unknown>;
+  const patch: Partial<FilterState> = {};
+  const text = (v: unknown) =>
+    typeof v === "string" ? v.trim().slice(0, 200) : undefined;
+  const query = text(r.query);
+  if (query !== undefined) patch.query = query;
+  const disp = text(r.disponibilidade);
+  if (disp !== undefined) patch.disponibilidade = disp;
+  const conf = text(r.conformidade);
+  if (conf !== undefined) patch.conformidade = conf;
+  const cat = text(r.categoria);
+  if (cat !== undefined) patch.categoria = cat;
+  if (Number.isInteger(r.page) && (r.page as number) > 0) {
+    patch.page = Math.min(r.page as number, 100000);
+  }
+  if (
+    Number.isInteger(r.pageSize) &&
+    (PAGE_SIZE_OPTS as readonly number[]).includes(r.pageSize as number)
+  ) {
+    patch.pageSize = r.pageSize as FilterState["pageSize"];
+  }
+  if (
+    typeof r.sortCol === "string" &&
+    SORT_COLS.includes(r.sortCol as SortableColumn)
+  ) {
+    patch.sortCol = r.sortCol as SortableColumn;
+  }
+  if (r.sortDir === "asc" || r.sortDir === "desc") patch.sortDir = r.sortDir;
+  return patch;
+}
+
+// Merges an untrusted persisted blob over fresh defaults; always complete.
+export function sanitizeFilters(raw: unknown): FilterState {
+  return { ...defaultFilters(), ...sanitizeFilterPatch(raw) };
 }
