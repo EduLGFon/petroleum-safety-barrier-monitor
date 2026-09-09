@@ -82,12 +82,15 @@ export interface KpiSnapshot {
   criticasNC: number;
   // Dynamic buckets - the fixed fields above are the well-known fast path,
   // these maps carry EVERY value present in the data (including future ones)
-  // so totals always reconcile and new statuses never go missing. Optional
-  // because the DB-wire path only carries fixed fields; computeKpi (the
-  // dashboard path) always fills them.
+  // so totals always reconcile and new statuses never go missing. Keyed by
+  // display string (computeKpi and resolveKpi both produce string keys).
+  // Optional for backward compat with old wire snapshots; StatusBand falls
+  // back to fixed fields when absent (known statuses only).
   byDisponibilidade?: Record<string, number>;
   byConformidade?: Record<string, number>;
   byCriticidade?: Record<string, number>;
+  // Server time when the snapshot was computed (ISO). Absent in mock mode.
+  syncedAt?: string;
 }
 
 export interface CategoryConformidade {

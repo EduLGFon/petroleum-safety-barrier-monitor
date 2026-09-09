@@ -8,6 +8,7 @@ import {
   fromAgrupamentoId,
   fromAuthorId,
   fromCategoriaId,
+  fromConformidadeId,
   fromCriticidadeId,
   fromDisponibilidadeId,
   fromDonoId,
@@ -66,15 +67,45 @@ export function resolveBarriers(items: WireBarrier[]): Barrier[] {
 }
 
 /** KPI snapshots are already numeric on the wire — pass-through with type narrowing.
- *  Dynamic buckets ride along untouched when a future backend sends them. */
+ *  Dynamic buckets arrive keyed by numeric id (as string) and are translated
+ *  to display-string keys here; already-string keys pass through untouched
+ *  for backward compat. syncedAt rides along when present. */
 export function resolveKpi(w: WireKpiSnapshot): KpiSnapshot {
-  const { byDisponibilidade, byConformidade, byCriticidade, ...fixed } = w as
-    & WireKpiSnapshot
-    & Partial<KpiSnapshot>;
+  const {
+    byDisponibilidade,
+    byConformidade,
+    byCriticidade,
+    syncedAt,
+    ...fixed
+  } = w as WireKpiSnapshot & Partial<KpiSnapshot>;
+  // Translates one numeric-id-keyed bucket to display-string keys.
+  // Non-numeric keys are kept as-is so old servers keep working.
+  const mapBucket = (
+    bucket: Record<string, number> | undefined,
+    fromId: (id: number) => string,
+  ): Record<string, number> | undefined => {
+    if (!bucket) return undefined;
+    const out: Record<string, number> = {};
+    for (const [k, v] of Object.entries(bucket)) {
+      const n = Number(k);
+      const label = k !== "" && Number.isInteger(n) ? fromId(n) : k;
+      out[label] = (out[label] ?? 0) + v;
+    }
+    return out;
+  };
   return {
     ...fixed,
-    ...(byDisponibilidade ? { byDisponibilidade } : {}),
-    ...(byConformidade ? { byConformidade } : {}),
-    ...(byCriticidade ? { byCriticidade } : {}),
+    ...(byDisponibilidade
+      ? {
+        byDisponibilidade: mapBucket(byDisponibilidade, fromDisponibilidadeId),
+      }
+      : {}),
+    ...(byConformidade
+      ? { byConformidade: mapBucket(byConformidade, fromConformidadeId) }
+      : {}),
+    ...(byCriticidade
+      ? { byCriticidade: mapBucket(byCriticidade, fromCriticidadeId) }
+      : {}),
+    ...(syncedAt ? { syncedAt } : {}),
   };
 }

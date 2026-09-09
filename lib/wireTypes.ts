@@ -48,6 +48,17 @@ export interface WireKpiSnapshot {
   naoConforme: number;
   pctConforme: number;
   criticasNC: number;
+  // Dynamic buckets - keyed by numeric id as string (JSON keys are strings),
+  // e.g. byDisponibilidade {"0": 12, "6": 3}. resolveKpi translates these to
+  // display-string keys. Optional so old servers still parse; when absent the
+  // UI falls back to fixed fields (known statuses only). New statuses must
+  // appear here or they vanish from the band over HTTP.
+  byDisponibilidade?: Record<string, number>;
+  byConformidade?: Record<string, number>;
+  byCriticidade?: Record<string, number>;
+  // Server time when the snapshot was computed (ISO). Lets the UI show
+  // staleness once the dashboard moves to server-paginated mode.
+  syncedAt?: string;
 }
 
 /** Query params accepted by GET /api/barriers */

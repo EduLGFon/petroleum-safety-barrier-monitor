@@ -191,7 +191,10 @@ const mockAdapter: BarriersApi = {
       query.locationId === undefined || query.locationId === 0 ||
       w.locationId === query.locationId
     );
-    return Promise.resolve(computeKpiLocal(resolveBarriers(all)));
+    return Promise.resolve({
+      ...computeKpiLocal(resolveBarriers(all)),
+      syncedAt: new Date().toISOString(),
+    });
   },
 };
 

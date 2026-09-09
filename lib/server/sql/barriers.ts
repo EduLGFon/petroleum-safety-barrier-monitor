@@ -194,38 +194,66 @@ export async function getBarrierById(id: number): Promise<WireBarrier | null> {
 }
 
 // Computes KPI snapshot counts, optionally scoped to one location.
+// Fixed fields cover the well-known statuses; dynamic by* buckets carry
+// EVERY id present (GROUP BY) so new statuses reconcile instead of vanishing.
 export async function getKpi(locationId?: number): Promise<WireKpiSnapshot> {
   const scoped = locationId !== undefined && locationId !== 0;
-  const rows = await queryRows<{
-    total: string;
-    disponivel: string;
-    fora_de_op: string;
-    indisp_cont: string;
-    degr_cont: string;
-    degradado: string;
-    indisponivel: string;
-    conforme: string;
-    nao_conforme: string;
-    criticas_nc: string;
-  }>(
-    `select
-       count(*)::text as total,
-       count(*) filter (where b.disponibilidade_id = 0)::text as disponivel,
-       count(*) filter (where b.disponibilidade_id = 1)::text as fora_de_op,
-       count(*) filter (where b.disponibilidade_id = 2)::text as indisp_cont,
-       count(*) filter (where b.disponibilidade_id = 3)::text as degr_cont,
-       count(*) filter (where b.disponibilidade_id = 4)::text as degradado,
-       count(*) filter (where b.disponibilidade_id = 5)::text as indisponivel,
-       count(*) filter (where b.conformidade_id = 0)::text as conforme,
-       count(*) filter (where b.conformidade_id = 1)::text as nao_conforme,
-       count(*) filter (where b.conformidade_id = 1 and b.criticidade_id = 1)::text as criticas_nc
-     from barriers b ${scoped ? "where b.location_id = $1" : ""}`,
-    scoped ? [locationId] : [],
-  );
+  const scopeText = scoped ? "where b.location_id = $1" : "";
+  const scopeArgs: unknown[] = scoped ? [locationId] : [];
+  const [rows, dispRows, confRows, critRows] = await Promise.all([
+    queryRows<{
+      total: string;
+      disponivel: string;
+      fora_de_op: string;
+      indisp_cont: string;
+      degr_cont: string;
+      degradado: string;
+      indisponivel: string;
+      conforme: string;
+      nao_conforme: string;
+      criticas_nc: string;
+    }>(
+      `select
+        count(*)::text as total,
+        count(*) filter (where b.disponibilidade_id = 0)::text as disponivel,
+        count(*) filter (where b.disponibilidade_id = 1)::text as fora_de_op,
+        count(*) filter (where b.disponibilidade_id = 2)::text as indisp_cont,
+        count(*) filter (where b.disponibilidade_id = 3)::text as degr_cont,
+        count(*) filter (where b.disponibilidade_id = 4)::text as degradado,
+        count(*) filter (where b.disponibilidade_id = 5)::text as indisponivel,
+        count(*) filter (where b.conformidade_id = 0)::text as conforme,
+        count(*) filter (where b.conformidade_id = 1)::text as nao_conforme,
+        count(*) filter (where b.conformidade_id = 1 and b.criticidade_id = 1)::text as criticas_nc
+      from barriers b ${scopeText}`,
+      scopeArgs,
+    ),
+    queryRows<{ id: string; count: string }>(
+      `select b.disponibilidade_id::text as id, count(*)::text as count
+       from barriers b ${scopeText} group by b.disponibilidade_id`,
+      scopeArgs,
+    ),
+    queryRows<{ id: string; count: string }>(
+      `select b.conformidade_id::text as id, count(*)::text as count
+       from barriers b ${scopeText} group by b.conformidade_id`,
+      scopeArgs,
+    ),
+    queryRows<{ id: string; count: string }>(
+      `select b.criticidade_id::text as id, count(*)::text as count
+       from barriers b ${scopeText} group by b.criticidade_id`,
+      scopeArgs,
+    ),
+  ]);
 
   const r = rows[0];
   const total = Number(r?.total ?? 0);
   const conforme = Number(r?.conforme ?? 0);
+
+  // Collects GROUP BY rows into id-keyed buckets (wire keys stay numeric).
+  const toBucket = (bucketRows: { id: string; count: string }[]) => {
+    const bucket: Record<string, number> = {};
+    for (const row of bucketRows) bucket[row.id] = Number(row.count ?? 0);
+    return bucket;
+  };
 
   return {
     total,
@@ -239,6 +267,10 @@ export async function getKpi(locationId?: number): Promise<WireKpiSnapshot> {
     naoConforme: Number(r?.nao_conforme ?? 0),
     criticasNC: Number(r?.criticas_nc ?? 0),
     pctConforme: total > 0 ? Math.round((conforme / total) * 100) : 0,
+    byDisponibilidade: toBucket(dispRows),
+    byConformidade: toBucket(confRows),
+    byCriticidade: toBucket(critRows),
+    syncedAt: new Date().toISOString(),
   };
 }
 
