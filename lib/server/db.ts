@@ -20,12 +20,14 @@ function createPool(): Pool {
   return new Pool(connectionString, 10, true);
 }
 
-// Reuse the pool across dev reloads and across route invocations.
-export const pool: Pool = globalThis.__barrierPool ?? createPool();
-
-const denoEnv = Deno.env.get("DENO_ENV") ?? Deno.env.get("NODE_ENV");
-if (denoEnv !== "production") {
-  globalThis.__barrierPool = pool;
+// Lazily-created pool: first queryRows call initializes it, so importing
+// this module (mock mode, health checks, tests) never throws for a missing
+// DATABASE_URL. Cached on globalThis across dev reloads and requests.
+function getPool(): Pool {
+  if (!globalThis.__barrierPool) {
+    globalThis.__barrierPool = createPool();
+  }
+  return globalThis.__barrierPool;
 }
 
 // Run a parameterized query and return typed rows. Values are always bound
@@ -34,7 +36,7 @@ export async function queryRows<T>(
   text: string,
   args: Array<unknown> = [],
 ): Promise<T[]> {
-  const client = await pool.connect();
+  const client = await getPool().connect();
   try {
     const result = await client.queryObject<T>(text, args);
     return result.rows;
