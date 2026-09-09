@@ -15,6 +15,7 @@ import type {
 } from "./types.ts";
 import { SIM_DATE } from "./constants.ts";
 
+// Aggregates KPI totals in one O(N) pass; empty input yields zeros, 0% and empty buckets.
 export function computeKpi(b: Barrier[]): KpiSnapshot {
   const t = b.length;
   // Single pass - counts every value actually present (dynamic buckets)
@@ -81,6 +82,7 @@ export function computeKpi(b: Barrier[]): KpiSnapshot {
   };
 }
 
+// Groups Conforme/ Não Conforme per category in one pass; truncates names >26 chars, sorts biggest-first.
 export function computeChartData(b: Barrier[]): CategoryConformidade[] {
   // Categories come from the data, not the CATEGORIES seed list: new
   // categories appear automatically, removed ones vanish. Sorted by volume
@@ -102,6 +104,7 @@ export function computeChartData(b: Barrier[]): CategoryConformidade[] {
     }));
 }
 
+// Applies case-insensitive query (tag/loc/instalação/categoria) plus exact filters; empty strings mean no filter.
 export function applyFilters(b: Barrier[], f: FilterState): Barrier[] {
   let d = b;
   if (f.query) {
@@ -120,6 +123,7 @@ export function applyFilters(b: Barrier[], f: FilterState): Barrier[] {
   return d;
 }
 
+// Sorts a copy (no mutation); id numeric, others pt-BR localeCompare; no sortCol returns input as-is.
 export function applySorting(b: Barrier[], f: FilterState): Barrier[] {
   if (!f.sortCol) return b;
   return [...b].sort((a, x) => {
@@ -133,10 +137,12 @@ export function applySorting(b: Barrier[], f: FilterState): Barrier[] {
   });
 }
 
+// Slices 1-based page window; out-of-range pages return empty, never throws.
 export function paginate<T>(a: T[], p: number, s: number): T[] {
   return a.slice((p - 1) * s, p * s);
 }
 
+// Days from ISO date to SIM_DATE, floored and clamped at 0 so future dates never go negative.
 export function daysSince(d: string): number {
   return Math.max(
     0,
@@ -144,6 +150,7 @@ export function daysSince(d: string): number {
   );
 }
 
+// Formats day count as pt-BR duration (dia/semana/mês/ano); days < 2 collapses to "1 dia".
 export function humanDuration(days: number): string {
   if (days < 2) return "1 dia";
   if (days < 7) return `${days} dias`;
@@ -155,16 +162,20 @@ export function humanDuration(days: number): string {
   return `${y} ano${y > 1 ? "s" : ""}`;
 }
 
+// Converts YYYY-MM-DD to DD/MM/YYYY; assumes valid ISO input, no validation.
 export function fmtDate(iso: string): string {
   const [y, m, d] = iso.split("-");
   return `${d}/${m}/${y}`;
 }
+// Formats number with pt-BR thousands separator.
 export function fmt(n: number): string {
   return n.toLocaleString("pt-BR");
 }
+// Appends % suffix; expects an already-rounded 0-100 value.
 export function pct(n: number): string {
   return `${n}%`;
 }
+// Returns a fresh default FilterState (page 1, 25 rows, sort by id asc); new object each call.
 export function defaultFilters(): FilterState {
   return {
     query: "",

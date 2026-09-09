@@ -62,6 +62,7 @@ const thSt: CSSProperties = {
   color: AURORA.sub,
 };
 
+// BarriersTable: renders the current page slice (rows) with sort headers, row select, and detail open; Pagination only shows when totalPages > 1.
 export function BarriersTable(
   {
     rows,
@@ -355,6 +356,7 @@ export function BarriersTable(
   );
 }
 
+// RowChk: presentational row checkbox; checked drives gradient fill + check mark, no click handling itself.
 function RowChk({ checked }: { checked: boolean }) {
   return (
     <div
@@ -390,6 +392,7 @@ function RowChk({ checked }: { checked: boolean }) {
   );
 }
 
+// Pagination: controlled pager over page/totalPages/total/pageSize; shows range label, page-size select, nav buttons, and clamped go-to input.
 function Pagination(
   { page, totalPages, total, pageSize, onChange, onPageSize }: {
     page: number;
@@ -402,6 +405,7 @@ function Pagination(
 ) {
   const from = ((page - 1) * pageSize) + 1,
     to = Math.min(page * pageSize, total);
+  // bs: button style for pager cells; active gets gradient + glow, disabled dims and blocks pointer.
   const bs = (active: boolean, disabled: boolean): CSSProperties => ({
     minWidth: "var(--d-page-btn)",
     height: "var(--d-page-btn)",
@@ -614,6 +618,7 @@ function Divider() {
     />
   );
 }
+// buildPages: windowed page list (cur ± 1 plus first/last with "…"); returns all pages when tot <= 7.
 function buildPages(cur: number, tot: number): (number | "…")[] {
   if (tot <= 7) return Array.from({ length: tot }, (_, i) => i + 1);
   const r: (number | "…")[] = [1];

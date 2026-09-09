@@ -49,6 +49,7 @@ const FMTS: { key: Fmt; Icon: I; label: string; ext: string; color: string }[] =
       color: "#6366f1",
     },
   ];
+// ExportToolbar: selection bar over selectedIds + allFiltered; derives all/some-selected tri-state and shows format buttons only when a row is selected.
 export function ExportToolbar(
   { selectedIds, allFiltered, onSelectAll, onClearAll, companyName }: Props,
 ) {
@@ -56,6 +57,7 @@ export function ExportToolbar(
   const count = selectedIds.size, hasAny = count > 0;
   const allSel = count === allFiltered.length && allFiltered.length > 0,
     someSel = count > 0 && !allSel;
+  // doExport: exports allFiltered rows filtered by selectedIds; no-ops when empty/loading and tracks per-format spinner until done.
   async function doExport(fmt: Fmt) {
     if (!hasAny || loading) return;
     const bs = allFiltered.filter((b) => selectedIds.has(b.id));
@@ -234,6 +236,7 @@ export function ExportToolbar(
     </div>
   );
 }
+// Chk: tri-state select-all box (checked check vs indeterminate dash); click delegates to onChange.
 function Chk(
   { checked, indeterminate, onChange }: {
     checked: boolean;

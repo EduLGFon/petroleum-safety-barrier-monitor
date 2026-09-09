@@ -21,6 +21,7 @@ interface C {
   delay: number;
 }
 
+// useAnimatedValue: eases cur toward target over duration (ease-out cubic via rAF); skips when unchanged and cancels on cleanup.
 function useAnimatedValue(target: number, duration = 600) {
   const [cur, setCur] = useState(target);
   const prev = useRef(target);
@@ -42,6 +43,7 @@ function useAnimatedValue(target: number, duration = 600) {
   return cur;
 }
 
+// AnimVal: pt-BR animated number with optional % suffix; bumps key on n change to retrigger the pop animation.
 function AnimVal({ n, isPercent }: { n: number; isPercent?: boolean }) {
   const v = useAnimatedValue(n);
   const prev = useRef(n);
@@ -60,6 +62,7 @@ function AnimVal({ n, isPercent }: { n: number; isPercent?: boolean }) {
   );
 }
 
+// KpiGrid: six glass cards from KpiSnapshot + location label; shares divide by total||1, Contingenciadas sums indisp + degr.
 export function KpiGrid({ kpi, location }: Props) {
   const t = kpi.total || 1;
   const loc = location === "ALL" ? "total geral" : `em ${location}`;

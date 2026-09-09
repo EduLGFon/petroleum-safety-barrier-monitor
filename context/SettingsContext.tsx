@@ -166,6 +166,7 @@ const SettingsCtx = createContext<Ctx>({
   removeMember: () => {},
 });
 
+// Loads persisted settings from `barrier-settings` key; SSR-safe, merges over DEFAULTS.
 function loadSettings(): SettingsState {
   if (typeof window === "undefined") return DEFAULTS;
   try {
@@ -176,6 +177,7 @@ function loadSettings(): SettingsState {
   }
 }
 
+// Applies accent preset to CSS vars (--accent, --glow, --kpi-grad-*); persisted via save, not here.
 function applyAccent(c: AccentColor) {
   const p = ACCENT_PRESETS[c];
   const r = document.documentElement;
@@ -186,19 +188,23 @@ function applyAccent(c: AccentColor) {
   r.style.setProperty("--kpi-grad-4", p.grad4);
 }
 
+// Sets documentElement dataset.theme; persisted via save (`barrier-settings`), not here.
 function applyTheme(t: Theme) {
   document.documentElement.dataset.theme = t;
 }
 
+// Toggles .no-anim class for reduced motion; persisted via save, not here.
 function applyMotion(reduce: boolean) {
   document.documentElement.classList.toggle("no-anim", reduce);
 }
+// Applies density token via dataset.density (falls back to comfortable); persisted via save, not here.
 function applyDensity(d: Density) {
   const key: Density = d === "compact" || d === "spacious" ? d : "comfortable";
   // Density only switches tokens: every component sizes itself from
   // var(--d-*) (see styles.css), so the whole UI re-rhythms at once.
   document.documentElement.dataset.density = key;
 }
+// Provides settings store; starts from DEFAULTS for SSR then hydrates from `barrier-settings` after mount.
 export function SettingsProvider(
   { children }: { children: ComponentChildren },
 ) {
@@ -214,6 +220,7 @@ export function SettingsProvider(
     applyMotion(s.reduceMotion);
   }, []);
 
+  // Persists next state to `barrier-settings` key; tolerates unavailable storage, still applies live.
   const save = useCallback((next: SettingsState) => {
     setSettings(next);
     try {
@@ -223,28 +230,35 @@ export function SettingsProvider(
     }
   }, []);
 
+  // Applies theme to DOM then persists via save (`barrier-settings`).
   const setTheme = useCallback((t: Theme) => {
     applyTheme(t);
     save({ ...settings, theme: t });
   }, [settings, save]);
+  // Applies accent CSS vars then persists via save (`barrier-settings`).
   const setAccent = useCallback((c: AccentColor) => {
     applyAccent(c);
     save({ ...settings, accentColor: c });
   }, [settings, save]);
+  // Applies density token then persists via save (`barrier-settings`).
   const setDensity = useCallback((d: Density) => {
     applyDensity(d);
     save({ ...settings, density: d });
   }, [settings, save]);
+  // Persists defaultFilters via save (`barrier-settings`); no DOM side effect.
   const setDefaults = useCallback((f: Partial<FilterState>) => {
     save({ ...settings, defaultFilters: f });
   }, [settings, save]);
+  // Persists defaultLocation via save (`barrier-settings`); no DOM side effect.
   const setDefaultLoc = useCallback((l: string) => {
     save({ ...settings, defaultLocation: l });
   }, [settings, save]);
+  // Toggles .no-anim class then persists via save (`barrier-settings`).
   const setReduceMotion = useCallback((v: boolean) => {
     applyMotion(v);
     save({ ...settings, reduceMotion: v });
   }, [settings, save]);
+  // Appends member (deduped by email) then persists via save (`barrier-settings`).
   const addMember = useCallback((email: string, role: MemberRole) => {
     if (settings.members.some((m) => m.email === email)) return;
     save({
@@ -256,6 +270,7 @@ export function SettingsProvider(
       }],
     });
   }, [settings, save]);
+  // Removes member by email then persists via save (`barrier-settings`).
   const removeMember = useCallback((email: string) => {
     save({
       ...settings,
@@ -282,6 +297,7 @@ export function SettingsProvider(
   );
 }
 
+// Returns the hydrated settings store; must be used inside SettingsProvider.
 export function useSettings() {
   return useContext(SettingsCtx);
 }

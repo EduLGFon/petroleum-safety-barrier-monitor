@@ -26,6 +26,7 @@ interface Props {
   companyName: string;
 }
 
+// Dashboard: island root; wraps DashboardView in Settings + Theme providers since server route context does not reach hydrated islands.
 export function Dashboard({ initialBarriers, companyName }: Props) {
   // Providers must wrap the island content itself: context from a server
   // route does not reach island code when it hydrates in the browser.
@@ -41,12 +42,14 @@ export function Dashboard({ initialBarriers, companyName }: Props) {
   );
 }
 
+// DashboardView: wires useDashboard state to filters/table/exports; derives live select vocabularies and applies settings defaults once after hydration.
 function DashboardView({ initialBarriers: barriers, companyName }: Props) {
   const [loading, setLoading] = useState(true);
   const [visible, setVisible] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const { settings } = useSettings();
 
+  // handleLoadDone: exits LoadingScreen then fades the shell in via rAF + short delay; stable callback for LoadingScreen onDone.
   const handleLoadDone = useCallback(() => {
     setLoading(false);
     // Short delay then fade in — smoother than instant

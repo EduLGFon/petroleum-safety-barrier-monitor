@@ -8,6 +8,7 @@ import { CONF_COLORS, DISP_COLORS } from "./constants.ts";
 import type { Barrier } from "./types.ts";
 import { withBrand } from "./company.ts";
 
+// Maps a Barrier to a 14-column export row; NC duration blank unless statusSince present, empty dono falls back.
 function row(b: Barrier): string[] {
   const nc = b.conformidade === "Não Conforme";
   const when = nc && b.statusSince
@@ -33,6 +34,7 @@ function row(b: Barrier): string[] {
   ];
 }
 
+// Returns current datetime as pt-BR DD/MM/YYYY HH:MM stamp for report headers.
 function ts(): string {
   return new Date().toLocaleDateString("pt-BR", {
     day: "2-digit",
@@ -43,6 +45,7 @@ function ts(): string {
   });
 }
 
+// Escapes &<>" for safe HTML/XLS/PDF embedding; run before pill/cell interpolation.
 function escHtml(v: string): string {
   return v
     .replace(/&/g, "&amp;")
@@ -51,6 +54,7 @@ function escHtml(v: string): string {
     .replace(/"/g, "&quot;");
 }
 
+// Triggers a browser download via object URL + temp anchor; revokes URL immediately to avoid leaks.
 function download(blob: Blob, filename: string): void {
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
@@ -60,6 +64,7 @@ function download(blob: Blob, filename: string): void {
   URL.revokeObjectURL(url);
 }
 
+// Throws when document is undefined; guards all exports which need DOM/Blob URLs (browser-only).
 function assertBrowser(): void {
   if (typeof document === "undefined") {
     throw new Error("Exports run in the browser only.");
@@ -83,6 +88,7 @@ interface KpiStats {
   criticas: string;
 }
 
+// Derives pt-BR formatted KPI totals; empty input yields zeros and 0% (length guard, no div-by-zero/NaN).
 function kpiStats(barriers: Barrier[]): KpiStats {
   const n = (xs: Barrier[]) => xs.length.toLocaleString("pt-BR");
   const conformes = barriers.filter((b) => b.conformidade === "Conforme");
@@ -144,6 +150,7 @@ function fitColWidths(headers: string[], rows: string[][]): number[] {
   });
 }
 
+// Builds the 11-row [label, value] summary table from kpiStats plus disponibilidade counts.
 function summaryRows(barriers: Barrier[]): Array<[string, string]> {
   const s = kpiStats(barriers);
   const count = (fn: (b: Barrier) => boolean) =>
@@ -307,6 +314,7 @@ export function exportToExcel(
 
 const REPORT_ID = "print-report";
 
+// Returns the landscape print-report HTML string (KPI chips + 9-col table); pure, no DOM side effects.
 export function buildPrintReport(
   barriers: Barrier[],
   companyName = "",
@@ -391,6 +399,7 @@ export function buildPrintReport(
     } · gerado em ${escHtml(ts())}</div></div>`;
 }
 
+// Mounts/reuses the #print-report node, swaps title, prints, then clears on afterprint; browser-only.
 export function exportToPDF(
   barriers: Barrier[],
   filename = "barreiras",
@@ -419,6 +428,7 @@ export function exportToPDF(
 // ── CSV ────────────────────────────────────────────────────────────────────
 // Plain-text format: no styling applies. Headers and pt-BR formatting only.
 
+// Builds ;-separated, quote-escaped CSV with BOM for pt-BR Excel; reuses row(); browser-only.
 export function exportToCSV(
   barriers: Barrier[],
   filename = "barreiras",

@@ -25,6 +25,7 @@ interface Props {
   barrier: Barrier | null;
   onClose: () => void;
 }
+// BarrierModal renders the detail dialog shell; handles ESC close, body scroll-lock, and backdrop dismiss.
 export function BarrierModal({ barrier, onClose }: Props) {
   const [tab, setTab] = useState<"details" | "history">("details");
   const key = useCallback((e: KeyboardEvent) => {
@@ -101,6 +102,7 @@ export function BarrierModal({ barrier, onClose }: Props) {
     </>
   );
 }
+// Content renders header/badges, NC alert with days-since logic, and Details/History tab switch.
 function Content(
   { b, onClose, tab, setTab }: {
     b: Barrier;
@@ -352,6 +354,7 @@ function Content(
     </>
   );
 }
+// Details shows metadata grid, current status duration, comments, and action plan.
 function Details({ b }: { b: Barrier }) {
   const dc = DISP_COLORS[b.disponibilidade],
     cc = CONF_COLORS[b.conformidade],
@@ -457,6 +460,7 @@ function Details({ b }: { b: Barrier }) {
     </div>
   );
 }
+// History renders statusHistory newest-first timeline with current-entry highlight.
 function History({ b }: { b: Barrier }) {
   const history = [...b.statusHistory].reverse();
   return (
@@ -611,6 +615,7 @@ function History({ b }: { b: Barrier }) {
     </div>
   );
 }
+// FR renders a labeled metadata field with optional accent/italic/full-width styling.
 function FR({
   Icon,
   label,
@@ -665,6 +670,7 @@ function FR({
     </div>
   );
 }
+// Sec renders an uppercase section heading for dialog body blocks.
 function Sec({ children }: { children: ComponentChildren }) {
   return (
     <div
@@ -681,6 +687,7 @@ function Sec({ children }: { children: ComponentChildren }) {
     </div>
   );
 }
+// Lbl renders a small uppercase field label for status/metadata values.
 function Lbl({ children }: { children: ComponentChildren }) {
   return (
     <div
@@ -697,6 +704,7 @@ function Lbl({ children }: { children: ComponentChildren }) {
     </div>
   );
 }
+// Div renders a thin horizontal divider between dialog sections.
 function Div() {
   return (
     <hr
@@ -708,6 +716,7 @@ function Div() {
     />
   );
 }
+// Txt renders a body paragraph with muted/italic fallback or accent emphasis.
 function Txt(
   { value, muted, accent }: { value: string; muted?: boolean; accent?: string },
 ) {

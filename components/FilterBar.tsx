@@ -37,6 +37,7 @@ const GLASS_INPUT = {
   outline: "none",
 } as const;
 
+// FilterBar: controlled search + three faceted selects over live vocab props (fallbacks for empty data); onFilter patches state, onReset clears.
 export function FilterBar(
   {
     filters,
@@ -181,6 +182,7 @@ export function FilterBar(
   );
 }
 
+// Sel: controlled select with accent styling when a value is set; empty value shows placeholder, max-width caps long vocabularies.
 function Sel(
   { value, onChange, placeholder, opts }: {
     value: string;

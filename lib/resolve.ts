@@ -24,6 +24,7 @@ import type { Barrier, StatusHistoryEntry } from "./types.ts";
 import type { KpiSnapshot } from "./types.ts";
 import { isConforme } from "./constants.ts";
 
+// Maps a wire history entry's numeric IDs to display strings; date/note pass through unchanged.
 export function resolveHistoryEntry(
   w: WireStatusHistoryEntry,
 ): StatusHistoryEntry {
@@ -35,6 +36,7 @@ export function resolveHistoryEntry(
   };
 }
 
+// Maps wire numeric IDs to Barrier strings; conformidade is derived from disponibilidade, never trusted from wire.
 export function resolveBarrier(w: WireBarrier): Barrier {
   const disponibilidade = fromDisponibilidadeId(w.disponibilidadeId);
   return {
@@ -58,6 +60,7 @@ export function resolveBarrier(w: WireBarrier): Barrier {
   };
 }
 
+// Maps a wire array to Barrier[] via resolveBarrier; preserves order, empty in → empty out.
 export function resolveBarriers(items: WireBarrier[]): Barrier[] {
   return items.map(resolveBarrier);
 }

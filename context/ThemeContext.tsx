@@ -17,6 +17,7 @@ const ThemeContext = createContext<ThemeCtx>({
   setTheme: () => {},
 });
 
+// Proxies theme from SettingsContext (`barrier-settings` key); no direct storage, delegates to setTheme.
 export function ThemeProvider({ children }: { children: ComponentChildren }) {
   const { settings, setTheme } = useSettings();
   return (
@@ -26,6 +27,7 @@ export function ThemeProvider({ children }: { children: ComponentChildren }) {
   );
 }
 
+// Returns proxied theme state; hydration/persistence handled by SettingsProvider.
 export function useTheme() {
   return useContext(ThemeContext);
 }

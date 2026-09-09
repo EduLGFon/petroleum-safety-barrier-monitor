@@ -34,6 +34,7 @@ interface Persisted {
   openId: number | null;
 }
 
+// Loads persisted dashboard slice from `barrier-dashboard` key; SSR-safe, returns {} on miss/error.
 function loadDash(): Partial<Persisted> {
   if (typeof window === "undefined") return {};
   try {
@@ -44,6 +45,7 @@ function loadDash(): Partial<Persisted> {
   }
 }
 
+// Persists dashboard slice to `barrier-dashboard` key; no-op on storage failure, state stays in memory.
 function saveDash(d: Persisted) {
   try {
     localStorage.setItem(STORE_KEY, JSON.stringify(d));
@@ -64,6 +66,7 @@ interface State {
   filters: FilterState;
 }
 
+// Pure reducer for location/filters/sort; resets page to 1 except on page-only navigation.
 function reducer(s: State, a: Action): State {
   switch (a.type) {
     case "SET_LOCATION":
@@ -96,6 +99,8 @@ function reducer(s: State, a: Action): State {
   }
 }
 
+// Central dashboard store; starts from defaults for SSR, hydrates from `barrier-dashboard` after mount.
+// Persists location/filters/selection/openId via saveDash once hydrated.
 export function useDashboard(allBarriers: Barrier[], defaultLocation = "ALL") {
   // Always start with consistent defaults for SSR — restore after mount
   const [state, dispatch] = useReducer(reducer, {
@@ -173,19 +178,23 @@ export function useDashboard(allBarriers: Barrier[], defaultLocation = "ALL") {
       ? { code: state.location, name: state.location, tipo: "Instalação" }
       : LOCATIONS[0]);
 
+  // Sets location and clears selection; persisted via saveDash effect.
   const setLocation = useCallback((code: string) => {
     dispatch({ type: "SET_LOCATION", payload: code });
     setSelectedIds(new Set());
   }, []);
+  // Patches filters (resets page unless page-only); persisted via saveDash effect.
   const setFilter = useCallback(
     (patch: Partial<FilterState>) =>
       dispatch({ type: "SET_FILTER", payload: patch }),
     [],
   );
+  // Toggles sort direction for column; persisted via saveDash effect.
   const setSort = useCallback(
     (col: SortableColumn) => dispatch({ type: "SET_SORT", payload: col }),
     [],
   );
+  // Resets filters to defaults and clears selection; persisted via saveDash effect.
   const resetFilters = useCallback(() => {
     dispatch({ type: "RESET_FILTERS" });
     setSelectedIds(new Set());
@@ -205,6 +214,7 @@ export function useDashboard(allBarriers: Barrier[], defaultLocation = "ALL") {
     });
   }, []);
 
+  // Toggles single-row selection; persisted as selectedIds via saveDash effect.
   const toggleSelect = useCallback((id: number) => {
     setSelectedIds((prev) => {
       const n = new Set(prev);
@@ -212,10 +222,12 @@ export function useDashboard(allBarriers: Barrier[], defaultLocation = "ALL") {
       return n;
     });
   }, []);
+  // Selects all currently filtered rows; persisted as selectedIds via saveDash effect.
   const selectAll = useCallback(
     () => setSelectedIds(new Set(sorted.map((b) => b.id))),
     [sorted],
   );
+  // Clears all row selection; persisted via saveDash effect.
   const clearAll = useCallback(() => setSelectedIds(new Set()), []);
 
   const hasActiveFilters = !!state.filters.query ||
