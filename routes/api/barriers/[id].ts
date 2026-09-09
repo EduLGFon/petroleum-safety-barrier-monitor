@@ -5,6 +5,7 @@ import { getBarrierById } from "../../../lib/server/sql/barriers.ts";
 import { define } from "../../../utils.ts";
 
 export const handler = define.handlers({
+  // GET single barrier by numeric id; 400 invalid, 404 when missing.
   async GET(ctx) {
     const barrierId = Number(ctx.params.id);
 

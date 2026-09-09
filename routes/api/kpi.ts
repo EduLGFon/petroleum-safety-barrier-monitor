@@ -5,6 +5,7 @@ import { getKpi } from "../../lib/server/sql/barriers.ts";
 import { define } from "../../utils.ts";
 
 export const handler = define.handlers({
+  // GET KPI snapshot for locationId (undefined/0 = all installations).
   async GET(ctx) {
     const raw = ctx.url.searchParams.get("locationId");
     const locationId = raw === null || raw === "" ? undefined : Number(raw);

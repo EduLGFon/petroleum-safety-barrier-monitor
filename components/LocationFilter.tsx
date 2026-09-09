@@ -12,6 +12,7 @@ interface Props {
   allBarriers: Barrier[];
   onChange: (c: string) => void;
 }
+// LocationFilter: station tabs derived from data plus Todas; scrolls horizontally.
 export function LocationFilter({ selected, allBarriers, onChange }: Props) {
   // Stations from the data first (future stations appear automatically),
   // seed metadata only supplies display names for known codes.
@@ -67,6 +68,7 @@ export function LocationFilter({ selected, allBarriers, onChange }: Props) {
   );
 }
 
+// Tab: single glass pill tab with count badge and staggered entrance.
 function Tab(
   { name, tipo, count, active, index, onClick }: {
     name: string;

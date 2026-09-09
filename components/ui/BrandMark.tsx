@@ -17,6 +17,7 @@ const SVG_PATHS =
 <path d="M3061 1915 c-222 -97 -414 -213 -651 -393 -190 -145 -282 -225 -629 -547 -461 -427 -585 -533 -809 -682 -143 -96 -324 -187 -472 -238 -57 -20 -105 -37 -106 -38 -1 -1 581 -1 1294 1 713 1 1322 2 1353 2 65 0 111 25 142 77 18 31 18 72 19 950 1 534 -3 918 -8 920 -5 1 -65 -22 -133 -52z"/>
 </g>`;
 
+// WaveSVG: fixed-size wave mark on a solid rounded square.
 function WaveSVG(
   { size, bg, fill }: { size: number; bg: string; fill: string },
 ) {
@@ -41,6 +42,7 @@ function WaveSVG(
   );
 }
 
+// BrandMark: adaptive (CSS vars) or fixed wave logo for splash/header.
 export function BrandMark(
   { variant = "icon", height = 40, light = true }: P,
 ) {

@@ -8,6 +8,7 @@ declare global {
   var __barrierPool: Pool | undefined;
 }
 
+// Creates lazy Postgres pool from DATABASE_URL; throws when unset.
 function createPool(): Pool {
   const connectionString = Deno.env.get("DATABASE_URL");
   if (!connectionString) {

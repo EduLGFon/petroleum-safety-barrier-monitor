@@ -13,6 +13,7 @@ interface Props {
 // instead of growing the page into a 70-row tower.
 const SCROLL_AFTER_ROWS = 18;
 
+// ConformidadeChart: glass card frame that scrolls the inner SVG past SCROLL_AFTER_ROWS.
 export function ConformidadeChart({ data }: Props) {
   const scroll = data.length > SCROLL_AFTER_ROWS;
   return (

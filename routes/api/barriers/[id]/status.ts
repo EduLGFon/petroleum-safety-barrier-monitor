@@ -12,6 +12,7 @@ interface StatusBody {
 }
 
 export const handler = define.handlers({
+  // PATCH barrier status via transitionBarrierStatus; validates id and body.
   async PATCH(ctx) {
     const barrierId = Number(ctx.params.id);
 

@@ -56,6 +56,7 @@ interface Props {
   companyName: string;
 }
 
+// SettingsPanel: slide-over dialog hosting appearance, filters, and members sections.
 export function SettingsPanel({ open, onClose, companyName }: Props) {
   const {
     settings,
@@ -88,16 +89,19 @@ export function SettingsPanel({ open, onClose, companyName }: Props) {
     };
   }, [open]);
 
+  // handleTheme: applies the theme with a brief press animation.
   const handleTheme = (t: Theme) => {
     setActiveTheme(t);
     setTheme(t);
     setTimeout(() => setActiveTheme(null), 350);
   };
+  // handleAccent: applies the accent color with a brief press animation.
   const handleAccent = (c: AccentColor) => {
     setActiveAccent(c);
     setAccent(c);
     setTimeout(() => setActiveAccent(null), 350);
   };
+  // handleDensity: applies the density with a brief press animation.
   const handleDensity = (d: Density) => {
     setActiveDensity(d);
     setDensity(d);
@@ -922,6 +926,7 @@ function SectTitle({ children }: { children: ComponentChildren }) {
     </div>
   );
 }
+// FieldLabel: small uppercase label for filter/default fields.
 function FieldLabel({ children }: { children: ComponentChildren }) {
   return (
     <div
@@ -983,6 +988,7 @@ function DensityGlyph(
   );
 }
 
+// Toggle: accessible switch for booleans like reduce-motion.
 function Toggle(
   { checked, onChange }: { checked: boolean; onChange: (v: boolean) => void },
 ) {

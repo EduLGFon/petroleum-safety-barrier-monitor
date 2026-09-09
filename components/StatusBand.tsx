@@ -20,6 +20,7 @@ interface Props {
   activeFilter: string;
   onFilter: (k: string) => void;
 }
+// StatusBand: clickable availability segments sized by volume; click toggles the filter.
 export function StatusBand({ kpi, activeFilter, onFilter }: Props) {
   // Prefer the dynamic buckets; the wire path only carries fixed fields, so
   // reconstruct from those when buckets are absent (known statuses only).
@@ -31,6 +32,7 @@ export function StatusBand({ kpi, activeFilter, onFilter }: Props) {
     "Degradado": kpi.degradado,
     "Indisponível": kpi.indisponivel,
   };
+  // Sort comparator: known statuses in KNOWN_ORDER first; unknowns trail by volume.
   const keys = Object.keys(counts).sort((a, b) => {
     const ia = KNOWN_ORDER.indexOf(a), ib = KNOWN_ORDER.indexOf(b);
     if (ia !== -1 || ib !== -1) {

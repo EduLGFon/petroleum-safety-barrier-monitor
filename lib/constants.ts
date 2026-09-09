@@ -44,6 +44,7 @@ const CONFORME_STATUSES: Disponibilidade[] = [
   "Indisponível Contingenciado",
   "Degradado Contingenciado",
 ];
+// True for statuses counted as Conforme (Disponível + contingenciados).
 export function isConforme(s: Disponibilidade): boolean {
   return CONFORME_STATUSES.includes(s);
 }
@@ -265,6 +266,7 @@ function hashHue(key: string): number {
   return Math.abs(h) % 360;
 }
 
+// Builds deterministic hue-based ColorSet for unknown runtime values.
 export function fallbackColors(key: string): ColorSet {
   const h = hashHue(key);
   return {
@@ -279,9 +281,11 @@ export function fallbackColors(key: string): ColorSet {
 export function dispColorFor(key: string): ColorSet {
   return { ...fallbackColors(key), ...DISP_COLORS[key] };
 }
+// Conformidade colors with deterministic fallback for new values.
 export function confColorFor(key: string): ColorSet {
   return { ...fallbackColors(key), ...CONF_COLORS[key] };
 }
+// Criticidade colors with deterministic fallback for new values.
 export function critColorFor(key: string): ColorSet {
   return { ...fallbackColors(key), ...CRIT_COLORS[key] };
 }

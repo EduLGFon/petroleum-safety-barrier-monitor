@@ -34,6 +34,7 @@ const GEO = {
   spacious: { ROW_H: 31, BAR_H: 22, LABEL_W: 220 },
 } as const;
 
+// ConformidadeChartInner: stacked Conforme / Não Conforme SVG bars with hover tip and density geometry.
 export default function ConformidadeChartInner({ data }: Props) {
   const [hover, setHover] = useState<
     { i: number; x: number; y: number } | null
@@ -59,6 +60,7 @@ export default function ConformidadeChartInner({ data }: Props) {
   const height = TOP + data.length * ROW_H + AXIS_H;
   const width = LABEL_W + PLOT_W + COUNT_W;
   const ticks = [0, Math.round(max / 2), max];
+  // w: linear value→pixels scale against the max row total.
   const w = (v: number) => Math.max(0, (v / max) * PLOT_W);
   const hovered = hover !== null ? data[hover.i] : null;
   // Geometry lives in attributes (SSR/fallback) AND in style: only the
@@ -117,6 +119,7 @@ export default function ConformidadeChartInner({ data }: Props) {
           // Staggered glide: each row trails the previous one on updates.
           const delay = `${Math.min(i * 45, 360)}ms`;
           const wC = Math.max(w(d.Conforme), d.Conforme > 0 ? 2 : 0);
+          // wN: Não Conforme segment width; 2px minimum keeps small values visible.
           const wN = Math.max(
             w(d["Não Conforme"]),
             d["Não Conforme"] > 0 ? 2 : 0,

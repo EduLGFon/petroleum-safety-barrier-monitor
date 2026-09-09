@@ -18,6 +18,7 @@ import type { Conformidade, Criticidade, Disponibilidade } from "./types.ts";
 
 // ─── Generic helpers ──────────────────────────────────────────────────────
 
+// Builds string->id reverse map from an id->string codes table.
 function buildReverse<T extends string>(
   codes: Record<number, T>,
 ): Record<T, number> {
@@ -30,6 +31,8 @@ function buildReverse<T extends string>(
 
 // ─── Location (Instalação) ────────────────────────────────────────────────
 // 0 = ALL is intentionally reserved as the "no filter / all locations" sentinel
+// Pattern for every domain below: toXId maps display string -> wire id,
+// fromXId maps wire id -> display string (each with a safe default for unknowns).
 
 export const LOCATION_CODES: Record<number, string> = {
   0: "ALL",

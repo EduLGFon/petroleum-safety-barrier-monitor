@@ -4,6 +4,8 @@ interface P {
   color?: string;
   strokeWidth?: number;
 }
+/* Icon factory: D wraps a raw path string in a 24px stroke SVG from size/color/width props.
+   All path strings are static constants, so innerHTML never touches user input. */
 const D = (s: number, c: string, w: number, ch: string) => (
   <svg
     width={s}
@@ -18,6 +20,7 @@ const D = (s: number, c: string, w: number, ch: string) => (
     dangerouslySetInnerHTML={{ __html: ch }}
   />
 );
+// Status icons: shield/check/alert/activity health states.
 export const ShieldIcon = (
   { size = 16, color = "currentColor", strokeWidth = 2 }: P,
 ) =>
@@ -81,6 +84,7 @@ export const ActivityIcon = (
     strokeWidth,
     '<polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>',
   );
+// Navigation icons: search/filter/sort/chevron/close chrome.
 export const SearchIcon = (
   { size = 16, color = "currentColor", strokeWidth = 2 }: P,
 ) =>
@@ -142,6 +146,7 @@ export const ChevronsRightIcon = (
     strokeWidth,
     '<path d="m6 17 5-5-5-5"/><path d="m13 17 5-5-5-5"/>',
   );
+// File/export icons: download + spreadsheet/pdf/text variants.
 export const DownloadIcon = (
   { size = 16, color = "currentColor", strokeWidth = 2 }: P,
 ) =>
@@ -178,6 +183,7 @@ export const FileTextIcon = (
     strokeWidth,
     '<path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><line x1="10" y1="9" x2="8" y2="9"/>',
   );
+// Theme icons: sun/moon/monitor appearance switcher.
 export const SunIcon = (
   { size = 16, color = "currentColor", strokeWidth = 2 }: P,
 ) =>
@@ -200,6 +206,7 @@ export const MonitorIcon = (
     strokeWidth,
     '<rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/>',
   );
+// Domain icons: user/building/pin/tag/calendar/clock/history/meta + CTA arrow.
 export const UserIcon = (
   { size = 16, color = "currentColor", strokeWidth = 2 }: P,
 ) =>

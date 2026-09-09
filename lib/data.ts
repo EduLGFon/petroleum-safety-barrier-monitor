@@ -53,6 +53,7 @@ const TAG_PREFIX: Record<string, string> = {
   "Detector de H₂S": "H2S",
 };
 
+// Builds display TAG (prefix-num-loc-suffix) from category id and location.
 function buildTag(catId: number, rng: Rng, locCode: string): string {
   const catName = CATEGORIA_CODES[catId];
   const prefix = TAG_PREFIX[catName] ?? "B";
@@ -63,11 +64,13 @@ function buildTag(catId: number, rng: Rng, locCode: string): string {
     : `${prefix}-${num}-${locCode}`;
 }
 
+// Returns a copy of date shifted by d days.
 function addDays(b: Date, d: number): Date {
   const x = new Date(b);
   x.setDate(x.getDate() + d);
   return x;
 }
+// Formats a date as YYYY-MM-DD (date part of ISO string).
 function fmtISO(d: Date): string {
   return d.toISOString().split("T")[0];
 }
@@ -84,6 +87,7 @@ const STATUS_DIST: [number, number][] = [
   [5, 0.07],
 ];
 
+// Picks a status id from STATUS_DIST cumulative probabilities.
 function pickStatusId(r: number): number {
   let cum = 0;
   for (const [id, p] of STATUS_DIST) {
@@ -189,6 +193,7 @@ function generateHistory(
 
 let _cache: WireBarrier[] | null = null;
 
+// Generates (once, cached) the deterministic mock WireBarrier[] dataset.
 export function getWireBarriers(): WireBarrier[] {
   if (_cache) return _cache;
 

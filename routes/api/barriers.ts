@@ -5,6 +5,7 @@ import { listBarriers } from "../../lib/server/sql/barriers.ts";
 import type { BarriersQuery } from "../../lib/wireTypes.ts";
 import { define } from "../../utils.ts";
 
+// Parses optional numeric query param; undefined for missing/invalid.
 function parseIntParam(v: string | null): number | undefined {
   if (v === null || v === "") return undefined;
   const n = Number(v);
@@ -12,6 +13,7 @@ function parseIntParam(v: string | null): number | undefined {
 }
 
 export const handler = define.handlers({
+  // GET paged barriers matching BarriersQuery filters; 500 on DB failure.
   async GET(ctx) {
     const sp = ctx.url.searchParams;
     const query: BarriersQuery = {

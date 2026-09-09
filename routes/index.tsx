@@ -8,6 +8,7 @@ import { getCompanyName } from "../lib/company.ts";
 import { mockApi } from "../lib/api.ts";
 import { define } from "../utils.ts";
 
+// Home page: server-loads barriers + company name for the Dashboard island.
 export default define.page(async function Home() {
   const barriers = await mockApi.getAllBarriers({});
   const companyName = getCompanyName();

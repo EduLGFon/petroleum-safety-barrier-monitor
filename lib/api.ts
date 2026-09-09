@@ -95,10 +95,12 @@ export function toWireQuery(f: DomainQuery): BarriersQuery {
 
 const CONFORME_STATUS_IDS = new Set([0, 1, 2, 3]); // Disponível, Fora de Op., Ind.Cont., Degr.Cont.
 
+// Derives conformidade id (0 Conforme / 1 Não Conforme) from disponibilidade id.
 function wireConformidadeId(dispId: number): number {
   return CONFORME_STATUS_IDS.has(dispId) ? 0 : 1; // 0=Conforme 1=Não Conforme
 }
 
+// Checks a wire barrier against numeric query filters (mock WHERE clause).
 function matchesQuery(w: WireBarrier, q: BarriersQuery): boolean {
   if (
     q.locationId !== undefined && q.locationId !== 0 &&
@@ -123,6 +125,7 @@ function matchesQuery(w: WireBarrier, q: BarriersQuery): boolean {
   return true;
 }
 
+// Sorts wire barriers in-memory by SortableColumn and direction.
 function sortWire(
   items: WireBarrier[],
   sortCol: string,
@@ -154,6 +157,7 @@ function sortWire(
 }
 
 const mockAdapter: BarriersApi = {
+  // Mock getBarriers: filters, sorts, paginates, resolves page to domain.
   getBarriers(query) {
     const all = getWireBarriers().filter((w) => matchesQuery(w, query));
     const total = all.length;
@@ -168,17 +172,20 @@ const mockAdapter: BarriersApi = {
     });
   },
 
+  // Mock getAllBarriers: filters/sorts all matches for export/KPI use.
   getAllBarriers(query) {
     const all = getWireBarriers().filter((w) => matchesQuery(w, query));
     const sorted = sortWire(all, query.sortCol ?? "id", query.sortDir ?? "asc");
     return Promise.resolve(resolveBarriers(sorted));
   },
 
+  // Mock getBarrierById: finds wire row by id, resolves to domain.
   getBarrierById(id) {
     const w = getWireBarriers().find((b) => b.id === id);
     return Promise.resolve(w ? resolveBarriers([w])[0] : null);
   },
 
+  // Mock getKpi: filters by location and computes local KPI snapshot.
   getKpi(query) {
     const all = getWireBarriers().filter((w) =>
       query.locationId === undefined || query.locationId === 0 ||
@@ -190,6 +197,7 @@ const mockAdapter: BarriersApi = {
 
 // ─── HTTP adapter — talks to a real backend using the wire format ────────
 
+// Serializes wire query to URL search string, skipping empty values.
 function buildQueryString(q: BarriersQuery): string {
   const params = new URLSearchParams();
   for (const [k, v] of Object.entries(q)) {
@@ -198,7 +206,9 @@ function buildQueryString(q: BarriersQuery): string {
   return params.toString();
 }
 
+// Creates an HTTP BarriersApi bound to the given backend baseUrl.
 function httpAdapterFactory(baseUrl: string): BarriersApi {
+  // GETs JSON path from baseUrl; throws on non-OK status.
   async function fetchJson<T>(path: string): Promise<T> {
     const res = await fetch(`${baseUrl}${path}`, {
       headers: { "Accept": "application/json" },
@@ -208,6 +218,7 @@ function httpAdapterFactory(baseUrl: string): BarriersApi {
   }
 
   return {
+    // HTTP getBarriers: fetches one wire page and resolves items to domain.
     async getBarriers(query) {
       const qs = buildQueryString(query);
       const data = await fetchJson<BarriersResponse>(`/api/barriers?${qs}`);
@@ -217,11 +228,13 @@ function httpAdapterFactory(baseUrl: string): BarriersApi {
         totalPages: data.totalPages,
       };
     },
+    // HTTP getAllBarriers: fetches up to 100k wire rows, resolves to domain.
     async getAllBarriers(query) {
       const qs = buildQueryString({ ...query, page: 1, pageSize: 100000 });
       const data = await fetchJson<BarriersResponse>(`/api/barriers?${qs}`);
       return resolveBarriers(data.items);
     },
+    // HTTP getBarrierById: fetches wire row by id; null on any error.
     async getBarrierById(id) {
       try {
         const w = await fetchJson<WireBarrier>(`/api/barriers/${id}`);
@@ -230,6 +243,7 @@ function httpAdapterFactory(baseUrl: string): BarriersApi {
         return null;
       }
     },
+    // HTTP getKpi: fetches wire KPI snapshot and resolves to domain.
     async getKpi(query) {
       const qs = buildQueryString(query);
       const w = await fetchJson<WireKpiSnapshot>(`/api/kpi?${qs}`);

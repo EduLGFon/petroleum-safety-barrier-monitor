@@ -10,6 +10,7 @@ interface Props {
   companyName: string;
 }
 
+// LoadingScreen: full-screen splash with eased progress that fades out before onDone.
 export function LoadingScreen({ onDone, companyName }: Props) {
   const [progress, setProgress] = useState(0);
   const [ready, setReady] = useState(false);

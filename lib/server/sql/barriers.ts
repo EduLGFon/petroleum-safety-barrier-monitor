@@ -22,6 +22,7 @@ const SORTABLE: Record<string, string> = {
   statusSince: "b.status_since",
 };
 
+// Resolves client sortCol/sortDir to a whitelisted ORDER BY fragment.
 function resolveOrderBy(sortCol?: string, sortDir?: string): string {
   const col = SORTABLE[sortCol ?? "id"] ?? SORTABLE.id;
   const dir = sortDir === "desc" ? "desc" : "asc";
@@ -54,6 +55,7 @@ interface HistoryEntry {
   note: string;
 }
 
+// Normalizes DB json (array or string) to HistoryEntry[]; [] on garbage.
 function toHistory(value: unknown): HistoryEntry[] {
   if (Array.isArray(value)) return value as HistoryEntry[];
   if (typeof value === "string") {
@@ -67,6 +69,7 @@ function toHistory(value: unknown): HistoryEntry[] {
   return [];
 }
 
+// Maps a BarrierRow to the WireBarrier contract.
 function toWireBarrier(r: BarrierRow): WireBarrier {
   return {
     id: r.id,
@@ -142,6 +145,7 @@ function buildWhere(q: BarriersQuery): { text: string; args: unknown[] } {
   };
 }
 
+// Lists paged wire barriers + total for the given BarriersQuery filters.
 export async function listBarriers(
   q: BarriersQuery,
 ): Promise<BarriersResponse> {
@@ -179,6 +183,7 @@ export async function listBarriers(
   };
 }
 
+// Fetches a single wire barrier by id, or null when missing.
 export async function getBarrierById(id: number): Promise<WireBarrier | null> {
   const rows = await queryRows<BarrierRow>(
     `select ${SELECT_COLUMNS} from barriers b
@@ -188,6 +193,7 @@ export async function getBarrierById(id: number): Promise<WireBarrier | null> {
   return rows[0] ? toWireBarrier(rows[0]) : null;
 }
 
+// Computes KPI snapshot counts, optionally scoped to one location.
 export async function getKpi(locationId?: number): Promise<WireKpiSnapshot> {
   const scoped = locationId !== undefined && locationId !== 0;
   const rows = await queryRows<{

@@ -28,6 +28,7 @@ const INIT = `(function(){try{
   document.documentElement.dataset.density=dn;
 }catch(e){}})();`;
 
+// App shell: builds branded title and outer html/head for all routes.
 export default define.page(function App({ Component }) {
   const title = withBrand(
     getCompanyName(),

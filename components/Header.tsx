@@ -30,10 +30,12 @@ function useConnection(): Conn {
       setConn("disconnected");
     }
     let timer = 0;
+    // onOffline: drops to disconnected at once; clears any pending reconnect timer.
     const onOffline = () => {
       globalThis.clearTimeout(timer);
       setConn("disconnected");
     };
+    // onOnline: flashes reconnecting, then settles to connected after 2.5s.
     const onOnline = () => {
       globalThis.clearTimeout(timer);
       setConn("reconnecting");
@@ -50,6 +52,7 @@ function useConnection(): Conn {
   return conn;
 }
 
+// GearIcon: 14px settings gear glyph for the header button.
 function GearIcon() {
   return (
     <svg
@@ -69,6 +72,7 @@ function GearIcon() {
   );
 }
 
+// Header: title + live connection dot on the left, settings gear on the right.
 export function Header({ onOpenSettings, companyName = "" }: Props) {
   const conn = useConnection();
   const { settings } = useSettings();
