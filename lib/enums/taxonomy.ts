@@ -36,9 +36,6 @@ export const AGRUPAMENTO_CODES: Record<number, string> = {
 };
 export const AGRUPAMENTO_IDS = buildReverse(AGRUPAMENTO_CODES);
 
-export function toAgrupamentoId(v: string): number | undefined {
-  return AGRUPAMENTO_IDS[v];
-}
 export function fromAgrupamentoId(id: number): string {
   return AGRUPAMENTO_CODES[id] ?? `Agrupamento (${id})`;
 }
@@ -55,9 +52,6 @@ export const TIPOLOGIA_CODES: Record<number, string> = {
 };
 export const TIPOLOGIA_IDS = buildReverse(TIPOLOGIA_CODES);
 
-export function toTipologiaId(v: string): number | undefined {
-  return TIPOLOGIA_IDS[v];
-}
 export function fromTipologiaId(id: number): string {
   return TIPOLOGIA_CODES[id] ?? `Tipologia (${id})`;
 }
@@ -74,9 +68,6 @@ export const DONO_CODES: Record<number, string> = {
 };
 export const DONO_IDS = buildReverse(DONO_CODES);
 
-export function toDonoId(v: string): number | undefined {
-  return DONO_IDS[v];
-}
 export function fromDonoId(id: number): string {
   if (id < 0) return "";
   return DONO_CODES[id] ?? `Dono (${id})`;

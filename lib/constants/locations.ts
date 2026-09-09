@@ -11,15 +11,6 @@ export const LOCATIONS: Location[] = [
   { code: "SPL", name: "SPL", tipo: "Base Operacional SP" },
 ];
 
-export const LOCATION_DIST = [
-  { code: "FAL", tipo: "Estação Coletora", count: 800 },
-  { code: "CNC", tipo: "Concessão Norte-Centro", count: 1200 },
-  { code: "CNS", tipo: "Concessão Norte-Sul", count: 900 },
-  { code: "FAP", tipo: "Planta de Processamento", count: 700 },
-  { code: "RJO", tipo: "Base Operacional Rio", count: 1100 },
-  { code: "SPL", tipo: "Base Operacional SP", count: 2100 },
-];
-
 // id-keyed variant used by the mock data generator (mirrors LOCATION_CODES in lib/enums.ts)
 export const LOCATION_DIST_BY_ID: {
   id: number;

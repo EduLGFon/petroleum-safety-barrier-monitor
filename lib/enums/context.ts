@@ -1,4 +1,4 @@
-// Enum codes for free-text-ish context domains (loc-desc/author/theme/accent) - split from lib/enums.ts to keep files small; why: isolates history and settings payload resolvers.
+// Enum codes for free-text-ish context domains (loc-desc/author) - split from lib/enums.ts to keep files small; why: isolates history resolvers.
 import { buildReverse } from "./codes.ts";
 
 // ─── Local description (physical location text) ──────────────────────────
@@ -27,9 +27,6 @@ export const LOC_DESC_CODES: Record<number, string> = {
 };
 export const LOC_DESC_IDS = buildReverse(LOC_DESC_CODES);
 
-export function toLocDescId(v: string): number | undefined {
-  return LOC_DESC_IDS[v];
-}
 export function fromLocDescId(id: number): string {
   return LOC_DESC_CODES[id] ?? `Local (${id})`;
 }
@@ -50,29 +47,6 @@ export const AUTHOR_CODES: Record<number, string> = {
 };
 export const AUTHOR_IDS = buildReverse(AUTHOR_CODES);
 
-export function toAuthorId(v: string): number | undefined {
-  return AUTHOR_IDS[v];
-}
 export function fromAuthorId(id: number): string {
   return AUTHOR_CODES[id] ?? `Autor (${id})`;
 }
-
-// ─── Theme & Accent (for settings payloads too) ──────────────────────────
-
-export const THEME_CODES: Record<number, "light" | "dark" | "amoled"> = {
-  0: "dark",
-  1: "light",
-  2: "amoled",
-};
-export const THEME_IDS = buildReverse(THEME_CODES);
-
-export const ACCENT_CODES: Record<number, string> = {
-  0: "blue",
-  1: "green",
-  2: "red",
-  3: "yellow",
-  4: "brown",
-  5: "mono",
-  6: "purple",
-};
-export const ACCENT_IDS = buildReverse(ACCENT_CODES);
