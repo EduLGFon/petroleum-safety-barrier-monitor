@@ -272,14 +272,17 @@ function httpAdapterFactory(baseUrl: string): BarriersApi {
       const data = await fetchJson<BarriersResponse>(`/api/barriers?${qs}`);
       return resolveBarriers(data.items);
     },
-    // HTTP getBarrierById: fetches wire row by id; null on any error.
+    // HTTP getBarrierById: fetches wire row by id; null only on 404,
+    // other failures throw so callers can tell "missing" from "broken".
     async getBarrierById(id) {
-      try {
-        const w = await fetchJson<WireBarrier>(`/api/barriers/${id}`);
-        return resolveBarriers([w])[0];
-      } catch {
-        return null;
-      }
+      const path = `/api/barriers/${id}`;
+      const res = await fetch(`${baseUrl}${path}`, {
+        headers: { "Accept": "application/json" },
+      });
+      if (res.status === 404) return null;
+      if (!res.ok) throw new Error(`API error ${res.status}: ${path}`);
+      const w = await res.json() as WireBarrier;
+      return resolveBarriers([w])[0];
     },
     // HTTP getKpi: fetches wire KPI snapshot and resolves to domain.
     async getKpi(query) {
