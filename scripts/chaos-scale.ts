@@ -91,9 +91,14 @@ check(
 check("new conformidade counted", (kpi.byConformidade?.[NEW_CONF] ?? 0) > 0);
 check("new criticidade counted", (kpi.byCriticidade?.[NEW_CRIT] ?? 0) > 0);
 check(
-  "fixed + dynamic conforme agree",
-  kpi.conforme + kpi.naoConforme + (kpi.byConformidade?.[NEW_CONF] ?? 0) ===
-    kpi.total,
+  "fixed conforme reconciles to total",
+  kpi.conforme + kpi.naoConforme === kpi.total,
+  `${kpi.conforme}+${kpi.naoConforme}/${kpi.total}`,
+);
+check(
+  "novel conformidade fails closed into NC",
+  (kpi.byConformidade?.[NEW_CONF] ?? 0) > 0 &&
+    kpi.naoConforme >= (kpi.byConformidade?.[NEW_CONF] ?? 0),
 );
 
 const chart = computeChartData(data);

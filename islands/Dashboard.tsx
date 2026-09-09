@@ -94,7 +94,9 @@ function DashboardView({ initialBarriers: barriers, companyName }: Props) {
     }
   }, [hydrated, defaultsApplied, loading, settings.defaultFilters, setFilter]);
 
-  const ncCount = kpi.degradado + kpi.indisponivel;
+  // Unified NC count: every non-Conforme barrier (fail-closed, novel statuses
+  // included) drives the alert, matching KpiGrid and the chart.
+  const ncCount = kpi.naoConforme;
   const isUrgentesActive = filters.conformidade === "Não Conforme" &&
     filters.sortCol === "statusSince";
 
@@ -197,7 +199,8 @@ function DashboardView({ initialBarriers: barriers, companyName }: Props) {
                 }}
               >
                 {ncCount.toLocaleString("pt-BR")}{" "}
-                barreira{ncCount > 1 ? "s" : ""} sem contingenciamento
+                barreira{ncCount > 1 ? "s" : ""}{" "}
+                não conforme{ncCount > 1 ? "s" : ""}
               </div>
               <div
                 style={{
@@ -206,7 +209,8 @@ function DashboardView({ initialBarriers: barriers, companyName }: Props) {
                   marginTop: 2,
                 }}
               >
-                Degradadas ou indisponíveis · ordenadas da mais urgente
+                Degradadas, indisponíveis ou novos status · ordenadas da mais
+                urgente
               </div>
             </div>
             <button

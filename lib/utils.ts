@@ -60,7 +60,10 @@ export function computeKpi(b: Barrier[]): KpiSnapshot {
         break;
     }
     if (x.conformidade === "Conforme") conforme++;
-    else if (x.conformidade === "Não Conforme") {
+    else {
+      // Fail-closed: any novel conformidade counts as Não Conforme, so the
+      // fixed fields always reconcile (conforme + naoConforme === total) and
+      // match computeChartData, which already buckets non-Conforme as NC.
       naoConforme++;
       if (x.criticidade === "Crítica") criticasNC++;
     }
@@ -83,7 +86,8 @@ export function computeKpi(b: Barrier[]): KpiSnapshot {
   };
 }
 
-// Groups Conforme/ Não Conforme per category in one pass; truncates names >26 chars, sorts biggest-first.
+// Groups Conforme / Não Conforme per category in one pass; truncates names >26 chars, sorts biggest-first.
+// Não Conforme means !== "Conforme" (fail-closed, same policy as computeKpi) so chart and KPI never diverge.
 export function computeChartData(b: Barrier[]): CategoryConformidade[] {
   // Categories come from the data, not the CATEGORIES seed list: new
   // categories appear automatically, removed ones vanish. Sorted by volume
