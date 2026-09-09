@@ -3,10 +3,10 @@
 // categories), so option lists arrive as props derived from the loaded
 // barriers; the seed constants below are fallback only for empty data.
 import { CloseIcon, FilterIcon, SearchIcon } from "./ui/Icons.tsx";
+import { useEffect, useState } from "preact/hooks";
 import type { FilterState } from "../lib/types.ts";
 import { CATEGORIES } from "../lib/constants.ts";
 import { AURORA } from "../lib/aurora.ts";
-import { useState } from "preact/hooks";
 
 interface Props {
   filters: FilterState;
@@ -51,6 +51,19 @@ export function FilterBar(
   }: Props,
 ) {
   const [focused, setFocused] = useState(false);
+  // Local search draft: typing updates the draft instantly but propagates to
+  // the dashboard pipeline debounced, so each keystroke no longer triggers a
+  // full filter + O(N log N) sort over tens of thousands of rows.
+  const [draft, setDraft] = useState(filters.query);
+  // External query changes (reset, restored state) overwrite the draft.
+  useEffect(() => {
+    setDraft(filters.query);
+  }, [filters.query]);
+  useEffect(() => {
+    if (draft === filters.query) return;
+    const t = setTimeout(() => onFilter({ query: draft }), 200);
+    return () => clearTimeout(t);
+  }, [draft, filters.query, onFilter]);
   // Props carry the live vocabulary; seed lists only fill empty datasets.
   const dispOpts = disponibilidades.length ? disponibilidades : FALLBACK_DISP;
   const confOpts = conformidades.length ? conformidades : FALLBACK_CONF;
@@ -82,15 +95,15 @@ export function FilterBar(
         >
           <SearchIcon
             size={14}
-            color={focused || filters.query ? "var(--accent-2)" : AURORA.sub}
+            color={focused || draft ? "var(--accent-2)" : AURORA.sub}
           />
         </span>
         <input
           type="search"
           placeholder="TAG, localização, categoria…"
-          value={filters.query}
+          value={draft}
           // NOTE: onInput, not onChange (see BarriersTable goto field).
-          onInput={(e) => onFilter({ query: e.currentTarget.value })}
+          onInput={(e) => setDraft(e.currentTarget.value)}
           onFocus={() => setFocused(true)}
           onBlur={() => setFocused(false)}
           style={{
@@ -99,7 +112,7 @@ export function FilterBar(
               "var(--d-input-y) var(--d-input-x) var(--d-input-y) var(--d-search-l)",
             fontSize: "var(--d-lead)",
             ...GLASS_INPUT,
-            border: focused || filters.query
+            border: focused || draft
               ? "1px solid var(--accent)"
               : `1px solid ${AURORA.segBorder}`,
             boxSizing: "border-box",

@@ -128,18 +128,26 @@ export function applyFilters(b: Barrier[], f: FilterState): Barrier[] {
   return d;
 }
 
-// Sorts a copy (no mutation); id numeric, others pt-BR localeCompare; no sortCol returns input as-is.
+// Shared collator: one instance for every compare (creating one per compare
+// was the 50k-row hotspot: ~800k locale setups per keystroke).
+const collator = new Intl.Collator("pt-BR", { numeric: true });
+
+// Sorts a copy (no mutation); id numeric, other columns via the shared pt-BR
+// collator over precomputed lowercase keys (one toLowerCase per row, not per
+// comparison); no sortCol returns input as-is.
 export function applySorting(b: Barrier[], f: FilterState): Barrier[] {
   if (!f.sortCol) return b;
-  return [...b].sort((a, x) => {
-    const av = String(a[f.sortCol as keyof Barrier] ?? "").toLowerCase();
-    const bv = String(x[f.sortCol as keyof Barrier] ?? "").toLowerCase();
+  const dir = f.sortDir === "asc" ? 1 : -1;
+  if (f.sortCol === "id") {
+    return [...b].sort((a, x) => (a.id - x.id) * dir);
+  }
+  const decorated = b.map((item) => ({
+    item,
     // ISO dates sort lexicographically correctly
-    const c = f.sortCol === "id"
-      ? (a.id - x.id)
-      : av.localeCompare(bv, "pt-BR", { numeric: true });
-    return f.sortDir === "asc" ? c : -c;
-  });
+    key: String(item[f.sortCol as keyof Barrier] ?? "").toLowerCase(),
+  }));
+  decorated.sort((a, x) => collator.compare(a.key, x.key) * dir);
+  return decorated.map((d) => d.item);
 }
 
 // Slices 1-based page window; out-of-range pages return empty, never throws.
