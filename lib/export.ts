@@ -3,14 +3,15 @@
 // is an HTML table saved as .xls (opens in Excel/LibreOffice) with brand
 // header, KPI strip, styled columns and a summary table. PDF prints a
 // dedicated landscape report (never the whole page). CSV uses ; with BOM.
-import { daysSince, fmtDate, humanDuration } from "./utils.ts";
-import { CONF_COLORS, DISP_COLORS } from "./constants.ts";
+import { computeKpi, daysSince, fmtDate, humanDuration } from "./utils.ts";
+import { CONF_COLORS, DISP_COLORS, DISP_KNOWN_ORDER } from "./constants.ts";
 import type { Barrier } from "./types.ts";
 import { withBrand } from "./company.ts";
 
 // Maps a Barrier to a 14-column export row; NC duration blank unless statusSince present, empty dono falls back.
+// Non-Conforme means !== "Conforme" (fail-closed, same as computeKpi).
 function row(b: Barrier): string[] {
-  const nc = b.conformidade === "Não Conforme";
+  const nc = b.conformidade !== "Conforme";
   const when = nc && b.statusSince
     ? `${humanDuration(daysSince(b.statusSince))} (desde ${
       fmtDate(b.statusSince)
@@ -88,24 +89,18 @@ interface KpiStats {
   criticas: string;
 }
 
-// Derives pt-BR formatted KPI totals; empty input yields zeros and 0% (length guard, no div-by-zero/NaN).
+// Derives pt-BR formatted KPI totals from one computeKpi pass; empty input
+// yields zeros and 0% (no div-by-zero/NaN). Matches dashboard KPI exactly,
+// including fail-closed novel values.
 function kpiStats(barriers: Barrier[]): KpiStats {
-  const n = (xs: Barrier[]) => xs.length.toLocaleString("pt-BR");
-  const conformes = barriers.filter((b) => b.conformidade === "Conforme");
-  const criticas = barriers.filter((b) =>
-    b.conformidade === "Não Conforme" && b.criticidade === "Crítica"
-  );
-  const pct = barriers.length > 0
-    ? `${Math.round(conformes.length / barriers.length * 100)}%`
-    : "0%";
+  const k = computeKpi(barriers);
+  const n = (v: number) => v.toLocaleString("pt-BR");
   return {
-    total: n(barriers),
-    conformes: n(conformes),
-    naoConformes: n(
-      barriers.filter((b) => b.conformidade === "Não Conforme"),
-    ),
-    pct,
-    criticas: n(criticas),
+    total: n(k.total),
+    conformes: n(k.conforme),
+    naoConformes: n(k.naoConforme),
+    pct: `${k.pctConforme}%`,
+    criticas: n(k.criticasNC),
   };
 }
 
@@ -150,32 +145,28 @@ function fitColWidths(headers: string[], rows: string[][]): number[] {
   });
 }
 
-// Builds the 11-row [label, value] summary table from kpiStats plus disponibilidade counts.
+// Builds the [label, value] summary table from one computeKpi pass.
+// Disponibilidade rows come from the dynamic bucket (known first in canonical
+// order, novel values after by volume), so a new status can never go missing
+// while the total still reconciles.
 function summaryRows(barriers: Barrier[]): Array<[string, string]> {
-  const s = kpiStats(barriers);
-  const count = (fn: (b: Barrier) => boolean) =>
-    barriers.filter(fn).length.toLocaleString("pt-BR");
+  const k = computeKpi(barriers);
+  const n = (v: number) => v.toLocaleString("pt-BR");
+  const byDisp = k.byDisponibilidade ?? {};
+  const keys = Object.keys(byDisp).sort((a, b) => {
+    const ia = DISP_KNOWN_ORDER.indexOf(a), ib = DISP_KNOWN_ORDER.indexOf(b);
+    if (ia !== -1 || ib !== -1) {
+      return (ia === -1 ? 99 : ia) - (ib === -1 ? 99 : ib);
+    }
+    return byDisp[b] - byDisp[a];
+  });
   return [
-    ["Total", s.total],
-    ["Disponíveis", count((b) => b.disponibilidade === "Disponível")],
-    [
-      "Fora de Operação",
-      count((b) => b.disponibilidade === "Fora de Operação"),
-    ],
-    [
-      "Ind. Contingenciado",
-      count((b) => b.disponibilidade === "Indisponível Contingenciado"),
-    ],
-    [
-      "Degr. Contingenciado",
-      count((b) => b.disponibilidade === "Degradado Contingenciado"),
-    ],
-    ["Degradado (NC)", count((b) => b.disponibilidade === "Degradado")],
-    ["Indisponível (NC)", count((b) => b.disponibilidade === "Indisponível")],
-    ["Conformes", s.conformes],
-    ["Não Conformes", s.naoConformes],
-    ["Críticas NC", s.criticas],
-    ["% Conformidade", s.pct],
+    ["Total", n(k.total)],
+    ...keys.map((key): [string, string] => [key, n(byDisp[key] ?? 0)]),
+    ["Conformes", n(k.conforme)],
+    ["Não Conformes", n(k.naoConforme)],
+    ["Críticas NC", n(k.criticasNC)],
+    ["% Conformidade", `${k.pctConforme}%`],
   ];
 }
 

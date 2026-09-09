@@ -250,6 +250,18 @@ export const PAGE_SIZE = 25;
 /** Page-size choices offered by the table pager at any scale. */
 export const PAGE_SIZE_OPTS = [25, 50, 100] as const;
 
+// Canonical order for the well-known disponibilidade values. Anything new
+// sorts after these (by volume) so bands and reports stay stable across
+// deploys. Shared by StatusBand and export summaries - single source.
+export const DISP_KNOWN_ORDER = [
+  "Disponível",
+  "Fora de Operação",
+  "Indisponível Contingenciado",
+  "Degradado Contingenciado",
+  "Degradado",
+  "Indisponível",
+];
+
 interface ColorSet {
   solid: string;
   bg: string;

@@ -2,19 +2,13 @@
 // This is why it exists: availability shares as a bare row of glass
 // cells (colored label over white value), sized by volume. Segments are
 // dynamic - new statuses appear automatically - and click to filter.
-import { dispColorFor, shortStatusLabel } from "../lib/constants.ts";
+import {
+  DISP_KNOWN_ORDER as KNOWN_ORDER,
+  dispColorFor,
+  shortStatusLabel,
+} from "../lib/constants.ts";
 import { AURORA, AURORA_TYPE } from "../lib/aurora.ts";
 import type { KpiSnapshot } from "../lib/types.ts";
-// Curated order for the well-known statuses; anything new sorts after them
-// by volume so the band stays stable across deploys.
-const KNOWN_ORDER = [
-  "Disponível",
-  "Fora de Operação",
-  "Indisponível Contingenciado",
-  "Degradado Contingenciado",
-  "Degradado",
-  "Indisponível",
-];
 interface Props {
   kpi: KpiSnapshot;
   activeFilter: string;
