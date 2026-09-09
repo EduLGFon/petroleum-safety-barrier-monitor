@@ -77,6 +77,12 @@ Importante: `conformidade` **nunca** vem do backend — é sempre derivada de
 `disponibilidadeId` via `isConforme()`, tanto no mock quanto no resolver. Isso
 evita que os dois campos fiquem inconsistentes.
 
+`WireKpiSnapshot` carrega os campos fixos mais os buckets dinâmicos opcionais
+`byDisponibilidade`, `byConformidade`, `byCriticidade` (chaves = id numérico
+como string) e `syncedAt` (ISO do servidor). `resolveKpi` traduz as chaves
+para strings de exibição; quando os buckets estão ausentes a UI usa os campos
+fixos (só cobre os status conhecidos).
+
 ## Usando a API real (Postgres)
 
 Os três endpoints que `httpAdapterFactory` espera já estão implementados em
