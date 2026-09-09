@@ -1,3 +1,12 @@
+/**
+ * ══════════════════════════════════════════════════════════════════════════
+ * UTILS — pure dashboard derivations: KPIs, charts, filter/sort/paginate
+ * ══════════════════════════════════════════════════════════════════════════
+ * Stateless helpers over Barrier[] (computeKpi, computeChartData,
+ * applyFilters, applySorting) plus date/number formatters. Used by
+ * hooks/useDashboard.ts to derive every visible row, total, and label.
+ */
+
 import type {
   Barrier,
   CategoryConformidade,

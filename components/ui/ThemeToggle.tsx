@@ -1,3 +1,6 @@
+// ThemeToggle - segmented light / dark / AMOLED switcher.
+// This is why it exists: exposes SettingsContext theme switching inline in
+// the header without opening the full SettingsPanel.
 import { useSettings } from "../../context/SettingsContext.tsx";
 import { MonitorIcon, MoonIcon, SunIcon } from "./Icons.tsx";
 import type { FunctionComponent } from "preact";

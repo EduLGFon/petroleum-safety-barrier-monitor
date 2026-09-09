@@ -1,3 +1,12 @@
+/**
+ * ══════════════════════════════════════════════════════════════════════════
+ * USE-DASHBOARD — central dashboard state + derived data for the main page
+ * ══════════════════════════════════════════════════════════════════════════
+ * Reducer for location/filters/sort, selection and open-row state with
+ * localStorage persistence (SSR-safe hydration). Derives kpi, chartData,
+ * and paged rows via lib/utils.ts; sole data source for dashboard islands.
+ */
+
 import {
   applyFilters,
   applySorting,

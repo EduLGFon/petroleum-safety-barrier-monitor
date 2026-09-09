@@ -1,3 +1,6 @@
+// Badge - uppercase status pill with optional glow dot.
+// This is why it exists: single shared badge renderer keeps availability /
+// conformity / criticality colors consistent across table, modal, and band.
 import type { CSSProperties } from "preact";
 interface P {
   label: string;

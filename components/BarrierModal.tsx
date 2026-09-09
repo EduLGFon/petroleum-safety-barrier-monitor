@@ -1,3 +1,6 @@
+// BarrierModal - detail dialog for a selected barrier with Details / History tabs.
+// This is why it exists: surfaces full metadata, status badges, NC alert, and
+// chronological statusHistory without leaving the dashboard grid.
 import {
   AlertTriangleIcon,
   BuildingIcon,

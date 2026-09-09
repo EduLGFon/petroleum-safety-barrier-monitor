@@ -1,3 +1,12 @@
+/**
+ * ══════════════════════════════════════════════════════════════════════════
+ * TYPES — canonical domain types shared by UI, utils, hooks, and API layer
+ * ══════════════════════════════════════════════════════════════════════════
+ * Open string unions (Disponibilidade, Conformidade, Criticidade) plus
+ * Barrier, KpiSnapshot, FilterState and table types. Central contract so
+ * new station values compile without code changes (dynamic-data principle).
+ */
+
 export type Theme = "light" | "dark" | "amoled";
 export type AccentColor =
   | "blue"

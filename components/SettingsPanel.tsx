@@ -1,3 +1,6 @@
+// SettingsPanel - slide-over dialog for appearance, default filters, members.
+// This is why it exists: centralizes theme / accent / density / reduce-motion
+// plus startup filter defaults from SettingsContext; members tab is future-only.
 import {
   ACCENT_PRESETS,
   type AccentColor,
