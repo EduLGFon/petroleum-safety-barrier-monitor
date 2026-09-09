@@ -2,18 +2,6 @@
 // This is why it exists: the tabular inventory itself; rows read as dark
 // list items (mono tag, dim location, glass pills) while
 // sorting, selection and pagination keep working underneath.
-import type { Barrier, FilterState, SortableColumn } from "../lib/types.ts";
-import {
-  confColorFor,
-  critColorFor,
-  dispColorFor,
-  PAGE_SIZE_OPTS,
-} from "../lib/constants.ts";
-import { daysSince, humanDuration } from "../lib/utils.ts";
-import { useRef, useState } from "preact/hooks";
-import type { CSSProperties } from "preact";
-import { AURORA, AURORA_TYPE } from "../lib/aurora.ts";
-import { Badge } from "./ui/Badge.tsx";
 import {
   ChevronDownIcon,
   ChevronLeftIcon,
@@ -24,6 +12,18 @@ import {
   ClockIcon,
   SortIcon,
 } from "./ui/Icons.tsx";
+import {
+  confColorFor,
+  critColorFor,
+  dispColorFor,
+  PAGE_SIZE_OPTS,
+} from "../lib/constants.ts";
+import type { Barrier, FilterState, SortableColumn } from "../lib/types.ts";
+import { daysSince, humanDuration } from "../lib/utils.ts";
+import { AURORA, AURORA_TYPE } from "../lib/aurora.ts";
+import { useRef, useState } from "preact/hooks";
+import type { CSSProperties } from "preact";
+import { Badge } from "./ui/Badge.tsx";
 
 interface Props {
   rows: Barrier[];

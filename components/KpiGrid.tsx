@@ -2,8 +2,8 @@
 // This is why it exists: six live metrics rendered as identical glass
 // cards (label / value / sub / signature-gradient progress). Only the
 // "Não Conformes" card carries the red glow.
-import { useEffect, useRef, useState } from "preact/hooks";
 import { AURORA, AURORA_TYPE, progressWidth } from "../lib/aurora.ts";
+import { useEffect, useRef, useState } from "preact/hooks";
 import type { KpiSnapshot } from "../lib/types.ts";
 import { fmt, pct } from "../lib/utils.ts";
 

@@ -6,10 +6,10 @@
 // Bars morph via CSS transitions on geometry attributes (staggered per
 // row) when the station changes; rows play a staggered entrance on mount.
 import { useEffect, useLayoutEffect, useRef, useState } from "preact/hooks";
+import { useSettings } from "../context/SettingsContext.tsx";
+import type { CategoryConformidade } from "../lib/types.ts";
 import { createPortal } from "preact/compat";
 import type { CSSProperties } from "preact";
-import type { CategoryConformidade } from "../lib/types.ts";
-import { useSettings } from "../context/SettingsContext.tsx";
 
 interface Props {
   data: CategoryConformidade[];

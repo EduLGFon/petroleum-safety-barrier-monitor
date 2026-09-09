@@ -1,11 +1,11 @@
 // Theme context - thin proxy over settings theme for themed components.
 // This is why it exists: lets any island read/switch theme without
 // touching settings storage directly.
-import { createContext } from "preact";
-import type { ComponentChildren } from "preact";
-import { useContext } from "preact/hooks";
 import { useSettings } from "./SettingsContext.tsx";
+import type { ComponentChildren } from "preact";
 import type { Theme } from "../lib/types.ts";
+import { useContext } from "preact/hooks";
+import { createContext } from "preact";
 
 interface ThemeCtx {
   theme: Theme;

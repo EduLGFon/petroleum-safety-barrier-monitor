@@ -1,9 +1,3 @@
-import type { ComponentChildren, FunctionComponent } from "preact";
-import { useCallback, useEffect, useState } from "preact/hooks";
-import type { Barrier } from "../lib/types.ts";
-import { CONF_COLORS, CRIT_COLORS, DISP_COLORS } from "../lib/constants.ts";
-import { Badge } from "./ui/Badge.tsx";
-import { daysSince, fmtDate, humanDuration } from "../lib/utils.ts";
 import {
   AlertTriangleIcon,
   BuildingIcon,
@@ -18,6 +12,12 @@ import {
   TagIcon,
   UserIcon,
 } from "./ui/Icons.tsx";
+import { CONF_COLORS, CRIT_COLORS, DISP_COLORS } from "../lib/constants.ts";
+import { daysSince, fmtDate, humanDuration } from "../lib/utils.ts";
+import type { ComponentChildren, FunctionComponent } from "preact";
+import { useCallback, useEffect, useState } from "preact/hooks";
+import type { Barrier } from "../lib/types.ts";
+import { Badge } from "./ui/Badge.tsx";
 interface Props {
   barrier: Barrier | null;
   onClose: () => void;

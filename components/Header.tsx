@@ -3,9 +3,9 @@
 // a live connection dot (emerald = connected, amber = reconnecting,
 // red = disconnected), gear button on the right. No cards, no pills, no
 // extra chrome: the header sits directly on the mesh canvas.
-import { useEffect, useState } from "preact/hooks";
 import { AURORA, AURORA_CONN, AURORA_TYPE } from "../lib/aurora.ts";
 import { useSettings } from "../context/SettingsContext.tsx";
+import { useEffect, useState } from "preact/hooks";
 
 interface Props {
   onOpenSettings: () => void;

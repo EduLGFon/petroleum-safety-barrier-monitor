@@ -4,8 +4,8 @@
 // (context does not cross the island boundary on the client). The shell
 // stays transparent so the Aurora mesh canvas paints edge to edge.
 import { Dashboard } from "../islands/Dashboard.tsx";
-import { mockApi } from "../lib/api.ts";
 import { getCompanyName } from "../lib/company.ts";
+import { mockApi } from "../lib/api.ts";
 import { define } from "../utils.ts";
 
 export default define.page(async function Home() {

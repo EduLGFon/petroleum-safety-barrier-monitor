@@ -2,8 +2,8 @@
 // This is why it exists: covers first paint with progress until onDone,
 // already dressed in the interface identity so there is no visual pop.
 import { useCallback, useEffect, useState } from "preact/hooks";
-import { AURORA } from "../lib/aurora.ts";
 import { BrandMark } from "./ui/BrandMark.tsx";
+import { AURORA } from "../lib/aurora.ts";
 
 interface Props {
   onDone: () => void;

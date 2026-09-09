@@ -1,8 +1,8 @@
 // Root app wrapper - renders outer HTML shell for every Fresh route.
 // This is why it exists: ports Next layout (lang, title, fonts, FOUC guard)
 // without React providers (added back when context is ported to preact).
-import { define } from "../utils.ts";
 import { getCompanyName, withBrand } from "../lib/company.ts";
+import { define } from "../utils.ts";
 
 // Runs before island hydration: restores theme/accent to prevent FOUC.
 const INIT = `(function(){try{

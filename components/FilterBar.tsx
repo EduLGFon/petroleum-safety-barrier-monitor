@@ -5,8 +5,8 @@
 import { CloseIcon, FilterIcon, SearchIcon } from "./ui/Icons.tsx";
 import type { FilterState } from "../lib/types.ts";
 import { CATEGORIES } from "../lib/constants.ts";
-import { useState } from "preact/hooks";
 import { AURORA } from "../lib/aurora.ts";
+import { useState } from "preact/hooks";
 
 interface Props {
   filters: FilterState;

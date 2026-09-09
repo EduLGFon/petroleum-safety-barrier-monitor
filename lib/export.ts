@@ -3,10 +3,10 @@
 // is an HTML table saved as .xls (opens in Excel/LibreOffice) with brand
 // header, KPI strip, styled columns and a summary table. PDF prints a
 // dedicated landscape report (never the whole page). CSV uses ; with BOM.
+import { daysSince, fmtDate, humanDuration } from "./utils.ts";
 import { CONF_COLORS, DISP_COLORS } from "./constants.ts";
 import type { Barrier } from "./types.ts";
 import { withBrand } from "./company.ts";
-import { daysSince, fmtDate, humanDuration } from "./utils.ts";
 
 function row(b: Barrier): string[] {
   const nc = b.conformidade === "Não Conforme";

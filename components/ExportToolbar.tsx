@@ -2,11 +2,6 @@
 // This is why it exists: row selection needs a visible anchor and the
 // export actions need one home; idle and active states share the same
 // glass bar language as the rest of the identity.
-import { exportToCSV, exportToExcel, exportToPDF } from "../lib/export.ts";
-import type { FunctionComponent } from "preact";
-import type { Barrier } from "../lib/types.ts";
-import { useState } from "preact/hooks";
-import { AURORA } from "../lib/aurora.ts";
 import {
   CloseIcon,
   DownloadIcon,
@@ -14,6 +9,11 @@ import {
   FileSpreadsheetIcon,
   FileTextIcon,
 } from "./ui/Icons.tsx";
+import { exportToCSV, exportToExcel, exportToPDF } from "../lib/export.ts";
+import type { FunctionComponent } from "preact";
+import type { Barrier } from "../lib/types.ts";
+import { AURORA } from "../lib/aurora.ts";
+import { useState } from "preact/hooks";
 interface Props {
   selectedIds: Set<number>;
   allFiltered: Barrier[];

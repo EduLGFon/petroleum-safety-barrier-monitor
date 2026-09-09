@@ -4,13 +4,6 @@
  * ══════════════════════════════════════════════════════════════════════════
  */
 
-import type { Barrier, StatusHistoryEntry } from "./types.ts";
-import type {
-  WireBarrier,
-  WireKpiSnapshot,
-  WireStatusHistoryEntry,
-} from "./wireTypes.ts";
-import type { KpiSnapshot } from "./types.ts";
 import {
   fromAgrupamentoId,
   fromAuthorId,
@@ -22,6 +15,13 @@ import {
   fromLocDescId,
   fromTipologiaId,
 } from "./enums.ts";
+import type {
+  WireBarrier,
+  WireKpiSnapshot,
+  WireStatusHistoryEntry,
+} from "./wireTypes.ts";
+import type { Barrier, StatusHistoryEntry } from "./types.ts";
+import type { KpiSnapshot } from "./types.ts";
 import { isConforme } from "./constants.ts";
 
 export function resolveHistoryEntry(

@@ -1,8 +1,8 @@
 import { useSettings } from "../../context/SettingsContext.tsx";
+import { MonitorIcon, MoonIcon, SunIcon } from "./Icons.tsx";
 import type { FunctionComponent } from "preact";
 import type { Theme } from "../../lib/types.ts";
 import { AURORA } from "../../lib/aurora.ts";
-import { MonitorIcon, MoonIcon, SunIcon } from "./Icons.tsx";
 type I = FunctionComponent<
   { size?: number; color?: string; strokeWidth?: number }
 >;

@@ -1,10 +1,10 @@
 // Settings context - persists theme, accent, defaults and members.
 // This is why it exists: single store for appearance and filter defaults,
 // hydrated from localStorage after mount for SSR consistency.
-import { createContext } from "preact";
-import type { ComponentChildren } from "preact";
 import { useCallback, useContext, useEffect, useState } from "preact/hooks";
 import type { FilterState, Theme } from "../lib/types.ts";
+import type { ComponentChildren } from "preact";
+import { createContext } from "preact";
 
 export type AccentColor =
   | "aurora"

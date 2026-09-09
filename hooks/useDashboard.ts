@@ -1,4 +1,12 @@
 import {
+  applyFilters,
+  applySorting,
+  computeChartData,
+  computeKpi,
+  defaultFilters,
+  paginate,
+} from "../lib/utils.ts";
+import {
   useCallback,
   useEffect,
   useMemo,
@@ -7,14 +15,6 @@ import {
 } from "preact/hooks";
 import type { Barrier, FilterState, SortableColumn } from "../lib/types.ts";
 import { LOCATIONS } from "../lib/constants.ts";
-import {
-  applyFilters,
-  applySorting,
-  computeChartData,
-  computeKpi,
-  defaultFilters,
-  paginate,
-} from "../lib/utils.ts";
 
 const STORE_KEY = "barrier-dashboard";
 

@@ -3,8 +3,8 @@
 // cells (colored label over white value), sized by volume. Segments are
 // dynamic - new statuses appear automatically - and click to filter.
 import { dispColorFor, shortStatusLabel } from "../lib/constants.ts";
-import type { KpiSnapshot } from "../lib/types.ts";
 import { AURORA, AURORA_TYPE } from "../lib/aurora.ts";
+import type { KpiSnapshot } from "../lib/types.ts";
 // Curated order for the well-known statuses; anything new sorts after them
 // by volume so the band stays stable across deploys.
 const KNOWN_ORDER = [

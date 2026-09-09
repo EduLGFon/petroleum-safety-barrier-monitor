@@ -1,5 +1,3 @@
-import type { ComponentChildren, FunctionComponent } from "preact";
-import { useEffect, useState } from "preact/hooks";
 import {
   ACCENT_PRESETS,
   type AccentColor,
@@ -7,9 +5,6 @@ import {
   DENSITY_PRESETS,
   useSettings,
 } from "../context/SettingsContext.tsx";
-import type { Theme } from "../lib/types.ts";
-import { withBrand } from "../lib/company.ts";
-import { CATEGORIES, LOCATIONS } from "../lib/constants.ts";
 import {
   CloseIcon,
   FilterIcon,
@@ -18,6 +13,11 @@ import {
   SunIcon,
   UserIcon,
 } from "./ui/Icons.tsx";
+import type { ComponentChildren, FunctionComponent } from "preact";
+import { CATEGORIES, LOCATIONS } from "../lib/constants.ts";
+import { useEffect, useState } from "preact/hooks";
+import { withBrand } from "../lib/company.ts";
+import type { Theme } from "../lib/types.ts";
 
 const THEMES: {
   value: Theme;

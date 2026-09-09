@@ -1,25 +1,25 @@
 // Dashboard island - interactive monitor wired to filters, table and exports.
 // This is why it exists: the only hydrated root; everything static stays
 // in components/ so the client ships JS for this subtree alone.
-import { useCallback, useEffect, useMemo, useState } from "preact/hooks";
-import type { Barrier } from "../lib/types.ts";
-import { distinctBy } from "../lib/constants.ts";
-import { useDashboard } from "../hooks/useDashboard.ts";
 import { SettingsProvider, useSettings } from "../context/SettingsContext.tsx";
-import { ThemeProvider } from "../context/ThemeContext.tsx";
-import { withBrand } from "../lib/company.ts";
-import { Header } from "../components/Header.tsx";
-import { LocationFilter } from "../components/LocationFilter.tsx";
-import { StatusBand } from "../components/StatusBand.tsx";
-import { KpiGrid } from "../components/KpiGrid.tsx";
+import { AlertTriangleIcon, ArrowRightIcon } from "../components/ui/Icons.tsx";
+import { useCallback, useEffect, useMemo, useState } from "preact/hooks";
 import { ConformidadeChart } from "../components/ConformidadeChart.tsx";
-import { FilterBar } from "../components/FilterBar.tsx";
+import { LocationFilter } from "../components/LocationFilter.tsx";
 import { ExportToolbar } from "../components/ExportToolbar.tsx";
 import { BarriersTable } from "../components/BarriersTable.tsx";
-import { BarrierModal } from "../components/BarrierModal.tsx";
 import { LoadingScreen } from "../components/LoadingScreen.tsx";
 import { SettingsPanel } from "../components/SettingsPanel.tsx";
-import { AlertTriangleIcon, ArrowRightIcon } from "../components/ui/Icons.tsx";
+import { BarrierModal } from "../components/BarrierModal.tsx";
+import { ThemeProvider } from "../context/ThemeContext.tsx";
+import { StatusBand } from "../components/StatusBand.tsx";
+import { useDashboard } from "../hooks/useDashboard.ts";
+import { FilterBar } from "../components/FilterBar.tsx";
+import { KpiGrid } from "../components/KpiGrid.tsx";
+import { Header } from "../components/Header.tsx";
+import { distinctBy } from "../lib/constants.ts";
+import type { Barrier } from "../lib/types.ts";
+import { withBrand } from "../lib/company.ts";
 
 interface Props {
   initialBarriers: Barrier[];

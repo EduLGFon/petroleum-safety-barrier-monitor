@@ -5,8 +5,8 @@
 // runs the signature gradient; idle tabs are quiet glass cells.
 import { LOCATIONS } from "../lib/constants.ts";
 import type { Barrier } from "../lib/types.ts";
-import { useMemo } from "preact/hooks";
 import { AURORA } from "../lib/aurora.ts";
+import { useMemo } from "preact/hooks";
 interface Props {
   selected: string;
   allBarriers: Barrier[];
