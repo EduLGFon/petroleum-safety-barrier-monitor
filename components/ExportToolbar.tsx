@@ -10,10 +10,10 @@ import {
   FileTextIcon,
 } from "./ui/Icons.tsx";
 import { exportToCSV, exportToExcel, exportToPDF } from "../lib/export.ts";
+import { useMemo, useState } from "preact/hooks";
 import type { FunctionComponent } from "preact";
 import type { Barrier } from "../lib/types.ts";
 import { AURORA } from "../lib/aurora.ts";
-import { useState } from "preact/hooks";
 interface Props {
   selectedIds: Set<number>;
   allFiltered: Barrier[];
@@ -54,19 +54,30 @@ export function ExportToolbar(
   { selectedIds, allFiltered, onSelectAll, onClearAll, companyName }: Props,
 ) {
   const [loading, setLoading] = useState<Fmt | null>(null);
-  const count = selectedIds.size, hasAny = count > 0;
+  const [error, setError] = useState<string | null>(null);
+  // Rows actually present in the current filter (selection can go stale when
+  // filters narrow, so the label and export use matched rows, not raw ids).
+  const exportable = useMemo(
+    () => allFiltered.filter((b) => selectedIds.has(b.id)),
+    [allFiltered, selectedIds],
+  );
+  const count = exportable.length, hasAny = count > 0;
   const allSel = count === allFiltered.length && allFiltered.length > 0,
     someSel = count > 0 && !allSel;
-  // doExport: exports allFiltered rows filtered by selectedIds; no-ops when empty/loading and tracks per-format spinner until done.
+  // doExport: exports matched rows; surfaces failures inline instead of
+  // silently clearing the spinner (previous try/finally had no catch).
   async function doExport(fmt: Fmt) {
     if (!hasAny || loading) return;
-    const bs = allFiltered.filter((b) => selectedIds.has(b.id));
+    const bs = exportable;
     const name = `barreiras-${new Date().toISOString().slice(0, 10)}`;
     setLoading(fmt);
+    setError(null);
     try {
       if (fmt === "xls") await exportToExcel(bs, name, companyName);
       if (fmt === "pdf") await exportToPDF(bs, name, companyName);
       if (fmt === "csv") exportToCSV(bs, name);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Falha ao exportar");
     } finally {
       setLoading(null);
     }
@@ -233,6 +244,21 @@ export function ExportToolbar(
             Selecione itens para exportar
           </span>
         )}
+      {error && (
+        <div
+          role="alert"
+          onClick={() => setError(null)}
+          title="Clique para dispensar"
+          style={{
+            flexBasis: "100%",
+            fontSize: "var(--d-small)",
+            color: "#f87171",
+            cursor: "pointer",
+          }}
+        >
+          {error}
+        </div>
+      )}
     </div>
   );
 }
