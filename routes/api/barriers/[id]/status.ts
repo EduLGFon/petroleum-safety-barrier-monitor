@@ -28,11 +28,19 @@ export const handler = define.handlers({
     }
 
     const { statusId, authorId, note } = body;
-    if (!Number.isInteger(statusId) || !Number.isInteger(authorId)) {
+    if (
+      !Number.isInteger(statusId) || (statusId as number) < 0 ||
+      !Number.isInteger(authorId) || (authorId as number) < 0
+    ) {
       return Response.json(
-        { error: "statusId and authorId are required integers" },
+        { error: "statusId and authorId are required non-negative integers" },
         { status: 400 },
       );
+    }
+    if (note !== undefined && typeof note !== "string") {
+      return Response.json({ error: "note must be a string" }, {
+        status: 400,
+      });
     }
 
     try {
@@ -40,7 +48,7 @@ export const handler = define.handlers({
         barrierId,
         statusId as number,
         authorId as number,
-        note ?? "",
+        (note ?? "").slice(0, 2000),
       );
       if (!updated) {
         return Response.json({ error: "Barrier not found" }, { status: 404 });
