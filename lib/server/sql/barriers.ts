@@ -8,152 +8,22 @@ import type {
   WireBarrier,
   WireKpiSnapshot,
 } from "../../wireTypes.ts";
+import {
+  type BarrierRow,
+  HISTORY_JOIN,
+  SELECT_COLUMNS,
+  toWireBarrier,
+} from "./mappers.ts";
+export {
+  HISTORY_JOIN,
+  SELECT_COLUMNS,
+  toHistory,
+  toWireBarrier,
+} from "./mappers.ts";
+export { buildWhere, escapeLike, resolveOrderBy, SORTABLE } from "./where.ts";
+export type { BarrierRow, HistoryEntry } from "./mappers.ts";
+import { buildWhere, resolveOrderBy } from "./where.ts";
 import { queryRows } from "../db.ts";
-
-// Maps frontend SortableColumn values (lib/types.ts) to fixed SQL.
-// Never derive this from user input.
-const SORTABLE: Record<string, string> = {
-  id: "b.id",
-  tag: "b.tag",
-  criticidade: "b.criticidade_id",
-  categoria: "b.categoria_id",
-  disponibilidade: "b.disponibilidade_id",
-  conformidade: "b.conformidade_id",
-  statusSince: "b.status_since",
-};
-
-// Resolves client sortCol/sortDir to a whitelisted ORDER BY fragment.
-function resolveOrderBy(sortCol?: string, sortDir?: string): string {
-  const col = SORTABLE[sortCol ?? "id"] ?? SORTABLE.id;
-  const dir = sortDir === "desc" ? "desc" : "asc";
-  // Safe: both parts come from fixed strings above and a two-value check.
-  return `${col} ${dir}`;
-}
-
-// Row shape returned by the shared SELECT.
-interface BarrierRow {
-  id: number;
-  tag: string;
-  tipologia_id: number;
-  location_id: number;
-  loc_desc_id: number;
-  criticidade_id: number;
-  categoria_id: number;
-  agrupamento_id: number;
-  dono_id: number; // coalesced to -1 in SQL when NULL
-  disponibilidade_id: number;
-  comentarios: string;
-  plano_acao: string;
-  status_since: string; // YYYY-MM-DD via to_char
-  status_history: unknown; // json array (parsed object or string)
-}
-
-interface HistoryEntry {
-  date: string;
-  statusId: number;
-  authorId: number;
-  note: string;
-}
-
-// Normalizes DB json (array or string) to HistoryEntry[]; [] on garbage.
-function toHistory(value: unknown): HistoryEntry[] {
-  if (Array.isArray(value)) return value as HistoryEntry[];
-  if (typeof value === "string") {
-    try {
-      const parsed: unknown = JSON.parse(value);
-      return Array.isArray(parsed) ? (parsed as HistoryEntry[]) : [];
-    } catch {
-      return [];
-    }
-  }
-  return [];
-}
-
-// Maps a BarrierRow to the WireBarrier contract.
-function toWireBarrier(r: BarrierRow): WireBarrier {
-  return {
-    id: r.id,
-    tag: r.tag,
-    tipologiaId: r.tipologia_id,
-    locationId: r.location_id,
-    locDescId: r.loc_desc_id,
-    criticidadeId: r.criticidade_id,
-    categoriaId: r.categoria_id,
-    agrupamentoId: r.agrupamento_id,
-    donoId: r.dono_id,
-    disponibilidadeId: r.disponibilidade_id,
-    comentarios: r.comentarios,
-    planoAcao: r.plano_acao,
-    statusSince: r.status_since,
-    statusHistory: toHistory(r.status_history),
-  };
-}
-
-// Shared column list + lateral history aggregation (one row per barrier).
-const SELECT_COLUMNS = `
-  b.id, b.tag, b.tipologia_id, b.location_id, b.loc_desc_id, b.criticidade_id,
-  b.categoria_id, b.agrupamento_id, coalesce(b.dono_id, -1) as dono_id,
-  b.disponibilidade_id, b.comentarios, b.plano_acao,
-  to_char(b.status_since, 'YYYY-MM-DD') as status_since,
-  coalesce(h.history, '[]'::json) as status_history
-`;
-
-const HISTORY_JOIN = `
-  left join lateral (
-    select json_agg(
-      json_build_object(
-        'date',     to_char(bsh.date, 'YYYY-MM-DD'),
-        'statusId', bsh.status_id,
-        'authorId', bsh.author_id,
-        'note',     bsh.note
-      ) order by bsh.date asc
-    ) as history
-    from barrier_status_history bsh
-    where bsh.barrier_id = b.id
-  ) h on true
-`;
-
-// Escapes LIKE wildcards so search text matches literally, not as a pattern.
-function escapeLike(s: string): string {
-  return s.replace(/[\\%_]/g, (c) => `\\${c}`);
-}
-
-// Builds WHERE text plus bound args. Placeholders are numbered from $1.
-function buildWhere(q: BarriersQuery): { text: string; args: unknown[] } {
-  const conds: string[] = [];
-  const args: unknown[] = [];
-  const push = (text: string, value: unknown) => {
-    args.push(value);
-    conds.push(`${text}$${args.length}`);
-  };
-  if (q.locationId !== undefined && q.locationId !== 0) {
-    push("and b.location_id = ", q.locationId);
-  }
-  if (q.disponibilidadeId !== undefined) {
-    push("and b.disponibilidade_id = ", q.disponibilidadeId);
-  }
-  if (q.conformidadeId !== undefined) {
-    push("and b.conformidade_id = ", q.conformidadeId);
-  }
-  if (q.categoriaId !== undefined) {
-    push("and b.categoria_id = ", q.categoriaId);
-  }
-  if (q.query) {
-    const lit = `%${escapeLike(q.query)}%`;
-    args.push(lit, lit);
-    const a = args.length - 1;
-    const b = args.length;
-    conds.push(
-      `and (b.tag ilike $${a} escape '\\' or loc.code ilike $${b} escape '\\')`,
-    );
-  }
-  if (q.since) push("and b.status_since >= ", q.since);
-  if (q.until) push("and b.status_since <= ", q.until);
-  return {
-    text: conds.length > 0 ? `where true ${conds.join(" ")}` : "",
-    args,
-  };
-}
 
 // Lists paged wire barriers + total for the given BarriersQuery filters.
 export async function listBarriers(

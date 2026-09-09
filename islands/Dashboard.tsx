@@ -1,26 +1,27 @@
 // Dashboard island - interactive monitor wired to filters, table and exports.
 // This is why it exists: the only hydrated root; everything static stays
 // in components/ so the client ships JS for this subtree alone.
+import {
+  DashboardFooter,
+  DashboardOverlays,
+} from "./dashboard/DashboardChrome.tsx";
 import { SettingsProvider, useSettings } from "../context/SettingsContext.tsx";
-import { AlertTriangleIcon, ArrowRightIcon } from "../components/ui/Icons.tsx";
-import { useCallback, useEffect, useMemo, useState } from "preact/hooks";
 import { ConformidadeChart } from "../components/ConformidadeChart.tsx";
+import { useDashboardVocabularies } from "./dashboard/vocabularies.ts";
 import { LocationFilter } from "../components/LocationFilter.tsx";
+import { useCallback, useEffect, useState } from "preact/hooks";
+import { LoadingScreen } from "../components/LoadingScreen.tsx";
 import { ExportToolbar } from "../components/ExportToolbar.tsx";
 import { BarriersTable } from "../components/BarriersTable.tsx";
-import { LoadingScreen } from "../components/LoadingScreen.tsx";
-import { SettingsPanel } from "../components/SettingsPanel.tsx";
-import { BarrierModal } from "../components/BarrierModal.tsx";
 import { ThemeProvider } from "../context/ThemeContext.tsx";
 import { StatusBand } from "../components/StatusBand.tsx";
 import { useDashboard } from "../hooks/useDashboard.ts";
 import { FilterBar } from "../components/FilterBar.tsx";
 import { sanitizeFilterPatch } from "../lib/utils.ts";
 import { KpiGrid } from "../components/KpiGrid.tsx";
+import { NcAlert } from "./dashboard/NcAlert.tsx";
 import { Header } from "../components/Header.tsx";
-import { distinctBy } from "../lib/constants.ts";
 import type { Barrier } from "../lib/types.ts";
-import { withBrand } from "../lib/company.ts";
 
 interface Props {
   initialBarriers: Barrier[];
@@ -100,20 +101,7 @@ function DashboardView({ initialBarriers: barriers, companyName }: Props) {
   const isUrgentesActive = filters.conformidade === "Não Conforme" &&
     filters.sortCol === "statusSince";
 
-  // Live vocabularies for the filter selects - derived from the dataset so
-  // new statuses/categories become filterable with no code change.
-  const dispOpts = useMemo(
-    () => distinctBy(barriers, (b) => b.disponibilidade),
-    [barriers],
-  );
-  const confOpts = useMemo(
-    () => distinctBy(barriers, (b) => b.conformidade),
-    [barriers],
-  );
-  const catOpts = useMemo(
-    () => distinctBy(barriers, (b) => b.categoria),
-    [barriers],
-  );
+  const { dispOpts, confOpts, catOpts } = useDashboardVocabularies(barriers);
 
   return (
     <>
@@ -169,84 +157,12 @@ function DashboardView({ initialBarriers: barriers, companyName }: Props) {
         </div>
 
         {/* NC alert - red glass with the signature red glow */}
-        {ncCount > 0 && (
-          <div
-            className="animate-fade-in glass-card"
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: "var(--d-gap)",
-              padding: "var(--d-alert-pad)",
-              marginBottom: "var(--d-stack)",
-              background: "var(--alert-nc-bg)",
-              border: "1px solid var(--alert-nc-border)",
-              borderRadius: 12,
-              boxShadow: "0 0 24px rgba(239,68,68,.25)",
-              animationDelay: ".32s",
-            }}
-          >
-            <AlertTriangleIcon
-              size={18}
-              color="var(--alert-nc-text)"
-              strokeWidth={2}
-            />
-            <div style={{ flex: 1 }}>
-              <div
-                style={{
-                  fontSize: "var(--d-lead)",
-                  fontWeight: 700,
-                  color: "var(--alert-nc-text)",
-                }}
-              >
-                {ncCount.toLocaleString("pt-BR")}{" "}
-                barreira{ncCount > 1 ? "s" : ""}{" "}
-                não conforme{ncCount > 1 ? "s" : ""}
-              </div>
-              <div
-                style={{
-                  fontSize: "var(--d-small)",
-                  color: "var(--alert-nc-sub)",
-                  marginTop: 2,
-                }}
-              >
-                Degradadas, indisponíveis ou novos status · ordenadas da mais
-                urgente
-              </div>
-            </div>
-            <button
-              type="button"
-              className="lift"
-              onClick={() => isUrgentesActive ? resetFilters() : showUrgentes()}
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: "var(--d-gap-xs)",
-                fontSize: "var(--d-small)",
-                fontWeight: 700,
-                padding: "var(--d-alert-btn)",
-                borderRadius: "var(--d-btn-radius)",
-                background:
-                  "color-mix(in srgb,var(--alert-nc-text) 12%,transparent)",
-                border:
-                  "1px solid color-mix(in srgb,var(--alert-nc-text) 35%,transparent)",
-                color: "var(--alert-nc-text)",
-                cursor: "pointer",
-                whiteSpace: "nowrap",
-              }}
-            >
-              {isUrgentesActive ? "Limpar filtro" : (
-                <>
-                  <ArrowRightIcon
-                    size={12}
-                    color="var(--alert-nc-text)"
-                    strokeWidth={2.5}
-                  />{" "}
-                  Ver urgentes
-                </>
-              )}
-            </button>
-          </div>
-        )}
+        <NcAlert
+          ncCount={ncCount}
+          isUrgentesActive={isUrgentesActive}
+          showUrgentes={showUrgentes}
+          resetFilters={resetFilters}
+        />
 
         {/* Export toolbar + filters */}
         <div style={{ animation: "slideUp .3s .36s var(--ease-out) both" }}>
@@ -285,25 +201,14 @@ function DashboardView({ initialBarriers: barriers, companyName }: Props) {
           />
         </div>
 
-        <div
-          className="tnum"
-          style={{
-            marginTop: "var(--d-foot-gap)",
-            textAlign: "center",
-            fontSize: "var(--d-caption)",
-            color: "var(--text-muted)",
-            letterSpacing: "0.08em",
-            animation: "fadeInFast .4s .5s both",
-          }}
-        >
-          {withBrand(companyName, "Monitor de Barreiras de Segurança")}
-        </div>
+        <DashboardFooter companyName={companyName} />
       </div>
 
-      <BarrierModal barrier={openBarrier} onClose={() => setOpenId(null)} />
-      <SettingsPanel
-        open={settingsOpen}
-        onClose={() => setSettingsOpen(false)}
+      <DashboardOverlays
+        openBarrier={openBarrier}
+        onCloseBarrier={() => setOpenId(null)}
+        settingsOpen={settingsOpen}
+        onCloseSettings={() => setSettingsOpen(false)}
         companyName={companyName}
       />
     </>
