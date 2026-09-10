@@ -48,7 +48,16 @@ function splitStatements(text: string): string[] {
     }
     if (quote) {
       buf += ch;
-      if (ch === quote && text[i - 1] !== "\\") quote = null;
+      if (ch === quote) {
+        // SQL escapes quotes by doubling ('it''s') — consume the pair and
+        // stay inside the string instead of splitting mid-literal.
+        if (next === quote) {
+          buf += next;
+          i += 2;
+          continue;
+        }
+        if (text[i - 1] !== "\\") quote = null;
+      }
       i++;
       continue;
     }
