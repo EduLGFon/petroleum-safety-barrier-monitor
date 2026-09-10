@@ -2,15 +2,8 @@
 // This is why it exists: Fresh port for the server-paginated dashboard; omitted
 // or 0 locationId means all installations (matches ALL=0 in lib/enums.ts).
 import { getChartData } from "../../lib/server/sql/chart.ts";
+import { parseIntParam } from "./_params.ts";
 import { define } from "../../utils.ts";
-
-// Parses optional integer query param; undefined for missing/malformed.
-function parseIntParam(v: string | null): number | undefined {
-  if (v === null || v === "") return undefined;
-  if (!/^-?\d+$/.test(v.trim())) return undefined;
-  const n = Number(v);
-  return Number.isSafeInteger(n) ? n : undefined;
-}
 
 export const handler = define.handlers({
   // GET chart rows for locationId (undefined/0 = all installations).
