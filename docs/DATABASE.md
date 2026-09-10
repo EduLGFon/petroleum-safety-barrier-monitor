@@ -11,9 +11,14 @@ parametrizadas por tagged templates.
 #    e crie o banco:
 createdb barreiras
 
-# 2. Configure a connection string
-cp .env.example .env.local
-# edite DATABASE_URL em .env.local
+# 2. Configure as variáveis de ambiente.
+#    Cada task lê um arquivo diferente — não há um único arquivo global:
+#      .env.local  ->  deno task db:migrate / db:seed (DATABASE_URL)
+#      .env        ->  deno task start (tudo: DATABASE_URL, PUBLIC_*)
+#      shell       ->  deno task dev NÃO lê nenhum --env-file; exporte no shell:
+#                       export $(cat .env | xargs)
+#    O jeito simples local: cp .env.example .env.local E .env, edite
+#    DATABASE_URL nos dois.
 
 # 3. Aplique o schema + seed das tabelas de lookup
 deno task db:migrate
@@ -21,12 +26,12 @@ deno task db:migrate
 # 4. Popule dados de demonstração (reaproveita o gerador mock existente)
 deno task db:seed
 
-# 5. Aponte o app para a API real
-#    em .env.local:
+# 5. Aponte o app para a API real. Em .env (para `start`) ou exportadas
+#    no shell (para `dev`):
 #    PUBLIC_API_MODE=http
 #    PUBLIC_API_BASE_URL=http://localhost:8000
 
-deno task dev
+deno task dev   # ou: deno task start (lê .env)
 ```
 
 `deno task db:migrate` e `deno task db:seed` são idempotentes: rodar de novo não
@@ -126,7 +131,9 @@ no app; `MemberRole` foi removido como scaffolding não utilizado).
 `location_id`, `disponibilidade_id`, `conformidade_id`, `categoria_id` e
 `criticidade_id` têm índices simples — são exatamente os campos que
 `BarriersQuery` filtra. `status_since` também é indexado, usado pela ordenação
-"mais urgente primeiro" (`sortCol=statusSince`).
+"mais urgente primeiro" (`sortCol=statusSince`). `tag` tem btree simples
+(`idx_barriers_tag`): igualdade e prefixo usam índice, `%q%` faz seq-scan —
+trigrama (`pg_trgm`) ficou de fora de propósito para não exigir a extensão.
 
 ## Seed de dados de demonstração
 
@@ -139,15 +146,16 @@ comparar/depurar os dois modos lado a lado.
 
 ## Arquivos desta camada
 
-| Arquivo                                    | Responsabilidade                                                  |
-| ------------------------------------------ | ----------------------------------------------------------------- |
-| `db/schema.sql`                            | DDL completo: tabelas, índices, triggers, funções                 |
-| `db/seed_lookups.sql`                      | Popula as tabelas de lookup a partir de `lib/enums.ts`            |
-| `scripts/migrate.ts`                       | Aplica os dois arquivos acima contra `DATABASE_URL`               |
-| `scripts/seed.ts`                          | Popula `barriers`/`barrier_status_history` com dados mock         |
-| `lib/server/db.ts`                         | Cliente Postgres Deno-native singleton (server routes only)       |
-| `lib/server/sql/barriers.ts`               | Queries: listagem/filtro/sort/paginação, KPI, transição de status |
-| `routes/api/barriers/route.ts`             | `GET /api/barriers`                                               |
-| `routes/api/barriers/[id]/route.ts`        | `GET /api/barriers/:id`                                           |
-| `routes/api/barriers/[id]/status/route.ts` | `PATCH /api/barriers/:id/status` (bonus)                          |
-| `routes/api/kpi/route.ts`                  | `GET /api/kpi`                                                    |
+| Arquivo                              | Responsabilidade                                            |
+| ------------------------------------ | ----------------------------------------------------------- |
+| `db/schema.sql`                      | DDL completo: tabelas, índices, triggers, funções           |
+| `db/seed_lookups.sql`                | Popula as tabelas de lookup a partir de `lib/enums.ts`      |
+| `scripts/migrate.ts`                 | Aplica os dois arquivos acima contra `DATABASE_URL`         |
+| `scripts/seed.ts`                    | Popula `barriers`/`barrier_status_history` com dados mock   |
+| `lib/server/db.ts`                   | Cliente Postgres Deno-native singleton (server routes only) |
+| `lib/server/sql/`                    | Queries: where/mappers + listagem/KPI/transição de status   |
+| `routes/api/barriers.ts`             | `GET /api/barriers`                                         |
+| `routes/api/barriers/[id].ts`        | `GET /api/barriers/:id`                                     |
+| `routes/api/barriers/[id]/status.ts` | `PATCH /api/barriers/:id/status` (bonus)                    |
+| `routes/api/kpi.ts`                  | `GET /api/kpi`                                              |
+| `routes/api/health.ts`               | `GET /api/health` (liveness, sem DB)                        |

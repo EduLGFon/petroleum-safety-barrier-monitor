@@ -112,7 +112,11 @@ create index if not exists idx_barriers_disponibilidade  on barriers(disponibili
 create index if not exists idx_barriers_conformidade      on barriers(conformidade_id);
 create index if not exists idx_barriers_categoria        on barriers(categoria_id);
 create index if not exists idx_barriers_criticidade      on barriers(criticidade_id);
-create index if not exists idx_barriers_tag_trgm         on barriers using btree (tag);
+-- Plain btree on tag (equality + prefix LIKE). Named *_tag on purpose: a
+-- trigram GIN index would be needed for real %q% search (pg_trgm), which this
+-- schema deliberately does not require. Drops the legacy misleading name.
+drop index if exists idx_barriers_tag_trgm;
+create index if not exists idx_barriers_tag              on barriers using btree (tag);
 create index if not exists idx_barriers_status_since     on barriers(status_since);
 
 -- ─── Status history (one row per transition, newest last) ─────────────────
