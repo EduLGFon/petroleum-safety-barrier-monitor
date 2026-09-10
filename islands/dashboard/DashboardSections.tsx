@@ -2,20 +2,17 @@
 // Why: client (mock) and server (HTTP) modes share one render tree; only the
 // data hook feeding `dash` differs. Settings defaults gate lives here too.
 import { DashboardFooter, DashboardOverlays } from "./DashboardChrome.tsx";
-import { ConformidadeChart } from "../../components/ConformidadeChart.tsx";
 import { LocationFilter } from "../../components/LocationFilter.tsx";
 import { ExportToolbar } from "../../components/ExportToolbar.tsx";
 import { BarriersTable } from "../../components/BarriersTable.tsx";
 import { useSettings } from "../../context/SettingsContext.tsx";
 import type { useDashboard } from "../../hooks/useDashboard.ts";
-import { StatusBand } from "../../components/StatusBand.tsx";
 import { FilterBar } from "../../components/FilterBar.tsx";
-import { KpiGrid } from "../../components/KpiGrid.tsx";
 import { Header } from "../../components/Header.tsx";
 import { sanitizeFilterPatch } from "../../lib/utils.ts";
+import { KpiSections } from "./KpiSections.tsx";
 import { useEffect, useState } from "preact/hooks";
 import type { Barrier } from "../../lib/types.ts";
-import { NcAlert } from "./NcAlert.tsx";
 
 // Either data hook return, plus optional server-only fetch state.
 export type Dash =
@@ -136,25 +133,13 @@ export function DashboardSections(
           />
         </div>
 
-        {/* Status band */}
-        <div style={{ animation: "slideUp .3s .08s var(--ease-out) both" }}>
-          <StatusBand
-            kpi={kpi}
-            activeFilter={filters.disponibilidade}
-            onFilter={(v) => setFilter({ disponibilidade: v })}
-          />
-        </div>
-
-        {/* KPI cards */}
-        <KpiGrid kpi={kpi} location={location} />
-
-        {/* Chart */}
-        <div style={{ animation: "slideUp .3s .28s var(--ease-out) both" }}>
-          <ConformidadeChart data={chartData} />
-        </div>
-
-        {/* NC alert - red glass with the signature red glow */}
-        <NcAlert
+        {/* KPI band, cards, chart, and NC alert */}
+        <KpiSections
+          kpi={kpi}
+          chartData={chartData}
+          location={location}
+          activeDisponibilidade={filters.disponibilidade}
+          onDispFilter={(v) => setFilter({ disponibilidade: v })}
           ncCount={ncCount}
           isUrgentesActive={isUrgentesActive}
           showUrgentes={showUrgentes}
