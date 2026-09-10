@@ -10,17 +10,27 @@ import { useMemo } from "preact/hooks";
 interface Props {
   selected: string;
   allBarriers: Barrier[];
+  // Precomputed tabs for server mode (client derives tabs from allBarriers).
+  stations?: { code: string; count: number }[];
+  total?: number;
   onChange: (c: string) => void;
 }
 // LocationFilter: station tabs derived from data plus Todas; scrolls horizontally.
-export function LocationFilter({ selected, allBarriers, onChange }: Props) {
+export function LocationFilter(
+  { selected, allBarriers, stations, total, onChange }: Props,
+) {
   // Stations from the data first (future stations appear automatically),
-  // seed metadata only supplies display names for known codes.
+  // seed metadata only supplies display names for known codes. Server mode
+  // passes precomputed stations instead of the full barrier list.
   const tabs = useMemo(() => {
     const meta = new Map(LOCATIONS.map((l) => [l.code, l]));
     const counts = new Map<string, number>();
-    for (const b of allBarriers) {
-      counts.set(b.instalacao, (counts.get(b.instalacao) ?? 0) + 1);
+    if (stations) {
+      for (const s of stations) counts.set(s.code, s.count);
+    } else {
+      for (const b of allBarriers) {
+        counts.set(b.instalacao, (counts.get(b.instalacao) ?? 0) + 1);
+      }
     }
     const codes = [...counts.keys()].sort((a, b) =>
       a.localeCompare(b, "pt-BR")
@@ -31,7 +41,7 @@ export function LocationFilter({ selected, allBarriers, onChange }: Props) {
       tipo: meta.get(code)?.tipo ?? "Instalação",
       count: counts.get(code) ?? 0,
     }));
-  }, [allBarriers]);
+  }, [allBarriers, stations]);
   return (
     <nav
       aria-label="Filtro por instalação"
@@ -48,7 +58,7 @@ export function LocationFilter({ selected, allBarriers, onChange }: Props) {
       <Tab
         name="Todas"
         tipo="Todas as Instalações"
-        count={allBarriers.length}
+        count={total ?? allBarriers.length}
         active={selected === "ALL"}
         index={0}
         onClick={() => onChange("ALL")}

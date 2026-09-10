@@ -10,6 +10,7 @@
 import { loadDash, saveDash } from "./dashboard/persistence.ts";
 import { useDashboardDerived } from "./dashboard/derived.ts";
 import { useFilterState } from "./dashboard/filter-state.ts";
+import { restoreSelection } from "./dashboard/selection.ts";
 import { useSelection } from "./dashboard/selection.ts";
 import { useCallback, useEffect } from "preact/hooks";
 import type { Barrier } from "../lib/types.ts";
@@ -40,15 +41,7 @@ export function useDashboard(allBarriers: Barrier[], defaultLocation = "ALL") {
   // After mount: restore validated selection/openId (filters restore inside
   // useFilterState; corrupt values fall back instead of wedging state).
   useEffect(() => {
-    const p = loadDash();
-    if (Array.isArray(p.selectedIds)) {
-      const ids = p.selectedIds.filter((n) => Number.isInteger(n) && n > 0)
-        .slice(0, 10000);
-      if (ids.length) setSelectedIds(new Set(ids));
-    }
-    if (Number.isInteger(p.openId) && (p.openId as number) > 0) {
-      setOpenId(p.openId as number);
-    }
+    restoreSelection(loadDash(), setSelectedIds, setOpenId);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 

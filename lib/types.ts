@@ -99,6 +99,15 @@ export interface CategoryConformidade {
   "Não Conforme": number;
 }
 
+// Server-provided filter vocabularies (display strings + per-station counts)
+// for server-paginated mode, where the client never holds the full dataset.
+export interface Vocabularies {
+  locations: { code: string; count: number }[];
+  disponibilidades: string[];
+  conformidades: string[];
+  categorias: string[];
+}
+
 export type SortableColumn = keyof Pick<
   Barrier,
   | "id"
