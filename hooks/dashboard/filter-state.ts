@@ -50,13 +50,16 @@ export function useFilterState(defaultLocation = "ALL") {
     dispatch({ type: "RESET_FILTERS" });
   }, []);
 
-  /** Show NC barriers sorted oldest-first (most urgent) */
+  /** Show NC barriers sorted oldest-first (most urgent); clears text and
+   *  category first so a stale query cannot render an unexplained empty list. */
   const showUrgentes = useCallback(() => {
     dispatch({
       type: "SET_FILTER",
       payload: {
+        query: "",
         disponibilidade: "",
         conformidade: "Não Conforme",
+        categoria: "",
         sortCol: "statusSince" as SortableColumn,
         sortDir: "asc",
         page: 1,
@@ -64,7 +67,8 @@ export function useFilterState(defaultLocation = "ALL") {
     });
   }, []);
 
-  const hasActiveFilters = !!state.filters.query ||
+  const hasActiveFilters = state.location !== "ALL" ||
+    !!state.filters.query ||
     !!state.filters.disponibilidade || !!state.filters.conformidade ||
     !!state.filters.categoria;
 
