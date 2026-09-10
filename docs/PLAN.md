@@ -2,7 +2,8 @@
 
 > AS-BUILT RECORD. The phases below are complete and committed on
 > `refactor/fresh-deno-native`. Section 5 lists what was deliberately left
-> out and the known limitations that remain.
+> out and the known limitations that remain. Section 6 records the docs
+> refresh that fixed the drift noted in earlier rounds.
 >
 > Original scope: dashboard-only. The future Fracttal-consuming server
 > (Postgres-backed, confidential) is out of scope. This work prepares
@@ -50,8 +51,9 @@ Snapshotted check/lint/fmt status and file inventory; committed the plan itself.
   vocabularies (`getVocabularies`) while `useServerDashboard` pages
   (`getBarriers`), KPI (`getKpi`), and chart (`getChartData`) per scope with
   cancellation, loading, error card/banner, and retry. Mock mode unchanged.
-- New `GET /api/chart` and `GET /api/health` (DB-independent; smoke-tested on
-  the production bundle alongside `/`).
+- New `GET /api/chart` (Postgres `GROUP BY`, scoped by `locationId`) and `GET
+  /api/health` (DB-independent liveness; both smoke-tested on the production
+  bundle alongside `/`).
 - Lazy DB pool (import no longer throws); write-path range/note validation;
   `http getBarrierById` returns null only on 404.
 - Persisted dashboard/settings state validated per-field; stale-page
@@ -72,12 +74,18 @@ Snapshotted check/lint/fmt status and file inventory; committed the plan itself.
 ### Phase 5 - decomposition
 
 Every module split with barrels keeping import paths stable: `ui/icons`,
-`lib/api` (types/query/mock/http), `lib/utils` (`dashboard/*` + `format`),
-`lib/export` (html/rows/summary/excel/pdf/csv), `table/`, `barrier-modal/`,
-`chart/`, `settings/`, `context/settings`, `hooks/dashboard`, `lib/enums`,
-`lib/constants`, `lib/mock`, `lib/server/sql`, island `dashboard/`,
-`components/export`, `components/filter`, `components/loading`. Zero files
-over 200 lines.
+`lib/api` (`types/query/mock/http`), `lib/utils` (barrel over
+`lib/dashboard/filters+kpi+chart` + `format`), `lib/export`
+(`rows/summary/csv/excel/pdf/html`), `table/`, `barrier-modal/`, `chart/`,
+`settings/`, `context/settings`, `hooks/dashboard`
+(`filter-state/reducer/persistence/selection/derived/server`),
+`lib/enums` (`codes/taxonomy/context`), `lib/constants`
+(`locations/catalog/helpers/colors`), `lib/mock`
+(`generator/history/tags/rng`), `lib/server/sql`
+(`barriers/chart/vocabularies/where/mappers`), island `dashboard/`
+(`DashboardView/DashboardSections/DashboardChrome/KpiSections/NcAlert/
+ServerError/vocabularies`), `components/export`, `components/filter`,
+`components/loading`. Zero files over 200 lines (verified: max 200).
 
 ### Follow-up rounds
 
@@ -94,13 +102,25 @@ over 200 lines.
 ## 3. Data loading as built
 
 ```text
-mock mode:  routes/index SSR full list -> Dashboard -> useDashboard (browser
-            filter/sort/paginate/KPI/chart over initialBarriers)
-http mode:  routes/index SSR vocabularies -> Dashboard ->
-            useServerDashboard (getBarriers/getKpi/getChartData per scope)
+mock mode:  routes/index SSR api.getAllBarriers -> <Dashboard
+            initialBarriers={full list} apiMode="mock" vocabularies={null}>
+            -> DashboardView ClientView -> useDashboard +
+            useDashboardVocabularies -> DashboardSections shared tree
+http mode:  routes/index SSR getVocabularies ->
+            <Dashboard initialBarriers={[]} apiMode="http" vocabularies>
+            -> DashboardView ServerView ->
+            useServerDashboard(httpAdapterFactory + toWireQuery) ->
+            Promise.all(getBarriers[full filters], getKpi[locationId],
+            getChartData[locationId]) with cancellation ->
+            DashboardSections shared tree
 shared:     DashboardSections render tree; filter-state/selection/persistence
-            slices; server-only SQL under lib/server (never imported by islands)
+            slices (reducer/derived); server-only SQL under lib/server (never
+            imported by islands); providers inside island root; page-only
+            export/detail in server mode
 ```
+
+See `docs/ARCHITECTURE.md` for the full lifecycle, bridge topology, and
+persistence map.
 
 ## 4. Non-goals (unchanged)
 
@@ -119,3 +139,20 @@ shared:     DashboardSections render tree; filter-state/selection/persistence
 - `toXId` skips unknown values with a warning instead of throwing (so live
   filters degrade visibly rather than crash).
 - `pg_trgm` not adopted: `%q%` does seq-scan by documented decision.
+
+## 6. Docs refresh (this round)
+
+- Created missing `docs/ARCHITECTURE.md` (referenced by `agents.md`):
+  runtime lifecycle per task with env sources, layer boundaries, mock vs http
+  flows, island bridge props, API/persistence/config summaries.
+- Refreshed `docs/API.md`: 5-method `BarriersApi`, split-module file table
+  (`lib/api/*`, `lib/enums/*`, `lib/constants/*`, `lib/mock/*`,
+  `lib/server/sql/*`, `_params.ts`, client vs server vocabularies), full
+  `BarriersQuery` params with clamping/whitelist, per-route status codes, no
+  `/api/vocabularies` note, `toWireQuery` location fix.
+- Refreshed `docs/DATABASE.md`: `jsr:@db/postgres` `Pool` + `$n` binding
+  (not tagged templates), per-task env table incl. `build`/`preview`,
+  `idx_history_barrier` + `set_updated_at` trigger, seed batch/`-1 → NULL`/
+  `--force` details, full SQL file table.
+- Fixed `.env` endpoint comment to list `GET /api/chart` + `GET /api/health`
+  like `.env.example`.
