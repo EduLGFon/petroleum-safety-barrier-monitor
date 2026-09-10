@@ -5,7 +5,6 @@
 -- reference them — add new rows with new ids instead.
 
 insert into locations (id, code, tipo) values
-  (0, 'ALL', 'Todas as Instalações'),
   (1, 'FAL', 'Estação Coletora'),
   (2, 'CNC', 'Concessão Norte-Centro'),
   (3, 'CNS', 'Concessão Norte-Sul'),
@@ -13,6 +12,12 @@ insert into locations (id, code, tipo) values
   (5, 'RJO', 'Base Operacional Rio'),
   (6, 'SPL', 'Base Operacional SP')
 on conflict (id) do update set code = excluded.code, tipo = excluded.tipo;
+
+-- 'ALL' (id 0) is a UI filter sentinel, not a real installation: remove the
+-- legacy row when nothing references it so no barrier can point at it.
+delete from locations where id = 0 and not exists (
+  select 1 from barriers where location_id = 0
+);
 
 insert into disponibilidades (id, label, is_conforme) values
   (0, 'Disponível', true),

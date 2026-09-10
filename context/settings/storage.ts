@@ -30,13 +30,6 @@ export function loadSettings(): SettingsState {
         raw.defaultLocation.trim() !== ""
       ? raw.defaultLocation
       : DEFAULTS.defaultLocation;
-    const members = Array.isArray(raw.members)
-      ? raw.members.filter((m) =>
-        m && typeof m.email === "string" &&
-        (m.role === "admin" || m.role === "viewer") &&
-        typeof m.addedAt === "string"
-      )
-      : DEFAULTS.members;
     return {
       ...DEFAULTS,
       ...raw,
@@ -47,7 +40,6 @@ export function loadSettings(): SettingsState {
       reduceMotion: typeof raw.reduceMotion === "boolean"
         ? raw.reduceMotion
         : DEFAULTS.reduceMotion,
-      members,
       // defaultFilters is applied to live dashboard state: keep only
       // well-formed keys, drop the rest instead of spreading blindly.
       defaultFilters: sanitizeFilterPatch(raw.defaultFilters),

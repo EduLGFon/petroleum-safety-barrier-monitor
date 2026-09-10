@@ -32,7 +32,7 @@ export const SORT_OPTS = [
   { value: "statusSince", label: "Tempo sem contingência" },
 ];
 
-// selSt: shared select/input style for filter and member fields.
+// selSt: shared select/input style for settings filter fields.
 export const selSt = {
   padding: "var(--d-input-y) var(--d-input-x)",
   fontSize: "var(--d-body)",

@@ -14,7 +14,7 @@
 
 create table if not exists locations (
   id    integer primary key,
-  code  text not null unique,          -- 'ALL','FAL','CNC','CNS','FAP','RJO','SPL'
+  code  text not null unique,          -- 'FAL','CNC','CNS','FAP','RJO','SPL' ('ALL' is UI-only, never a row)
   tipo  text not null                   -- installation type, display only
 );
 

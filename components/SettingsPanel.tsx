@@ -1,16 +1,15 @@
-// SettingsPanel - slide-over dialog for appearance, default filters, members.
+// SettingsPanel - slide-over dialog for appearance and default filters.
 // This is why it exists: centralizes theme / accent / density / reduce-motion
-// plus startup filter defaults from SettingsContext; members tab is future-only.
+// plus startup filter defaults from SettingsContext.
 import {
   type AccentColor,
   type Density,
   useSettings,
 } from "../context/SettingsContext.tsx";
 import { PanelFooter, PanelHeader } from "./settings/PanelChrome.tsx";
-import { FilterIcon, SunIcon, UserIcon } from "./ui/Icons.tsx";
+import { FilterIcon, SunIcon } from "./ui/Icons.tsx";
 import { AppearanceSection } from "./settings/AppearanceSection.tsx";
 import { FiltersSection } from "./settings/FiltersSection.tsx";
-import { MembersSection } from "./settings/MembersSection.tsx";
 import { useEffect, useState } from "preact/hooks";
 import type { Theme } from "../lib/types.ts";
 
@@ -20,7 +19,7 @@ interface Props {
   companyName: string;
 }
 
-// SettingsPanel: slide-over dialog hosting appearance, filters, and members sections.
+// SettingsPanel: slide-over dialog hosting appearance and filters sections.
 export function SettingsPanel({ open, onClose, companyName }: Props) {
   const {
     settings,
@@ -31,7 +30,7 @@ export function SettingsPanel({ open, onClose, companyName }: Props) {
     setDefaultLoc,
     setReduceMotion,
   } = useSettings();
-  const [section, setSection] = useState<"appearance" | "filters" | "members">(
+  const [section, setSection] = useState<"appearance" | "filters">(
     "appearance",
   );
   const [activeTheme, setActiveTheme] = useState<Theme | null>(null);
@@ -129,7 +128,7 @@ export function SettingsPanel({ open, onClose, companyName }: Props) {
             key: "filters",
             label: "Filtros",
             Icon: FilterIcon,
-          }, { key: "members", label: "Membros", Icon: UserIcon }].map((
+          }].map((
             { key, label, Icon },
           ) => (
             <button
@@ -188,9 +187,6 @@ export function SettingsPanel({ open, onClose, companyName }: Props) {
             setDefaultLoc={setDefaultLoc}
           />
         )}
-
-        {/* ── MEMBERS ── */}
-        {section === "members" && <MembersSection />}
 
         {/* Footer */}
         <PanelFooter companyName={companyName} />

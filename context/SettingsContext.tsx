@@ -1,18 +1,15 @@
-// Settings context - persists theme, accent, defaults and members.
+// Settings context - persists theme, accent, and filter defaults.
 // This is why it exists: single store for appearance and filter defaults,
 // hydrated from localStorage after mount for SSR consistency.
 import {
   type AccentColor,
   DEFAULTS,
   type Density,
-  type MemberRole,
   type SettingsState,
 } from "./settings/presets.ts";
 export type {
   AccentColor,
   Density,
-  Member,
-  MemberRole,
   SettingsState,
 } from "./settings/presets.ts";
 import {
@@ -41,8 +38,6 @@ interface Ctx {
   setDefaults: (f: Partial<FilterState>) => void;
   setDefaultLoc: (l: string) => void;
   setReduceMotion: (v: boolean) => void;
-  addMember: (email: string, role: MemberRole) => void;
-  removeMember: (email: string) => void;
 }
 
 const SettingsCtx = createContext<Ctx>({
@@ -53,8 +48,6 @@ const SettingsCtx = createContext<Ctx>({
   setDefaults: () => {},
   setDefaultLoc: () => {},
   setReduceMotion: () => {},
-  addMember: () => {},
-  removeMember: () => {},
 });
 
 // Provides settings store; starts from DEFAULTS for SSR then hydrates from `barrier-settings` after mount.
@@ -107,25 +100,6 @@ export function SettingsProvider(
     applyMotion(v);
     save({ ...settings, reduceMotion: v });
   }, [settings, save]);
-  // Appends member (deduped by email) then persists via save (`barrier-settings`).
-  const addMember = useCallback((email: string, role: MemberRole) => {
-    if (settings.members.some((m) => m.email === email)) return;
-    save({
-      ...settings,
-      members: [...settings.members, {
-        email,
-        role,
-        addedAt: new Date().toISOString(),
-      }],
-    });
-  }, [settings, save]);
-  // Removes member by email then persists via save (`barrier-settings`).
-  const removeMember = useCallback((email: string) => {
-    save({
-      ...settings,
-      members: settings.members.filter((m) => m.email !== email),
-    });
-  }, [settings, save]);
 
   return (
     <SettingsCtx.Provider
@@ -137,8 +111,6 @@ export function SettingsProvider(
         setDefaults,
         setDefaultLoc,
         setReduceMotion,
-        addMember,
-        removeMember,
       }}
     >
       {children}

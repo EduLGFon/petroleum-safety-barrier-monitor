@@ -118,8 +118,8 @@ código da aplicação que deveria fazer isso.
 
 Isso já está exposto via `PATCH /api/barriers/:id/status`, mas a UI ainda não
 chama esse endpoint — é o caminho natural para quando a feature de "admins podem
-editar contingenciamento" (já modelada em `SettingsContext.tsx`'s `MemberRole`)
-for implementada.
+editar contingenciamento" for implementada (papéis de acesso ainda não existem
+no app; `MemberRole` foi removido como scaffolding não utilizado).
 
 ## Índices
 

@@ -1,4 +1,4 @@
-// Settings presets - accent/density catalogs, member/settings types, DEFAULTS and storage KEY.
+// Settings presets - accent/density catalogs, settings types, DEFAULTS and storage KEY.
 // This is why it exists: single source of truth shared by context, storage validation and DOM appliers.
 import type { FilterState, Theme } from "../../lib/types.ts";
 
@@ -109,13 +109,6 @@ export const DENSITY_PRESETS: Record<
   spacious: { label: "Amplo", hint: "Monitores maiores de 16″" },
 };
 
-export type MemberRole = "admin" | "viewer";
-export interface Member {
-  email: string;
-  role: MemberRole;
-  addedAt: string;
-}
-
 export interface SettingsState {
   theme: Theme;
   accentColor: AccentColor;
@@ -123,7 +116,6 @@ export interface SettingsState {
   defaultFilters: Partial<FilterState>;
   defaultLocation: string;
   reduceMotion: boolean;
-  members: Member[];
 }
 
 export const DEFAULTS: SettingsState = {
@@ -133,7 +125,6 @@ export const DEFAULTS: SettingsState = {
   defaultFilters: {},
   defaultLocation: "ALL",
   reduceMotion: false,
-  members: [],
 };
 
 export const KEY = "barrier-settings";
