@@ -94,8 +94,14 @@ Os três endpoints que `httpAdapterFactory` espera já estão implementados em
   `BarriersResponse { items: WireBarrier[], total, page, pageSize, totalPages }`
 - `GET /api/barriers/:id` → `WireBarrier`
 - `GET /api/kpi?locationId=1` → `WireKpiSnapshot`
+- `GET /api/chart?locationId=1` → `WireCategoryConformidade[]`
+- `GET /api/health` → `{ ok, time }` (liveness, sem DB)
 - `PATCH /api/barriers/:id/status` → `WireBarrier` (bonus: único caminho de
   escrita, ainda não chamado pela UI — veja docs/DATABASE.md)
+
+Em `PUBLIC_API_MODE=http` o dashboard pagina pelo servidor (`useServerDashboard`):
+páginas via `getBarriers`, KPI via `getKpi`, gráfico via `getChartData` e
+vocabulários via SSR (`getVocabularies`). Export cobre a página carregada.
 
 Para ativar:
 
