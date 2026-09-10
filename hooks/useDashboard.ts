@@ -2,39 +2,45 @@
  * ══════════════════════════════════════════════════════════════════════════
  * USE-DASHBOARD — central dashboard state + derived data for the main page
  * ══════════════════════════════════════════════════════════════════════════
- * Reducer for location/filters/sort, selection and open-row state with
- * localStorage persistence (SSR-safe hydration). Derives kpi, chartData,
- * and paged rows via lib/utils.ts; sole data source for dashboard islands.
+ * Composer over dashboard slices (filter-state, selection, persistence,
+ * derived): filter semantics, selection/open-row state with localStorage
+ * persistence (SSR-safe hydration), and paged rows/KPI/chart derivations.
+ * Sole data source for dashboard islands in client (mock) mode.
  */
-
-import { useCallback, useEffect, useReducer, useState } from "preact/hooks";
-import type { Barrier, FilterState, SortableColumn } from "../lib/types.ts";
-import { defaultFilters, sanitizeFilters } from "../lib/utils.ts";
 import { loadDash, saveDash } from "./dashboard/persistence.ts";
 import { useDashboardDerived } from "./dashboard/derived.ts";
-import { reducer } from "./dashboard/reducer.ts";
+import { useFilterState } from "./dashboard/filter-state.ts";
+import { useSelection } from "./dashboard/selection.ts";
+import { useCallback, useEffect } from "preact/hooks";
+import type { Barrier } from "../lib/types.ts";
 
 // Central dashboard store; starts from defaults for SSR, hydrates from `barrier-dashboard` after mount.
 // Persists location/filters/selection/openId via saveDash once hydrated.
 export function useDashboard(allBarriers: Barrier[], defaultLocation = "ALL") {
-  // Always start with consistent defaults for SSR — restore after mount
-  const [state, dispatch] = useReducer(reducer, {
-    location: "ALL",
-    filters: defaultFilters(),
-  });
-  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
-  const [openId, setOpenId] = useState<number | null>(null);
-  const [hydrated, setHydrated] = useState(false);
+  const {
+    location,
+    filters,
+    hydrated,
+    hasActiveFilters,
+    setLocation: setLoc,
+    setFilter,
+    setSort,
+    resetFilters: resetFil,
+    showUrgentes,
+  } = useFilterState(defaultLocation);
+  const {
+    selectedIds,
+    setSelectedIds,
+    openId,
+    setOpenId,
+    toggleSelect,
+    clearAll,
+  } = useSelection();
 
-  // After mount: restore validated persisted state (corrupt values fall back
-  // to defaults instead of wedging filters, page, or selection).
+  // After mount: restore validated selection/openId (filters restore inside
+  // useFilterState; corrupt values fall back instead of wedging state).
   useEffect(() => {
     const p = loadDash();
-    const location = typeof p.location === "string" && p.location.trim() !== ""
-      ? p.location
-      : defaultLocation;
-    const filters = sanitizeFilters(p.filters ?? {});
-    dispatch({ type: "RESTORE", payload: { location, ...filters } });
     if (Array.isArray(p.selectedIds)) {
       const ids = p.selectedIds.filter((n) => Number.isInteger(n) && n > 0)
         .slice(0, 10000);
@@ -43,7 +49,6 @@ export function useDashboard(allBarriers: Barrier[], defaultLocation = "ALL") {
     if (Number.isInteger(p.openId) && (p.openId as number) > 0) {
       setOpenId(p.openId as number);
     }
-    setHydrated(true);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -51,12 +56,12 @@ export function useDashboard(allBarriers: Barrier[], defaultLocation = "ALL") {
   useEffect(() => {
     if (!hydrated) return;
     saveDash({
-      location: state.location,
-      filters: state.filters,
+      location,
+      filters,
       selectedIds: [...selectedIds],
       openId,
     });
-  }, [state, selectedIds, openId, hydrated]);
+  }, [location, filters, hydrated, selectedIds, openId]);
 
   const {
     kpi,
@@ -66,76 +71,37 @@ export function useDashboard(allBarriers: Barrier[], defaultLocation = "ALL") {
     totalPages,
     openBarrier,
     locationDetails,
-  } = useDashboardDerived(allBarriers, state.location, state.filters, openId);
+  } = useDashboardDerived(allBarriers, location, filters, openId);
 
   // Sets location and clears selection; persisted via saveDash effect.
   const setLocation = useCallback((code: string) => {
-    dispatch({ type: "SET_LOCATION", payload: code });
-    setSelectedIds(new Set());
-  }, []);
-  // Patches filters (resets page unless page-only); persisted via saveDash effect.
-  const setFilter = useCallback(
-    (patch: Partial<FilterState>) =>
-      dispatch({ type: "SET_FILTER", payload: patch }),
-    [],
-  );
-  // Toggles sort direction for column; persisted via saveDash effect.
-  const setSort = useCallback(
-    (col: SortableColumn) => dispatch({ type: "SET_SORT", payload: col }),
-    [],
-  );
+    setLoc(code);
+    clearAll();
+  }, [setLoc, clearAll]);
   // Resets filters to defaults and clears selection; persisted via saveDash effect.
   const resetFilters = useCallback(() => {
-    dispatch({ type: "RESET_FILTERS" });
-    setSelectedIds(new Set());
-  }, []);
+    resetFil();
+    clearAll();
+  }, [resetFil, clearAll]);
 
   // Self-heals a stale persisted page (e.g. page 5 restored against a
   // now-1-page result): clamps and persists the fix instead of trapping the
   // user on an empty table with a hidden pager. Guarded, so no loop.
   useEffect(() => {
     if (!hydrated) return;
-    if (state.filters.page > totalPages) setFilter({ page: totalPages });
-  }, [hydrated, state.filters.page, totalPages, setFilter]);
+    if (filters.page > totalPages) setFilter({ page: totalPages });
+  }, [hydrated, filters.page, totalPages, setFilter]);
 
-  /** Show NC barriers sorted oldest-first (most urgent) */
-  const showUrgentes = useCallback(() => {
-    dispatch({
-      type: "SET_FILTER",
-      payload: {
-        disponibilidade: "",
-        conformidade: "Não Conforme",
-        sortCol: "statusSince" as SortableColumn,
-        sortDir: "asc",
-        page: 1,
-      },
-    });
-  }, []);
-
-  // Toggles single-row selection; persisted as selectedIds via saveDash effect.
-  const toggleSelect = useCallback((id: number) => {
-    setSelectedIds((prev) => {
-      const n = new Set(prev);
-      n.has(id) ? n.delete(id) : n.add(id);
-      return n;
-    });
-  }, []);
   // Selects all currently filtered rows; persisted as selectedIds via saveDash effect.
   const selectAll = useCallback(
     () => setSelectedIds(new Set(sorted.map((b) => b.id))),
-    [sorted],
+    [sorted, setSelectedIds],
   );
-  // Clears all row selection; persisted via saveDash effect.
-  const clearAll = useCallback(() => setSelectedIds(new Set()), []);
-
-  const hasActiveFilters = !!state.filters.query ||
-    !!state.filters.disponibilidade || !!state.filters.conformidade ||
-    !!state.filters.categoria;
 
   return {
-    location: state.location,
+    location,
     locationDetails,
-    filters: state.filters,
+    filters,
     kpi,
     chartData,
     rows,
