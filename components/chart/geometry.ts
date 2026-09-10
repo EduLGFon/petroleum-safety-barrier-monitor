@@ -36,8 +36,9 @@ export function computeMax(data: CategoryConformidade[]): number {
 }
 
 // buildTicks: axis stops at 0, midpoint and max for the gliding scale.
+// Deduped so tiny datasets (max 1) render [0, 1], not [0, 1, 1].
 export function buildTicks(max: number): number[] {
-  return [0, Math.round(max / 2), max];
+  return [...new Set([0, Math.round(max / 2), max])];
 }
 
 // scaleW: linear value→pixels scale against the max row total.
