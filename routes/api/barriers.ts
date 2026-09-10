@@ -1,11 +1,7 @@
 // API: GET /api/barriers - paged wire barrier list.
 // This is why it exists: Fresh port of the Next route with the same
 // BarriersQuery contract (see lib/wireTypes.ts) for the http adapter.
-import {
-  parseDateParam,
-  parseIntParam,
-  parseQueryParam,
-} from "./_params.ts";
+import { parseDateParam, parseIntParam, parseQueryParam } from "./_params.ts";
 import { listBarriers } from "../../lib/server/sql/barriers.ts";
 import type { BarriersQuery } from "../../lib/wireTypes.ts";
 import { define } from "../../utils.ts";
