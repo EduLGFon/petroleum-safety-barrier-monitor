@@ -18,12 +18,17 @@ import {
 } from "./enums.ts";
 import type {
   WireBarrier,
+  WireCategoryConformidade,
   WireKpiSnapshot,
   WireStatusHistoryEntry,
 } from "./wireTypes.ts";
-import type { Barrier, StatusHistoryEntry } from "./types.ts";
-import type { KpiSnapshot } from "./types.ts";
+import type {
+  Barrier,
+  CategoryConformidade,
+  StatusHistoryEntry,
+} from "./types.ts";
 import { isConforme } from "./constants.ts";
+import type { KpiSnapshot } from "./types.ts";
 
 // Maps a wire history entry's numeric IDs to display strings; date/note pass through unchanged.
 export function resolveHistoryEntry(
@@ -108,4 +113,20 @@ export function resolveKpi(w: WireKpiSnapshot): KpiSnapshot {
       : {}),
     ...(syncedAt ? { syncedAt } : {}),
   };
+}
+
+// Maps wire per-category totals to chart rows; naoConforme is total minus
+// conforme (fail-closed novel handling, same as computeChartData). Names
+// truncate past 26 chars like the client derivation; SQL order is preserved.
+export function resolveChartData(
+  items: WireCategoryConformidade[],
+): CategoryConformidade[] {
+  return items.map((w) => {
+    const name = fromCategoriaId(w.categoriaId);
+    return {
+      name: name.length > 26 ? name.slice(0, 26) + "…" : name,
+      Conforme: w.conforme,
+      "Não Conforme": Math.max(0, w.total - w.conforme),
+    };
+  });
 }

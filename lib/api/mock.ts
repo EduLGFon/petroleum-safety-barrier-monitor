@@ -3,7 +3,7 @@
 // ids, exactly like a real SQL WHERE clause would, then resolves only the
 // final page to domain objects.
 import type { BarriersQuery, WireBarrier } from "../wireTypes.ts";
-import { computeKpi as computeKpiLocal } from "../utils.ts";
+import { computeChartData, computeKpi as computeKpiLocal } from "../utils.ts";
 import { resolveBarriers } from "../resolve.ts";
 import { fromLocationId } from "../enums.ts";
 import type { BarriersApi } from "./types.ts";
@@ -114,5 +114,14 @@ export const mockAdapter: BarriersApi = {
       ...computeKpiLocal(resolveBarriers(all)),
       syncedAt: new Date().toISOString(),
     });
+  },
+
+  // Mock getChartData: filters by location and computes local chart rows.
+  getChartData(query) {
+    const all = getWireBarriers().filter((w) =>
+      query.locationId === undefined || query.locationId === 0 ||
+      w.locationId === query.locationId
+    );
+    return Promise.resolve(computeChartData(resolveBarriers(all)));
   },
 };

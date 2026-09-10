@@ -6,9 +6,10 @@ import type {
   BarriersQuery,
   BarriersResponse,
   WireBarrier,
+  WireCategoryConformidade,
   WireKpiSnapshot,
 } from "../wireTypes.ts";
-import { resolveBarriers, resolveKpi } from "../resolve.ts";
+import { resolveBarriers, resolveChartData, resolveKpi } from "../resolve.ts";
 import { buildQueryString } from "./query.ts";
 import type { BarriersApi } from "./types.ts";
 
@@ -57,6 +58,14 @@ export function httpAdapterFactory(baseUrl: string): BarriersApi {
       const qs = buildQueryString(query);
       const w = await fetchJson<WireKpiSnapshot>(`/api/kpi?${qs}`);
       return resolveKpi(w);
+    },
+    // HTTP getChartData: fetches wire per-category totals and resolves rows.
+    async getChartData(query) {
+      const qs = buildQueryString(query);
+      const items = await fetchJson<WireCategoryConformidade[]>(
+        `/api/chart?${qs}`,
+      );
+      return resolveChartData(items);
     },
   };
 }

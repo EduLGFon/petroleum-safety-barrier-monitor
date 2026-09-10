@@ -61,6 +61,15 @@ export interface WireKpiSnapshot {
   syncedAt?: string;
 }
 
+// Per-category Conforme totals for the chart. naoConforme is derived as
+// total - conforme (fail-closed: novel conformidade counts as NC, same as
+// computeChartData), so new values never split the chart from the KPI.
+export interface WireCategoryConformidade {
+  categoriaId: number;
+  conforme: number;
+  total: number;
+}
+
 /** Query params accepted by GET /api/barriers */
 export interface BarriersQuery {
   locationId?: number;

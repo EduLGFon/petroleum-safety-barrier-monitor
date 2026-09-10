@@ -2,7 +2,7 @@
 // This is why it exists: BarriersApi lets mock and HTTP adapters swap
 // without touching consumers; DomainQuery is the UI-facing filter shape
 // that toWireQuery encodes to numeric wire ids.
-import type { Barrier, KpiSnapshot } from "../types.ts";
+import type { Barrier, CategoryConformidade, KpiSnapshot } from "../types.ts";
 import type { BarriersQuery } from "../wireTypes.ts";
 
 export interface BarriersApi {
@@ -18,6 +18,10 @@ export interface BarriersApi {
   getBarrierById(id: number): Promise<Barrier | null>;
   /** Fetch a precomputed KPI snapshot for the given scope */
   getKpi(query: Pick<BarriersQuery, "locationId">): Promise<KpiSnapshot>;
+  /** Fetch per-category Conforme totals for the chart for the given scope */
+  getChartData(
+    query: Pick<BarriersQuery, "locationId">,
+  ): Promise<CategoryConformidade[]>;
 }
 
 export interface DomainQuery {
