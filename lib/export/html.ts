@@ -2,6 +2,10 @@
 // This is why it exists: spreadsheet, print report, and CSV share these
 // browser-only building blocks instead of reimplementing them per format.
 
+// DOM-heavy formats (styled spreadsheet, print report) cap here: beyond this
+// the HTML string / print DOM freezes the tab. CSV stays uncapped (plain text).
+export const MAX_DOM_ROWS = 10_000;
+
 // Returns current datetime as pt-BR DD/MM/YYYY HH:MM stamp for report headers.
 export function ts(): string {
   return new Date().toLocaleDateString("pt-BR", {

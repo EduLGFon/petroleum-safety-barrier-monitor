@@ -1,7 +1,14 @@
 // Spreadsheet export - barriers as .xls (HTML table for Excel/LibreOffice).
 // This is why it exists: zero-dependency spreadsheet with brand header, KPI
 // strip, auto-fitted columns, styled rows, and a summary table.
-import { assertBrowser, download, escHtml, pill, ts } from "./html.ts";
+import {
+  assertBrowser,
+  download,
+  escHtml,
+  MAX_DOM_ROWS,
+  pill,
+  ts,
+} from "./html.ts";
 import { CONF_COLORS, DISP_COLORS } from "../constants.ts";
 import { kpiStats, summaryRows } from "./summary.ts";
 import { withBrand } from "../company.ts";
@@ -50,13 +57,21 @@ function fitColWidths(headers: string[], rows: string[][]): number[] {
 }
 
 // Exports barriers as .xls (HTML table) with brand header, KPI strip, styled
-// columns, and summary table; browser-only.
+// columns, and summary table; browser-only. Refuses beyond MAX_DOM_ROWS with
+// an actionable error (filter down or use CSV) instead of freezing the tab.
 export function exportToExcel(
   barriers: Barrier[],
   filename = "barreiras",
   companyName = "",
 ): void {
   assertBrowser();
+  if (barriers.length > MAX_DOM_ROWS) {
+    throw new Error(
+      `Excel comporta até ${MAX_DOM_ROWS.toLocaleString("pt-BR")} registros; ` +
+        `filtrado tem ${barriers.length.toLocaleString("pt-BR")}. ` +
+        `Filtre mais ou exporte CSV.`,
+    );
+  }
   const brand = companyName.toUpperCase() ||
     "MONITOR DE BARREIRAS DE SEGURANÇA";
   const stats = kpiStats(barriers);

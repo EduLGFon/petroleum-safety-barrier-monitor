@@ -2,7 +2,7 @@
 // This is why it exists: printing the whole app page would leak chrome;
 // a dedicated report node with print CSS (see static/styles.css) prints
 // only the data table.
-import { assertBrowser, escHtml, pill, ts } from "./html.ts";
+import { assertBrowser, escHtml, MAX_DOM_ROWS, pill, ts } from "./html.ts";
 import { CONF_COLORS, DISP_COLORS } from "../constants.ts";
 import { daysSince, humanDuration } from "../utils.ts";
 import { withBrand } from "../company.ts";
@@ -97,12 +97,21 @@ export function buildPrintReport(
 }
 
 // Mounts/reuses the #print-report node, swaps title, prints, then clears on afterprint; browser-only.
+// Refuses beyond MAX_DOM_ROWS with an actionable error (filter down or use
+// CSV) instead of mounting tens of thousands of rows into the print DOM.
 export function exportToPDF(
   barriers: Barrier[],
   filename = "barreiras",
   companyName = "",
 ): void {
   assertBrowser();
+  if (barriers.length > MAX_DOM_ROWS) {
+    throw new Error(
+      `PDF comporta até ${MAX_DOM_ROWS.toLocaleString("pt-BR")} registros; ` +
+        `filtrado tem ${barriers.length.toLocaleString("pt-BR")}. ` +
+        `Filtre mais ou exporte CSV.`,
+    );
+  }
   let node = document.getElementById(REPORT_ID);
   if (!node) {
     node = document.createElement("div");
