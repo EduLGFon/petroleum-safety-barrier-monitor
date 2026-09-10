@@ -1,156 +1,121 @@
 # Plan - petroleum-safety-barrier-monitor dashboard rewrite + Fracttal readiness
 
-> This file is the save-ready execution plan. Dashboard-only scope.
-> The future Fracttal-consuming server (Postgres-backed, confidential) is out
-> of scope. This plan prepares dashboard seams, contracts, and hygiene so that
-> server can plug in later without rework.
+> AS-BUILT RECORD. The phases below are complete and committed on
+> `refactor/fresh-deno-native`. Section 5 lists what was deliberately left
+> out and the known limitations that remain.
+>
+> Original scope: dashboard-only. The future Fracttal-consuming server
+> (Postgres-backed, confidential) is out of scope. This work prepares
+> dashboard seams, contracts, and hygiene so that server can plug in later.
 
-## 1. Context and decisions
+## 1. Context and decisions (unchanged)
 
 - Dashboard for petroleum safety barriers, fed in future by a server not built yet.
 - That server will consume Fracttal API data and use Postgres.
-- Focus now: rewrite the dashboard. Do not write the confidential consumer.
-- Sync model agreed: webhooks for real-time plus polling for integrity. This is
-  the right hybrid because webhooks alone get lost or reorder, polling alone is
-  stale or wasteful. Hybrid gives low latency plus self-healing.
-- Prior decisions kept: hygiene first, relaxed file limit (~200 lines, not
-  strict 150), delete YAGNI dead code, allow breaking fix to `WireKpiSnapshot`
-  plus SQL.
+- Sync model agreed: webhooks for real-time plus polling for integrity.
+- Decisions kept throughout: hygiene first, relaxed file limit (~200 lines),
+  delete YAGNI dead code, allow breaking fix to `WireKpiSnapshot` plus SQL.
+- Verification per change: `deno check`, `deno lint`, `deno fmt` (no file
+  args), plus `deno task test` once the suite existed; atomic Conventional
+  Commits, one logical change each.
 
-## 2. Is the code ready? No
+## 2. What was done
 
-Current flow:
+### Phase 0 - baseline
+
+Snapshotted check/lint/fmt status and file inventory; committed the plan itself.
+
+### Phase 1 - hygiene
+
+- Removed `@std/csv`, `@types/babel__core`, stale `.next/`.
+- Reordered imports repo-wide (descending logical length, longest first).
+- Added the 7 missing top-of-file headers; documented all public functions.
+- Result: `deno check` / `lint` / `fmt --check` green from here on.
+
+### Phase 2 - contract plus mappers
+
+- `WireKpiSnapshot` carries optional `byDisponibilidade/byConformidade/
+  byCriticidade` (numeric-id keys) plus `syncedAt`; `resolveKpi` translates
+  keys to display strings (string keys pass through for old servers).
+- SQL `getKpi` returns the buckets via `GROUP BY`; mock `getKpi` stamps time.
+- `toXId` returns `undefined` on unknown (callers skip + warn) instead of a
+  wrong known id; `fromXId` returns explicit sentinels (`ST-7`,
+  `Disponibilidade (6)`) instead of plausible labels.
+- `BarriersQuery` gains `since/until`; `ILIKE` wildcards escaped; integer-only
+  route params shared via `routes/api/_params.ts`; page/pageSize floored.
+
+### Phase 3 - loading plus errors
+
+- `routes/index.tsx` loads via mode-aware `api`; HTTP mode SSR's filter
+  vocabularies (`getVocabularies`) while `useServerDashboard` pages
+  (`getBarriers`), KPI (`getKpi`), and chart (`getChartData`) per scope with
+  cancellation, loading, error card/banner, and retry. Mock mode unchanged.
+- New `GET /api/chart` and `GET /api/health` (DB-independent; smoke-tested on
+  the production bundle alongside `/`).
+- Lazy DB pool (import no longer throws); write-path range/note validation;
+  `http getBarrierById` returns null only on 404.
+- Persisted dashboard/settings state validated per-field; stale-page
+  self-heal; settings-defaults handoff sanitized; export failures surface
+  inline; export count uses matched rows.
+
+### Phase 4 - scale plus reconcile
+
+- Fail-closed novel conformidade everywhere (`computeKpi`, `computeChartData`,
+  KPI grid, alert now driven by `kpi.naoConforme`, exports); chaos-scale
+  proves `conforme + naoConforme === total` with novel values.
+- Export summaries derive from one `computeKpi` pass (was ~9 passes);
+  `DISP_KNOWN_ORDER` shared by band and exports; DOM-heavy formats capped at
+  10k rows with CSV guidance.
+- Sort uses precomputed keys plus a shared `Intl.Collator`; search input
+  debounced at 200ms.
+
+### Phase 5 - decomposition
+
+Every module split with barrels keeping import paths stable: `ui/icons`,
+`lib/api` (types/query/mock/http), `lib/utils` (`dashboard/*` + `format`),
+`lib/export` (html/rows/summary/excel/pdf/csv), `table/`, `barrier-modal/`,
+`chart/`, `settings/`, `context/settings`, `hooks/dashboard`, `lib/enums`,
+`lib/constants`, `lib/mock`, `lib/server/sql`, island `dashboard/`,
+`components/export`, `components/filter`, `components/loading`. Zero files
+over 200 lines.
+
+### Follow-up rounds
+
+- YAGNI deletions: ThemeToggle, THEME/ACCENT codes, unused `to*` mappers,
+  `LOCATION_DIST`, members scaffolding + tab, `ALL` DB sentinel row.
+- Docs drift: Fresh route paths, per-task env-file map, tag index rename.
+- Small fixes: shared route parsers (incl. kpi float), urgent-view reset,
+  location-aware `hasActiveFilters`, reference-counted body lock, date
+  guards, chart tick dedupe, SQL `''` splitting.
+- `deno task test`: 35 unit tests over pure modules (format, kpi, chart,
+  filters, resolve, query, where, pagination, geometry).
+- Production `vite build` plus preview smoke (`/`, `/api/health` 200).
+
+## 3. Data loading as built
 
 ```text
-lib/data.ts mock 6800 rows -> mockApi -> resolve -> routes/index.tsx SSR full array
--> Dashboard initialBarriers -> useDashboard client filter/sort/paginate/KPI/chart
+mock mode:  routes/index SSR full list -> Dashboard -> useDashboard (browser
+            filter/sort/paginate/KPI/chart over initialBarriers)
+http mode:  routes/index SSR vocabularies -> Dashboard ->
+            useServerDashboard (getBarriers/getKpi/getChartData per scope)
+shared:     DashboardSections render tree; filter-state/selection/persistence
+            slices; server-only SQL under lib/server (never imported by islands)
 ```
 
-Parallel unused path: `routes/api/* -> lib/server/sql/* -> Postgres`.
-
-Blockers:
-
-1. `routes/index.tsx` hardcodes `mockApi.getAllBarriers({})`. Ships full dataset
-   as props. No paged mode, no `syncedAt`, no stale or error states.
-2. `hooks/useDashboard.ts` filters, sorts, paginates, and aggregates all rows in
-   browser. Sort recomputes `toLowerCase + localeCompare pt-BR` per compare.
-   Fails at 50k rows.
-3. `lib/api.ts getAllBarriers pageSize:100000`, `sql/barriers.ts` cap 100k. No
-   cursor, no chunking, no `since/until`, no timeout. Export builds a 30-80MB
-   HTML string plus 50k `<tr>` print DOM.
-4. Wire plus SQL drop new values: `getKpi` hardcodes 6x
-   `disponibilidade_id=0..5`, `WireKpiSnapshot` has no `by*` buckets,
-   `computeKpi` drops novel conformidade from fixed fields while
-   `computeChartData` lumps it into NC. Chart NC differs from KPI NC.
-5. `toXId ?? 0` maps unknown to a wrong known id. `fromXId` maps unknown id to
-   a plausible label. Silent corruption on new Fracttal taxonomy.
-6. No provenance: no `externalCode`, `sourceUpdatedAt`, `syncVersion`, or
-   `sync_state` table. `barriers.id identity` collides with Fracttal ids. Upsert
-   is impossible.
-7. Auth and config not ready: no `lib/server/config.ts`, `getEnv` silent mock
-   fallback, boot-time consts, `.env` vs `.env.local` split (`dev` loads none,
-   `start` loads `.env`, `db:*` loads `.env.local`), no `PUBLIC_` vs
-   server-only enforcement.
-8. Hygiene debt: 24/42 files violate import-desc rule, 7 missing headers, near
-   zero function comments, 22 files over limit (worst `SettingsPanel` 1022,
-   `BarrierModal` 726, `BarriersTable` 627), 2 dead deps (`@std/csv`,
-   `@types/babel__core`), stale `.next/`, triple filter/sort/KPI/color
-   implementations, 7 swallowed `catch{}` blocks.
-
-## 3. What must change - dashboard scope only
-
-### A. Data contract (dashboard side)
-
-- Extend `WireKpiSnapshot` with `byDisponibilidade`, `byConformidade`,
-  `byCriticidade`, plus `syncedAt`. Keep numeric wire and string domain.
-  Keep `conformidade` derived client-side, never trusted from wire.
-- Add opaque provenance passthrough (`externalCode`, `sourceUpdatedAt`). No
-  Fracttal logic in dashboard.
-- Strict mappers: `toXId` throws on unknown, `fromXId` returns an unknown
-  sentinel plus hash fallback color, never a fake known label.
-- Extend `BarriersQuery` with `since/until` plus bounds validation (`page`
-  and `pageSize` max, `sortCol` whitelist, escape `%/_` in `ILIKE`).
-
-### B. Data loading (stop shipping full table)
-
-- `routes/index.tsx`: respect `PUBLIC_API_MODE`, query paged `listBarriers`
-  plus `getKpi` on server or via `httpAdapter`. Pass `initialPage + total +
-  kpi + syncedAt`, not the full array.
-- `useDashboard` plus `Dashboard` island: server-paginated mode calling
-  `api.getBarriers` and `api.getKpi` on location, filter, and page change, with
-  loading, error, and stale UI. Keep client full-array mode for mock demo only.
-- Remove `getAllBarriers 100k` hack from export and KPI paths. Use server
-  aggregation.
-- Add `GET /api/health` and a unified error envelope
-  `{error,code,requestId}`: `400` on bad query, `502` on upstream or DB, typed
-  client errors, no `catch -> null`.
-
-### C. Reconciliation and scale
-
-- Fix SQL `getKpi` to `GROUP BY` dynamic buckets.
-- Unify novel-conformidade policy: `non-conforme = total - conforme -
-  explicit-new`, applied the same way in `computeKpi`, `computeChartData`,
-  `KpiGrid`, and export `summaryRows`.
-- Fix `ncCount = kpi.naoConforme`, not `degradado + indisponivel`.
-- Perf: reuse single-pass `computeKpi` (remove 9-pass export counting),
-  precomputed sort keys plus `Intl.Collator`, debounced query, CSV-first export
-  with row cap, `pg_trgm` index or rename misleading `tag_trgm` btree.
-- Keep working scale invariants: chart scroll cap at 18 rows, table
-  pagination, scrollable pills, capped stagger delays.
-
-### D. Config and secrets hygiene (no confidential code)
-
-- Add `lib/server/config.ts` spec only: reads bare non-`PUBLIC_` vars,
-  validates shape, throws at boot without echoing values.
-- Fix `deno.jsonc` env-file story plus docs (`DATABASE.md`, `API.md`,
-  `.env.example` header): one canonical file or an explicit per-task map. Fix
-  `dev` loading no file today.
-- Codify `PUBLIC_` as client-safe and may-bundle vs bare as server-only in
-  `lib/server` only. Enforce `islands/*` never imports `lib/server/*`.
-- Delete dead code: `ThemeToggle`, `THEME/ACCENT_CODES`, unused `to*`,
-  `LOCATION_DIST`, members CRUD preview, `ALL` DB sentinel row, `.next/`,
-  dead deps.
-
-### E. Decomposition (relaxed ~200 lines)
-
-- Split `SettingsPanel/`, `BarrierModal/`, `Table/`, `export/`, `chart/`,
-  `constants/`, `icons/`, `api/`, `sql/`, and `useDashboard` slices. New files
-  stay under ~200 lines with one responsibility each. Colocate
-  `*-options.ts` and `*-geometry.ts` next to owners.
-
-### F. Non-goals
+## 4. Non-goals (unchanged)
 
 - No Fracttal OAuth, fetch, mapping values, webhook receiver, poller, or
   secrets. Only dashboard seams plus placeholders in `.env.example` and docs.
 
-## 4. Execution phases
+## 5. Deliberately left out / known limitations
 
-- Phase 0 baseline (0.5d): snapshot `deno check`, `lint`, `fmt --check`,
-  `wc -l`, `git status`, divergence matrix.
-- Phase 1 hygiene (1-2d): dead deps, `.next/`, imports desc, 7 headers,
-  function comments. Gate: `deno check`, `deno lint`, `deno fmt` in order, no
-  file args.
-- Phase 2 contract plus mappers (2d): wire `by*` plus `syncedAt`, strict
-  `to/fromXId`, provenance passthrough, query validation. Gate:
-  `chaos-scale.ts` extended to SQL path plus novel status.
-- Phase 3 loading plus errors (2-3d): paged index, server-mode hook, health
-  and error envelope, lazy pool, FK and range checks, storage validation plus
-  hydration race fix. Gate: mock vs http parity, stale-page trap fixed.
-- Phase 4 scale plus reconcile (2d): `GROUP BY` KPI, unified NC policy,
-  single-pass export, sort and collator and debounce, trigram, export cap.
-  Gate: 50k synthetic perf check.
-- Phase 5 decomposition (3-4d): splits above, no behavior change. Gate per
-  split: check, lint, fmt.
-- Phase 6 docs plus final gate (1d): fix `DATABASE.md` Fresh paths, env-file
-  docs, API contract, mapping policy, sync ownership note (future server wins,
-  trigger derives conformidade). Final full gate.
-- Commits: atomic Conventional Commits, one logical change each.
-
-## 5. Risks
-
-- Multiline import length metric is ambiguous (physical first-line vs logical
-  total). Confirm before mass reorder.
-- Wire break needs the future server to return `by*` plus `syncedAt`.
-  Dashboard must degrade to fixed fields with a warning until then.
-- Strict `fromXId` will surface previously hidden bad rows as Unknown. Needs
-  UI empty-state copy.
+- No `externalCode` / `sourceUpdatedAt` provenance passthrough and no
+  `sync_state` table (planned, unneeded until the sync worker exists).
+- No `lib/server/config.ts` boot validation; no unified `{error,code,
+  requestId}` envelope; `getAllBarriers` 100k path retained for mock/export.
+- Settings-defaults race (gate firing before settings hydration) narrowed by
+  sanitization but not re-architected; page-only export and page-local detail
+  resolution in server mode (documented in code).
+- `toXId` skips unknown values with a warning instead of throwing (so live
+  filters degrade visibly rather than crash).
+- `pg_trgm` not adopted: `%q%` does seq-scan by documented decision.
