@@ -2,6 +2,7 @@
 // This is why it exists: surfaces full metadata, status badges, NC alert, and
 // chronological statusHistory without leaving the dashboard grid.
 import { useCallback, useEffect, useState } from "preact/hooks";
+import { lockBody, unlockBody } from "../../lib/body-lock.ts";
 import { HistoryIcon, InfoIcon } from "../ui/Icons.tsx";
 import { BarrierDetails } from "./BarrierDetails.tsx";
 import { BarrierHistory } from "./BarrierHistory.tsx";
@@ -21,12 +22,14 @@ export function BarrierModal({ barrier, onClose }: Props) {
     document.addEventListener("keydown", key);
     return () => document.removeEventListener("keydown", key);
   }, [key]);
+  // Shared counter with SettingsPanel: scroll resumes only after the last
+  // overlay closes, so closing one dialog cannot unlock scroll under another.
   useEffect(() => {
-    document.body.style.overflow = barrier ? "hidden" : "";
-    if (barrier) setTab("details");
-    return () => {
-      document.body.style.overflow = "";
-    };
+    if (barrier) {
+      lockBody();
+      setTab("details");
+      return () => unlockBody();
+    }
   }, [barrier]);
   const isOpen = !!barrier;
   return (

@@ -7,9 +7,10 @@ import {
   useSettings,
 } from "../context/SettingsContext.tsx";
 import { PanelFooter, PanelHeader } from "./settings/PanelChrome.tsx";
-import { FilterIcon, SunIcon } from "./ui/Icons.tsx";
 import { AppearanceSection } from "./settings/AppearanceSection.tsx";
 import { FiltersSection } from "./settings/FiltersSection.tsx";
+import { lockBody, unlockBody } from "../lib/body-lock.ts";
+import { FilterIcon, SunIcon } from "./ui/Icons.tsx";
 import { useEffect, useState } from "preact/hooks";
 import type { Theme } from "../lib/types.ts";
 
@@ -45,11 +46,13 @@ export function SettingsPanel({ open, onClose, companyName }: Props) {
     return () => document.removeEventListener("keydown", h);
   }, [onClose]);
 
+  // Shared counter with BarrierModal: scroll resumes only after the last
+  // overlay closes, so closing the panel cannot unlock scroll under the modal.
   useEffect(() => {
-    document.body.style.overflow = open ? "hidden" : "";
-    return () => {
-      document.body.style.overflow = "";
-    };
+    if (open) {
+      lockBody();
+      return () => unlockBody();
+    }
   }, [open]);
 
   // handleTheme: applies the theme with a brief press animation.
