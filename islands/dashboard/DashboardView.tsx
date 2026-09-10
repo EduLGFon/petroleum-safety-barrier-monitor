@@ -1,36 +1,58 @@
-// DashboardView - interactive monitor sections wired to filters, table and exports.
-// Why: split from islands/Dashboard.tsx so the island root stays slim while this view keeps all state and effects intact.
-import { DashboardFooter, DashboardOverlays } from "./DashboardChrome.tsx";
-import { ConformidadeChart } from "../../components/ConformidadeChart.tsx";
-import { LocationFilter } from "../../components/LocationFilter.tsx";
+// DashboardView - mode switch between client and server data views.
+// Why: mock mode aggregates the SSR'd list in the browser; HTTP mode pages
+// from the API. Both render the shared DashboardSections tree.
+import { useServerDashboard } from "../../hooks/dashboard/server.ts";
 import { LoadingScreen } from "../../components/LoadingScreen.tsx";
-import { ExportToolbar } from "../../components/ExportToolbar.tsx";
-import { BarriersTable } from "../../components/BarriersTable.tsx";
 import { useSettings } from "../../context/SettingsContext.tsx";
-import { useCallback, useEffect, useState } from "preact/hooks";
-import { useDashboardVocabularies } from "./vocabularies.ts";
-import { StatusBand } from "../../components/StatusBand.tsx";
+import type { Barrier, Vocabularies } from "../../lib/types.ts";
+import { DashboardSections } from "./DashboardSections.tsx";
 import { useDashboard } from "../../hooks/useDashboard.ts";
-import { FilterBar } from "../../components/FilterBar.tsx";
-import { sanitizeFilterPatch } from "../../lib/utils.ts";
-import { KpiGrid } from "../../components/KpiGrid.tsx";
-import { Header } from "../../components/Header.tsx";
-import type { Barrier } from "../../lib/types.ts";
-import { NcAlert } from "./NcAlert.tsx";
+import { useDashboardVocabularies } from "./vocabularies.ts";
+import { useCallback, useEffect, useState } from "preact/hooks";
 
 interface Props {
   initialBarriers: Barrier[];
   companyName: string;
+  apiMode: "mock" | "http";
+  apiBaseUrl: string;
+  vocabularies: Vocabularies | null;
 }
 
-// DashboardView: wires useDashboard state to filters/table/exports; derives live select vocabularies and applies settings defaults once after hydration.
+// DashboardView: picks the data mode; splash, settings, and sections live
+// in the mode views below so hooks never run conditionally.
 export function DashboardView(
-  { initialBarriers: barriers, companyName }: Props,
+  { initialBarriers, companyName, apiMode, apiBaseUrl, vocabularies }: Props,
+) {
+  const { settings } = useSettings();
+  if (apiMode === "http") {
+    return (
+      <ServerView
+        baseUrl={apiBaseUrl}
+        vocabularies={vocabularies}
+        companyName={companyName}
+        defaultLocation={settings.defaultLocation}
+      />
+    );
+  }
+  return (
+    <ClientView
+      barriers={initialBarriers}
+      companyName={companyName}
+      defaultLocation={settings.defaultLocation}
+    />
+  );
+}
+
+// ClientView: mock-mode dashboard over the SSR'd barrier list.
+function ClientView(
+  { barriers, companyName, defaultLocation }: {
+    barriers: Barrier[];
+    companyName: string;
+    defaultLocation: string;
+  },
 ) {
   const [loading, setLoading] = useState(true);
   const [visible, setVisible] = useState(false);
-  const [settingsOpen, setSettingsOpen] = useState(false);
-  const { settings } = useSettings();
 
   // handleLoadDone: exits LoadingScreen then fades the shell in via rAF + short delay; stable callback for LoadingScreen onDone.
   const handleLoadDone = useCallback(() => {
@@ -39,49 +61,7 @@ export function DashboardView(
     requestAnimationFrame(() => setTimeout(() => setVisible(true), 30));
   }, []);
 
-  const {
-    location,
-    filters,
-    kpi,
-    chartData,
-    rows,
-    allFiltered,
-    filteredTotal,
-    totalPages,
-    hasActiveFilters,
-    hydrated,
-    selectedIds,
-    openBarrier,
-    setOpenId,
-    setLocation,
-    setFilter,
-    setSort,
-    resetFilters,
-    showUrgentes,
-    toggleSelect,
-    selectAll,
-    clearAll,
-  } = useDashboard(barriers, settings.defaultLocation);
-
-  // Apply settings default filters after hydration (once). The patch is
-  // sanitized so a stale or tampered preset can never wedge the grid.
-  const [defaultsApplied, setDefaultsApplied] = useState(false);
-  useEffect(() => {
-    if (!hydrated || defaultsApplied || loading) return;
-    setDefaultsApplied(true);
-    // Only apply settings defaults if no persisted state existed
-    const patch = sanitizeFilterPatch(settings.defaultFilters);
-    if (Object.keys(patch).length > 0) {
-      setFilter(patch);
-    }
-  }, [hydrated, defaultsApplied, loading, settings.defaultFilters, setFilter]);
-
-  // Unified NC count: every non-Conforme barrier (fail-closed, novel statuses
-  // included) drives the alert, matching KpiGrid and the chart.
-  const ncCount = kpi.naoConforme;
-  const isUrgentesActive = filters.conformidade === "Não Conforme" &&
-    filters.sortCol === "statusSince";
-
+  const dash = useDashboard(barriers, defaultLocation);
   const { dispOpts, confOpts, catOpts } = useDashboardVocabularies(barriers);
 
   return (
@@ -89,107 +69,145 @@ export function DashboardView(
       {loading && (
         <LoadingScreen onDone={handleLoadDone} companyName={companyName} />
       )}
+      <DashboardSections
+        dash={dash}
+        barriers={barriers}
+        dispOpts={dispOpts}
+        confOpts={confOpts}
+        catOpts={catOpts}
+        visible={visible}
+        loading={loading}
+        companyName={companyName}
+      />
+    </>
+  );
+}
 
+// ServerView: HTTP-mode dashboard paging from the API per scope change.
+function ServerView(
+  { baseUrl, vocabularies, companyName, defaultLocation }: {
+    baseUrl: string;
+    vocabularies: Vocabularies | null;
+    companyName: string;
+    defaultLocation: string;
+  },
+) {
+  const [splashDone, setSplashDone] = useState(false);
+  const [shown, setShown] = useState(false);
+  const dash = useServerDashboard(baseUrl, defaultLocation);
+  const { loading, error, retry, rows } = dash;
+
+  // Fade the shell in once the first scope resolves; later refetches keep
+  // showing stale data instead of flashing the splash on every keystroke.
+  useEffect(() => {
+    if (!loading && !error) setShown(true);
+  }, [loading, error]);
+  const firstLoad = loading && rows.length === 0 && !splashDone;
+
+  if (error && rows.length === 0) {
+    return (
       <div
-        className="aurora-shell"
+        role="alert"
+        className="glass-card"
         style={{
-          fontFamily: "var(--font-sans)",
-          minHeight: "100dvh",
-          padding: "var(--d-page)",
-          boxSizing: "border-box",
-          color: "var(--text-primary)",
-          fontSize: "var(--d-page-fs)",
-          opacity: visible ? 1 : 0,
-          transform: visible ? "none" : "translateY(6px)",
-          transition:
-            "opacity .5s var(--ease-out), transform .5s var(--ease-out)",
+          maxWidth: 520,
+          margin: "15vh auto",
+          padding: 24,
+          textAlign: "center",
         }}
       >
-        {/* Header */}
-        <Header
-          onOpenSettings={() => setSettingsOpen(true)}
+        <div
+          style={{
+            fontSize: "var(--d-lead)",
+            fontWeight: 700,
+            color: "var(--alert-nc-text)",
+            marginBottom: 8,
+          }}
+        >
+          Falha ao carregar dados
+        </div>
+        <div
+          style={{
+            fontSize: "var(--d-small)",
+            color: "var(--text-muted)",
+            marginBottom: 16,
+          }}
+        >
+          {error}
+        </div>
+        <button
+          type="button"
+          onClick={retry}
+          className="lift"
+          style={{
+            padding: "var(--d-btn-pad)",
+            fontSize: "var(--d-small)",
+            fontWeight: 700,
+            borderRadius: 7,
+            cursor: "pointer",
+            border: "1px solid var(--accent)",
+            background: "transparent",
+            color: "var(--accent)",
+          }}
+        >
+          Tentar novamente
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <>
+      {firstLoad && (
+        <LoadingScreen
+          onDone={() => setSplashDone(true)}
           companyName={companyName}
         />
-
-        {/* Location tabs */}
-        <div style={{ animation: "slideUp .3s .04s var(--ease-out) both" }}>
-          <LocationFilter
-            selected={location}
-            allBarriers={barriers}
-            onChange={setLocation}
-          />
+      )}
+      {error && (
+        <div
+          role="alert"
+          style={{
+            maxWidth: 1400,
+            margin: "0 auto var(--d-bar-gap) auto",
+            padding: "10px 14px",
+            borderRadius: 10,
+            fontSize: "var(--d-small)",
+            color: "#f87171",
+            border: "1px solid rgba(248,113,113,.4)",
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            gap: 12,
+          }}
+        >
+          <span>{error}</span>
+          <button
+            type="button"
+            onClick={retry}
+            style={{
+              background: "transparent",
+              border: "none",
+              color: "inherit",
+              fontWeight: 700,
+              cursor: "pointer",
+              whiteSpace: "nowrap",
+            }}
+          >
+            Tentar novamente
+          </button>
         </div>
-
-        {/* Status band */}
-        <div style={{ animation: "slideUp .3s .08s var(--ease-out) both" }}>
-          <StatusBand
-            kpi={kpi}
-            activeFilter={filters.disponibilidade}
-            onFilter={(v) => setFilter({ disponibilidade: v })}
-          />
-        </div>
-
-        {/* KPI cards */}
-        <KpiGrid kpi={kpi} location={location} />
-
-        {/* Chart */}
-        <div style={{ animation: "slideUp .3s .28s var(--ease-out) both" }}>
-          <ConformidadeChart data={chartData} />
-        </div>
-
-        {/* NC alert - red glass with the signature red glow */}
-        <NcAlert
-          ncCount={ncCount}
-          isUrgentesActive={isUrgentesActive}
-          showUrgentes={showUrgentes}
-          resetFilters={resetFilters}
-        />
-
-        {/* Export toolbar + filters */}
-        <div style={{ animation: "slideUp .3s .36s var(--ease-out) both" }}>
-          <ExportToolbar
-            selectedIds={selectedIds}
-            allFiltered={allFiltered}
-            onSelectAll={selectAll}
-            onClearAll={clearAll}
-            companyName={companyName}
-          />
-          <FilterBar
-            filters={filters}
-            filteredTotal={filteredTotal}
-            hasActiveFilters={hasActiveFilters}
-            disponibilidades={dispOpts}
-            conformidades={confOpts}
-            categorias={catOpts}
-            onFilter={setFilter}
-            onReset={resetFilters}
-          />
-        </div>
-
-        {/* Table */}
-        <div style={{ animation: "slideUp .3s .4s var(--ease-out) both" }}>
-          <BarriersTable
-            rows={rows}
-            filters={filters}
-            filteredTotal={filteredTotal}
-            totalPages={totalPages}
-            selectedIds={selectedIds}
-            onToggleSelect={toggleSelect}
-            onSort={setSort}
-            onPageChange={(p) => setFilter({ page: p })}
-            onPageSize={(n) => setFilter({ pageSize: n })}
-            onSelect={(b) => setOpenId(b.id)}
-          />
-        </div>
-
-        <DashboardFooter companyName={companyName} />
-      </div>
-
-      <DashboardOverlays
-        openBarrier={openBarrier}
-        onCloseBarrier={() => setOpenId(null)}
-        settingsOpen={settingsOpen}
-        onCloseSettings={() => setSettingsOpen(false)}
+      )}
+      <DashboardSections
+        dash={dash}
+        barriers={[]}
+        stations={vocabularies?.locations}
+        total={dash.filteredTotal}
+        dispOpts={vocabularies?.disponibilidades ?? []}
+        confOpts={vocabularies?.conformidades ?? []}
+        catOpts={vocabularies?.categorias ?? []}
+        visible={shown}
+        loading={loading}
         companyName={companyName}
       />
     </>
