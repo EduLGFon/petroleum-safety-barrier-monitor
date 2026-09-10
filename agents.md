@@ -6,13 +6,17 @@
   headline biscuit pills, overly robotic filler, and unnatural prose in message
   templates and generated outputs. Prefer clean, standard hyphens ("-") and
   natural human-like formatting.
-- Be concise and direct in your responses.
+- Be concise and direct in your responses. Avoid verbosity.
 
 ## Code rules
 
 - Imports in every file must be organized descending by line length (longest on
   top to shortest on bottom of the imports section).
-- Avoid overly large files (>150 lines) and complex syntax. It's better splitting in several small files or even folders, if needed
+- Prefer small, focused files (~150 lines as a soft guide, not a hard budget).
+  Judge each case: splitting a cohesive module across files can hurt readability
+  more than a slightly longer file helps it. Split when a file mixes
+  responsibilities or becomes hard to follow; keep it whole when the logic reads
+  best in one place. Avoid overly large files and complex syntax.
 - In all files: include a top-of-file comment describing what the file does and
   why it is needed (giving the most important context up front). Always write
   good comments on functions and non-obvious code, adhering to good commenting
@@ -58,3 +62,14 @@
   logical change (`type(scope): short description`, e.g. `fix(chart): ...`).
   Group several files in the same commit only when together they implement a
   single thing. Never bundle unrelated changes in one commit.
+- Delegate independent workstreams and context-heavy exploration to subagents
+  via the Task tool; handle trivial or tightly-coupled work directly to avoid
+  overhead.
+
+## Documentation rules
+
+- Before making architectural changes (new modules, data flows, runtime
+  lifecycle, bridge topology, persistence, config), read `docs/ARCHITECTURE.md`
+  first and follow the structure it describes.
+- When your change alters anything described there, update the affected sections
+  in the same commit so the doc never drifts from the code.
