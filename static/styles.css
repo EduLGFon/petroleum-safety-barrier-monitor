@@ -16,11 +16,13 @@ body {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
-/* Page canvas — html/body carry the theme background so no unpainted
-   (white) area can ever show around the app on any density or theme. */
+/* Page canvas — html/body carry the aurora gradient so any sliver of
+   document exposed around the shell (overscroll, scrollbar gutter, stretch)
+   blends into the same gradient instead of flashing a flat base color. */
 html,
 body {
-  background: var(--bg-page);
+  background: var(--au-page);
+  background-color: var(--au-page-base);
 }
 body {
   min-height: 100dvh;
@@ -73,7 +75,7 @@ input[type="search"]::-webkit-search-cancel-button {
   --alert-nc-sub: #991b1b;
   /* Aurora identity on light mist */
   --au-page:
-    radial-gradient(1200px 400px at 20% 0%,#c7d2fe 0%,#e0f2fe 45%,#e9eefb 100%);
+    radial-gradient(120vmax 120vmin at 20% 0%,#c7d2fe 0%,#e0f2fe 45%,#e9eefb 100%);
   --au-page-base: #e9eefb;
   --au-card: rgba(255,255,255,.78);
   --au-card-border: rgba(15,23,42,.08);
@@ -129,7 +131,7 @@ input[type="search"]::-webkit-search-cancel-button {
   --alert-nc-sub: rgba(252,165,165,.65);
   /* Aurora identity */
   --au-page:
-    radial-gradient(1200px 400px at 20% 0%,#1d2b64 0%,#0a1128 45%,#050a18 100%);
+    radial-gradient(120vmax 120vmin at 20% 0%,#1d2b64 0%,#0a1128 45%,#050a18 100%);
   --au-page-base: #050a18;
   --au-card: rgba(255,255,255,.06);
   --au-card-border: rgba(255,255,255,.1);
@@ -183,7 +185,7 @@ input[type="search"]::-webkit-search-cancel-button {
   --alert-nc-sub: rgba(252,165,165,.65);
   /* Aurora identity on pure black */
   --au-page:
-    radial-gradient(1200px 400px at 20% 0%,#141b4d 0%,#05070f 45%,#000000 100%);
+    radial-gradient(120vmax 120vmin at 20% 0%,#141b4d 0%,#05070f 45%,#000000 100%);
   --au-page-base: #000000;
   --au-card: rgba(255,255,255,.06);
   --au-card-border: rgba(255,255,255,.1);
