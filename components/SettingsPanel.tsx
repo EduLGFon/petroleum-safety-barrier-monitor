@@ -11,7 +11,7 @@ import { AppearanceSection } from "./settings/AppearanceSection.tsx";
 import { FiltersSection } from "./settings/FiltersSection.tsx";
 import { lockBody, unlockBody } from "../lib/body-lock.ts";
 import { FilterIcon, SunIcon } from "./ui/Icons.tsx";
-import { useEffect, useState } from "preact/hooks";
+import { useEffect, useRef, useState } from "preact/hooks";
 import type { Theme } from "../lib/types.ts";
 
 interface Props {
@@ -74,10 +74,45 @@ export function SettingsPanel({ open, onClose, companyName }: Props) {
     setTimeout(() => setActiveDensity(null), 350);
   };
 
+  // Focus management: remember the trigger on open, focus the panel, restore
+  // the trigger on close so keyboard users land back where they started.
+  const panelRef = useRef<HTMLElement | null>(null);
+  const restoreFocusRef = useRef<HTMLElement | null>(null);
+  const activeEl = () => document.activeElement as HTMLElement | null;
+  useEffect(() => {
+    if (open) {
+      restoreFocusRef.current = activeEl();
+      panelRef.current?.focus();
+    } else if (restoreFocusRef.current) {
+      restoreFocusRef.current.focus();
+      restoreFocusRef.current = null;
+    }
+  }, [open]);
+  const trapTab = (e: KeyboardEvent) => {
+    if (e.key !== "Tab" || !open) return;
+    const root = panelRef.current;
+    if (!root) return;
+    const focusables = root.querySelectorAll<HTMLElement>(
+      'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])',
+    );
+    if (focusables.length === 0) return;
+    const first = focusables[0];
+    const last = focusables[focusables.length - 1];
+    if (e.shiftKey && activeEl() === first) {
+      e.preventDefault();
+      last.focus();
+    } else if (!e.shiftKey && activeEl() === last) {
+      e.preventDefault();
+      first.focus();
+    }
+  };
+
   return (
     <>
       {/* Backdrop */}
       <div
+        inert={!open}
+        aria-hidden="true"
         onClick={onClose}
         style={{
           position: "fixed",
@@ -93,8 +128,13 @@ export function SettingsPanel({ open, onClose, companyName }: Props) {
 
       {/* Panel */}
       <aside
+        inert={!open}
         role="dialog"
         aria-label="Configurações"
+        aria-hidden={!open}
+        tabIndex={-1}
+        ref={panelRef}
+        onKeyDown={trapTab}
         style={{
           position: "fixed",
           top: 0,

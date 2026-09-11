@@ -59,10 +59,22 @@ export function BarriersTable(
                 {COLS.map((c) => (
                   <th
                     key={c.col}
+                    scope="col"
+                    aria-sort={filters.sortCol === c.col
+                      ? filters.sortDir === "asc" ? "ascending" : "descending"
+                      : "none"}
+                    tabIndex={0}
                     onClick={() => onSort(c.col)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" || e.key === " ") {
+                        e.preventDefault();
+                        onSort(c.col);
+                      }
+                    }}
                     style={{
                       ...thSt,
                       width: c.w,
+                      cursor: "pointer",
                       color: filters.sortCol === c.col
                         ? "var(--accent)"
                         : "var(--text-muted)",

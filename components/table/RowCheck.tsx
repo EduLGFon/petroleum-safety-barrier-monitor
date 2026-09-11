@@ -6,7 +6,7 @@ import { AURORA } from "../../lib/aurora.ts";
 export function RowChk({ checked }: { checked: boolean }) {
   return (
     <div
-      className={checked ? "animate-check" : ""}
+      className={"trow-chk " + (checked ? "animate-check" : "")}
       style={{
         width: "var(--d-rowchk)",
         height: "var(--d-rowchk)",

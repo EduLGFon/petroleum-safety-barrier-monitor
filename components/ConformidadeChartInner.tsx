@@ -131,6 +131,7 @@ export default function ConformidadeChartInner({ data }: Props) {
       <div
         style={{
           display: "flex",
+          flexWrap: "wrap",
           gap: "var(--d-gap-lg)",
           fontSize: "var(--d-small)",
           color: "var(--text-muted)",

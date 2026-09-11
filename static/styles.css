@@ -243,6 +243,17 @@ body,
   border-radius: 4px;
 }
 
+/* Row checkbox: visible focus ring on the drawn box (the real input is clipped). */
+.trow-chk-label {
+  display: inline-flex;
+  cursor: pointer;
+}
+.trow-chk-label > input:focus-visible + .trow-chk {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
 /* ── Aurora premium shell ──────────────────────────────────────────────
    Mesh canvas + glass cards. The canvas
    follows the active theme and the

@@ -82,6 +82,8 @@ export function ChartTooltip(
         boxShadow: "var(--shadow-md)",
         pointerEvents: "none",
         maxWidth: 260,
+        overflowWrap: "break-word",
+        minWidth: 120,
       }}
     >
       <div

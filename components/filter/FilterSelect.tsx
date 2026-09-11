@@ -39,6 +39,9 @@ export function Sel(
         transition: "all .2s var(--ease-std)",
         // Long vocabularies (70+ categories) must not stretch the row.
         maxWidth: "min(320px, 100%)",
+        // Share narrow rows evenly instead of one stuck at full width.
+        flex: "1 1 170px",
+        minWidth: 0,
       }}
     >
       <option value="">{placeholder}</option>

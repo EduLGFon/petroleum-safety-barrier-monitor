@@ -30,6 +30,13 @@ export function BarrierRow(
   return (
     <tr
       key={b.id}
+      tabIndex={0}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          onSelect(b);
+        }
+      }}
       style={{
         borderBottom: `1px solid ${AURORA.rowDivider}`,
         background: isSel ? "rgba(99,102,241,.12)" : "transparent",
@@ -52,14 +59,29 @@ export function BarrierRow(
       }}
     >
       {/* Checkbox */}
-      <td
-        style={{ padding: "var(--d-cell-pad)" }}
-        onClick={(e) => {
-          e.stopPropagation();
-          onToggleSelect(b.id);
-        }}
-      >
-        <RowChk checked={isSel} />
+      <td style={{ padding: "var(--d-cell-pad)" }}>
+        <label
+          className="trow-chk-label"
+          onClick={(e) => {
+            e.stopPropagation();
+          }}
+        >
+          <input
+            type="checkbox"
+            checked={isSel}
+            onChange={() => onToggleSelect(b.id)}
+            aria-label={`Selecionar ${b.tag}`}
+            style={{
+              position: "absolute",
+              opacity: 0,
+              width: 1,
+              height: 1,
+              overflow: "hidden",
+              clip: "rect(0 0 0 0)",
+            }}
+          />
+          <RowChk checked={isSel} />
+        </label>
       </td>
       {/* # */}
       <td
