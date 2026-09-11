@@ -17,12 +17,16 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 /* Page canvas — html/body carry the aurora gradient so any sliver of
-   document exposed around the shell (overscroll, scrollbar gutter, stretch)
-   blends into the same gradient instead of flashing a flat base color. */
+   document exposed around the shell (scrollbar gutter, stretch) blends
+   into the same gradient instead of flashing a flat base color. The
+   gray flash seen when flinging past the page ends is the browser's own
+   overscroll glow, painted by Chromium's internals with a default canvas
+   color that ignores page backgrounds, so overscroll is suppressed too. */
 html,
 body {
   background: var(--au-page);
   background-color: var(--au-page-base);
+  overscroll-behavior-y: none;
 }
 body {
   min-height: 100dvh;
