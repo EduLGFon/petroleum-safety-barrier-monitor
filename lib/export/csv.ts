@@ -5,6 +5,12 @@ import { assertBrowser, download } from "./html.ts";
 import { row } from "./rows.ts";
 import type { Barrier } from "../types.ts";
 
+// ;-quote-escapes one CSV cell (double quotes double); shared by export so tests
+// can cover the escaping that otherwise only runs inside a browser download.
+export function csvCell(v: unknown): string {
+  return `"${String(v ?? "").replace(/"/g, '""')}"`;
+}
+
 // Builds ;-separated, quote-escaped CSV with BOM for pt-BR Excel; reuses row(); browser-only.
 export function exportToCSV(
   barriers: Barrier[],
@@ -27,10 +33,9 @@ export function exportToCSV(
     "Comentários",
     "Plano de Ação",
   ];
-  const esc = (v: unknown) => `"${String(v ?? "").replace(/"/g, '""')}"`;
   const csv = [
-    hdrs.map(esc).join(";"),
-    ...barriers.map((b) => row(b).map(esc).join(";")),
+    hdrs.map(csvCell).join(";"),
+    ...barriers.map((b) => row(b).map(csvCell).join(";")),
   ].join("\r\n");
   download(
     new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8;" }),

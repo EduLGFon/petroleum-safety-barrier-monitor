@@ -1,8 +1,8 @@
 // Chaos scale check - proves the UI logic survives future catalog growth.
-// This is why it exists: synthesizes 50 stations x 70 categories plus brand
-// new status/criticality values, then asserts every dynamic-data contract
-// (KPI reconciliation, chart derivation, filter vocabularies, color/label
-// fallbacks, pagination). Run with: deno run scripts/chaos-scale.ts
+// This is why it exists: synthesizes 50 stations x 100 categories (50k rows)
+// plus brand new status/criticality values, then asserts every dynamic-data
+// contract (KPI reconciliation, chart derivation, filter vocabularies,
+// color/label fallbacks, pagination). Run with: deno run scripts/chaos-scale.ts
 import type { Barrier } from "../lib/types.ts";
 import {
   applyFilters,
@@ -18,7 +18,7 @@ import {
   shortStatusLabel,
 } from "../lib/constants.ts";
 
-const STATIONS = 50, CATS = 70, PER_COMBO = 3;
+const STATIONS = 50, CATS = 100, PER_COMBO = 10;
 const NEW_DISP = "Em Comissionamento";
 const NEW_CONF = "Parcialmente Conforme";
 const NEW_CRIT = "Muito Crítica";
@@ -103,7 +103,7 @@ check(
 
 const chart = computeChartData(data);
 check(
-  "chart derives 70 rows from data",
+  "chart derives one row per category",
   chart.length === CATS,
   `${chart.length}`,
 );
@@ -118,12 +118,16 @@ check(
 
 const stations = distinctBy(data, (b) => b.instalacao);
 check(
-  "50 stations discovered",
+  "all stations discovered",
   stations.length === STATIONS,
   `${stations.length}`,
 );
 const cats = distinctBy(data, (b) => b.categoria);
-check("70 categories discovered", cats.length === CATS, `${cats.length}`);
+check(
+  "all categories discovered",
+  cats.length === CATS,
+  `${cats.length}`,
+);
 
 const newStatusRows = applyFilters(data, {
   query: "",
@@ -179,5 +183,7 @@ if (failures) {
   Deno.exit(1);
 }
 console.log(
-  "\nChaos scale check passed: 50 stations, 70 categories, new vocabularies.",
+  "\nChaos scale check passed: " +
+    `${data.length} rows, ${STATIONS} stations, ${CATS} categories, ` +
+    "new vocabularies.",
 );

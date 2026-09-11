@@ -16,10 +16,17 @@ import { httpAdapterFactory } from "../../lib/api/http.ts";
 import { toWireQuery } from "../../lib/api/query.ts";
 import { computeKpi } from "../../lib/utils.ts";
 import { LOCATIONS } from "../../lib/constants.ts";
+import type { BarriersApi } from "../../lib/api/types.ts";
 
 // Server-driven dashboard store; same 22-key contract as useDashboard plus
 // loading/error/retry. Export covers the current page only (see note below).
-export function useServerDashboard(baseUrl: string, defaultLocation = "ALL") {
+// adapterOverride lets tests inject a fake BarriersApi; callers using the real
+// HTTP path stay untouched (it is just httpAdapterFactory(baseUrl)).
+export function useServerDashboard(
+  baseUrl: string,
+  defaultLocation = "ALL",
+  adapterOverride?: BarriersApi,
+) {
   const {
     location,
     filters,
@@ -39,7 +46,10 @@ export function useServerDashboard(baseUrl: string, defaultLocation = "ALL") {
     toggleSelect,
     clearAll,
   } = useSelection();
-  const adapter = useMemo(() => httpAdapterFactory(baseUrl), [baseUrl]);
+  const adapter = useMemo(
+    () => adapterOverride ?? httpAdapterFactory(baseUrl),
+    [adapterOverride, baseUrl],
+  );
 
   const [items, setItems] = useState<Barrier[]>([]);
   const [total, setTotal] = useState(0);
