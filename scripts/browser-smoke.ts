@@ -2,10 +2,14 @@
 // This is why it exists: reproduces client-side behavior (hydration,
 // settings, sorting, selection, modal, chart tooltip) that SSR checks cannot
 // catch, and fails loudly on console errors or failed interaction checks.
-// Run with: deno run -A scripts/browser-smoke.ts [url]
+// Run with: deno run -A scripts/browser-smoke.ts [url] [mode]
+//   url  - app origin (default http://localhost:5173/)
+//   mode - "mock" (default), "http-ok" (live API render + page-only export
+//          notice) or "http-err" (ServerErrorCard + retry re-fires the fetch)
 // Requires a chrome-headless-shell binary for this platform (see CHROME_BIN
 // below); the profile is wiped per run so persisted state can't leak in.
 const BASE = Deno.args[0] ?? "http://localhost:5173/";
+const MODE = Deno.args[1] ?? "mock";
 const PROFILE = "/tmp/opencode/chrome-profile";
 const CHROME_BIN =
   "/tmp/opencode/chrome/hs-arm64/chrome-headless-shell-linux-arm64/chrome-headless-shell";
@@ -100,61 +104,223 @@ async function cdp(scenario: Scenario) {
   }
 }
 
-// Minimal scenario runner: navigate, wait, drive interactions, print console
-// errors + pass/fail checks. Runs in mock mode by default; HTTP mode keeps the
-// loading/banner path client-side tested by hooks/dashboard/server_test.ts.
-await cdp(async (_send: Send, _on: On, call: Call, events: CdpMsg[]) => {
-  const errors: string[] = [];
-  const results: Array<[string, boolean]> = [];
-  const check = (name: string, ok: boolean) => results.push([name, ok]);
-  const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
-  // enable runtime console capture via polling events after run
-  await call("Page.enable");
-  await call("Runtime.enable");
-  await call("Page.navigate", { url: BASE });
-  await wait(9000);
-  const evalJs = async (expr: string): Promise<unknown> => {
-    const r = await call("Runtime.evaluate", {
-      expression: expr,
-      returnByValue: true,
-      awaitPromise: true,
-    }) as { result?: { value?: unknown } };
-    return r.result?.value ?? null;
-  };
-  // Prod builds ship the full mock catalog, so the loading splash can linger
-  // past 9s; real pointer input lands on whatever topmost layer is present,
-  // so keep waiting (extra 20s max) until the screen is interactive.
-  let splashLeft = false;
-  for (let i = 0; i < 40 && !splashLeft; i++) {
-    splashLeft = (await evalJs(
-      `!document.querySelector('div[style*="z-index:9999"]')`,
-    )) as boolean;
-    if (!splashLeft) await wait(500);
-  }
-  for (const e of events) {
-    if (e.method === "Runtime.consoleAPICalled") {
-      const p = e.params as {
-        type: string;
-        args: Array<{ value?: unknown; description?: string }>;
-      };
-      if (p.type === "error") {
+// HTTP-mode scenario: verifies the server-data path against a live API.
+// http-ok asserts the loaded dashboard (Postgres rows, vocabularies-driven
+// tabs, page-only export note, no banner); http-err points the client at a
+// dead origin so the fetch fails and exercises ServerErrorCard + retry.
+function httpScenario(mode: "http-ok" | "http-err") {
+  return async (_send: Send, _on: On, call: Call, events: CdpMsg[]) => {
+    const errors: string[] = [];
+    const results: Array<[string, boolean]> = [];
+    const check = (name: string, ok: boolean) => results.push([name, ok]);
+    const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
+    await call("Page.enable");
+    await call("Runtime.enable");
+    await call("Network.enable");
+    await call("Page.navigate", { url: BASE });
+    await wait(9000);
+    const evalJs = async (expr: string): Promise<unknown> => {
+      const r = await call("Runtime.evaluate", {
+        expression: expr,
+        returnByValue: true,
+        awaitPromise: true,
+      }) as { result?: { value?: unknown } };
+      return r.result?.value ?? null;
+    };
+    for (const e of events) {
+      if (e.method === "Runtime.consoleAPICalled") {
+        const p = e.params as {
+          type: string;
+          args: Array<{ value?: unknown; description?: string }>;
+        };
+        if (p.type === "error") {
+          errors.push(
+            p.args.map((a) => String(a.value ?? a.description ?? "?")).join(
+              " ",
+            ),
+          );
+        }
+      }
+      if (e.method === "Runtime.exceptionThrown") {
         errors.push(
-          p.args.map((a) => String(a.value ?? a.description ?? "?")).join(" "),
+          "EXCEPTION: " +
+            JSON.stringify(
+              (e.params as Record<string, unknown>).exceptionDetails,
+            )
+              .slice(0, 500),
         );
       }
     }
-    if (e.method === "Runtime.exceptionThrown") {
-      errors.push(
-        "EXCEPTION: " +
-          JSON.stringify((e.params as Record<string, unknown>).exceptionDetails)
-            .slice(0, 500),
-      );
-    }
-  }
-  console.log("CONSOLE_ERRORS:", JSON.stringify(errors.slice(0, 10), null, 1));
+    console.log(
+      "CONSOLE_ERRORS:",
+      JSON.stringify(errors.slice(0, 10), null, 1),
+    );
+    // Counts API page fetches seen on the wire (retry must re-fire one).
+    const apiFetches = () =>
+      events.filter((e) =>
+        e.method === "Network.requestWillBeSent" &&
+        (e.params as { request?: { url?: string } }).request?.url?.includes(
+          "/api/barriers",
+        )
+      ).length;
 
-  // ── Static shell checks ────────────────────────────────────────────────
-  const shell = await evalJs(`(() => {
+    if (mode === "http-err") {
+      // ── Failure path: dead API origin -> error card + retry re-fires ────
+      let card: unknown = null;
+      for (let i = 0; i < 24 && !card; i++) {
+        await wait(500);
+        card = await evalJs(`(() => {
+          const a = [...document.querySelectorAll('[role="alert"]')].find(
+            (n) => n.textContent?.includes('Falha ao carregar dados'));
+          return a ? { btn: !!a.querySelector('button') } : null;
+        })()`);
+      }
+      console.log("HTTP_ERR_CARD:", JSON.stringify(card));
+      check(
+        "server error card shows on fetch failure",
+        (card as { btn: boolean } | null)?.btn === true,
+      );
+      const rowsAfterErr = await evalJs(
+        `document.querySelectorAll('tbody tr[tabindex="0"]').length`,
+      );
+      check("no table rows on failure", rowsAfterErr === 0);
+      const firedBefore = apiFetches();
+      await evalJs(
+        `[...document.querySelectorAll('[role="alert"] button')].at(-1)?.click()`,
+      );
+      await wait(1500);
+      const firedAfter = apiFetches();
+      console.log("RETRY_FIRED:", firedBefore, "→", firedAfter);
+      check("retry re-fires the API request", firedAfter > firedBefore);
+      const stillErr = await evalJs(`(() => {
+        const a = [...document.querySelectorAll('[role="alert"]')].find(
+          (n) => n.textContent?.includes('Falha ao carregar dados'));
+        return !!a;
+      })()`);
+      check("error card persists after retry", !!stillErr);
+    } else {
+      // ── Success path: live API renders the dashboard with vocabularies ──
+      for (let i = 0; i < 24; i++) {
+        const gone = (await evalJs(
+          `!document.querySelector('div[style*="z-index:9999"]')`,
+        )) as boolean;
+        if (gone) break;
+        await wait(500);
+      }
+      await wait(500);
+      const dash = await evalJs(`(() => {
+        const note = document.querySelector('[data-page-export-note]');
+        const tabs = document.querySelectorAll(
+          'nav[aria-label="Filtro por instalação"] button');
+        const chart = document.querySelector(
+          'svg[aria-label="Conformidade por categoria"]');
+        return {
+          rows: document.querySelectorAll('tbody tr[tabindex="0"]').length,
+          kpiLabel: document.body.textContent.includes('TOTAL DE BARREIRAS'),
+          chartBars: chart ? chart.querySelectorAll('rect').length : 0,
+          alerts: [...document.querySelectorAll('[role="alert"]')]
+            .map((n) => n.textContent?.slice(0, 40)),
+          note: note ? note.textContent?.trim() : null,
+          tabCount: tabs.length,
+          total: document.querySelector('nav[aria-label="Filtro por instalação"] .tnum')?.textContent,
+        };
+      })()`);
+      console.log("HTTP_OK_DASH:", JSON.stringify(dash));
+      const d = dash as {
+        rows: number;
+        kpiLabel: boolean;
+        chartBars: number;
+        alerts: string[];
+        note: string | null;
+        tabCount: number;
+        total: string;
+      };
+      check("server table renders a full page", d.rows === 25);
+      check("server KPI cards render", d.kpiLabel);
+      check("server chart renders bars", d.chartBars > 0);
+      check(
+        "no error banner or card in success path",
+        d.alerts.length === 0,
+      );
+      check(
+        "page-only export note shown",
+        !!d.note?.includes("página atual"),
+      );
+      check("location tabs come from vocabularies", d.tabCount > 1);
+      check("total count comes from the API", /^[\d.]+$/.test(d.total ?? ""));
+    }
+
+    console.log("RESULTS:", JSON.stringify(results, null, 1));
+    const failed = results.filter(([, ok]) => !ok).length;
+    if (failed > 0 || errors.length > 0) Deno.exit(1);
+  };
+}
+
+// Minimal scenario runner: navigate, wait, drive interactions, print console
+// errors + pass/fail checks. Mock mode covers hydration/settings/selection/
+// modal/tooltip; the http modes exercise the server-data banner/retry path.
+if (MODE !== "mock") {
+  await cdp(httpScenario(MODE === "http-err" ? "http-err" : "http-ok"));
+} else {
+  await cdp(async (_send: Send, _on: On, call: Call, events: CdpMsg[]) => {
+    const errors: string[] = [];
+    const results: Array<[string, boolean]> = [];
+    const check = (name: string, ok: boolean) => results.push([name, ok]);
+    const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
+    // enable runtime console capture via polling events after run
+    await call("Page.enable");
+    await call("Runtime.enable");
+    await call("Page.navigate", { url: BASE });
+    await wait(9000);
+    const evalJs = async (expr: string): Promise<unknown> => {
+      const r = await call("Runtime.evaluate", {
+        expression: expr,
+        returnByValue: true,
+        awaitPromise: true,
+      }) as { result?: { value?: unknown } };
+      return r.result?.value ?? null;
+    };
+    // Prod builds ship the full mock catalog, so the loading splash can linger
+    // past 9s; real pointer input lands on whatever topmost layer is present,
+    // so keep waiting (extra 20s max) until the screen is interactive.
+    let splashLeft = false;
+    for (let i = 0; i < 40 && !splashLeft; i++) {
+      splashLeft = (await evalJs(
+        `!document.querySelector('div[style*="z-index:9999"]')`,
+      )) as boolean;
+      if (!splashLeft) await wait(500);
+    }
+    for (const e of events) {
+      if (e.method === "Runtime.consoleAPICalled") {
+        const p = e.params as {
+          type: string;
+          args: Array<{ value?: unknown; description?: string }>;
+        };
+        if (p.type === "error") {
+          errors.push(
+            p.args.map((a) => String(a.value ?? a.description ?? "?")).join(
+              " ",
+            ),
+          );
+        }
+      }
+      if (e.method === "Runtime.exceptionThrown") {
+        errors.push(
+          "EXCEPTION: " +
+            JSON.stringify(
+              (e.params as Record<string, unknown>).exceptionDetails,
+            )
+              .slice(0, 500),
+        );
+      }
+    }
+    console.log(
+      "CONSOLE_ERRORS:",
+      JSON.stringify(errors.slice(0, 10), null, 1),
+    );
+
+    // ── Static shell checks ────────────────────────────────────────────────
+    const shell = await evalJs(`(() => {
     const chart = document.querySelector('svg[aria-label="Conformidade por categoria"]');
     const sortable = document.querySelector('th[aria-sort]');
     return {
@@ -172,42 +338,42 @@ await cdp(async (_send: Send, _on: On, call: Call, events: CdpMsg[]) => {
       kpiCards: document.querySelectorAll('.kpi-card, [class*="kpi"] [class*="kpi"]').length,
     };
   })()`);
-  console.log("SHELL:", JSON.stringify(shell, null, 1));
-  check("renders chart bars", (shell as { chartBars: number }).chartBars > 0);
-  check(
-    "loading splash resolved",
-    (shell as { loadingGone: boolean }).loadingGone,
-  );
-  check(
-    "accent tokens applied",
-    !!shell && (shell as { hasAccent: boolean }).hasAccent,
-  );
-  check(
-    "mock page has rows",
-    (shell as { rows: number }).rows === 25,
-  );
-  check(
-    "rows expose real checkboxes",
-    (shell as { checkboxes: number }).checkboxes === 25,
-  );
-  check(
-    "sortable header announces a valid sort state",
-    ["ascending", "descending", "none"].includes(
-      (shell as { sortableSort: string }).sortableSort,
-    ),
-  );
-
-  // ── Selection: real pointer click on the row checkbox, expect it to tick --
-  // Scrolled into view first: trusted clicks land at viewport coordinates, and
-  // the first row's checkbox sits far below the fold on the mocked 6800 rows.
-  // Poll-and-reclick in case a click races a late render, like a user would.
-  let ticked = 0;
-  for (let attempt = 0; attempt < 4 && !ticked; attempt++) {
-    await evalJs(
-      `document.querySelector('tbody label.trow-chk-label').scrollIntoView({ block: 'center' })`,
+    console.log("SHELL:", JSON.stringify(shell, null, 1));
+    check("renders chart bars", (shell as { chartBars: number }).chartBars > 0);
+    check(
+      "loading splash resolved",
+      (shell as { loadingGone: boolean }).loadingGone,
     );
-    await wait(300);
-    const chk = (await evalJs(`(() => {
+    check(
+      "accent tokens applied",
+      !!shell && (shell as { hasAccent: boolean }).hasAccent,
+    );
+    check(
+      "mock page has rows",
+      (shell as { rows: number }).rows === 25,
+    );
+    check(
+      "rows expose real checkboxes",
+      (shell as { checkboxes: number }).checkboxes === 25,
+    );
+    check(
+      "sortable header announces a valid sort state",
+      ["ascending", "descending", "none"].includes(
+        (shell as { sortableSort: string }).sortableSort,
+      ),
+    );
+
+    // ── Selection: real pointer click on the row checkbox, expect it to tick --
+    // Scrolled into view first: trusted clicks land at viewport coordinates, and
+    // the first row's checkbox sits far below the fold on the mocked 6800 rows.
+    // Poll-and-reclick in case a click races a late render, like a user would.
+    let ticked = 0;
+    for (let attempt = 0; attempt < 4 && !ticked; attempt++) {
+      await evalJs(
+        `document.querySelector('tbody label.trow-chk-label').scrollIntoView({ block: 'center' })`,
+      );
+      await wait(300);
+      const chk = (await evalJs(`(() => {
       const l = document.querySelector('tbody label.trow-chk-label');
       const r = l.getBoundingClientRect();
       const at = document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2);
@@ -217,56 +383,56 @@ await cdp(async (_send: Send, _on: On, call: Call, events: CdpMsg[]) => {
         hit: at ? at.tagName + '.' + (at.className || '') : null,
       };
     })()`)) as { x: number; y: number; hit: string };
-    await call("Input.dispatchMouseEvent", {
-      type: "mouseMoved",
-      x: chk.x,
-      y: chk.y,
-    });
-    await call("Input.dispatchMouseEvent", {
-      type: "mousePressed",
-      x: chk.x,
-      y: chk.y,
-      button: "left",
-      clickCount: 1,
-    });
-    await call("Input.dispatchMouseEvent", {
-      type: "mouseReleased",
-      x: chk.x,
-      y: chk.y,
-      button: "left",
-      clickCount: 1,
-    });
-    await wait(500);
-    ticked = (await evalJs(
-      `document.querySelectorAll('tbody input[type="checkbox"]:checked').length`,
-    )) as number;
-    if (ticked > 1) ticked = -1; // multiple rows selected means a misfire
-  }
-  const selDebug = await evalJs(
-    `(() => {
+      await call("Input.dispatchMouseEvent", {
+        type: "mouseMoved",
+        x: chk.x,
+        y: chk.y,
+      });
+      await call("Input.dispatchMouseEvent", {
+        type: "mousePressed",
+        x: chk.x,
+        y: chk.y,
+        button: "left",
+        clickCount: 1,
+      });
+      await call("Input.dispatchMouseEvent", {
+        type: "mouseReleased",
+        x: chk.x,
+        y: chk.y,
+        button: "left",
+        clickCount: 1,
+      });
+      await wait(500);
+      ticked = (await evalJs(
+        `document.querySelectorAll('tbody input[type="checkbox"]:checked').length`,
+      )) as number;
+      if (ticked > 1) ticked = -1; // multiple rows selected means a misfire
+    }
+    const selDebug = await evalJs(
+      `(() => {
       const i = document.querySelector('tbody input[type="checkbox"]');
       return { checked: i ? i.checked : null, label: i ? i.getAttribute('aria-label') : null };
     })()`,
-  );
-  console.log("SELECTED_TICKED:", ticked, JSON.stringify(selDebug));
-  check("row checkbox ticks via UI", ticked === 1);
+    );
+    console.log("SELECTED_TICKED:", ticked, JSON.stringify(selDebug));
+    check("row checkbox ticks via UI", ticked === 1);
 
-  // ── Sort: toggle the first sortable th and expect the state to flip ────
-  const th = `document.querySelector('th[aria-sort]')`;
-  const s0 = (await evalJs(`${th}.getAttribute('aria-sort')`)) as string;
-  const opp = (v: string) => v === "ascending" ? "descending" : "ascending";
-  await evalJs(`${th}.click()`);
-  await wait(400);
-  const s1 = (await evalJs(`${th}.getAttribute('aria-sort')`)) as string;
-  await evalJs(`${th}.click()`);
-  await wait(400);
-  const s2 = (await evalJs(`${th}.getAttribute('aria-sort')`)) as string;
-  console.log("SORT:", s0, "→", s1, "→", s2);
-  check(`sort flips to ${opp(s0)}`, s1 === opp(s0));
-  check("sort toggles back on second click", s2 === s0);
+    // ── Sort: toggle the first sortable th and expect the state to flip ────
+    const th = `document.querySelector('th[aria-sort]')`;
+    const s0 = (await evalJs(`${th}.getAttribute('aria-sort')`)) as string;
+    const opp = (v: string) => v === "ascending" ? "descending" : "ascending";
+    await evalJs(`${th}.click()`);
+    await wait(400);
+    const s1 = (await evalJs(`${th}.getAttribute('aria-sort')`)) as string;
+    await evalJs(`${th}.click()`);
+    await wait(400);
+    const s2 = (await evalJs(`${th}.getAttribute('aria-sort')`)) as string;
+    console.log("SORT:", s0, "→", s1, "→", s2);
+    check(`sort flips to ${opp(s0)}`, s1 === opp(s0));
+    check("sort toggles back on second click", s2 === s0);
 
-  // ── Tooltip: hover first chart row, expect portalled tooltip ----------
-  await evalJs(`(() => {
+    // ── Tooltip: hover first chart row, expect portalled tooltip ----------
+    await evalJs(`(() => {
     const rect = document.querySelector(
       'svg[aria-label="Conformidade por categoria"] rect[fill="transparent"]');
     const b = rect.getBoundingClientRect();
@@ -274,58 +440,58 @@ await cdp(async (_send: Send, _on: On, call: Call, events: CdpMsg[]) => {
       bubbles: true, clientX: b.x + 60, clientY: b.y + 8,
     }));
   })()`);
-  let tip: unknown = null;
-  for (let attempt = 0; attempt < 3 && !tip; attempt++) {
-    await wait(500);
-    tip = await evalJs(
-      `(() => {
+    let tip: unknown = null;
+    for (let attempt = 0; attempt < 3 && !tip; attempt++) {
+      await wait(500);
+      tip = await evalJs(
+        `(() => {
         const t = document.querySelector('[role="tooltip"]');
         return t ? { w: t.getBoundingClientRect().width, text: t.textContent } : null;
       })()`,
-    );
-    if (!tip) {
-      await evalJs(`(() => {
+      );
+      if (!tip) {
+        await evalJs(`(() => {
       const rect = document.querySelector(
         'svg[aria-label="Conformidade por categoria"] rect[fill="transparent"]');
       rect.dispatchEvent(new MouseEvent('mousemove', {
         bubbles: true, clientX: 260, clientY: 140,
       }));
     })()`);
+      }
     }
-  }
-  console.log("TOOLTIP:", JSON.stringify(tip));
-  check(
-    "chart tooltip appears on hover",
-    !!(tip as { text: string } | null)?.text?.includes("Conforme"),
-  );
-  await evalJs(`document.body.dispatchEvent(new Event('scroll'))`);
-  await wait(200);
+    console.log("TOOLTIP:", JSON.stringify(tip));
+    check(
+      "chart tooltip appears on hover",
+      !!(tip as { text: string } | null)?.text?.includes("Conforme"),
+    );
+    await evalJs(`document.body.dispatchEvent(new Event('scroll'))`);
+    await wait(200);
 
-  // press: physical-like key events through CDP Input (listeners on document
-  // receive these regardless of JS focus; synthetic KeyboardEvent stubs were
-  // unreliable for the modal's native document keydown handler).
-  const press = async (key: string) => {
-    const vk = key === "Escape" ? 27 : 13;
-    await call("Input.dispatchKeyEvent", {
-      type: "keyDown",
-      key,
-      code: key,
-      windowsVirtualKeyCode: vk,
-      nativeVirtualKeyCode: vk,
-      text: "",
-    });
-    await call("Input.dispatchKeyEvent", {
-      type: "keyUp",
-      key,
-      code: key,
-      windowsVirtualKeyCode: vk,
-      nativeVirtualKeyCode: vk,
-      text: "",
-    });
-  };
+    // press: physical-like key events through CDP Input (listeners on document
+    // receive these regardless of JS focus; synthetic KeyboardEvent stubs were
+    // unreliable for the modal's native document keydown handler).
+    const press = async (key: string) => {
+      const vk = key === "Escape" ? 27 : 13;
+      await call("Input.dispatchKeyEvent", {
+        type: "keyDown",
+        key,
+        code: key,
+        windowsVirtualKeyCode: vk,
+        nativeVirtualKeyCode: vk,
+        text: "",
+      });
+      await call("Input.dispatchKeyEvent", {
+        type: "keyUp",
+        key,
+        code: key,
+        windowsVirtualKeyCode: vk,
+        nativeVirtualKeyCode: vk,
+        text: "",
+      });
+    };
 
-  // ── Modal: click a barrier row cell, expect detail dialog + ESC close ----
-  const modal = await evalJs(`(() => {
+    // ── Modal: click a barrier row cell, expect detail dialog + ESC close ----
+    const modal = await evalJs(`(() => {
     const row = document.querySelector('tbody tr[tabindex="0"]');
     const tag = row.querySelector('.tnum')?.textContent?.trim() ?? '';
     row.children[2].click();
@@ -337,29 +503,29 @@ await cdp(async (_send: Send, _on: On, call: Call, events: CdpMsg[]) => {
       });
     }, 500));
   })()`);
-  console.log("MODAL:", JSON.stringify(modal));
-  check(
-    "barrier modal opens from a row click",
-    (modal as { opened: boolean }).opened === true,
-  );
-  check(
-    "modal names the clicked barrier tag",
-    (modal as { sameTag: boolean }).sameTag === true,
-  );
-  await press("Escape");
-  await wait(400);
-  const modalClosed = await evalJs(`(() => {
+    console.log("MODAL:", JSON.stringify(modal));
+    check(
+      "barrier modal opens from a row click",
+      (modal as { opened: boolean }).opened === true,
+    );
+    check(
+      "modal names the clicked barrier tag",
+      (modal as { sameTag: boolean }).sameTag === true,
+    );
+    await press("Escape");
+    await wait(400);
+    const modalClosed = await evalJs(`(() => {
     const d = document.querySelector('[role="dialog"][aria-modal="true"]');
     return d ? d.inert === true : true;
   })()`);
-  check("ESC closes barrier modal", !!modalClosed);
+    check("ESC closes barrier modal", !!modalClosed);
 
-  // ── Settings: open panel, switch theme, verify, ESC close -------------
-  await evalJs(
-    `document.querySelector('button[aria-label="Configurações"]').click()`,
-  );
-  await wait(500);
-  const panel = await evalJs(`(() => {
+    // ── Settings: open panel, switch theme, verify, ESC close -------------
+    await evalJs(
+      `document.querySelector('button[aria-label="Configurações"]').click()`,
+    );
+    await wait(500);
+    const panel = await evalJs(`(() => {
     const start = document.documentElement.dataset.theme;
     const p = document.querySelector('aside[role="dialog"][aria-label="Configurações"]');
     const label = start === 'dark' ? 'Aurora Claro' : 'Aurora Escura';
@@ -372,18 +538,22 @@ await cdp(async (_send: Send, _on: On, call: Call, events: CdpMsg[]) => {
       after: btn ? null : 'no picker',
     }), 400));
   })()`);
-  await wait(200);
-  const theme = await evalJs(`document.documentElement.dataset.theme`);
-  const pv = panel as { visible: boolean; start: string; after: string | null };
-  console.log("SETTINGS_VISIBLE:", pv.visible, "THEME:", theme);
-  check("settings panel opens", pv.visible);
-  check(
-    "theme switch applies dataset",
-    theme !== pv.start && pv.after === null,
-  );
-  await press("Escape");
-  await wait(400);
-  const panelClosed = await evalJs(`(() => {
+    await wait(200);
+    const theme = await evalJs(`document.documentElement.dataset.theme`);
+    const pv = panel as {
+      visible: boolean;
+      start: string;
+      after: string | null;
+    };
+    console.log("SETTINGS_VISIBLE:", pv.visible, "THEME:", theme);
+    check("settings panel opens", pv.visible);
+    check(
+      "theme switch applies dataset",
+      theme !== pv.start && pv.after === null,
+    );
+    await press("Escape");
+    await wait(400);
+    const panelClosed = await evalJs(`(() => {
     const p = document.querySelector('aside[role="dialog"][aria-label="Configurações"]');
     const m = document.querySelector('[role="dialog"][aria-modal="true"]');
     return {
@@ -391,17 +561,18 @@ await cdp(async (_send: Send, _on: On, call: Call, events: CdpMsg[]) => {
       modalStillClosed: !m || m.inert === true,
     };
   })()`);
-  console.log("AFTER_SETTINGS_ESC:", JSON.stringify(panelClosed));
-  check(
-    "ESC closes settings panel",
-    (panelClosed as { panel: boolean }).panel === true,
-  );
-  check(
-    "modal stays closed through settings ESC",
-    (panelClosed as { modalStillClosed: boolean }).modalStillClosed === true,
-  );
+    console.log("AFTER_SETTINGS_ESC:", JSON.stringify(panelClosed));
+    check(
+      "ESC closes settings panel",
+      (panelClosed as { panel: boolean }).panel === true,
+    );
+    check(
+      "modal stays closed through settings ESC",
+      (panelClosed as { modalStillClosed: boolean }).modalStillClosed === true,
+    );
 
-  console.log("RESULTS:", JSON.stringify(results, null, 1));
-  const failed = results.filter(([, ok]) => !ok).length;
-  if (failed > 0 || errors.length > 0) Deno.exit(1);
-});
+    console.log("RESULTS:", JSON.stringify(results, null, 1));
+    const failed = results.filter(([, ok]) => !ok).length;
+    if (failed > 0 || errors.length > 0) Deno.exit(1);
+  });
+}
