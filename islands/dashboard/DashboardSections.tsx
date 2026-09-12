@@ -36,6 +36,7 @@ interface SectionsProps {
   visible: boolean;
   loading: boolean;
   companyName: string;
+  serverMode: boolean;
 }
 
 // DashboardSections: header, tabs, band, KPI, chart, alert, exports, table,
@@ -52,6 +53,7 @@ export function DashboardSections(
     visible,
     loading,
     companyName,
+    serverMode,
   }: SectionsProps,
 ) {
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -154,6 +156,7 @@ export function DashboardSections(
             onSelectAll={selectAll}
             onClearAll={clearAll}
             companyName={companyName}
+            serverMode={serverMode}
           />
           <FilterBar
             filters={filters}

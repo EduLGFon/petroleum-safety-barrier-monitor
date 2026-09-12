@@ -79,6 +79,7 @@ function ClientView(
         visible={visible}
         loading={loading}
         companyName={companyName}
+        serverMode={false}
       />
     </>
   );
@@ -129,6 +130,7 @@ function ServerView(
         visible={shown}
         loading={loading}
         companyName={companyName}
+        serverMode
       />
     </>
   );

@@ -15,10 +15,20 @@ interface Props {
   onSelectAll: () => void;
   onClearAll: () => void;
   companyName: string;
+  // Server mode pages from the API, so exports cover only the current page;
+  // the toolbar says so up front instead of surprising a user mid-export.
+  serverMode?: boolean;
 }
 // ExportToolbar: selection bar over selectedIds + allFiltered; derives all/some-selected tri-state and shows format buttons only when a row is selected.
 export function ExportToolbar(
-  { selectedIds, allFiltered, onSelectAll, onClearAll, companyName }: Props,
+  {
+    selectedIds,
+    allFiltered,
+    onSelectAll,
+    onClearAll,
+    companyName,
+    serverMode,
+  }: Props,
 ) {
   const [loading, setLoading] = useState<Fmt | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -141,6 +151,19 @@ export function ExportToolbar(
             Selecione itens para exportar
           </span>
         )}
+      {serverMode && (
+        <div
+          role="note"
+          data-page-export-note
+          style={{
+            flexBasis: "100%",
+            fontSize: "var(--d-small)",
+            color: AURORA.sub,
+          }}
+        >
+          Exportação abrange somente a página atual
+        </div>
+      )}
       {error && (
         <div
           role="alert"
