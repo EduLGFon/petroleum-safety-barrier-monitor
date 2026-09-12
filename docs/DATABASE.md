@@ -79,7 +79,28 @@ barriers
   comentarios           text
   plano_acao            text
   status_since          date
+  external_code         text unique, nullable (chave de match do Fracttal)
+  source_updated_at     timestamptz, nullable
+  deleted_at            timestamptz, nullable (soft delete via sync)
   created_at / updated_at
+
+sync_state
+  id                    identity, PK
+  scope                 text (ex: "fixture:..." / "fracttal-live:FAL")
+  status                running | ok | failed
+  inserts / updates / deletes / skips
+  note                  text
+  started_at / finished_at
+
+alert_events
+  id                    identity, PK
+  barrier_id            → barriers, on delete set null
+  transition_date       date
+  status_id             → disponibilidades
+  kind                  default 'barrier_transition'
+  dedup_key             text unique (barrier + data de transição)
+  payload               jsonb
+  sent_at               timestamptz, nullable (null = ainda não enviado)
 
 barrier_status_history
   id                    identity, PK
@@ -137,6 +158,21 @@ chama esse endpoint — é o caminho natural para quando a feature de "admins po
 editar contingenciamento" for implementada (papéis de acesso ainda não existem
 no app).
 
+### Provenance + sync (P3)
+
+`external_code` (UNIQUE, nullable) é a chave de match do upsert: dedup garantido
+pela constraint, não por lógica de aplicação. `deleted_at` é o soft delete —
+itens que somem do Fracttal (crawl escopado) ficam com a linha e o histórico
+intactos, mas `buildWhere`/`scopeText`/queries de `chart.ts` e
+`vocabularies.ts` já filtram `where b.deleted_at is null` por padrão; uma
+view "admin" pode listar deletados. `sync_state` registra uma linha por run
+(contagens de inserts/updates/deletes/skips, `status`, `note`). `alert_events`
+tem dedup (`dedup_key`) e `sent_at` null até o envio (P5); o sync hoje só
+apende `barrier_status_history` via `record_status_change` (author 10
+"Sincronização Fracttal") em mudança real de status — nunca enfileira alerta.
+`lib/server/sql/sync.ts` implementa o `SyncIo` default
+(`buildMapContext`/`loadLocal`/`startRun`/`applyPlan`/`finishRun`).
+
 ## Índices
 
 `location_id`, `disponibilidade_id`, `conformidade_id`, `categoria_id` e
@@ -176,6 +212,9 @@ splitter que respeita corpos dollar-quoted (`$$`), quotes e comentários
 | `lib/server/sql/chart.ts`            | `getChartData` (`GROUP BY categoria_id`, `conforme` + `total`)                                                                                                                               |
 | `lib/server/sql/vocabularies.ts`     | `getVocabularies()` (labels + counts, SSR-only, sem rota HTTP)                                                                                                                               |
 | `lib/server/sql/where.ts`            | `buildWhere` (args `$n`, `escapeLike`), `resolveOrderBy` (whitelist `SORTABLE`)                                                                                                              |
+| `lib/server/sql/sync.ts`             | `defaultSyncIo` P3: contexto label→id, `loadLocal`, `startRun`/`applyPlan`/`finishRun` (upsert via `external_code` UNIQUE, `record_status_change`)                                           |
+| `lib/server/fracttal/map.ts`         | Mapper P3: `mapAsset` (resolução exata label→id, skip+motivo p/ não mapeado), `disponibilidadeFromAsset`, `IMPORT_DEFAULTS`                                                                  |
+| `lib/server/fracttal/sync.ts`        | Orquestrador P3: `planReconcile` (puro), `runSync` (dry-run default), `fieldsSignature`                                                                                                      |
 | `lib/server/sql/mappers.ts`          | `SELECT_COLUMNS`, `HISTORY_JOIN` (lateral `json_agg`), `toWireBarrier`, `toHistory`                                                                                                          |
 | `routes/api/_params.ts`              | Parsers estritos compartilhados (`parseInt/parseDate/parseQueryParam`)                                                                                                                       |
 | `routes/api/barriers.ts`             | `GET /api/barriers`                                                                                                                                                                          |

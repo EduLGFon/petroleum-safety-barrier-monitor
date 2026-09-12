@@ -38,6 +38,9 @@ export interface FracttalClientOptions {
 
 export interface FracttalClient {
   listAssets(query: FracttalListQuery): Promise<FracttalPage>;
+  listRawItems(
+    query: FracttalListQuery,
+  ): Promise<{ rows: unknown[]; total: number }>;
   collectAssets(
     query: FracttalListQuery,
     maxPages?: number,
@@ -258,6 +261,21 @@ export function createFracttalClient(
     };
   }
 
+  // listRawItems: hands the raw rows straight through (no parseAsset). The
+  // sync pipeline does its own parse + map + reconcile, so this is the only
+  // surface it needs for a live run.
+  async function listRawItems(
+    query: FracttalListQuery,
+  ): Promise<{ rows: unknown[]; total: number }> {
+    const body = await getJson(`/items?${buildListQuery(query).toString()}`);
+    const envelope = parseEnvelope(body);
+    const rows = Array.isArray(envelope.data) ? envelope.data : [];
+    return {
+      rows,
+      total: typeof envelope.total === "number" ? envelope.total : rows.length,
+    };
+  }
+
   async function collectAssets(
     query: FracttalListQuery,
     maxPages = 1,
@@ -299,5 +317,5 @@ export function createFracttalClient(
     };
   }
 
-  return { listAssets, collectAssets };
+  return { listAssets, listRawItems, collectAssets };
 }

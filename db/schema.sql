@@ -88,9 +88,18 @@ create table if not exists barriers (
 
   status_since       date        not null default current_date,
 
+  -- Provenance + soft delete (Fracttal sync, P3). external_code is the
+  -- stable upstream business key used for upsert matching — never renumber.
+  external_code       text        unique,
+  source_updated_at   timestamptz,          -- best-available remote timestamp; null when upstream exposes none
+  deleted_at          timestamptz,          -- set by sync when the upstream row disappears; row stays for audit
+
   created_at         timestamptz not null default now(),
   updated_at         timestamptz not null default now()
 );
+
+create index if not exists idx_barriers_external_code on barriers(external_code);
+create index if not exists idx_barriers_deleted_at on barriers(deleted_at);
 
 create or replace function barriers_set_conformidade() returns trigger as $$
 begin
@@ -174,3 +183,43 @@ begin
   values (p_barrier_id, current_date, p_status_id, p_author_id, p_note);
 end;
 $$ language plpgsql;
+
+-- ─── Sync state + alert events (Fracttal import, P3) ───────────────────────
+
+-- One row per sync run: audit trail + ops diagnosis. status is
+-- 'running'|'ok'|'failed'. cursor is an opaque checkpoint for resumable
+-- paging once the poller is alive; counts are reconcile totals.
+create table if not exists sync_state (
+  id          integer generated always as identity primary key,
+  scope       text        not null default 'all',
+  status      text        not null,              -- running | ok | failed
+  cursor      text,
+  inserts     integer     not null default 0,
+  updates     integer     not null default 0,
+  skips       integer     not null default 0,
+  deletes     integer     not null default 0,
+  note        text        not null default '',
+  started_at  timestamptz not null default now(),
+  finished_at timestamptz not null default now()
+);
+
+create index if not exists idx_sync_state_status on sync_state(status, started_at desc);
+
+-- Barrier alert dedup: one row per (barrier, transition date, status) so a
+-- re-fired event can never double-notify. sent_at null = pending send; the
+-- send path (P5) flips it after a successful notify. payload holds context
+-- for the future email renderer.
+create table if not exists alert_events (
+  id              integer generated always as identity primary key,
+  barrier_id      integer     references barriers(id) on delete set null,
+  transition_date date        not null,
+  status_id       integer     not null references disponibilidades(id),
+  kind            text        not null default 'barrier_transition',
+  dedup_key       text        not null unique,   -- barrier_id:date:status_id
+  payload         jsonb       not null default '{}'::jsonb,
+  sent_at         timestamptz,
+  created_at      timestamptz not null default now()
+);
+
+create index if not exists idx_alert_events_unsent
+  on alert_events(kind, sent_at) where sent_at is null;

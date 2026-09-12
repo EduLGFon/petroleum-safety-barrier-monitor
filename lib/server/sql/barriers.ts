@@ -68,11 +68,11 @@ export async function listBarriers(
   };
 }
 
-// Fetches a single wire barrier by id, or null when missing.
+// Fetches a single wire barrier by id, or null when missing/deleted.
 export async function getBarrierById(id: number): Promise<WireBarrier | null> {
   const rows = await queryRows<BarrierRow>(
     `select ${SELECT_COLUMNS} from barriers b
-     ${HISTORY_JOIN} where b.id = $1`,
+     ${HISTORY_JOIN} where b.id = $1 and b.deleted_at is null`,
     [id],
   );
   return rows[0] ? toWireBarrier(rows[0]) : null;
@@ -83,7 +83,9 @@ export async function getBarrierById(id: number): Promise<WireBarrier | null> {
 // EVERY id present (GROUP BY) so new statuses reconcile instead of vanishing.
 export async function getKpi(locationId?: number): Promise<WireKpiSnapshot> {
   const scoped = locationId !== undefined && locationId !== 0;
-  const scopeText = scoped ? "where b.location_id = $1" : "";
+  const scopeText = scoped
+    ? "where b.deleted_at is null and b.location_id = $1"
+    : "where b.deleted_at is null";
   const scopeArgs: unknown[] = scoped ? [locationId] : [];
   const [rows, dispRows, confRows, critRows] = await Promise.all([
     queryRows<{

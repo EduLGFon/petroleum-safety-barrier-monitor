@@ -10,12 +10,14 @@ export async function getVocabularies(): Promise<Vocabularies> {
   const [locRows, dispRows, confRows, catRows] = await Promise.all([
     queryRows<{ code: string; count: string }>(
       `select loc.code as code, count(b.id)::text as count
-       from locations loc left join barriers b on b.location_id = loc.id
+       from locations loc
+       left join barriers b on b.location_id = loc.id and b.deleted_at is null
        group by loc.code order by loc.code`,
     ),
     queryRows<{ label: string }>(
       `select distinct disp.label as label from barriers b
        join disponibilidades disp on disp.id = b.disponibilidade_id
+       where b.deleted_at is null
        order by disp.label`,
     ),
     queryRows<{ label: string }>(
@@ -23,11 +25,13 @@ export async function getVocabularies(): Promise<Vocabularies> {
          else 'Não Conforme' end as label
        from barriers b
        join disponibilidades disp on disp.id = b.disponibilidade_id
+       where b.deleted_at is null
        order by label`,
     ),
     queryRows<{ label: string }>(
       `select distinct cat.label as label from barriers b
        join categorias cat on cat.id = b.categoria_id
+       where b.deleted_at is null
        order by cat.label`,
     ),
   ]);

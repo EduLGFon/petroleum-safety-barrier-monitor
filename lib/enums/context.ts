@@ -44,6 +44,7 @@ export const AUTHOR_CODES: Record<number, string> = {
   7: "Camila Ferreira",
   8: "Marcelo Gomes",
   9: "Patrícia Nunes",
+  10: "Sincronização Fracttal",
 };
 export const AUTHOR_IDS = buildReverse(AUTHOR_CODES);
 

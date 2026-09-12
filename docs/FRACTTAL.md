@@ -55,10 +55,8 @@ auditable, with deletions soft.
   and unreadable; `code` is the stable business key).
 - `barriers.source_updated_at` (timestamptz, nullable) — the best available
   remote modification signal. Gap: `GET /items` does not return a
-  last-modified timestamp in the documented shape, so a fallback is defined:
-  when the source exposes none, the sync run time is used and the mapping
-  note records it. Re-evaluate when a real capture shows an `updated`-like
-  field.
+  last-modified timestamp in the documented shape, so `source_updated_at`
+  stays null until a real capture shows an `updated`-like field.
 - `barriers.deleted_at` (timestamptz, nullable) — soft delete. Items missing
   from Fracttal (a full-scope crawl sees none for that `external_code`) set
   `deleted_at`; the row stays so history/audit survives. `is_deleted`
@@ -85,7 +83,7 @@ is provisional and reviewed against a real fixture before P3.
 | `externalCode` (new wire field) | `code`                                                                  | Upsert match key                                                                                                                      |
 | `disponibilidade`               | `available` + `initial_date_out_of_service`/`last_final_date_available` | `available:false` → some Indisponível bucket; contingent/degraded buckets need a secondary signal (work orders), **unmapped for now** |
 | `conformidade`                  | derived: open/corrective work order on the asset — endpoint TBD         | **Unmapped**: needs the work-order contract + fixture review                                                                          |
-| `criticidade`                   | `priorities_description` → map                                          | values unknown until fixture; new enum rows may be needed                                                                             |
+| `criticidade`                   | `priorities_description` → map                                          | resolved in P3 against the seed: `'Crítica'`/`'Não Crítica'` exact match, anything else is listed and skipped                         |
 | `categoria`                     | `groups_1_description`/`groups_2_description`                           | category taxonomy differs per tenant; list, don't force                                                                               |
 | `location`                      | `location_code` / `parent_description`                                  | station grouping                                                                                                                      |
 | `tag` (barcode label)           | `code`                                                                  | display tag                                                                                                                           |
@@ -101,6 +99,53 @@ value): ids needing new enum rows are derived from that list, never guessed.
    → writes anonymized page set to `scripts/fixtures/fracttal-assets-sample.json`.
 3. Review the report: totals, unmapped values, anomalies.
 4. Commit as the P2 fixture; P3 replays it (never calls prod from CI).
+
+## Sync service (P3, as-built)
+
+Pipeline: quoted raw rows → parse (`parsePage`, malformed listed) → map
+(`mapAsset`, label→id exact resolution, skip+reason on unmapped) → pure
+reconcile plan → apply (or dry-run report) → `sync_state` audit row.
+
+- `lib/server/fracttal/map.ts` — `disponibilidadeFromAsset` (unavailable →
+  Indisponível id 5, else Disponível id 0) + `IMPORT_DEFAULTS`
+  (`tipologiaId=3`, `agrupamentoId=0`, `locDescId=0`, `donoId=null`).
+  Unmapped labels are listed in the run report, never guessed.
+- `lib/server/fracttal/sync.ts` — `planReconcile` (pure) + `runSync`
+  (orchestrator). Change detection via a stored `signature` (see module
+  comment; ORDER IS PART OF THE CONTRACT). Dry-run is the default; nothing
+  is written without an explicit flag. Restores reappearing rows, flags
+  `statusChanged` on availability flips.
+- `lib/server/sql/sync.ts` — the default `SyncIo`: builds label→id context
+  from the lookup tables, loads scoped locals, applies the plan (inserts via
+  `INSERT ... ON CONFLICT (external_code) DO NOTHING` — the UNIQUE constraint
+  is the dedup authority; status changes go through the one sanctioned
+  `record_status_change()` with author 10 "Sincronização Fracttal"), and
+  writes the run audit.
+- History rule: history appends only on a real status change. Freshly
+  imported rows get one stamp (`Importado do Fracttal`), so the timeline is
+  never empty.
+- Deletion rule: scoped locals absent upstream (and not already deleted) are
+  soft-deleted (`deleted_at = now()`). Deletion is per-scope: a one-station
+  sync never retires another station's barriers.
+- `sync_state`: `status` (`running/ok/failed`), counts
+  (`inserts/updates/deletes/skips`), `scope`, `note`. The skips total always
+  reconciles to (malformed + unmapped + planned skips), so the row sums with
+  the run report.
+- `alert_events`: schema is in place for P5 (dedup on
+  barrier + transition date, `sent_at` null until sent); the sync pipeline
+  records transitions in `barrier_status_history` only, it does not enqueue
+  alerts yet.
+
+Run shapes:
+
+```
+# fixture dry-run (default; needs DATABASE_URL for local reconcile)
+deno run -A scripts/fracttal-sync.ts --fixture scripts/fixtures/fracttal-assets-sample.json
+# same but writing
+deno run -A scripts/fracttal-sync.ts --fixture <path> --apply
+# live, reviewed prod session only, one station, single bounded GET
+deno run -A scripts/fracttal-sync.ts --live --location-code FAL --scope prod:fal --dry-run
+```
 
 ## Out of scope here
 

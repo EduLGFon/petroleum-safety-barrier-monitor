@@ -18,7 +18,11 @@ export async function getChartData(
     `select b.categoria_id::text as categoria_id,
        count(*) filter (where b.conformidade_id = 0)::text as conforme,
        count(*)::text as total
-     from barriers b ${scoped ? "where b.location_id = $1" : ""}
+     from barriers b ${
+      scoped
+        ? "where b.deleted_at is null and b.location_id = $1"
+        : "where b.deleted_at is null"
+    }
      group by b.categoria_id order by count(*) desc`,
     scoped ? [locationId] : [],
   );

@@ -9,8 +9,10 @@ Deno.test("resolveOrderBy whitelists columns, coerces direction", () => {
   assertStrictEquals(resolveOrderBy(undefined, undefined), "b.id asc");
 });
 
-Deno.test("buildWhere is empty without filters", () => {
-  assertEquals(buildWhere({}), { text: "", args: [] });
+Deno.test("buildWhere defaults to hiding soft-deleted rows", () => {
+  const { text, args } = buildWhere({});
+  assertEquals(args, []);
+  assertEquals(text, "where b.deleted_at is null");
 });
 
 Deno.test("buildWhere binds ids as numbered args", () => {
@@ -18,6 +20,7 @@ Deno.test("buildWhere binds ids as numbered args", () => {
   assertEquals(args, [1, 4]);
   assert(text.includes("b.location_id = $1"));
   assert(text.includes("b.categoria_id = $2"));
+  assert(text.includes("b.deleted_at is null"));
 });
 
 Deno.test("buildWhere escapes LIKE wildcards", () => {

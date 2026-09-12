@@ -106,5 +106,6 @@ insert into authors (id, name) values
   (6, 'Ricardo Souza'),
   (7, 'Camila Ferreira'),
   (8, 'Marcelo Gomes'),
-  (9, 'Patrícia Nunes')
+  (9, 'Patrícia Nunes'),
+  (10, 'Sincronização Fracttal')
 on conflict (id) do update set name = excluded.name;

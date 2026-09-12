@@ -61,8 +61,13 @@ export function buildWhere(
   }
   if (q.since) push("and b.status_since >= ", q.since);
   if (q.until) push("and b.status_since <= ", q.until);
+  // Default views exclude soft-deleted rows; the admin/deleted listing (P3)
+  // joins on deleted_at explicitly instead. Keeps the clause first so every
+  // barrier query inherits the filter without callers remembering it.
   return {
-    text: conds.length > 0 ? `where true ${conds.join(" ")}` : "",
+    text: `where b.deleted_at is null${
+      conds.length > 0 ? ` ${conds.join(" ")}` : ""
+    }`,
     args,
   };
 }
