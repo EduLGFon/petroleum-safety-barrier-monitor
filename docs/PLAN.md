@@ -99,6 +99,19 @@ ServerError/vocabularies`), `components/export`, `components/filter`,
   filters, resolve, query, where, pagination, geometry).
 - Production `vite build` plus preview smoke (`/`, `/api/health` 200).
 
+### P1 close (front-end polish + test)
+
+- Page-only export notice in server mode: `ExportToolbar` gains
+  `serverMode` and renders `data-page-export-note` under the bar;
+  `DashboardSections` threads it (false in ClientView, true in ServerView).
+- `scripts/browser-smoke.ts [url] [mock|http-ok|http-err]`: http-ok asserts
+  the live-API dashboard (25 rows, server KPI/chart, no banner,
+  vocabularies tabs, export note), http-err drives the ServerErrorCard and
+  asserts retry re-fires the fetch. These scenarios need headless Chromium;
+  the same loading/error/retry behavior is covered headless-only by
+  `hooks/dashboard/server_test.ts`.
+- `deno task test` extended to 86; chrome runs are optional for CI-green.
+
 ## 3. Data loading as built
 
 ```text
@@ -135,7 +148,7 @@ persistence map.
   requestId}` envelope; `getAllBarriers` 100k path retained for mock/export.
 - Settings-defaults race (gate firing before settings hydration) narrowed by
   sanitization but not re-architected; page-only export and page-local detail
-  resolution in server mode (documented in code).
+  resolution in server mode (announced in the UI via the export note).
 - `toXId` skips unknown values with a warning instead of throwing (so live
   filters degrade visibly rather than crash).
 - `pg_trgm` not adopted: `%q%` does seq-scan by documented decision.

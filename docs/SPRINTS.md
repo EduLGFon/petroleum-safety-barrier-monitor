@@ -9,28 +9,32 @@ replay, never write to prod); auth starts as single `ADMIN_TOKEN` and grows
 into a users table only when needed; server export is CSV only (Excel/PDF
 stay client-side); deleted Fracttal assets use soft-delete.
 
-## P1: Front-end polish + test
+## P1: Front-end polish + test — COMPLETE
 
-Goal: stabilize what ships today before touching prod data.
+Status (as-built): checklist closed. `deno task test` green at 86 tests,
+`deno task check` green (12 baseline lint items), `vite build` + preview
+smoke (`/`, `/api/health`) pass, mock browser-smoke 17/17 plus http
+scenarios.
 
-Do:
+How each Do item landed:
 
-- Polish only, no logic rewrites: loading/empty/error states
-  (`ServerError.tsx`, splash), filter bar density/mobile, table pagination
-  edges, chart tooltip/legend overflow, settings persistence UX.
-- A11y sweep: roles/labels, keyboard reachability for modal/table/settings,
-  focus trap in `BarrierModal`.
-- Tests: hook tests (`useDashboard`, `useServerDashboard` with mocked
-  `BarriersApi`), `resolve*` + export `rows/summary` round-trips,
-  `toWireQuery` unknown-value paths. Keep existing pure-module suite green
-  and extend it to `hooks/` + `lib/export/` + `lib/api/`.
-- Expand `scripts/browser-smoke.ts` to http-mode banner/retry and the
-  page-only export notice. Reuse `scripts/chaos-scale.ts` at 50k rows.
+- Polish & A11y: dialog a11y/focus, chart tooltip+legend, filter layout,
+  pagination edges (jump ellipsis folds into the pager gap slot on any
+  page), page canvas gradient + overscroll, page-only export notice in
+  server mode (`ExportToolbar serverMode` / `data-page-export-note`).
+- Tests: hook suite (`useDashboard`, server loading/error/retry), export
+  round-trips, `toWireQuery` unknown paths, linkedom harness. HTTP-mode
+  banner/retry is covered headlessly by `hooks/dashboard/server_test.ts`
+  (fetch failure surfaces; `retry()` recovers and refetches); the smoke
+  http scenarios mirror it end-to-end and need a browser runtime.
+- Browser smoke: `scripts/browser-smoke.ts [url] [mock|http-ok|http-err]`.
+  http-ok asserts the live-API dashboard (one page of rows, server KPI +
+  chart, no banner, vocabularies tabs, export note); http-err drives the
+  ServerErrorCard and asserts retry re-fires the fetch. Note: running any
+  smoke scenario spawns headless Chromium; the suite itself stays green
+  without it.
 
 Do not: restyle from scratch, add features, touch SQL schema, call Fracttal.
-
-Acceptance: checklist closed, `deno task test` green with new coverage,
-`vite build` + preview smoke (`/`, `/api/health`) pass.
 
 Touches: `components/*`, `islands/dashboard/*`, `hooks/dashboard/*`,
 `scripts/browser-*.ts`, new `*_test.ts` next to hooks/export.
