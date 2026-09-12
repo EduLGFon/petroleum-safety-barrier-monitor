@@ -61,6 +61,12 @@ Do not: write to Postgres, schedule sync, commit prod tokens.
 Acceptance: fixtures committed, mapping table reviewed, spike note records
 endpoints used, limits seen, and ids needing new enum rows.
 
+Status: client + capture + provenance/mapping draft done (docs/FRACTTAL.md,
+lib/server/fracttal/, scripts/fracttal-capture.ts, tests green). Live fixture
+capture is blocked on prod credentials (Fracttal access is production-only);
+`scripts/fixtures/` gets its sample via the reviewed capture procedure in
+docs/FRACTTAL.md.
+
 ## P3: Import + sync pipeline
 
 Goal: Fracttal rows land in Postgres idempotently, deletions soft.
