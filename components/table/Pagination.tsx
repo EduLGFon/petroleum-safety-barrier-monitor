@@ -27,7 +27,11 @@ export function Pagination(
   const from = ((page - 1) * pageSize) + 1,
     to = Math.min(page * pageSize, total);
   const pages = buildPages(page, totalPages);
-  const firstEllipsis = pages.indexOf("…");
+  // The goto chip sits where the trailing ellipsis would be, so mid-list
+  // (deep pages) it reads as the right-hand gap instead of a hole between
+  // "1" and the current window. When the window hugs the last page and no
+  // gap exists, it trails the final page number instead.
+  const trailingEllipsis = pages.lastIndexOf("…");
   return (
     <div
       style={{
@@ -96,7 +100,7 @@ export function Pagination(
           </button>
           {pages.map((p, i) =>
             p === "…"
-              ? i === firstEllipsis
+              ? i === trailingEllipsis
                 ? (
                   <GotoInput
                     key="goto"
@@ -123,6 +127,13 @@ export function Pagination(
                   {p}
                 </button>
               )
+          )}
+          {trailingEllipsis === -1 && (
+            <GotoInput
+              page={page}
+              totalPages={totalPages}
+              onChange={onChange}
+            />
           )}
           <button
             type="button"

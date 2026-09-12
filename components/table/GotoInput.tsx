@@ -1,7 +1,8 @@
-// GotoInput - jump-to-page chip with commit/cancel semantics.
+// GotoInput - jump-to-page ellipsis that becomes a numeric field on focus.
 // Why: isolates the draft/Escape/blur interplay so Pagination keeps only
-// layout (range label, page-size select, nav buttons). Renders as a bare
-// numeric chip so it can sit in the pager where the page-gap ellipsis is.
+// layout. Idle it mirrors the page-gap ellipsis (same size, "…" placeholder),
+// so the pager reads like a normal elided pager on ANY page; focusing it
+// widens it into a go-to-page input with commit/cancel-on-Escape semantics.
 import { useRef, useState } from "preact/hooks";
 
 interface GotoInputProps {
@@ -14,12 +15,15 @@ interface GotoInputProps {
 export function GotoInput({ page, totalPages, onChange }: GotoInputProps) {
   // Draft for the go-to-page field: null means "follow the current page".
   const [draft, setDraft] = useState<string | null>(null);
+  // Focus turns the ellipsis into the numeric field (and back on blur).
+  const [focused, setFocused] = useState(false);
   // Escape sets this so the blur it triggers reverts instead of committing
   // (the blur handler still sees the pre-Escape draft - render is async).
   const cancelRef = useRef(false);
   const commitDraft = () => {
     const cancelled = cancelRef.current;
     cancelRef.current = false;
+    setFocused(false);
     if (cancelled || draft === null) return;
     const parsed = parseInt(draft, 10);
     // NaN (empty/garbage) keeps the page; out-of-range clamps to 1..total.
@@ -38,11 +42,12 @@ export function GotoInput({ page, totalPages, onChange }: GotoInputProps) {
       spellcheck={false}
       aria-label="Ir para a página"
       title={`Ir para a página (1–${totalPages})`}
-      placeholder={String(page)}
+      placeholder={focused ? String(page) : "…"}
       value={draft ?? ""}
       // NOTE: onInput, not onChange. Preact 10 binds onChange to the
       // native `change` event, which text fields only fire on blur -
       // with onChange the draft would lag one Enter behind.
+      onFocus={() => setFocused(true)}
       onInput={(e) => setDraft(e.currentTarget.value)}
       onBlur={commitDraft}
       onKeyDown={(e) => {
@@ -59,8 +64,11 @@ export function GotoInput({ page, totalPages, onChange }: GotoInputProps) {
       }}
       className="goto-input"
       style={{
-        // Fits the widest page number with room to type.
-        width: `calc(${String(totalPages).length + 1}ch + 14px)`,
+        // Idle: same width as the ellipsis chip. Focused: fits the widest
+        // page number with room to type.
+        width: focused
+          ? `calc(${String(totalPages).length + 1}ch + 14px)`
+          : "var(--d-page-btn)",
         minWidth: "var(--d-page-btn)",
       }}
     />
