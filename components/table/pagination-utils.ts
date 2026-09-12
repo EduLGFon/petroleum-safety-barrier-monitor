@@ -16,6 +16,11 @@ export const bs = (active: boolean, disabled: boolean): CSSProperties => ({
   border: active ? "1px solid transparent" : `1px solid ${AURORA.dataBorder}`,
   borderRadius: "var(--d-chip-radius)",
   background: active ? AURORA.grad : AURORA.data,
+  // Paint the gradient across the whole border-box: the default
+  // padding-box origin leaves the 1px border ring and the rounded corner
+  // slivers of the active chip unpainted, leaking the flat page canvas as
+  // a minuscule off-gradient pixel at each corner.
+  backgroundOrigin: "border-box",
   color: active ? "#fff" : disabled ? AURORA.sub : AURORA.pillText,
   cursor: disabled ? "not-allowed" : "pointer",
   opacity: disabled ? 0.35 : 1,

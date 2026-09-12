@@ -10,7 +10,6 @@ import { PAGE_SIZE_OPTS } from "../../lib/constants.ts";
 import { bs, buildPages } from "./pagination-utils.ts";
 import { AURORA } from "../../lib/aurora.ts";
 import { GotoInput } from "./GotoInput.tsx";
-import { Divider } from "./RowCheck.tsx";
 
 interface PaginationProps {
   page: number;
@@ -28,6 +27,7 @@ export function Pagination(
   const from = ((page - 1) * pageSize) + 1,
     to = Math.min(page * pageSize, total);
   const pages = buildPages(page, totalPages);
+  const firstEllipsis = pages.indexOf("…");
   return (
     <div
       style={{
@@ -96,14 +96,23 @@ export function Pagination(
           </button>
           {pages.map((p, i) =>
             p === "…"
-              ? (
-                <span
-                  key={`e${i}`}
-                  style={{ ...bs(false, true), cursor: "default" }}
-                >
-                  …
-                </span>
-              )
+              ? i === firstEllipsis
+                ? (
+                  <GotoInput
+                    key="goto"
+                    page={page}
+                    totalPages={totalPages}
+                    onChange={onChange}
+                  />
+                )
+                : (
+                  <span
+                    key={`e${i}`}
+                    style={{ ...bs(false, true), cursor: "default" }}
+                  >
+                    …
+                  </span>
+                )
               : (
                 <button
                   type="button"
@@ -132,8 +141,6 @@ export function Pagination(
             <ChevronsRightIcon size={14} />
           </button>
         </div>
-        <Divider />
-        <GotoInput page={page} totalPages={totalPages} onChange={onChange} />
       </div>
     </div>
   );
