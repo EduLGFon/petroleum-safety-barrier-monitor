@@ -47,7 +47,7 @@ export function failureBody(info: SyncFailureInfo): string {
 }
 
 // smtpEmailNotifier: optional channel; every failure sends one email. The
-// SMTP send itself is best-effort (see module header) — callers still use
+// SMTP send itself is best-effort (see module header) - callers still use
 // notifyFailureToAll with a swallow guard.
 export function smtpEmailNotifier(
   config: SmtpConfig,

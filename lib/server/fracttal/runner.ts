@@ -3,9 +3,11 @@
 // pollOnce drives one scope through lock -> run -> notify-on-failure so runs
 // never overlap and failures are never silent; createPollLoop keeps that
 // cadence with start/stop semantics (stop is safe mid-run).
-import type { SyncResult } from "./sync.ts";
 import type { OpsNotifier, SyncFailureInfo } from "./notify.ts";
+
 import { notifyFailureToAll } from "./notify.ts";
+
+import type { SyncResult } from "./sync.ts";
 
 export interface ScopeLock {
   isRunning(scope: string): Promise<boolean>;
@@ -67,7 +69,7 @@ export interface PollLoop {
 
 // createPollLoop: fires pollOnce for one scope every intervalMs until stop().
 // A crashing poll (lock failure, notifier logic) is logged and the cadence
-// continues — a poll loop must never die from a single bad tick.
+// continues - a poll loop must never die from a single bad tick.
 export function createPollLoop(
   scope: string,
   opts: {

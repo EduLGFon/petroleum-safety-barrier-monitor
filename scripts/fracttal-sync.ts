@@ -7,17 +7,22 @@
 //   - live mode reuses the read-only client: one location, 1 page, capped;
 //   - never sends emails - audit rows go to sync_state, nothing else mails.
 // The exit code is 1 on thrown errors; mapping/unmapped skips are warnings.
-import { createFracttalClient } from "../lib/server/fracttal/client.ts";
-import { runSync, type SyncResult } from "../lib/server/fracttal/sync.ts";
-import { loadSyncConfig } from "../lib/server/config.ts";
 import {
   consoleNotifier,
   notifyFailureToAll,
   smtpConfigFromEnv,
   smtpEmailNotifier,
 } from "../lib/server/fracttal/notify.ts";
-import type { OpsNotifier } from "../lib/server/fracttal/notify.ts";
+
+import { runSync, type SyncResult } from "../lib/server/fracttal/sync.ts";
+
+import { createFracttalClient } from "../lib/server/fracttal/client.ts";
+
 import type { ItemTypeValue } from "../lib/server/fracttal/itemType.ts";
+
+import type { OpsNotifier } from "../lib/server/fracttal/notify.ts";
+
+import { loadSyncConfig } from "../lib/server/config.ts";
 
 const DEFAULT_BASE_URL = "https://app.fracttal.com/api";
 const DEFAULT_FIXTURE = "scripts/fixtures/fracttal-assets-sample.json";

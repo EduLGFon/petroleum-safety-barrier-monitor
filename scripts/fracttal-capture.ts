@@ -10,9 +10,12 @@
 //   - anonymizeAsset() strips private/free-text fields before saving;
 //   - tokens come from env, never from code or fixtures.
 import { createFracttalClient } from "../lib/server/fracttal/client.ts";
-import { anonymizeAsset } from "../lib/server/fracttal/anonymize.ts";
-import { ITEM_TYPE_LABELS } from "../lib/server/fracttal/itemType.ts";
+
 import type { ItemTypeValue } from "../lib/server/fracttal/itemType.ts";
+
+import { ITEM_TYPE_LABELS } from "../lib/server/fracttal/itemType.ts";
+
+import { anonymizeAsset } from "../lib/server/fracttal/anonymize.ts";
 
 const DEFAULT_BASE_URL = "https://app.fracttal.com/api";
 

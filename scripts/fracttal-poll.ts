@@ -12,18 +12,25 @@
 //   OPS_SMTP_HOST / OPS_SMTP_PORT / OPS_SMTP_USER / OPS_SMTP_PASS
 //   OPS_EMAIL_TO / OPS_EMAIL_FROM        emails are optional; without them
 //                                         failures still log via [ops] console
-import { createFracttalClient } from "../lib/server/fracttal/client.ts";
-import { runSync } from "../lib/server/fracttal/sync.ts";
-import { loadSyncConfig } from "../lib/server/config.ts";
-import { syncScopeRunning } from "../lib/server/sql/sync.ts";
-import { createPollLoop } from "../lib/server/fracttal/runner.ts";
 import {
   consoleNotifier,
   smtpConfigFromEnv,
   smtpEmailNotifier,
 } from "../lib/server/fracttal/notify.ts";
-import type { OpsNotifier } from "../lib/server/fracttal/notify.ts";
+
+import { createFracttalClient } from "../lib/server/fracttal/client.ts";
+
 import type { ItemTypeValue } from "../lib/server/fracttal/itemType.ts";
+
+import type { OpsNotifier } from "../lib/server/fracttal/notify.ts";
+
+import { createPollLoop } from "../lib/server/fracttal/runner.ts";
+
+import { syncScopeRunning } from "../lib/server/sql/sync.ts";
+
+import { runSync } from "../lib/server/fracttal/sync.ts";
+
+import { loadSyncConfig } from "../lib/server/config.ts";
 
 const DEFAULT_BASE_URL = "https://app.fracttal.com/api";
 
@@ -80,7 +87,7 @@ function main(): void {
   if (smtp) notifiers.push(smtpEmailNotifier(smtp));
 
   // run: one bounded live GET per scope, then the standard runSync pipeline
-  // (writes are intended here — this is the production cadence).
+  // (writes are intended here - this is the production cadence).
   const loops = flags.scopes.map((locationCode) => {
     return createPollLoop(`fracttal-live:${locationCode}`, {
       run: async () => {

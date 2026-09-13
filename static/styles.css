@@ -16,7 +16,7 @@ body {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
-/* Page canvas — html/body carry the aurora gradient so any sliver of
+/* Page canvas - html/body carry the aurora gradient so any sliver of
    document exposed around the shell (scrollbar gutter, stretch) blends
    into the same gradient instead of flashing a flat base color. The
    gray flash seen when flinging past the page ends is the browser's own
@@ -72,7 +72,7 @@ input[type="search"]::-webkit-search-cancel-button {
   --shadow-sm: 0 1px 3px rgba(15,23,42,.07),0 1px 2px rgba(15,23,42,.04);
   --shadow-md: 0 4px 16px rgba(15,23,42,.09);
   --shadow-lg: 0 24px 70px rgba(15,23,42,.18);
-  /* Alert colours – red glass on light */
+  /* Alert colours - red glass on light */
   --alert-nc-bg: rgba(220,38,38,.06);
   --alert-nc-border: rgba(220,38,38,.28);
   --alert-nc-text: #b91c1c;
@@ -304,7 +304,7 @@ select option {
 }
 
 /* ══════════════════════════════════════════════════════════════════════════════
-   PROFESSIONAL ANIMATIONS — no springs, no bounces
+   PROFESSIONAL ANIMATIONS - no springs, no bounces
 ══════════════════════════════════════════════════════════════════════════════ */
 /* Easing variables (CSS custom props for reference in JS) */
 :root {
@@ -777,7 +777,7 @@ select option {
     transform: none;
   }
 }
-/* Chart row entrance — backwards fill (not both) so the inline opacity
+/* Chart row entrance - backwards fill (not both) so the inline opacity
    used for hover-dimming takes over once the entrance finishes. */
 @keyframes chartRowIn {
   from {
@@ -996,7 +996,7 @@ select option {
   animation: checkIn 0.18s var(--ease-out) both;
 }
 
-/* ── Button lift — professional hover with NO bounce ──────────────────────── */
+/* ── Button lift - professional hover with NO bounce ──────────────────────── */
 .lift {
   transition:
     transform 0.18s var(--ease-std),

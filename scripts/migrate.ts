@@ -1,8 +1,9 @@
 // Migrate - applies db/schema.sql then db/seed_lookups.sql.
 // This is why it exists: idempotent one-command DB setup for Fresh routes.
 // Run with: deno task db:migrate
-import { Pool } from "@db/postgres";
 import { fromFileUrl } from "@std/path";
+
+import { Pool } from "@db/postgres";
 
 const connectionString = Deno.env.get("DATABASE_URL");
 if (!connectionString) {
@@ -49,7 +50,7 @@ function splitStatements(text: string): string[] {
     if (quote) {
       buf += ch;
       if (ch === quote) {
-        // SQL escapes quotes by doubling ('it''s') — consume the pair and
+        // SQL escapes quotes by doubling ('it''s') - consume the pair and
         // stay inside the string instead of splitting mid-literal.
         if (next === quote) {
           buf += next;

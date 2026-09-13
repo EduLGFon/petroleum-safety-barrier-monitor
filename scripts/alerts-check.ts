@@ -8,14 +8,6 @@
 // mail), FRACTTAL_* not needed. Exit 0 when the run completes (counts in
 // the log, even with dead-letters); exit 1 on unexpected failure (DB down,
 // no relay when sending) after notifying ops.
-import { getBarriersByIds } from "../lib/server/sql/barriers.ts";
-import { sqlAlertStore } from "../lib/server/sql/alerts.ts";
-import { listRecipients } from "../lib/server/sql/recipients.ts";
-import {
-  smtpAlertConfigFromEnv,
-  smtpAlertMailer,
-} from "../lib/server/alerts/mailer.ts";
-import { runAlertCycle } from "../lib/server/alerts/run.ts";
 import {
   consoleNotifier,
   notifyFailureToAll,
@@ -23,6 +15,19 @@ import {
   smtpConfigFromEnv,
   smtpEmailNotifier,
 } from "../lib/server/fracttal/notify.ts";
+
+import {
+  smtpAlertConfigFromEnv,
+  smtpAlertMailer,
+} from "../lib/server/alerts/mailer.ts";
+
+import { getBarriersByIds } from "../lib/server/sql/barriers.ts";
+
+import { listRecipients } from "../lib/server/sql/recipients.ts";
+
+import { sqlAlertStore } from "../lib/server/sql/alerts.ts";
+
+import { runAlertCycle } from "../lib/server/alerts/run.ts";
 
 interface Flags {
   apply: boolean;

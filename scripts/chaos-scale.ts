@@ -3,13 +3,6 @@
 // plus brand new status/criticality values, then asserts every dynamic-data
 // contract (KPI reconciliation, chart derivation, filter vocabularies,
 // color/label fallbacks, pagination). Run with: deno run scripts/chaos-scale.ts
-import type { Barrier } from "../lib/types.ts";
-import {
-  applyFilters,
-  computeChartData,
-  computeKpi,
-  paginate,
-} from "../lib/utils.ts";
 import {
   confColorFor,
   critColorFor,
@@ -17,6 +10,15 @@ import {
   distinctBy,
   shortStatusLabel,
 } from "../lib/constants.ts";
+
+import {
+  applyFilters,
+  computeChartData,
+  computeKpi,
+  paginate,
+} from "../lib/utils.ts";
+
+import type { Barrier } from "../lib/types.ts";
 
 const STATIONS = 50, CATS = 100, PER_COMBO = 10;
 const NEW_DISP = "Em Comissionamento";
@@ -39,19 +41,19 @@ function build(): Barrier[] {
         out.push({
           id: id++,
           tag: `ST${s}-CAT${c}-${k}`,
-          tipologia: `Tipologia ${s % 9}`,
-          instalacao: s < 6
+          typology: `Tipologia ${s % 9}`,
+          location: s < 6
             ? ["FAL", "CNC", "CNS", "FAP", "RJO", "SPL"][s]
             : `ST-${s}`,
           locDesc: "Chaos rig",
-          criticidade: (s + c + k) % 13 === 0 ? NEW_CRIT : "Crítica",
-          categoria: `Categoria de Teste ${c}`,
-          agrupamento: "Chaos",
-          dono: `Dono ${s % 12}`,
-          disponibilidade: disp,
-          conformidade: conf,
-          comentarios: "",
-          planoAcao: "",
+          criticality: (s + c + k) % 13 === 0 ? NEW_CRIT : "Crítica",
+          category: `Categoria de Teste ${c}`,
+          grouping: "Chaos",
+          owner: `Dono ${s % 12}`,
+          availability: disp,
+          compliance: conf,
+          comments: "",
+          actionPlan: "",
           statusSince: "2026-01-01",
           statusHistory: [],
         });
@@ -75,7 +77,7 @@ check(
 );
 
 const kpi = computeKpi(data);
-const bucketSum = Object.values(kpi.byDisponibilidade ?? {}).reduce(
+const bucketSum = Object.values(kpi.byAvailability ?? {}).reduce(
   (a, b) => a + b,
   0,
 );
@@ -85,20 +87,20 @@ check(
   `${bucketSum}/${kpi.total}`,
 );
 check(
-  "new disponibilidade counted",
-  (kpi.byDisponibilidade?.[NEW_DISP] ?? 0) > 0,
+  "new availability counted",
+  (kpi.byAvailability?.[NEW_DISP] ?? 0) > 0,
 );
-check("new conformidade counted", (kpi.byConformidade?.[NEW_CONF] ?? 0) > 0);
-check("new criticidade counted", (kpi.byCriticidade?.[NEW_CRIT] ?? 0) > 0);
+check("new compliance counted", (kpi.byCompliance?.[NEW_CONF] ?? 0) > 0);
+check("new criticality counted", (kpi.byCriticality?.[NEW_CRIT] ?? 0) > 0);
 check(
   "fixed conforme reconciles to total",
-  kpi.conforme + kpi.naoConforme === kpi.total,
-  `${kpi.conforme}+${kpi.naoConforme}/${kpi.total}`,
+  kpi.compliant + kpi.nonCompliant === kpi.total,
+  `${kpi.compliant}+${kpi.nonCompliant}/${kpi.total}`,
 );
 check(
-  "novel conformidade fails closed into NC",
-  (kpi.byConformidade?.[NEW_CONF] ?? 0) > 0 &&
-    kpi.naoConforme >= (kpi.byConformidade?.[NEW_CONF] ?? 0),
+  "novel compliance fails closed into NC",
+  (kpi.byCompliance?.[NEW_CONF] ?? 0) > 0 &&
+    kpi.nonCompliant >= (kpi.byCompliance?.[NEW_CONF] ?? 0),
 );
 
 const chart = computeChartData(data);
@@ -116,13 +118,13 @@ check(
   ),
 );
 
-const stations = distinctBy(data, (b) => b.instalacao);
+const stations = distinctBy(data, (b) => b.location);
 check(
   "all stations discovered",
   stations.length === STATIONS,
   `${stations.length}`,
 );
-const cats = distinctBy(data, (b) => b.categoria);
+const cats = distinctBy(data, (b) => b.category);
 check(
   "all categories discovered",
   cats.length === CATS,
@@ -131,9 +133,9 @@ check(
 
 const newStatusRows = applyFilters(data, {
   query: "",
-  disponibilidade: NEW_DISP,
-  conformidade: "",
-  categoria: "",
+  availability: NEW_DISP,
+  compliance: "",
+  category: "",
   page: 1,
   pageSize: 25,
   sortCol: "id",
@@ -146,7 +148,7 @@ check(
 );
 check(
   "filter result matches bucket",
-  newStatusRows.length === kpi.byDisponibilidade?.[NEW_DISP],
+  newStatusRows.length === kpi.byAvailability?.[NEW_DISP],
 );
 
 const pages = Math.ceil(data.length / 100);

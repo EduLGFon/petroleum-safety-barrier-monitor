@@ -1,8 +1,9 @@
 // Seed - populates barriers + barrier_status_history with demo data.
 // This is why it exists: reuses the deterministic mock generator so local
 // Postgres matches mock mode. Run: deno task db:seed [-- --force]
-import { Pool } from "@db/postgres";
 import { getWireBarriers } from "../lib/data.ts";
+
+import { Pool } from "@db/postgres";
 
 const BATCH_SIZE = 500;
 
@@ -19,16 +20,16 @@ const pool = new Pool(connectionString, 1, true);
 
 const BARRIER_COLS = [
   "tag",
-  "tipologia_id",
+  "typology_id",
   "location_id",
   "loc_desc_id",
-  "criticidade_id",
-  "categoria_id",
-  "agrupamento_id",
-  "dono_id",
-  "disponibilidade_id",
-  "comentarios",
-  "plano_acao",
+  "criticality_id",
+  "category_id",
+  "grouping_id",
+  "owner_id",
+  "availability_id",
+  "comments",
+  "action_plan",
   "status_since",
 ] as const;
 
@@ -118,16 +119,16 @@ async function main() {
 
     const barrierRows: BarrierInsert[] = chunk.map((b) => ({
       tag: b.tag,
-      tipologia_id: b.tipologiaId,
+      typology_id: b.typologyId,
       location_id: b.locationId,
       loc_desc_id: b.locDescId,
-      criticidade_id: b.criticidadeId,
-      categoria_id: b.categoriaId,
-      agrupamento_id: b.agrupamentoId,
-      dono_id: b.donoId < 0 ? null : b.donoId,
-      disponibilidade_id: b.disponibilidadeId,
-      comentarios: b.comentarios,
-      plano_acao: b.planoAcao,
+      criticality_id: b.criticalityId,
+      category_id: b.categoryId,
+      grouping_id: b.groupingId,
+      owner_id: b.ownerId < 0 ? null : b.ownerId,
+      availability_id: b.availabilityId,
+      comments: b.comments,
+      action_plan: b.actionPlan,
       status_since: b.statusSince,
     }));
 

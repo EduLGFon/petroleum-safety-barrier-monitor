@@ -3,10 +3,13 @@
 // of node ambient types (happy-dom drags @types/node into the program). JSX is
 // unusable here (Fresh precompile emits template vnodes that only mount under
 // the island runtime), so every fixture renders through createElement (h()).
-import { parseHTML } from "linkedom";
 import { createElement as h } from "preact";
-import { render } from "preact";
+
 import { act } from "preact/test-utils";
+
+import { parseHTML } from "linkedom";
+
+import { render } from "preact";
 
 export interface TestDom {
   window: Window & { document: Document };
