@@ -135,6 +135,9 @@ valores ligados como `$1/$2`):
   Stream via `ReadableStream` (chunks de 500 linhas), cap de 10.000 linhas
   (`400` com o total filtrado quando excede — refine os filtros),
   `Content-Disposition: attachment`, `X-Export-Total` com o total filtrado.
+- `GET /api/barriers/deleted` (+ os mesmos filtros) → `BarriersResponse`
+  só com linhas deletadas (auditoria do soft-delete do sync). Exige
+  `ADMIN_TOKEN`; o detalhe `/api/barriers/:id` segue escondendo deletados.
 - `GET /api/kpi?locationId=1` → `WireKpiSnapshot` (só `locationId`;
   omitido/`0` = todas; demais params ignorados)
 - `GET /api/chart?locationId=1` → `WireCategoryConformidade[]` (mesmo escopo)
@@ -154,8 +157,8 @@ pública é fixa por rota e o detalhe vai ao log com o `requestId`).
 
 Abertura decidida explicitamente: **GETs do dashboard são abertos**
 (`barriers`, `:id`, `kpi`, `chart`, `export`) — dado operacional de leitura;
-**escritas exigem `ADMIN_TOKEN`** (`PATCH .../status`, futuras rotas
-admin/recipients). Sem token configurado, escrita responde `401`.
+**escritas e auditoria exigem `ADMIN_TOKEN`** (`PATCH .../status`, recipients,
+`GET /api/barriers/deleted`). Sem token configurado, escrita responde `401`.
 
 Throttle in-memory por IP remoto (nunca `X-Forwarded-For`, forjável):
 120 req/min em leitura, 30 req/min em escrita, 10 req/min no export
@@ -245,6 +248,7 @@ toWireQuery({ location: "FAL", disponibilidade: "Degradado", page: 1 });
 | `lib/server/sql/mappers.ts`          | `SELECT_COLUMNS`, `HISTORY_JOIN` (lateral `json_agg`), `toWireBarrier`                   |
 | `routes/api/_params.ts`              | Parsers estritos (`parseInt/parseDate/parseQueryParam`); nunca é rota (`_` prefix)       |
 | `routes/api/barriers.ts`             | `GET /api/barriers` (aberto, throttle leitura)                                           |
+| `routes/api/barriers/deleted.ts`     | `GET /api/barriers/deleted` (só deleted, exige `ADMIN_TOKEN`)                            |
 | `routes/api/barriers/[id].ts`        | `GET /api/barriers/:id` (aberto, throttle leitura)                                       |
 | `routes/api/barriers/[id]/status.ts` | `PATCH /api/barriers/:id/status` (exige `ADMIN_TOKEN`, throttle escrita)                 |
 | `routes/api/export.ts`               | `GET /api/export?format=csv` (aberto, throttle export, cap 10k, stream)                  |
@@ -326,3 +330,27 @@ Rollback para mock (sem tocar no banco): `PUBLIC_API_MODE=mock` (o cliente
 volta ao gerador determinístico; as rotas `/api/*` seguem exigindo
 `DATABASE_URL`, mas nada as chama). Rollback total: build anterior +
 modo mock.
+
+## Cutover para produção (P3, primeira ida)
+
+Ordem fechada — cada passo depende do anterior verde:
+
+1. **Backup**: `pg_dump "$DATABASE_URL" -Fc -f barreiras-pre-cutover.dump`
+   (restaurável via `pg_restore`; contagens conferidas no § Operação).
+2. **Migrate contra o backup, nunca direto**: suba um banco vazio a partir
+   do dump, rode `deno task db:migrate`, confira `barriers`/`lookups`/`sync_state`/`alert_events`/`alert_recipients` presentes; só então migre o prod.
+3. **Dual-run mock-vs-http**: com o banco migrado + seedado, compare os
+   totais do dashboard nos dois modos (mesmos filtros):
+   - mock: `PUBLIC_API_MODE=mock` → anote KPI total, Não Conformes, linhas do grid;
+   - http: `PUBLIC_API_MODE=http` + `DATABASE_URL` → mesmos números devem
+     reconciliar com o seed (mock é determinístico, seed é fixo — qualquer
+     divergência além do esperado é stop-ship);
+   - `GET /api/export?format=csv` com o filtro cheio: total de linhas de
+     dados == `X-Export-Total` == total da rota `/api/barriers`.
+4. **Checklist de cutover**: sync dry-run limpo no fixture
+   (`scripts/fracttal-sync.ts`, sem `--apply`); `ADMIN_TOKEN` + `OPS_SMTP_*`
+   configurados; um recipient ativo cadastrado; `alerts-check.ts` dry-run
+   verde; smoke `/` + `/api/health` no build de prod.
+5. **Ligar**: serviço systemd + poll + cron do digest (ver § Operação);
+   primeiro `--apply` do sync em sessão revisada (P3: produção é só leitura
+   até esse ponto).

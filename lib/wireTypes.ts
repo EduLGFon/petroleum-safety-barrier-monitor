@@ -84,6 +84,9 @@ export interface BarriersQuery {
   pageSize?: number;
   sortCol?: string;
   sortDir?: "asc" | "desc";
+  // Admin deleted listing only (GET /api/barriers/deleted): flips the
+  // soft-delete filter to deleted-only. The dashboard never sets this.
+  includeDeleted?: boolean;
 }
 
 export interface BarriersResponse {

@@ -15,6 +15,19 @@ Deno.test("buildWhere defaults to hiding soft-deleted rows", () => {
   assertEquals(text, "where b.deleted_at is null");
 });
 
+Deno.test("buildWhere includeDeleted flips to deleted-only", () => {
+  const { text, args } = buildWhere({ includeDeleted: true });
+  assertEquals(args, []);
+  assertEquals(text, "where b.deleted_at is not null");
+});
+
+Deno.test("buildWhere includeDeleted composes with other filters", () => {
+  const { text, args } = buildWhere({ includeDeleted: true, locationId: 2 });
+  assertEquals(args, [2]);
+  assert(text.startsWith("where b.deleted_at is not null"));
+  assert(text.includes("b.location_id = $1"));
+});
+
 Deno.test("buildWhere binds ids as numbered args", () => {
   const { text, args } = buildWhere({ locationId: 1, categoriaId: 4 });
   assertEquals(args, [1, 4]);

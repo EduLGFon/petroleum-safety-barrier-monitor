@@ -106,7 +106,10 @@ one history row via `record_status_change` (author 10), deleted fixture row
 stays in DB with `deleted_at` set and hides from the default `/api/barriers`
 view. Sync failures notify ops (stderr always, optional SMTP email via native
 `lib/server/fracttal/smtp.ts`) and exit non-zero after the `failed` audit row
-is written. Polling cadence landed (`lib/server/fracttal/runner.ts` +
+is written. Soft-deleted rows are auditable through the token-guarded
+`GET /api/barriers/deleted` (same filters/shape, deleted-only; default
+views hide them). Cutover procedure (backup-first migrate, dual-run
+mock-vs-http compare, checklist, rollback) in docs/API.md. Polling cadence landed (`lib/server/fracttal/runner.ts` +
 `scripts/fracttal-poll.ts`): per-scope locks via `syncScopeRunning` (stale
 after 10 min; verified against real Postgres — fresh `running` blocks, stale /
 `ok` / `failed` do not), crashed ticks reschedule instead of killing the loop.

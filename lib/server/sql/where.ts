@@ -61,13 +61,15 @@ export function buildWhere(
   }
   if (q.since) push("and b.status_since >= ", q.since);
   if (q.until) push("and b.status_since <= ", q.until);
-  // Default views exclude soft-deleted rows; the admin/deleted listing (P3)
-  // joins on deleted_at explicitly instead. Keeps the clause first so every
-  // barrier query inherits the filter without callers remembering it.
+  // Soft-delete scope: default views hide deleted rows; the admin deleted
+  // listing (GET /api/barriers/deleted) flips to deleted-only. Keeps the
+  // clause first so every barrier query inherits the filter without callers
+  // remembering it.
+  const scope = q.includeDeleted === true
+    ? "where b.deleted_at is not null"
+    : "where b.deleted_at is null";
   return {
-    text: `where b.deleted_at is null${
-      conds.length > 0 ? ` ${conds.join(" ")}` : ""
-    }`,
+    text: `${scope}${conds.length > 0 ? ` ${conds.join(" ")}` : ""}`,
     args,
   };
 }
