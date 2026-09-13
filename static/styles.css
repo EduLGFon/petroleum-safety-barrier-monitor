@@ -272,8 +272,10 @@ html {
   color-scheme: light;
 }
 .aurora-shell {
-  background: var(--au-page);
-  background-color: var(--au-page-base);
+  /* Transparent so html/body's single aurora gradient reads edge to edge;
+     painting the shell's own copy re-anchors the radial center to the
+     narrower shell box and shows a seam against the body gradient. */
+  background: transparent;
 }
 .tnum {
   font-variant-numeric: tabular-nums;

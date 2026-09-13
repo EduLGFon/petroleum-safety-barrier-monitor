@@ -123,7 +123,7 @@ function ServerView(
         dash={dash}
         barriers={[]}
         stations={vocabularies?.locations}
-        total={dash.filteredTotal}
+        total={vocabularies?.locations?.reduce((sum, s) => sum + s.count, 0)}
         dispOpts={vocabularies?.disponibilidades ?? []}
         confOpts={vocabularies?.conformidades ?? []}
         catOpts={vocabularies?.categorias ?? []}
