@@ -120,7 +120,30 @@ reconcile plan → apply (or dry-run report) → `sync_state` audit row.
   `INSERT ... ON CONFLICT (external_code) DO NOTHING` — the UNIQUE constraint
   is the dedup authority; status changes go through the one sanctioned
   `record_status_change()` with author 10 "Sincronização Fracttal"), and
-  writes the run audit.
+  writes the run audit. Also exposes `syncScopeRunning(scope, staleMinutes=10)`
+  as the poll lock: true while a `running` row for the scope is fresh, so a
+  crashed run only blocks polls for the stale window instead of forever.
+- Sync failures never go silent. `scripts/fracttal-sync.ts` notifies ops on
+  every failure (loud stderr line via `consoleNotifier` plus an optional ops
+  email) and exits non-zero; the `failed` audit row is still written first, so
+  the DB agrees with the alert. This channel is separate from barrier alerts
+  (P5 `alert_events`), which stay untouched.
+- `lib/server/fracttal/smtp.ts` — a small Deno-native SMTP submission client
+  (EHLO, optional STARTTLS upgrade, AUTH PLAIN, MAIL/RCPT/DATA with
+  dot-stuffing, QUIT). No external dependency: the reader is released before
+  `Deno.startTls` takes the socket, since the TLS handshake requires both
+  streams unlocked.
+- `lib/server/fracttal/notify.ts` — `OpsNotifier` list, `smtpEmailNotifier`
+  plus `smtpConfigFromEnv()` (`OPS_SMTP_HOST` + `OPS_EMAIL_TO` required; port
+  465 means implicit TLS), and `notifyFailureToAll` which is best-effort: one
+  failing channel never blocks the others.
+- `lib/server/fracttal/runner.ts` — `pollOnce` (scope lock → run → notify on
+  failure) and `createPollLoop` per scope: a single crashed tick (lock query
+  down, upstream down) is reported and the cadence continues; `stop()` is
+  stop-safe. `scripts/fracttal-poll.ts` wires it: env-configured scopes
+  (`FRACTTAL_SYNC_SCOPES`), cadence (`FRACTTAL_POLL_SECONDS`, min 5), graceful
+  SIGINT/SIGTERM shutdown. The lock is the runner's own overlap guard — one
+  scope never runs two syncs at once.
 - History rule: history appends only on a real status change. Freshly
   imported rows get one stamp (`Importado do Fracttal`), so the timeline is
   never empty.
@@ -145,9 +168,11 @@ deno run -A scripts/fracttal-sync.ts --fixture scripts/fixtures/fracttal-assets-
 deno run -A scripts/fracttal-sync.ts --fixture <path> --apply
 # live, reviewed prod session only, one station, single bounded GET
 deno run -A scripts/fracttal-sync.ts --live --location-code FAL --scope prod:fal --dry-run
+# polling cadence (env-driven; needs FRACTTAL_KEY/SECRET + DATABASE_URL)
+FRACTTAL_SYNC_SCOPES=FAL scripts/fracttal-poll.ts
 ```
 
 ## Out of scope here
 
-- Write endpoints, scheduling, webhook receiver (P3+).
+- Write endpoints, webhook receiver (P3+).
 - A real fixture (needs prod access) — captured by the procedure above.

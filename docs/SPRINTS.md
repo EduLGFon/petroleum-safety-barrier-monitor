@@ -99,12 +99,17 @@ views; live prod run is read-capped and reviewed before scheduling.
 Status (as-built): schema migration landed (provenance columns, `sync_state`,
 `alert_events`, author 10 "Sincronização Fracttal"), all default barrier
 queries hide soft-deleted rows, mapper + pure reconcile planner + `runSync`
-orchestrator tested headless (130 tests green; check at 12-problem baseline),
+orchestrator tested headless (146 tests green; check at 12-problem baseline),
 CLI `scripts/fracttal-sync.ts` verified end-to-end on a scratch Postgres:
 dry-run shows reconcile counts, rerun idempotent, availability flip appends
 one history row via `record_status_change` (author 10), deleted fixture row
 stays in DB with `deleted_at` set and hides from the default `/api/barriers`
-view. Sync failure audit path (sync_state failed + rethrow) covered by tests.
+view. Sync failures notify ops (stderr always, optional SMTP email via native
+`lib/server/fracttal/smtp.ts`) and exit non-zero after the `failed` audit row
+is written. Polling cadence landed (`lib/server/fracttal/runner.ts` +
+`scripts/fracttal-poll.ts`): per-scope locks via `syncScopeRunning` (stale
+after 10 min; verified against real Postgres — fresh `running` blocks, stale /
+`ok` / `failed` do not), crashed ticks reschedule instead of killing the loop.
 Live prod run remains blocked on prod credentials (production-only).
 
 ## P4: API hardening + auth + server CSV export

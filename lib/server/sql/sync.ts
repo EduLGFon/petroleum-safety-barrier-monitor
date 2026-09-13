@@ -15,6 +15,24 @@ import type { MapContext } from "../fracttal/map.ts";
 
 export const SYNC_AUTHOR_ID = 10; // authors.id, see db/seed_lookups.sql
 
+// syncScopeRunning: poll lock - true while a run for the scope is still
+// 'running'. A crashed run would block polls forever, so the lock is stale
+// once started_at is older than staleMinutes.
+export async function syncScopeRunning(
+  scope: string,
+  staleMinutes = 10,
+): Promise<boolean> {
+  const rows = await queryRows<{ one: number }>(
+    `select 1 as one
+     from sync_state
+     where scope = $1 and status = 'running'
+       and started_at >= now() - make_interval(mins => $2)
+     limit 1`,
+    [scope, staleMinutes],
+  );
+  return rows.length > 0;
+}
+
 // defaultSyncIo: the wiring runSync uses when no custom io is injected.
 export const defaultSyncIo: SyncIo = {
   async buildMapContext(): Promise<MapContext> {

@@ -8,7 +8,14 @@
 //   - never sends emails - audit rows go to sync_state, nothing else mails.
 // The exit code is 1 on thrown errors; mapping/unmapped skips are warnings.
 import { createFracttalClient } from "../lib/server/fracttal/client.ts";
-import { runSync } from "../lib/server/fracttal/sync.ts";
+import { runSync, type SyncResult } from "../lib/server/fracttal/sync.ts";
+import {
+  consoleNotifier,
+  notifyFailureToAll,
+  smtpConfigFromEnv,
+  smtpEmailNotifier,
+} from "../lib/server/fracttal/notify.ts";
+import type { OpsNotifier } from "../lib/server/fracttal/notify.ts";
 import type { ItemTypeValue } from "../lib/server/fracttal/itemType.ts";
 
 const DEFAULT_BASE_URL = "https://app.fracttal.com/api";
@@ -106,10 +113,25 @@ async function main(): Promise<void> {
   const flags = parseFlags(Deno.args);
   const { source, scope } = await sourceFor(flags);
 
-  const result = await runSync(source, {
-    scope,
-    dryRun: !flags.apply,
-  });
+  const notifiers: OpsNotifier[] = [consoleNotifier];
+  const smtp = smtpConfigFromEnv();
+  if (smtp) notifiers.push(smtpEmailNotifier(smtp));
+  const startedAt = new Date();
+
+  let result: SyncResult;
+  try {
+    result = await runSync(source, { scope, dryRun: !flags.apply });
+  } catch (err) {
+    const note = err instanceof Error ? err.message : String(err);
+    await notifyFailureToAll(notifiers, {
+      scope,
+      startedAt: startedAt.toISOString(),
+      note,
+      runId: null,
+    });
+    console.error(`[fracttal-sync] ${note}`);
+    Deno.exit(1);
+  }
 
   const { plan } = result;
   const counts = result.written ?? plan.counts;
