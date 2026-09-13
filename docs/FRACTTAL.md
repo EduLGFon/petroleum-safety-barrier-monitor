@@ -61,7 +61,7 @@ auditable, with deletions soft.
   from Fracttal (a full-scope crawl sees none for that `external_code`) set
   `deleted_at`; the row stays so history/audit survives. `is_deleted`
   derived = `deleted_at IS NOT NULL`. Default dashboard views filter it out;
-  an admin view can list deleted rows.
+  retired rows are auditable via `GET /api/barriers/deleted` (admin token).
 - `sync_state` table — one row per run:
   `id, started_at, finished_at, scope (location_code), cursor (start),
   counts (insert/update/skip/error), status (running/ok/failed),
@@ -154,10 +154,10 @@ reconcile plan → apply (or dry-run report) → `sync_state` audit row.
   (`inserts/updates/deletes/skips`), `scope`, `note`. The skips total always
   reconciles to (malformed + unmapped + planned skips), so the row sums with
   the run report.
-- `alert_events`: schema is in place for P5 (dedup on
-  barrier + transition date, `sent_at` null until sent); the sync pipeline
-  records transitions in `barrier_status_history` only, it does not enqueue
-  alerts yet.
+- `alert_events`: consumed by the P5 alert cycle (`scripts/alerts-check.ts`):
+  dedup on barrier + transition date, `sent_at` null until sent. The sync
+  pipeline itself still records transitions in `barrier_status_history`
+  only — it never enqueues alerts.
 
 Run shapes:
 
@@ -169,10 +169,11 @@ deno run -A scripts/fracttal-sync.ts --fixture <path> --apply
 # live, reviewed prod session only, one station, single bounded GET
 deno run -A scripts/fracttal-sync.ts --live --location-code FAL --scope prod:fal --dry-run
 # polling cadence (env-driven; needs FRACTTAL_KEY/SECRET + DATABASE_URL)
-FRACTTAL_SYNC_SCOPES=FAL scripts/fracttal-poll.ts
+FRACTTAL_SYNC_SCOPES=FAL deno run -A scripts/fracttal-poll.ts
 ```
 
 ## Out of scope here
 
-- Write endpoints, webhook receiver (P3+).
+- Webhook receiver (polling first; webhooks only if Fracttal supports them,
+  with signature check).
 - A real fixture (needs prod access) — captured by the procedure above.

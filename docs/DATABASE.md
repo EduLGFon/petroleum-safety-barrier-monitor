@@ -102,6 +102,13 @@ alert_events
   payload               jsonb
   sent_at               timestamptz, nullable (null = ainda não enviado)
 
+alert_recipients
+  id                    identity, PK
+  email                 text unique
+  name                  text, default ''
+  active                boolean, default true
+  created_at
+
 barrier_status_history
   id                    identity, PK
   barrier_id            → barriers, on delete cascade

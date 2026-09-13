@@ -109,9 +109,12 @@ fixos (só cobre os status conhecidos).
 
 ## Usando a API real (Postgres)
 
-Os seis handlers que `httpAdapterFactory` espera já estão implementados em
-`routes/api/`, sobre PostgreSQL (sem ORM — SQL puro via `jsr:@db/postgres`,
-valores ligados como `$1/$2`):
+Os handlers que `httpAdapterFactory` espera (barriers, `:id`, kpi, chart)
+mais os de escrita/admin/exportação já estão implementados em `routes/api/`,
+sobre PostgreSQL (sem ORM — SQL puro via `jsr:@db/postgres`, valores ligados
+como `$1/$2`). Inventário completo: `barriers`, `barriers/deleted`,
+`barriers/:id`, `barriers/:id/status`, `export`, `kpi`, `chart`, `health`,
+`recipients`, `recipients/:id` (`_params.ts` é só parsers, nunca rota):
 
 - `GET /api/barriers?locationId=1&disponibilidadeId=4&conformidadeId=1&categoriaId=2&query=FAL&since=2024-01-01&until=2024-12-31&page=1&pageSize=25&sortCol=statusSince&sortDir=desc` →
   `BarriersResponse { items: WireBarrier[], total, page, pageSize, totalPages }`
