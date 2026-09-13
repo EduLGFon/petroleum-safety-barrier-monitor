@@ -99,7 +99,8 @@ views; live prod run is read-capped and reviewed before scheduling.
 Status (as-built): schema migration landed (provenance columns, `sync_state`,
 `alert_events`, author 10 "Sincronização Fracttal"), all default barrier
 queries hide soft-deleted rows, mapper + pure reconcile planner + `runSync`
-orchestrator tested headless (146 tests green; check at 12-problem baseline),
+orchestrator tested headless (201 tests green at latest count; check at
+12-problem baseline),
 CLI `scripts/fracttal-sync.ts` verified end-to-end on a scratch Postgres:
 dry-run shows reconcile counts, rerun idempotent, availability flip appends
 one history row via `record_status_change` (author 10), deleted fixture row
@@ -152,10 +153,10 @@ docs/API.md); in-memory throttle per remote IP (120/30/10 per min for
 read/write/export, health exempt); `GET /api/export?format=csv` streams the
 filtered set (BOM + 14-col rows + RESUMO via shared `row()`/`csvCell()`/
 `summaryRows()`, 10k cap with the filtered total named on overflow);
-`CSV_HEADERS` single-sourced between browser and server exports. 170 tests
-green (config/auth/throttle/errors/export units + DB-gated fixture→upsert→
-GET/export integration, verified against real Postgres); check at the
-12-problem baseline.
+`CSV_HEADERS` single-sourced between browser and server exports. 201 tests
+green at latest count (config/auth/throttle/errors/export units + DB-gated
+fixture→upsert→GET/export integration, verified against real Postgres);
+check at the 12-problem baseline.
 
 ## P5: Contingency + email alerts + prod readiness
 
@@ -193,8 +194,9 @@ Verificado de ponta a ponta contra Postgres + sink SMTP de mentira: 1
 email no run (assunto/corpo conferidos), 0 no rerun, falha de relay loga
 `event <id>` e o run seguinte entrega; smoke `/` + `/api/health` verdes;
 backup `pg_dump -Fc` → restore com contagens idênticas; operação
-(systemd, cron, rollback para mock) em docs/API.md. 195 testes verdes
-(headless + integração DB-gated); check no baseline de 12 problemas.
+(systemd, cron, rollback para mock) em docs/API.md. 201 testes verdes na
+última contagem (headless + integração DB-gated); check no baseline de
+12 problemas.
 Bugs reais achados no caminho e corrigidos: `close()` do SMTP estourava
 `Bad resource ID` após o QUIT (email entregue virava falha + duplicata no
 retry) e `updateRecipient` não passava `args` ao `queryRows` (PATCH 500).
