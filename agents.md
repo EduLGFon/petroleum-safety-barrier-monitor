@@ -29,6 +29,12 @@
   Web-standard APIs like `Deno.serve`, `Deno.mkdir`, `Deno.Command`, `fetch`,
   then (2) Deno-native libraries (std/JSR), then (3) Deno-first packages. Use
   Node/npm packages only as a last resort.
+- Language split: user-facing strings stay in Portuguese (pt-BR); dev-facing
+  strings are English. Code identifiers, comments, docs, logs, and test names
+  use English names, while display values (UI labels, seeded category/status
+  labels, email copy, export headers, pt-BR date/duration formatting) are never
+  translated - only identifier spellings change. `docs/GLOSSARY.md` is the
+  single source of truth for the PT display value to EN identifier mapping.
 
 ## Architecture rules
 
