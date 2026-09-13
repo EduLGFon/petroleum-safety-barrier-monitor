@@ -20,8 +20,8 @@ plus `fsRoutes()`. `client.ts` only imports `static/styles.css` for HMR.
 | `build`      | `vite build`                                           | shell at build time; request-time env still needed at serve |
 | `preview`    | `deno serve -A _fresh/server.js`                       | shell only, no `--env-file`                                 |
 | `start`      | `deno serve --env-file=.env -A _fresh/server.js`       | `.env`                                                      |
-| `db:migrate` | `deno run -A --env-file=.env.local scripts/migrate.ts` | `.env.local` (`DATABASE_URL`)                               |
-| `db:seed`    | `deno run -A --env-file=.env.local scripts/seed.ts`    | `.env.local` (`DATABASE_URL`)                               |
+| `db:migrate` | `deno run -A --env-file=.env scripts/migrate.ts`     | `.env` (`DATABASE_URL`)                                       |
+| `db:seed`    | `deno run -A --env-file=.env scripts/seed.ts`        | `.env` (`DATABASE_URL`)                                       |
 
 `build` emits `_fresh/server.js` + `_fresh/server/` + `_fresh/client/`.
 `COMPANY_NAME` is read per request, not baked at build time.
@@ -146,8 +146,7 @@ Full contract lives in `docs/API.md`. Summary:
 See `.env.example`. `COMPANY_NAME` brands titles/headers/exports (empty =
 unbranded). `PUBLIC_API_MODE` (`mock`/`http`) + `PUBLIC_API_BASE_URL`
 select the adapter. `DATABASE_URL` feeds `lib/server/db.ts` and both `db:*`
-tasks. `dev` needs shell exports; `start` reads `.env`; `db:*` read
-`.env.local`.
+tasks. `dev` needs shell exports; `start`/`db:*` read `.env`.
 
 ## Design principles
 

@@ -192,8 +192,7 @@ Para ativar:
    PUBLIC_API_BASE_URL=          # vazio = mesma origem da página (recomendado)
    DATABASE_URL=postgres://user:password@localhost:5432/barreiras
    ```
-   (`dev` lê do shell — `export $(cat .env | xargs)`; `start` lê `.env`;
-   `db:*` leem `.env.local`.) Quando `PUBLIC_API_BASE_URL` é vazio, a rota
+   (`dev` lê do shell — `export $(cat .env | xargs)`; `start`/`db:*` leem `.env`.) Quando `PUBLIC_API_BASE_URL` é vazio, a rota
    `routes/index.tsx` usa a própria origem da requisição — o browser busca
    `/api/*` same-origin em qualquer porta que o app esteja servindo. Defina a
    variável explicitamente apenas quando a API estiver em outra origem (essa

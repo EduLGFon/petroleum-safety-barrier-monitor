@@ -13,8 +13,8 @@
     "build": "vite build",
     "preview": "deno serve -A _fresh/server.js",
     "start": "deno serve --env-file=.env -A _fresh/server.js",
-    "db:migrate": "deno run -A --env-file=.env.local scripts/migrate.ts",
-    "db:seed": "deno run -A --env-file=.env.local scripts/seed.ts"
+    "db:migrate": "deno run -A --env-file=.env scripts/migrate.ts",
+    "db:seed": "deno run -A --env-file=.env scripts/seed.ts"
   },
   "imports": {
     "@/": "./",

@@ -7,7 +7,7 @@ import { fromFileUrl } from "@std/path";
 const connectionString = Deno.env.get("DATABASE_URL");
 if (!connectionString) {
   console.error(
-    "DATABASE_URL is not set. Copy .env.example to .env.local first.",
+    "DATABASE_URL is not set. Copy .env.example to .env first.",
   );
   Deno.exit(1);
 }

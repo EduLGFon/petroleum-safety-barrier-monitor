@@ -13,7 +13,7 @@ function createPool(): Pool {
   const connectionString = Deno.env.get("DATABASE_URL");
   if (!connectionString) {
     throw new Error(
-      "DATABASE_URL is not set. Copy .env.example to .env.local and point it at your Postgres instance.",
+      "DATABASE_URL is not set. Copy .env.example to .env and point it at your Postgres instance.",
     );
   }
   // Lazy pool of 10: connections open on first use, reused across requests.

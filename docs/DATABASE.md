@@ -11,14 +11,11 @@ concatenação de input em `text`; `ORDER BY` só pela whitelist `SORTABLE`).
 #    e crie o banco:
 createdb barreiras
 
-# 2. Configure as variáveis de ambiente.
-#    Cada task lê um arquivo diferente — não há um único arquivo global:
-#      .env.local  ->  deno task db:migrate / db:seed (DATABASE_URL)
-#      .env        ->  deno task start (tudo: DATABASE_URL, PUBLIC_*)
+# 2. Configure as variáveis de ambiente. Um único arquivo `.env` cobre tudo:
+#      .env        ->  deno task start / db:migrate / db:seed (--env-file=.env)
 #      shell       ->  deno task dev / preview / build NÃO leem --env-file;
 #                       exporte no shell: export $(cat .env | xargs)
-#    O jeito simples local: cp .env.example .env.local E .env, edite
-#    DATABASE_URL nos dois.
+#    O jeito simples local: cp .env.example .env, edite DATABASE_URL.
 
 # 3. Aplique o schema + seed das tabelas de lookup
 deno task db:migrate
