@@ -1,49 +1,56 @@
-"use client";
-import dynamic from "next/dynamic";
-import type { CategoryConformidade } from "@/lib/types";
-const Chart = dynamic(() => import("./ConformidadeChartInner"), {
-  ssr: false,
-  loading: () => (
-    <div
-      style={{
-        height: 240,
-        background:
-          "linear-gradient(90deg,var(--bg-elevated) 25%,var(--bg-surface) 50%,var(--bg-elevated) 75%)",
-        backgroundSize: "200% 100%",
-        borderRadius: 8,
-        animation: "shimmer 1.5s linear infinite",
-      }}
-    />
-  ),
-});
+// Conformidade chart card - Aurora glass section around the SVG bars.
+// This is why it exists: keeps the card frame stable while the inner
+// chart stays dependency-free (no dynamic import needed in Fresh).
+import type { CategoryConformidade } from "../lib/types.ts";
+import Chart from "./ConformidadeChartInner.tsx";
+import { AURORA } from "../lib/aurora.ts";
+
 interface Props {
   data: CategoryConformidade[];
 }
+
+// Scroll budget: past this many rows the plot scrolls inside the card
+// instead of growing the page into a 70-row tower.
+const SCROLL_AFTER_ROWS = 18;
+
+// ConformidadeChart: glass card frame that scrolls the inner SVG past SCROLL_AFTER_ROWS.
 export function ConformidadeChart({ data }: Props) {
+  const scroll = data.length > SCROLL_AFTER_ROWS;
   return (
     <div
+      className="glass-card"
       style={{
-        background: "var(--bg-surface)",
-        border: "1px solid var(--border)",
-        borderRadius: 12,
-        padding: "18px 18px 10px",
-        marginBottom: 20,
-        boxShadow: "var(--shadow-sm)",
+        background: AURORA.data,
+        border: `1px solid ${AURORA.dataBorder}`,
+        borderRadius: AURORA.dataRadius,
+        padding: "var(--d-chart-pad)",
+        marginBottom: "var(--d-section)",
       }}
     >
       <div
+        className="tnum"
         style={{
           fontSize: 10,
           fontWeight: 800,
-          color: "var(--text-muted)",
+          color: AURORA.label,
           textTransform: "uppercase",
-          letterSpacing: "0.12em",
-          marginBottom: 14,
+          letterSpacing: "0.14em",
+          marginBottom: "var(--d-sect-title-gap)",
         }}
       >
-        Conformidade por Categoria
+        Conformidade por Categoria · {data.length}
       </div>
-      <Chart data={data} />
+      <div
+        style={scroll
+          ? {
+            maxHeight: "min(60vh, 520px)",
+            overflowY: "auto",
+            paddingRight: 4,
+          }
+          : undefined}
+      >
+        <Chart data={data} />
+      </div>
     </div>
   );
 }

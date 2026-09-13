@@ -1,17 +1,12 @@
-"use client";
-import { useCallback, useEffect, useRef, useState } from "react";
-import type { KpiSnapshot } from "@/lib/types";
-import { fmt, pct } from "@/lib/utils";
-import {
-  AlertOctagonIcon,
-  CheckCircleIcon,
-  FlameIcon,
-  ShieldIcon,
-  TargetIcon,
-  WrenchIcon,
-} from "./ui/Icons";
+// Aurora Executive Dark KPI cards.
+// This is why it exists: six live metrics rendered as identical glass
+// cards (label / value / sub / signature-gradient progress). Only the
+// "Não Conformes" card carries the red glow.
+import { AURORA, AURORA_TYPE, progressWidth } from "../lib/aurora.ts";
+import { useEffect, useRef, useState } from "preact/hooks";
+import type { KpiSnapshot } from "../lib/types.ts";
+import { fmt, pct } from "../lib/utils.ts";
 
-type I = React.FC<{ size?: number; color?: string; strokeWidth?: number }>;
 interface Props {
   kpi: KpiSnapshot;
   location: string;
@@ -21,12 +16,12 @@ interface C {
   rawNum: number;
   isPercent?: boolean;
   sub: string;
-  grad: string;
-  Icon: I;
-  pv?: number;
+  share?: number;
+  alert?: boolean;
   delay: number;
 }
 
+// useAnimatedValue: eases cur toward target over duration (ease-out cubic via rAF); skips when unchanged and cancels on cleanup.
 function useAnimatedValue(target: number, duration = 600) {
   const [cur, setCur] = useState(target);
   const prev = useRef(target);
@@ -48,6 +43,7 @@ function useAnimatedValue(target: number, duration = 600) {
   return cur;
 }
 
+// AnimVal: pt-BR animated number with optional % suffix; bumps key on n change to retrigger the pop animation.
 function AnimVal({ n, isPercent }: { n: number; isPercent?: boolean }) {
   const v = useAnimatedValue(n);
   const prev = useRef(n);
@@ -66,61 +62,56 @@ function AnimVal({ n, isPercent }: { n: number; isPercent?: boolean }) {
   );
 }
 
+// KpiGrid: six glass cards from KpiSnapshot + location label; shares divide by total||1, Contingenciadas sums indisp + degr.
 export function KpiGrid({ kpi, location }: Props) {
   const t = kpi.total || 1;
   const loc = location === "ALL" ? "total geral" : `em ${location}`;
+  const dispShare = Math.round(kpi.disponivel / t * 100);
+  const ncShare = Math.round(kpi.naoConforme / t * 100);
+  const contShare = Math.round((kpi.indispCont + kpi.degrCont) / t * 100);
   const cards: C[] = [
     {
       label: "Total de Barreiras",
-      Icon: ShieldIcon,
       rawNum: kpi.total,
       sub: loc,
-      grad: "var(--kpi-grad-1)",
+      share: 100,
       delay: 0,
     },
     {
       label: "Disponíveis",
-      Icon: CheckCircleIcon,
       rawNum: kpi.disponivel,
-      sub: pct(Math.round(kpi.disponivel / t * 100)) + " do inv.",
-      grad: "var(--kpi-grad-2)",
+      sub: pct(dispShare) + " do inv.",
+      share: dispShare,
       delay: 50,
-      pv: Math.round(kpi.disponivel / t * 100),
     },
     {
       label: "Não Conformes",
-      Icon: AlertOctagonIcon,
       rawNum: kpi.naoConforme,
-      sub: pct(Math.round(kpi.naoConforme / t * 100)) + " do inv.",
-      grad: "var(--kpi-grad-3)",
+      sub: pct(ncShare) + " do inv.",
+      share: ncShare,
+      alert: true,
       delay: 100,
-      pv: Math.round(kpi.naoConforme / t * 100),
     },
     {
       label: "Contingenciadas",
-      Icon: WrenchIcon,
       rawNum: kpi.indispCont + kpi.degrCont,
       sub: "Ind. + Degr. contingenciadas",
-      grad: "var(--kpi-grad-4)",
+      share: contShare,
       delay: 150,
-      pv: Math.round((kpi.indispCont + kpi.degrCont) / t * 100),
     },
     {
       label: "% Conformidade",
-      Icon: TargetIcon,
       rawNum: kpi.pctConforme,
       isPercent: true,
       sub: fmt(kpi.conforme) + " conformes",
-      grad: "var(--kpi-grad-5)",
+      share: kpi.pctConforme,
       delay: 200,
-      pv: kpi.pctConforme,
     },
     {
       label: "Críticas NC",
-      Icon: FlameIcon,
       rawNum: kpi.criticasNC,
       sub: "Críticas não conformes",
-      grad: "var(--kpi-grad-6)",
+      alert: kpi.criticasNC > 0,
       delay: 250,
     },
   ];
@@ -129,114 +120,69 @@ export function KpiGrid({ kpi, location }: Props) {
     <div
       style={{
         display: "grid",
-        gridTemplateColumns: "repeat(auto-fit,minmax(150px,1fr))",
-        gap: 10,
-        marginBottom: 20,
+        gridTemplateColumns: "repeat(auto-fit,minmax(var(--d-kpi-min),1fr))",
+        gap: "var(--d-kpi-gap)",
+        marginBottom: "var(--d-section)",
       }}
     >
       {cards.map((c) => (
         <div
           key={c.label}
-          className="animate-card-in"
+          className="animate-card-in glass-card"
           style={{
-            background: c.grad,
-            borderRadius: 14,
-            padding: "15px 17px 13px",
-            position: "relative",
-            overflow: "hidden",
-            boxShadow: "var(--shadow-sm)",
+            background: AURORA.card,
+            border: `1px solid ${AURORA.cardBorder}`,
+            borderRadius: AURORA.cardRadius,
+            padding: "14px 16px",
+            boxShadow: c.alert ? AURORA.redGlow : "none",
             minWidth: 0,
             animationDelay: `${c.delay}ms`,
-            cursor: "default",
-            transition:
-              "box-shadow .2s var(--ease-std), transform .2s var(--ease-std)",
-          }}
-          onMouseEnter={(e) => {
-            (e.currentTarget as HTMLDivElement).style.boxShadow =
-              "var(--shadow-md), 0 0 20px var(--glow)";
-            (e.currentTarget as HTMLDivElement).style.transform =
-              "translateY(-1px)";
-          }}
-          onMouseLeave={(e) => {
-            (e.currentTarget as HTMLDivElement).style.boxShadow =
-              "var(--shadow-sm)";
-            (e.currentTarget as HTMLDivElement).style.transform = "none";
           }}
         >
-          {/* Shine */}
           <div
             style={{
-              position: "absolute",
-              top: 0,
-              left: 0,
-              right: 0,
-              height: "50%",
-              background:
-                "linear-gradient(180deg,rgba(255,255,255,.1) 0%,transparent 100%)",
-              borderRadius: "14px 14px 0 0",
-              pointerEvents: "none",
-            }}
-          />
-          {/* Progress */}
-          {c.pv !== undefined && (
-            <div
-              style={{
-                position: "absolute",
-                bottom: 0,
-                left: 0,
-                right: 0,
-                height: 3,
-                background: "rgba(0,0,0,.2)",
-              }}
-            >
-              <div
-                style={{
-                  height: "100%",
-                  width: `${c.pv}%`,
-                  background: "rgba(255,255,255,.45)",
-                  transition: "width .7s var(--ease-out)",
-                  borderRadius: "0 3px 0 0",
-                }}
-              />
-            </div>
-          )}
-          <div style={{ marginBottom: 8 }}>
-            <c.Icon size={17} color="rgba(255,255,255,.72)" strokeWidth={1.8} />
-          </div>
-          <div
-            style={{
-              fontSize: 10,
-              fontWeight: 700,
-              letterSpacing: "0.1em",
+              fontSize: AURORA_TYPE.kpiLabel.fontSize,
+              letterSpacing: AURORA_TYPE.kpiLabel.letterSpacing,
+              fontWeight: AURORA_TYPE.kpiLabel.fontWeight,
+              color: AURORA.label,
               textTransform: "uppercase",
-              color: "rgba(255,255,255,.6)",
-              marginBottom: 5,
             }}
           >
-            {c.label}
+            {c.label.toUpperCase()}
           </div>
           <div
+            className="tnum"
             style={{
-              fontSize: 27,
-              fontWeight: 800,
-              color: "#fff",
-              lineHeight: 1,
-              letterSpacing: "-0.02em",
-              textShadow: "0 2px 8px rgba(0,0,0,.28)",
-              marginBottom: 5,
+              fontFamily: "var(--font-display)",
+              fontSize: AURORA_TYPE.kpiValue.fontSize,
+              fontWeight: AURORA_TYPE.kpiValue.fontWeight,
+              color: AURORA.value,
+              letterSpacing: AURORA_TYPE.kpiValue.letterSpacing,
             }}
           >
             <AnimVal n={c.rawNum} isPercent={c.isPercent} />
           </div>
-          <div
-            style={{
-              fontSize: 11,
-              color: "rgba(255,255,255,.5)",
-              fontWeight: 500,
-            }}
-          >
-            {c.sub}
-          </div>
+          <div style={{ fontSize: 12, color: AURORA.sub }}>{c.sub}</div>
+          {c.share !== undefined && (
+            <div
+              style={{
+                height: 3,
+                borderRadius: 99,
+                marginTop: 10,
+                background: AURORA.track,
+              }}
+            >
+              <div
+                style={{
+                  width: progressWidth(c.share),
+                  height: "100%",
+                  borderRadius: 99,
+                  background: AURORA.grad,
+                  transition: "width .7s var(--ease-out)",
+                }}
+              />
+            </div>
+          )}
         </div>
       ))}
     </div>

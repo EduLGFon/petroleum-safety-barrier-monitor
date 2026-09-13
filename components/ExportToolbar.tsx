@@ -1,82 +1,80 @@
-"use client";
-import { useState } from "react";
-import type { Barrier } from "@/lib/types";
-import { exportToCSV, exportToExcel, exportToPDF } from "@/lib/export";
-import {
-  CloseIcon,
-  DownloadIcon,
-  FilePdfIcon,
-  FileSpreadsheetIcon,
-  FileTextIcon,
-} from "./ui/Icons";
+// Export toolbar - Aurora glass selection/export bar.
+// This is why it exists: row selection needs a visible anchor and the
+// export actions need one home; idle and active states share the same
+// glass bar language as the rest of the identity.
+import { exportToCSV, exportToExcel, exportToPDF } from "../lib/export.ts";
+import { ExportButtons, type Fmt } from "./export/ExportButtons.tsx";
+import { TriCheck } from "./export/TriCheck.tsx";
+import { useMemo, useState } from "preact/hooks";
+import type { Barrier } from "../lib/types.ts";
+import { CloseIcon } from "./ui/Icons.tsx";
+import { AURORA } from "../lib/aurora.ts";
 interface Props {
   selectedIds: Set<number>;
   allFiltered: Barrier[];
   onSelectAll: () => void;
   onClearAll: () => void;
+  companyName: string;
+  // Server mode pages from the API, so exports cover only the current page;
+  // the toolbar says so up front instead of surprising a user mid-export.
+  serverMode?: boolean;
 }
-type Fmt = "xlsx" | "pdf" | "csv";
-type I = React.FC<{ size?: number; color?: string; strokeWidth?: number }>;
-const FMTS: { key: Fmt; Icon: I; label: string; ext: string; color: string }[] =
-  [
-    {
-      key: "xlsx",
-      Icon: FileSpreadsheetIcon,
-      label: "Excel",
-      ext: ".xlsx",
-      color: "#16a34a",
-    },
-    {
-      key: "pdf",
-      Icon: FilePdfIcon,
-      label: "PDF",
-      ext: ".pdf",
-      color: "#dc2626",
-    },
-    {
-      key: "csv",
-      Icon: FileTextIcon,
-      label: "CSV",
-      ext: ".csv",
-      color: "#2563eb",
-    },
-  ];
+// ExportToolbar: selection bar over selectedIds + allFiltered; derives all/some-selected tri-state and shows format buttons only when a row is selected.
 export function ExportToolbar(
-  { selectedIds, allFiltered, onSelectAll, onClearAll }: Props,
+  {
+    selectedIds,
+    allFiltered,
+    onSelectAll,
+    onClearAll,
+    companyName,
+    serverMode,
+  }: Props,
 ) {
   const [loading, setLoading] = useState<Fmt | null>(null);
-  const count = selectedIds.size, hasAny = count > 0;
+  const [error, setError] = useState<string | null>(null);
+  // Rows actually present in the current filter (selection can go stale when
+  // filters narrow, so the label and export use matched rows, not raw ids).
+  const exportable = useMemo(
+    () => allFiltered.filter((b) => selectedIds.has(b.id)),
+    [allFiltered, selectedIds],
+  );
+  const count = exportable.length, hasAny = count > 0;
   const allSel = count === allFiltered.length && allFiltered.length > 0,
     someSel = count > 0 && !allSel;
+  // doExport: exports matched rows; surfaces failures inline instead of
+  // silently clearing the spinner (previous try/finally had no catch).
   async function doExport(fmt: Fmt) {
     if (!hasAny || loading) return;
-    const bs = allFiltered.filter((b) => selectedIds.has(b.id));
-    const name = `seacrest-barreiras-${new Date().toISOString().slice(0, 10)}`;
+    const bs = exportable;
+    const name = `barreiras-${new Date().toISOString().slice(0, 10)}`;
     setLoading(fmt);
+    setError(null);
     try {
-      if (fmt === "xlsx") await exportToExcel(bs, name);
-      if (fmt === "pdf") await exportToPDF(bs, name);
+      if (fmt === "xls") await exportToExcel(bs, name, companyName);
+      if (fmt === "pdf") await exportToPDF(bs, name, companyName);
       if (fmt === "csv") exportToCSV(bs, name);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Falha ao exportar");
     } finally {
       setLoading(null);
     }
   }
   return (
     <div
+      className="glass-card"
       style={{
         display: "flex",
         alignItems: "center",
-        gap: 10,
+        gap: "var(--d-bar-gap)",
         flexWrap: "wrap",
-        padding: "11px 14px",
-        marginBottom: 10,
-        background: hasAny
-          ? "color-mix(in srgb,var(--accent) 5%,var(--bg-elevated))"
-          : "var(--bg-elevated)",
+        padding: "var(--d-bar-pad)",
+        marginBottom: "var(--d-bar-gap)",
+        background: AURORA.data,
         border: hasAny
-          ? "1px solid color-mix(in srgb,var(--accent) 30%,var(--border))"
-          : "1px solid var(--border)",
-        borderRadius: 11,
+          ? "1px solid rgba(99,102,241,.4)"
+          : `1px solid ${AURORA.dataBorder}`,
+        borderRadius: AURORA.dataRadius,
+        boxShadow: hasAny ? AURORA.auroraGlow : "none",
         transition: "all .25s var(--ease-std)",
       }}
     >
@@ -85,20 +83,21 @@ export function ExportToolbar(
         style={{
           display: "flex",
           alignItems: "center",
-          gap: 9,
+          gap: "var(--d-check-gap)",
           cursor: "pointer",
         }}
       >
-        <Chk
+        <TriCheck
           checked={allSel}
           indeterminate={someSel}
           onChange={() => allSel ? onClearAll() : onSelectAll()}
         />
         <span
+          className="tnum"
           style={{
-            fontSize: 13,
+            fontSize: "var(--d-body)",
             fontWeight: 600,
-            color: "var(--text-secondary)",
+            color: AURORA.pillText,
             whiteSpace: "nowrap",
           }}
         >
@@ -113,148 +112,72 @@ export function ExportToolbar(
       </label>
       {someSel && (
         <button
+          type="button"
           onClick={onClearAll}
           style={{
             display: "flex",
             alignItems: "center",
-            gap: 4,
-            fontSize: 12,
-            padding: "4px 9px",
+            gap: "var(--d-gap-2xs)",
+            fontSize: "var(--d-small)",
+            padding: "var(--d-mini-pad)",
             borderRadius: 6,
             background: "transparent",
-            border: "1px solid var(--border)",
-            color: "var(--text-muted)",
+            border: `1px solid ${AURORA.dataBorder}`,
+            color: AURORA.label,
             cursor: "pointer",
             transition: "all .2s",
           }}
         >
-          <CloseIcon size={11} color="var(--text-muted)" />Limpar
+          <CloseIcon size={11} color={AURORA.label} />Limpar
         </button>
       )}
       <div style={{ flex: 1 }} />
       {hasAny
         ? (
-          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-            <div
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: 5,
-                marginRight: 4,
-              }}
-            >
-              <DownloadIcon size={13} color="var(--text-muted)" />
-              <span
-                style={{
-                  fontSize: 13,
-                  color: "var(--text-muted)",
-                  whiteSpace: "nowrap",
-                }}
-              >
-                Exportar {count.toLocaleString("pt-BR")}:
-              </span>
-            </div>
-            {FMTS.map(({ key, Icon, label, ext, color }) => (
-              <button
-                key={key}
-                onClick={() => doExport(key)}
-                disabled={!!loading}
-                className="lift"
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 5,
-                  padding: "7px 13px",
-                  fontSize: 12,
-                  fontWeight: 700,
-                  borderRadius: 8,
-                  cursor: loading ? "wait" : "pointer",
-                  border: `1px solid ${color}44`,
-                  background: `${color}0e`,
-                  color,
-                  opacity: loading && loading !== key ? 0.4 : 1,
-                  whiteSpace: "nowrap",
-                }}
-              >
-                {loading === key
-                  ? (
-                    <span
-                      style={{
-                        animation: "pulse 1s infinite",
-                        fontSize: 12,
-                        display: "inline-block",
-                        width: 13,
-                        height: 13,
-                        borderRadius: "50%",
-                        border: "2px solid currentColor",
-                        borderTopColor: "transparent",
-                        animationDuration: ".7s",
-                        animationName: "spin",
-                      }}
-                    />
-                  )
-                  : <Icon size={14} color={color} strokeWidth={2} />}
-                {label}
-                <span style={{ fontSize: 10, opacity: .6 }}>{ext}</span>
-              </button>
-            ))}
-          </div>
+          <ExportButtons
+            count={count}
+            loading={loading}
+            onExport={doExport}
+          />
         )
         : (
           <span
             style={{
-              fontSize: 12,
-              color: "var(--text-muted)",
+              fontSize: "var(--d-small)",
+              color: AURORA.sub,
               fontStyle: "italic",
             }}
           >
             Selecione itens para exportar
           </span>
         )}
-    </div>
-  );
-}
-function Chk(
-  { checked, indeterminate, onChange }: {
-    checked: boolean;
-    indeterminate: boolean;
-    onChange: () => void;
-  },
-) {
-  const a = checked || indeterminate;
-  return (
-    <div
-      onClick={onChange}
-      style={{
-        width: 16,
-        height: 16,
-        borderRadius: 4,
-        flexShrink: 0,
-        border: a ? "2px solid var(--accent)" : "2px solid var(--border)",
-        background: a ? "var(--accent)" : "transparent",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        cursor: "pointer",
-        transition: "all .18s var(--ease-std)",
-        boxShadow: a ? "0 0 7px var(--glow)" : "none",
-      }}
-    >
-      {checked && (
-        <svg width="8" height="6" viewBox="0 0 8 6" fill="none">
-          <path
-            d="M1 3L3 5L7 1"
-            stroke="white"
-            strokeWidth="1.6"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-        </svg>
-      )}
-      {indeterminate && (
+      {serverMode && (
         <div
-          style={{ width: 8, height: 2, background: "white", borderRadius: 1 }}
-        />
+          role="note"
+          data-page-export-note
+          style={{
+            flexBasis: "100%",
+            fontSize: "var(--d-small)",
+            color: AURORA.sub,
+          }}
+        >
+          Exportação abrange somente a página atual
+        </div>
+      )}
+      {error && (
+        <div
+          role="alert"
+          onClick={() => setError(null)}
+          title="Clique para dispensar"
+          style={{
+            flexBasis: "100%",
+            fontSize: "var(--d-small)",
+            color: "#f87171",
+            cursor: "pointer",
+          }}
+        >
+          {error}
+        </div>
       )}
     </div>
   );

@@ -1,18 +1,66 @@
-import { SeacrestLogo } from "./ui/SeacrestLogo";
-import { ShieldIcon } from "./ui/Icons";
+// Aurora Executive Dark header.
+// This is why it exists: eyebrow + an extra-thin title on the left with
+// a live connection dot (emerald = connected, amber = reconnecting,
+// red = disconnected), gear button on the right. No cards, no pills, no
+// extra chrome: the header sits directly on the mesh canvas.
+import { AURORA, AURORA_CONN, AURORA_TYPE } from "../lib/aurora.ts";
+import { useSettings } from "../context/SettingsContext.tsx";
+import { useEffect, useState } from "preact/hooks";
 
 interface Props {
   onOpenSettings: () => void;
+  companyName?: string;
 }
 
+type Conn = "connected" | "reconnecting" | "disconnected";
+
+const CONN_LABEL: Record<Conn, string> = {
+  connected: "Conectado",
+  reconnecting: "Reconectando…",
+  disconnected: "Desconectado",
+};
+
+// Live browser connectivity: online/offline events drive the dot. A
+// fresh offline→online flip shows amber "reconnecting" briefly before
+// settling on emerald, so all three states are reachable in production.
+function useConnection(): Conn {
+  const [conn, setConn] = useState<Conn>("connected");
+  useEffect(() => {
+    if (typeof navigator !== "undefined" && !navigator.onLine) {
+      setConn("disconnected");
+    }
+    let timer = 0;
+    // onOffline: drops to disconnected at once; clears any pending reconnect timer.
+    const onOffline = () => {
+      globalThis.clearTimeout(timer);
+      setConn("disconnected");
+    };
+    // onOnline: flashes reconnecting, then settles to connected after 2.5s.
+    const onOnline = () => {
+      globalThis.clearTimeout(timer);
+      setConn("reconnecting");
+      timer = globalThis.setTimeout(() => setConn("connected"), 2500);
+    };
+    globalThis.addEventListener("offline", onOffline);
+    globalThis.addEventListener("online", onOnline);
+    return () => {
+      globalThis.clearTimeout(timer);
+      globalThis.removeEventListener("offline", onOffline);
+      globalThis.removeEventListener("online", onOnline);
+    };
+  }, []);
+  return conn;
+}
+
+// GearIcon: 14px settings gear glyph for the header button.
 function GearIcon() {
   return (
     <svg
-      width="16"
-      height="16"
+      width="14"
+      height="14"
       viewBox="0 0 24 24"
       fill="none"
-      stroke="rgba(255,255,255,0.85)"
+      stroke="currentColor"
       strokeWidth="2"
       strokeLinecap="round"
       strokeLinejoin="round"
@@ -24,200 +72,101 @@ function GearIcon() {
   );
 }
 
-export function Header({ onOpenSettings }: Props) {
+// Header: title + live connection dot on the left, settings gear on the right.
+export function Header({ onOpenSettings, companyName = "" }: Props) {
+  const conn = useConnection();
+  const { settings } = useSettings();
+  const isUp = conn === "connected";
+  // Connected: the palette's main color. Offline: red - or gray when the
+  // palette itself is red, so the two states never look alike.
+  const color = isUp
+    ? AURORA_CONN.connected
+    : settings.accentColor === "red"
+    ? AURORA_CONN.offlineOnRed
+    : AURORA_CONN.offline;
+  const glow = isUp ? AURORA_CONN.connectedGlow : color;
   return (
     <header
       style={{
-        background: "var(--hero-grad)",
-        borderRadius: 14,
-        padding: "20px 26px",
-        marginBottom: 20,
         display: "flex",
         justifyContent: "space-between",
         alignItems: "center",
-        gap: 16,
+        gap: 12,
         flexWrap: "wrap",
-        position: "relative",
-        overflow: "hidden",
-        boxShadow: "var(--shadow-md)",
+        marginBottom: "var(--d-section)",
         animation: "cardAppear .35s var(--ease-out) both",
       }}
     >
-      {/* Decoration */}
-      <div
-        style={{
-          position: "absolute",
-          inset: 0,
-          overflow: "hidden",
-          pointerEvents: "none",
-        }}
-      >
-        <div
-          style={{
-            position: "absolute",
-            inset: 0,
-            backgroundImage:
-              "linear-gradient(rgba(59,130,246,.04) 1px,transparent 1px),linear-gradient(90deg,rgba(59,130,246,.04) 1px,transparent 1px)",
-            backgroundSize: "36px 36px",
-          }}
-        />
-        <div
-          style={{
-            position: "absolute",
-            top: -60,
-            right: 60,
-            width: 240,
-            height: 240,
-            borderRadius: "50%",
-            background:
-              "radial-gradient(circle,rgba(59,130,246,.18) 0%,transparent 70%)",
-            animation: "orb 10s ease-in-out infinite",
-          }}
-        />
-        <div
-          style={{
-            position: "absolute",
-            bottom: -40,
-            right: 300,
-            width: 160,
-            height: 160,
-            borderRadius: "50%",
-            background:
-              "radial-gradient(circle,rgba(124,58,237,.12) 0%,transparent 70%)",
-            animation: "orb 7s ease-in-out 3s infinite",
-          }}
-        />
-        <div
-          style={{
-            position: "absolute",
-            bottom: 0,
-            left: 0,
-            right: 0,
-            height: 1,
-            background:
-              "linear-gradient(90deg,transparent,var(--accent),var(--accent-2),transparent)",
-          }}
-        />
-      </div>
-
-      {/* Brand */}
-      <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          gap: 18,
-          position: "relative",
-        }}
-      >
-        <SeacrestLogo variant="icon" height={44} light />
-        <div
-          style={{
-            width: 1,
-            height: 42,
-            background: "rgba(255,255,255,.12)",
-            flexShrink: 0,
-          }}
-        />
-        <div>
+      <div>
+        {companyName && (
           <div
             style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 6,
-              marginBottom: 4,
+              fontFamily: "var(--font-sans)",
+              fontSize: AURORA_TYPE.eyebrow.fontSize,
+              letterSpacing: AURORA_TYPE.eyebrow.letterSpacing,
+              fontWeight: AURORA_TYPE.eyebrow.fontWeight,
+              color: AURORA.eyebrow,
             }}
           >
-            <ShieldIcon
-              size={11}
-              color="rgba(96,165,250,.8)"
-              strokeWidth={2.5}
-            />
-            <span
-              style={{
-                fontSize: 9,
-                fontWeight: 800,
-                letterSpacing: "0.16em",
-                textTransform: "uppercase",
-                background: "linear-gradient(90deg,#60a5fa,#a78bfa)",
-                WebkitBackgroundClip: "text",
-                WebkitTextFillColor: "transparent",
-                backgroundClip: "text",
-              }}
-            >
-              Sistema de Segurança Operacional
-            </span>
+            {companyName.toUpperCase()}
           </div>
-          <h1
-            style={{
-              margin: 0,
-              fontSize: 19,
-              fontWeight: 900,
-              color: "#fff",
-              letterSpacing: "-0.025em",
-              lineHeight: 1.15,
-              textShadow: "0 2px 12px rgba(0,0,0,.35)",
-            }}
-          >
-            Monitor de Barreiras de Segurança
-          </h1>
-        </div>
-      </div>
-
-      {/* Right */}
-      <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          gap: 12,
-          position: "relative",
-          flexWrap: "wrap",
-        }}
-      >
+        )}
         <div
           style={{
-            textAlign: "right",
-            fontSize: 11,
-            color: "rgba(148,163,184,.8)",
-            lineHeight: 1.7,
-          }}
-        >
-          <div
-            style={{
-              fontFamily: 'ui-monospace,"Cascadia Code",monospace',
-              letterSpacing: "0.05em",
-              fontSize: 10,
-            }}
-          >
-            Todas as Concessões
-          </div>
-          <div>
-            {new Date().toLocaleDateString("pt-BR", {
-              day: "2-digit",
-              month: "2-digit",
-              year: "numeric",
-            })}
-          </div>
-        </div>
-        <button
-          onClick={onOpenSettings}
-          className="lift"
-          title="Configurações"
-          style={{
-            width: 38,
-            height: 38,
+            fontFamily: "var(--font-display)",
+            fontSize: AURORA_TYPE.hero.fontSize,
+            fontWeight: AURORA_TYPE.hero.fontWeight,
+            letterSpacing: AURORA_TYPE.hero.letterSpacing,
+            color: AURORA.value,
             display: "flex",
             alignItems: "center",
-            justifyContent: "center",
-            background: "rgba(255,255,255,.1)",
-            border: "1px solid rgba(255,255,255,.15)",
-            borderRadius: 10,
-            cursor: "pointer",
-            backdropFilter: "blur(4px)",
+            gap: 10,
           }}
         >
-          <GearIcon />
-        </button>
+          Monitor de Barreiras
+          <span
+            title={CONN_LABEL[conn]}
+            aria-label={CONN_LABEL[conn]}
+            style={{
+              width: 12,
+              height: 12,
+              borderRadius: 99,
+              flexShrink: 0,
+              // Solid bulb in the live color + three-layer halo.
+              // Lit states breathe/flicker, the dead state holds still.
+              background: color,
+              boxShadow:
+                `0 0 3px ${color}, 0 0 10px ${glow}, 0 0 22px color-mix(in srgb, ${color} 35%, transparent)`,
+              animation: conn === "connected"
+                ? "bulbBreathe 3.5s ease-in-out infinite"
+                : conn === "reconnecting"
+                ? "bulbFlicker 1.6s linear infinite"
+                : "none",
+            }}
+          />
+        </div>
       </div>
+      <button
+        type="button"
+        onClick={onOpenSettings}
+        className="glass-pill lift"
+        title="Configurações"
+        aria-label="Configurações"
+        style={{
+          width: 32,
+          height: 32,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          background: AURORA.pill,
+          border: `1px solid ${AURORA.pillBorder}`,
+          borderRadius: 99,
+          color: AURORA.pillText,
+          cursor: "pointer",
+        }}
+      >
+        <GearIcon />
+      </button>
     </header>
   );
 }

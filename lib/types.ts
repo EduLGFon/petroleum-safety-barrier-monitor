@@ -1,3 +1,12 @@
+/**
+ * ══════════════════════════════════════════════════════════════════════════
+ * TYPES — canonical domain types shared by UI, utils, hooks, and API layer
+ * ══════════════════════════════════════════════════════════════════════════
+ * Open string unions (Disponibilidade, Conformidade, Criticidade) plus
+ * Barrier, KpiSnapshot, FilterState and table types. Central contract so
+ * new station values compile without code changes (dynamic-data principle).
+ */
+
 export type Theme = "light" | "dark" | "amoled";
 export type AccentColor =
   | "blue"
@@ -8,16 +17,25 @@ export type AccentColor =
   | "mono"
   | "purple";
 
+// Domain vocabularies - open string unions on purpose. The known literals
+// give autocomplete, while `string & {}` keeps new station statuses,
+// categories, owners, etc. compilable without a code change (dynamic-data
+// principle in agents.md). Never narrow these back to closed unions.
+// (The ban-types ignores below are intentional: openness is the design.)
 export type Disponibilidade =
   | "Disponível"
   | "Fora de Operação"
   | "Indisponível Contingenciado"
   | "Degradado Contingenciado"
   | "Degradado"
-  | "Indisponível";
+  | "Indisponível"
+  // deno-lint-ignore ban-types
+  | (string & {});
 
-export type Conformidade = "Conforme" | "Não Conforme";
-export type Criticidade = "Crítica" | "Não Crítica";
+// deno-lint-ignore ban-types
+export type Conformidade = "Conforme" | "Não Conforme" | (string & {});
+// deno-lint-ignore ban-types
+export type Criticidade = "Crítica" | "Não Crítica" | (string & {});
 
 export interface StatusHistoryEntry {
   date: string;
@@ -62,12 +80,32 @@ export interface KpiSnapshot {
   naoConforme: number;
   pctConforme: number;
   criticasNC: number;
+  // Dynamic buckets - the fixed fields above are the well-known fast path,
+  // these maps carry EVERY value present in the data (including future ones)
+  // so totals always reconcile and new statuses never go missing. Keyed by
+  // display string (computeKpi and resolveKpi both produce string keys).
+  // Optional for backward compat with old wire snapshots; StatusBand falls
+  // back to fixed fields when absent (known statuses only).
+  byDisponibilidade?: Record<string, number>;
+  byConformidade?: Record<string, number>;
+  byCriticidade?: Record<string, number>;
+  // Server time when the snapshot was computed (ISO). Absent in mock mode.
+  syncedAt?: string;
 }
 
 export interface CategoryConformidade {
   name: string;
   Conforme: number;
   "Não Conforme": number;
+}
+
+// Server-provided filter vocabularies (display strings + per-station counts)
+// for server-paginated mode, where the client never holds the full dataset.
+export interface Vocabularies {
+  locations: { code: string; count: number }[];
+  disponibilidades: string[];
+  conformidades: string[];
+  categorias: string[];
 }
 
 export type SortableColumn = keyof Pick<

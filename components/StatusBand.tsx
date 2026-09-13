@@ -1,22 +1,24 @@
-"use client";
-import type { KpiSnapshot } from "@/lib/types";
-import { DISP_COLORS } from "@/lib/constants";
-import { ActivityIcon } from "./ui/Icons";
-const SEGS = [
-  { key: "Disponível", short: "Disponível" },
-  { key: "Fora de Operação", short: "Fora de Op." },
-  { key: "Indisponível Contingenciado", short: "Indisp. Cont." },
-  { key: "Degradado Contingenciado", short: "Degr. Cont." },
-  { key: "Degradado", short: "Degradado" },
-  { key: "Indisponível", short: "Indisponível" },
-] as const;
+// Aurora Executive Dark status segments.
+// This is why it exists: availability shares as a bare row of glass
+// cells (colored label over white value), sized by volume. Segments are
+// dynamic - new statuses appear automatically - and click to filter.
+import {
+  DISP_KNOWN_ORDER as KNOWN_ORDER,
+  dispColorFor,
+  shortStatusLabel,
+} from "../lib/constants.ts";
+import { AURORA, AURORA_TYPE } from "../lib/aurora.ts";
+import type { KpiSnapshot } from "../lib/types.ts";
 interface Props {
   kpi: KpiSnapshot;
   activeFilter: string;
   onFilter: (k: string) => void;
 }
+// StatusBand: clickable availability segments sized by volume; click toggles the filter.
 export function StatusBand({ kpi, activeFilter, onFilter }: Props) {
-  const counts: Record<string, number> = {
+  // Prefer the dynamic buckets; the wire path only carries fixed fields, so
+  // reconstruct from those when buckets are absent (known statuses only).
+  const counts = kpi.byDisponibilidade ?? {
     "Disponível": kpi.disponivel,
     "Fora de Operação": kpi.foraDeOp,
     "Indisponível Contingenciado": kpi.indispCont,
@@ -24,136 +26,81 @@ export function StatusBand({ kpi, activeFilter, onFilter }: Props) {
     "Degradado": kpi.degradado,
     "Indisponível": kpi.indisponivel,
   };
-  const total = kpi.total || 1;
+  // Sort comparator: known statuses in KNOWN_ORDER first; unknowns trail by volume.
+  const keys = Object.keys(counts).sort((a, b) => {
+    const ia = KNOWN_ORDER.indexOf(a), ib = KNOWN_ORDER.indexOf(b);
+    if (ia !== -1 || ib !== -1) {
+      return (ia === -1 ? 99 : ia) - (ib === -1 ? 99 : ib);
+    }
+    return counts[b] - counts[a];
+  });
   return (
-    <div style={{ marginBottom: 20 }}>
+    <div style={{ marginBottom: "var(--d-section)" }}>
       <div
         style={{
           display: "flex",
-          alignItems: "center",
           gap: 6,
-          fontSize: 11,
-          fontWeight: 700,
-          color: "var(--text-muted)",
-          textTransform: "uppercase",
-          letterSpacing: "0.1em",
-          marginBottom: 8,
+          overflowX: "auto",
+          maxWidth: "100%",
         }}
       >
-        <ActivityIcon size={13} color="var(--accent)" strokeWidth={2} />{" "}
-        Disponibilidade — clique para filtrar
-      </div>
-      <div
-        style={{
-          display: "flex",
-          gap: 4,
-          height: 68,
-          background: "var(--bg-elevated)",
-          borderRadius: 14,
-          padding: 4,
-          border: "1px solid var(--border)",
-          boxShadow: "var(--shadow-sm)",
-        }}
-      >
-        {SEGS.map((seg, i) => {
-          const count = counts[seg.key] ?? 0,
-            ptPct = Math.round(count / total * 100);
-          const cfg = DISP_COLORS[seg.key],
-            isA = activeFilter === seg.key,
+        {keys.map((key, i) => {
+          const count = counts[key] ?? 0;
+          const cfg = dispColorFor(key),
+            short = shortStatusLabel(key),
+            isA = activeFilter === key,
             isDim = !!activeFilter && !isA;
           return (
             <button
-              key={seg.key}
-              onClick={() => onFilter(isA ? "" : seg.key)}
-              title={seg.key}
+              type="button"
+              key={key}
+              onClick={() => onFilter(isA ? "" : key)}
+              title={`${key} - clique para filtrar`}
               aria-pressed={isA}
               style={{
                 flex: Math.max(count, 1),
-                background: cfg.grad,
+                background: AURORA.seg,
                 border: isA
-                  ? "2px solid rgba(255,255,255,.6)"
-                  : "2px solid transparent",
-                borderRadius: 10,
+                  ? `1px solid ${AURORA.value}`
+                  : `1px solid ${AURORA.segBorder}`,
+                borderRadius: AURORA.segRadius,
                 cursor: "pointer",
-                display: "flex",
-                flexDirection: "column",
-                alignItems: "center",
-                justifyContent: "center",
-                gap: 1,
-                padding: "0 5px",
-                opacity: isDim ? 0.16 : 1,
-                transform: isA ? "scale(1.025)" : "scale(1)",
-                transition:
-                  "opacity .22s var(--ease-std), transform .22s var(--ease-std), box-shadow .22s var(--ease-std), border .15s",
-                overflow: "hidden",
-                minWidth: 54,
+                padding: "10px 4px",
+                textAlign: "center",
+                opacity: isDim ? 0.35 : 1,
+                minWidth: "var(--d-seg-min)",
+                flexShrink: 0,
                 boxShadow: isA ? `0 0 18px ${cfg.solid}55` : "none",
-                position: "relative",
-                animation: `cardAppear .3s ${i * 40}ms var(--ease-out) both`,
-              }}
-              onMouseEnter={(e) => {
-                if (!isA) {
-                  (e.currentTarget as HTMLButtonElement).style.transform =
-                    "scale(1.015)";
-                }
-              }}
-              onMouseLeave={(e) => {
-                if (!isA) {
-                  (e.currentTarget as HTMLButtonElement).style
-                    .transform = "scale(1)";
-                }
+                transition:
+                  "opacity .22s var(--ease-std), box-shadow .22s var(--ease-std), border .15s",
+                animation: `cardAppear .3s ${
+                  Math.min(i * 40, 400)
+                }ms var(--ease-out) both`,
               }}
             >
               <div
                 style={{
-                  position: "absolute",
-                  top: 0,
-                  left: 0,
-                  right: 0,
-                  height: "44%",
-                  background:
-                    "linear-gradient(180deg,rgba(255,255,255,.12) 0%,transparent 100%)",
-                  pointerEvents: "none",
-                }}
-              />
-              <span
-                style={{
-                  fontSize: 9,
-                  fontWeight: 700,
-                  color: "rgba(255,255,255,.82)",
-                  letterSpacing: "0.07em",
-                  textTransform: "uppercase",
+                  fontSize: AURORA_TYPE.bandLabel.fontSize,
+                  fontWeight: AURORA_TYPE.bandLabel.fontWeight,
+                  color: cfg.solid,
                   overflow: "hidden",
                   textOverflow: "ellipsis",
                   whiteSpace: "nowrap",
-                  maxWidth: "100%",
-                  position: "relative",
                 }}
               >
-                {seg.short}
-              </span>
-              <span
+                {short}
+              </div>
+              <div
+                className="tnum"
                 style={{
-                  fontSize: 20,
-                  fontWeight: 800,
-                  color: "#fff",
-                  lineHeight: 1,
-                  textShadow: "0 1px 5px rgba(0,0,0,.4)",
-                  position: "relative",
+                  fontFamily: "var(--font-display)",
+                  fontSize: AURORA_TYPE.bandValue.fontSize,
+                  fontWeight: AURORA_TYPE.bandValue.fontWeight,
+                  color: AURORA.value,
                 }}
               >
                 {count.toLocaleString("pt-BR")}
-              </span>
-              <span
-                style={{
-                  fontSize: 9,
-                  color: "rgba(255,255,255,.6)",
-                  fontWeight: 600,
-                  position: "relative",
-                }}
-              >
-                {ptPct}%
-              </span>
+              </div>
             </button>
           );
         })}

@@ -1,0 +1,53 @@
+// Enum codes for free-text-ish context domains (loc-desc/author) - split from lib/enums.ts to keep files small; why: isolates history resolvers.
+import { buildReverse } from "./codes.ts";
+
+// ─── Local description (physical location text) ──────────────────────────
+
+export const LOC_DESC_CODES: Record<number, string> = {
+  0: "Próx. ao Separador de Teste",
+  1: "Próx. ao Manifold de Produção",
+  2: "Área do Compressor Principal",
+  3: "Sala Elétrica Principal",
+  4: "Área de Descarregamento/Carreg.",
+  5: "Próximo às Caldeiras",
+  6: "Caixa de API",
+  7: "Plataforma de Acesso Norte",
+  8: "Área do Tanque de Armazenamento",
+  9: "Subestação Elétrica SE-01",
+  10: "Área de Bombeamento",
+  11: "Torre de Destilação T-100",
+  12: "Unidade de Processamento UP-02",
+  13: "Módulo de Controle MCE",
+  14: "Linha de Transferência LT-300",
+  15: "Ponto de Coleta PC-14",
+  16: "Disjuntor Interligação Gerador",
+  17: "Válvula de Bloqueio Principal",
+  18: "Área de Compressão AC-05",
+  19: "Área de Filtração",
+};
+export const LOC_DESC_IDS = buildReverse(LOC_DESC_CODES);
+
+export function fromLocDescId(id: number): string {
+  return LOC_DESC_CODES[id] ?? `Local (${id})`;
+}
+
+// ─── History author ───────────────────────────────────────────────────────
+
+export const AUTHOR_CODES: Record<number, string> = {
+  0: "João Silva",
+  1: "Maria Santos",
+  2: "Carlos Oliveira",
+  3: "Ana Costa",
+  4: "Pedro Alves",
+  5: "Fernanda Lima",
+  6: "Ricardo Souza",
+  7: "Camila Ferreira",
+  8: "Marcelo Gomes",
+  9: "Patrícia Nunes",
+  10: "Sincronização Fracttal",
+};
+export const AUTHOR_IDS = buildReverse(AUTHOR_CODES);
+
+export function fromAuthorId(id: number): string {
+  return AUTHOR_CODES[id] ?? `Autor (${id})`;
+}

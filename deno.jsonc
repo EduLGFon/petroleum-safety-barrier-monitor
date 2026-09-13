@@ -1,0 +1,87 @@
+{
+  // Barrier monitor - Deno-only config (Fresh 2 + Deno-native libs).
+  // Single source of truth: tasks, import map, TS, lint and fmt live here.
+  // No package.json / tsconfig.json / next.config.mjs - all removed.
+  "name": "barrier-monitor",
+  "version": "0.4.0",
+  "exports": "./main.ts",
+  "nodeModulesDir": "manual",
+  "tasks": {
+    "check": "deno fmt --check . && deno lint . && deno check main.ts routes/api/*.ts routes/api/*/*.ts routes/api/*/*/*.ts scripts/*.ts",
+    "test": "deno test --allow-read=scripts/fixtures --allow-net=127.0.0.1,localhost --allow-env=OPS_SMTP_HOST,OPS_SMTP_PORT,OPS_SMTP_USER,OPS_SMTP_PASS,OPS_EMAIL_TO,OPS_EMAIL_FROM,DATABASE_URL .",
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "deno serve -A _fresh/server.js",
+    "start": "deno serve --env-file=.env -A _fresh/server.js",
+    "db:migrate": "deno run -A --env-file=.env.local scripts/migrate.ts",
+    "db:seed": "deno run -A --env-file=.env.local scripts/seed.ts"
+  },
+  "imports": {
+    "@/": "./",
+    "fresh": "jsr:@fresh/core@^2.3.3",
+    "preact": "npm:preact@^10.29.1",
+    "@preact/signals": "npm:@preact/signals@^2.9.0",
+    "@fresh/plugin-vite": "jsr:@fresh/plugin-vite@^1.1.2",
+    "vite": "npm:vite@^7.1.3",
+    "@std/path": "jsr:@std/path@^1",
+    "@db/postgres": "jsr:@db/postgres@^0.19.5",
+    "linkedom": "npm:linkedom@^0.18.13"
+  },
+  "lint": {
+    "rules": {
+      "tags": [
+        "fresh",
+        "recommended"
+      ]
+    }
+  },
+  "fmt": {
+    "lineWidth": 80,
+    "indentWidth": 2,
+    "singleQuote": false,
+    "proseWrap": "preserve",
+    "exclude": [
+      "**/_fresh/*",
+      "node_modules",
+      ".next"
+    ]
+  },
+  "exclude": [
+    "**/_fresh/*",
+    "node_modules",
+    ".next",
+    "out",
+    "build",
+    "dist"
+  ],
+  "compilerOptions": {
+    "lib": [
+      "dom",
+      "dom.asynciterable",
+      "dom.iterable",
+      "deno.ns"
+    ],
+    "strict": true,
+    "jsx": "precompile",
+    "jsxImportSource": "preact",
+    "jsxPrecompileSkipElements": [
+      "a",
+      "img",
+      "source",
+      "body",
+      "html",
+      "head",
+      "title",
+      "meta",
+      "script",
+      "link",
+      "style",
+      "base",
+      "noscript",
+      "template"
+    ],
+    "types": [
+      "vite/client"
+    ]
+  }
+}

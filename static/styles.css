@@ -1,0 +1,1098 @@
+/* ── Reset ─────────────────────────────────────────────────────────────────── */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+html,
+body {
+  margin: 0;
+  padding: 0;
+}
+body {
+  font-family: var(--font-sans);
+  font-size: 15px;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+/* Page canvas — html/body carry the aurora gradient so any sliver of
+   document exposed around the shell (scrollbar gutter, stretch) blends
+   into the same gradient instead of flashing a flat base color. The
+   gray flash seen when flinging past the page ends is the browser's own
+   overscroll glow, painted by Chromium's internals with a default canvas
+   color that ignores page backgrounds, so overscroll is suppressed too. */
+html,
+body {
+  background: var(--au-page);
+  background-color: var(--au-page-base);
+  overscroll-behavior-y: none;
+}
+body {
+  min-height: 100dvh;
+}
+button,
+select,
+input {
+  font-family: inherit;
+  font-size: inherit;
+}
+input[type="search"]::-webkit-search-cancel-button {
+  -webkit-appearance: none;
+}
+
+/* ── Themes ──────────────────────────────────────────────────────────────────
+   Aurora Executive Dark is the interface identity. The
+   --au-* tokens carry it on every theme: dark is the reference,
+   light is the same language on a mist canvas, amoled on pure black.
+   The signature gradient/glow derive from --accent/--accent-2/--glow,
+   which follow the user's accent preset at runtime - so theme and color
+   switching visibly re-tints the whole interface. */
+[data-theme="light"] {
+  --bg-page: #e9eefb;
+  --bg-surface: #ffffff;
+  --bg-elevated: #f4f7fd;
+  --bg-hover: #e9eff9;
+  --bg-stripe: transparent;
+  --border: #d5dded;
+  --border-subtle: #e4eaf4;
+  --text-primary: #0d1829;
+  --text-secondary: #33415c;
+  --text-muted: #64748b;
+  --accent: #6366f1;
+  --accent-2: #22d3ee;
+  --glow: rgba(99,102,241,.35);
+  --hero-grad: transparent;
+  --kpi-grad-1: linear-gradient(90deg,#6366f1,#22d3ee);
+  --kpi-grad-2: linear-gradient(90deg,#6366f1,#22d3ee);
+  --kpi-grad-3: linear-gradient(90deg,#6366f1,#22d3ee);
+  --kpi-grad-4: linear-gradient(90deg,#6366f1,#22d3ee);
+  --kpi-grad-5: linear-gradient(90deg,#6366f1,#22d3ee);
+  --kpi-grad-6: linear-gradient(90deg,#6366f1,#22d3ee);
+  --shadow-sm: 0 1px 3px rgba(15,23,42,.07),0 1px 2px rgba(15,23,42,.04);
+  --shadow-md: 0 4px 16px rgba(15,23,42,.09);
+  --shadow-lg: 0 24px 70px rgba(15,23,42,.18);
+  /* Alert colours – red glass on light */
+  --alert-nc-bg: rgba(220,38,38,.06);
+  --alert-nc-border: rgba(220,38,38,.28);
+  --alert-nc-text: #b91c1c;
+  --alert-nc-sub: #991b1b;
+  /* Aurora identity on light mist */
+  --au-page:
+    radial-gradient(120vmax 120vmin at 20% 0%,#c7d2fe 0%,#e0f2fe 45%,#e9eefb 100%);
+  --au-page-base: #e9eefb;
+  --au-card: rgba(255,255,255,.78);
+  --au-card-border: rgba(15,23,42,.08);
+  --au-data: rgba(255,255,255,.68);
+  --au-data-border: rgba(15,23,42,.08);
+  --au-seg: rgba(255,255,255,.82);
+  --au-seg-border: rgba(15,23,42,.08);
+  --au-pill: rgba(255,255,255,.85);
+  --au-pill-border: rgba(15,23,42,.12);
+  --au-row: rgba(15,23,42,.07);
+  --au-eyebrow: #4f46e5;
+  --au-label: #64748b;
+  --au-value: #0f172a;
+  --au-sub: #94a3b8;
+  --au-loc: #94a3b8;
+  --au-pill-text: #334155;
+  --au-track: rgba(15,23,42,.08);
+  --au-red-glow: 0 0 24px rgba(220,38,38,.18);
+  --au-danger-bg: rgba(220,38,38,.08);
+  --au-danger-fg: #b91c1c;
+  --au-dialog: #ffffff;
+}
+
+[data-theme="dark"] {
+  --bg-page: #050a18;
+  --bg-surface: rgba(255,255,255,.06);
+  --bg-elevated: rgba(255,255,255,.05);
+  --bg-hover: rgba(255,255,255,.09);
+  --bg-stripe: transparent;
+  --border: rgba(255,255,255,.1);
+  --border-subtle: rgba(255,255,255,.06);
+  --text-primary: #ffffff;
+  --text-secondary: #e2e8f0;
+  --text-muted: #94a3b8;
+  --accent: #6366f1;
+  --accent-2: #22d3ee;
+  --glow: rgba(99,102,241,.35);
+  --hero-grad: transparent;
+  --kpi-grad-1: linear-gradient(90deg,#6366f1,#22d3ee);
+  --kpi-grad-2: linear-gradient(90deg,#6366f1,#22d3ee);
+  --kpi-grad-3: linear-gradient(90deg,#6366f1,#22d3ee);
+  --kpi-grad-4: linear-gradient(90deg,#6366f1,#22d3ee);
+  --kpi-grad-5: linear-gradient(90deg,#6366f1,#22d3ee);
+  --kpi-grad-6: linear-gradient(90deg,#6366f1,#22d3ee);
+  --glass-bg: rgba(255,255,255,.055);
+  --glass-border: rgba(255,255,255,.1);
+  --shadow-sm: 0 0 0 rgba(0,0,0,0);
+  --shadow-md: 0 0 0 rgba(0,0,0,0);
+  --shadow-lg: 0 24px 70px rgba(0,0,0,.6);
+  --alert-nc-bg: rgba(239,68,68,.07);
+  --alert-nc-border: rgba(239,68,68,.25);
+  --alert-nc-text: #fca5a5;
+  --alert-nc-sub: rgba(252,165,165,.65);
+  /* Aurora identity */
+  --au-page:
+    radial-gradient(120vmax 120vmin at 20% 0%,#1d2b64 0%,#0a1128 45%,#050a18 100%);
+  --au-page-base: #050a18;
+  --au-card: rgba(255,255,255,.06);
+  --au-card-border: rgba(255,255,255,.1);
+  --au-data: rgba(255,255,255,.04);
+  --au-data-border: rgba(255,255,255,.08);
+  --au-seg: rgba(255,255,255,.05);
+  --au-seg-border: rgba(255,255,255,.08);
+  --au-pill: rgba(255,255,255,.08);
+  --au-pill-border: rgba(255,255,255,.14);
+  --au-row: rgba(255,255,255,.06);
+  --au-eyebrow: #818cf8;
+  --au-label: #94a3b8;
+  --au-value: #ffffff;
+  --au-sub: #64748b;
+  --au-loc: #71717a;
+  --au-pill-text: #e2e8f0;
+  --au-track: rgba(255,255,255,.1);
+  --au-red-glow: 0 0 24px rgba(239,68,68,.25);
+  --au-danger-bg: rgba(239,68,68,.15);
+  --au-danger-fg: #fca5a5;
+  --au-dialog: #0a1128;
+}
+
+[data-theme="amoled"] {
+  --bg-page: #000000;
+  --bg-surface: rgba(255,255,255,.06);
+  --bg-elevated: rgba(255,255,255,.05);
+  --bg-hover: rgba(255,255,255,.09);
+  --bg-stripe: transparent;
+  --border: rgba(255,255,255,.1);
+  --border-subtle: rgba(255,255,255,.06);
+  --text-primary: #ffffff;
+  --text-secondary: #e2e8f0;
+  --text-muted: #94a3b8;
+  --accent: #6366f1;
+  --accent-2: #22d3ee;
+  --glow: rgba(99,102,241,.35);
+  --hero-grad: transparent;
+  --kpi-grad-1: linear-gradient(90deg,#6366f1,#22d3ee);
+  --kpi-grad-2: linear-gradient(90deg,#6366f1,#22d3ee);
+  --kpi-grad-3: linear-gradient(90deg,#6366f1,#22d3ee);
+  --kpi-grad-4: linear-gradient(90deg,#6366f1,#22d3ee);
+  --kpi-grad-5: linear-gradient(90deg,#6366f1,#22d3ee);
+  --kpi-grad-6: linear-gradient(90deg,#6366f1,#22d3ee);
+  --shadow-sm: 0 0 0 rgba(0,0,0,0);
+  --shadow-md: 0 0 0 rgba(0,0,0,0);
+  --shadow-lg: 0 24px 70px rgba(0,0,0,.85);
+  --alert-nc-bg: rgba(239,68,68,.07);
+  --alert-nc-border: rgba(239,68,68,.25);
+  --alert-nc-text: #fca5a5;
+  --alert-nc-sub: rgba(252,165,165,.65);
+  /* Aurora identity on pure black */
+  --au-page:
+    radial-gradient(120vmax 120vmin at 20% 0%,#141b4d 0%,#05070f 45%,#000000 100%);
+  --au-page-base: #000000;
+  --au-card: rgba(255,255,255,.06);
+  --au-card-border: rgba(255,255,255,.1);
+  --au-data: rgba(255,255,255,.04);
+  --au-data-border: rgba(255,255,255,.08);
+  --au-seg: rgba(255,255,255,.05);
+  --au-seg-border: rgba(255,255,255,.08);
+  --au-pill: rgba(255,255,255,.08);
+  --au-pill-border: rgba(255,255,255,.14);
+  --au-row: rgba(255,255,255,.06);
+  --au-eyebrow: #818cf8;
+  --au-label: #94a3b8;
+  --au-value: #ffffff;
+  --au-sub: #64748b;
+  --au-loc: #71717a;
+  --au-pill-text: #e2e8f0;
+  --au-track: rgba(255,255,255,.1);
+  --au-red-glow: 0 0 24px rgba(239,68,68,.25);
+  --au-danger-bg: rgba(239,68,68,.15);
+  --au-danger-fg: #fca5a5;
+  --au-dialog: #050505;
+}
+
+/* ── Smooth theme/colour transitions ───────────────────────────────────────── */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+body,
+[data-theme] * {
+  transition:
+    background-color 0.3s cubic-bezier(0.4,0,0.2,1),
+    border-color 0.3s cubic-bezier(0.4,0,0.2,1),
+    color 0.2s cubic-bezier(0.4,0,0.2,1),
+    box-shadow 0.25s cubic-bezier(0.4,0,0.2,1);
+}
+
+/* ── Scrollbar ─────────────────────────────────────────────────────────────── */
+::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--text-muted);
+}
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* Row checkbox: visible focus ring on the drawn box (the real input is clipped). */
+.trow-chk-label {
+  display: inline-flex;
+  cursor: pointer;
+}
+.trow-chk-label > input:focus-visible + .trow-chk {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* ── Aurora premium shell ──────────────────────────────────────────────
+   Mesh canvas + glass cards. The canvas
+   follows the active theme and the
+   signature gradient/glow follow the accent preset - switching either
+   visibly re-tints the whole interface. */
+html {
+  color-scheme: dark;
+}
+[data-theme="light"] {
+  color-scheme: light;
+}
+.aurora-shell {
+  background: var(--au-page);
+  background-color: var(--au-page-base);
+}
+.tnum {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum" 1, "cv05" 1;
+}
+.font-display {
+  font-family: var(--font-display);
+  letter-spacing: -.02em;
+  font-feature-settings: "ss01" 1, "cv05" 1;
+}
+.glass-card {
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+.glass-pill {
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+::placeholder {
+  color: var(--au-sub);
+  opacity: 1;
+}
+select option {
+  background-color: var(--au-dialog);
+  color: var(--au-pill-text);
+}
+
+/* ══════════════════════════════════════════════════════════════════════════════
+   PROFESSIONAL ANIMATIONS — no springs, no bounces
+══════════════════════════════════════════════════════════════════════════════ */
+/* Easing variables (CSS custom props for reference in JS) */
+:root {
+  --ease-out: cubic-bezier(0.16,1,0.3,1);
+  --ease-std: cubic-bezier(0.4,0,0.2,1);
+  --ease-in: cubic-bezier(0.4,0,1,1);
+  /* Typefaces - thin modern premium, shared by every surface
+     (dashboard island, table/mono cells) so the font
+     stays consistent across the interface.
+     Inter Tight throughout (display AND sans resolve to the same
+     stack); JetBrains Mono for TAGs. See AURORA_TYPE in lib/aurora.ts -
+     the single source of truth the dashboard imports. */
+  --font-sans: "Inter Tight","Inter",-apple-system,"Segoe UI",sans-serif;
+  --font-display: "Inter Tight","Inter",-apple-system,"Segoe UI",sans-serif;
+  --font-mono: "JetBrains Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
+}
+
+/* ── Interface density ────────────────────────────────────────────────────
+   Type scale + spacing rhythm per mode. Comfortable is the reference
+   design; compact tightens every metric, spacious opens them up.
+   Components consume these via var(--d-*) so a single data-density
+   switch re-rhythms the entire UI (no zoom hacks). */
+:root,
+[data-density="comfortable"] {
+  /* Type scale */
+  --d-hero: 19px;
+  --d-display: 27px;
+  --d-band-num: 20px;
+  --d-dialog-title: 21px;
+  --d-arrow: 16px;
+  --d-lead: 14px;
+  --d-body: 13px;
+  --d-small: 12px;
+  --d-caption: 11px;
+  --d-micro: 10px;
+  --d-tiny: 9px;
+  --d-page-fs: 15px;
+  /* Page rhythm */
+  --d-page: 18px 22px;
+  --d-shell: 20px 18px 40px;
+  --d-section: 20px;
+  --d-stack: 14px;
+  --d-stack-sm: 12px;
+  --d-bar-gap: 10px;
+  --d-foot-gap: 28px;
+  /* Gaps */
+  --d-gap-lg: 16px;
+  --d-gap: 12px;
+  --d-opt-gap: 8px;
+  --d-gap-xs: 6px;
+  --d-mini-gap: 5px;
+  --d-gap-2xs: 4px;
+  /* Hero header */
+  --d-hero-pad: 20px 26px;
+  --d-hero-radius: 14px;
+  --d-hero-gap: 18px;
+  --d-hero-div: 42px;
+  --d-gear: 38px;
+  /* Location pills */
+  --d-pill-pad: 8px 14px;
+  --d-pill-gap: 7px;
+  --d-pill-radius: 10px;
+  --d-count-pad: 1px 7px;
+  --d-pill-sm-radius: 5px;
+  /* Status band */
+  --d-band-h: 68px;
+  --d-band-pad: 4px;
+  --d-seg-min: 54px;
+  --d-seg-pad: 0 5px;
+  /* KPI cards */
+  --d-kpi-gap: 10px;
+  --d-kpi-min: 150px;
+  --d-kpi-pad: 15px 17px 13px;
+  /* Cards */
+  --d-card-radius: 12px;
+  --d-chart-pad: 18px 18px 10px;
+  --d-sect-title-gap: 14px;
+  --d-field-gap: 7px;
+  /* Export toolbar */
+  --d-bar-pad: 11px 14px;
+  --d-bar-radius: 11px;
+  --d-btn-pad: 7px 13px;
+  --d-btn-radius: 8px;
+  --d-mini-pad: 4px 9px;
+  --d-mini-radius: 6px;
+  --d-check-gap: 9px;
+  --d-chk: 16px;
+  /* Inputs */
+  --d-input-y: 9px;
+  --d-input-x: 12px;
+  --d-search-l: 34px;
+  --d-search-icon: 11px;
+  --d-sel-pad: 9px 10px;
+  --d-input-radius: 9px;
+  /* Table */
+  --d-cell-pad: 10px 14px;
+  --d-arrow-pad: 10px 12px;
+  --d-nc-pad: 3px 8px;
+  --d-empty-pad: 52px;
+  --d-page-btn: 32px;
+  --d-rowchk: 15px;
+  /* Badges */
+  --d-badge-xs-fs: 10px;
+  --d-badge-xs-pad: 2px 7px;
+  --d-badge-sm-fs: 11px;
+  --d-badge-sm-pad: 3px 8px;
+  --d-badge-md-fs: 12px;
+  --d-badge-md-pad: 4px 11px;
+  --d-badge-dot: 6px;
+  --d-badge-dot-xs: 5px;
+  /* Dialog (modal + settings panel) */
+  --d-dialog-w: 580px;
+  --d-dialog-radius: 20px;
+  --d-dialog-head: 20px 22px 16px;
+  --d-dialog-body: 20px 22px;
+  --d-dialog-tab: 11px 20px;
+  --d-details-gap: 16px 20px;
+  --d-status-gap: 14px 20px;
+  --d-block-gap: 22px;
+  --d-div-gap: 18px;
+  --d-row-pad: 12px 14px;
+  --d-row-radius: 10px;
+  --d-close-btn: 34px;
+  --d-history-gap: 16px;
+  /* Settings panel */
+  --d-panel-w: 420px;
+  --d-panel-title: 18px;
+  --d-panel-body: 22px;
+  --d-panel-gap-lg: 26px;
+  --d-panel-gap: 18px;
+  --d-panel-tab: 10px 8px;
+  --d-opt-pad: 14px 8px;
+  --d-opt-radius: 12px;
+  --d-thumb: 40px;
+  --d-thumb-radius: 10px;
+  --d-swatch: 36px;
+  --d-preview-pad: 14px 16px;
+  --d-soon-pad: 20px;
+  --d-chip-pad: 5px 12px;
+  --d-chip-radius: 7px;
+  --d-reset-pad: 10px 16px;
+  --d-foot-pad: 14px 22px;
+  --d-toggle-w: 44px;
+  --d-toggle-h: 24px;
+  --d-toggle-knob: 18px;
+  --d-density-pad: 14px 6px 12px;
+  --d-density-hint: 9.5px;
+  /* NC alert (dashboard) */
+  --d-alert-pad: 13px 18px;
+  --d-alert-btn: 7px 14px;
+  /* Chart tooltip */
+  --d-tip-pad: 10px 14px;
+  /* Loading splash */
+  --d-splash-pad: 48px 56px;
+  --d-splash-radius: 24px;
+  --d-splash-gap: 30px;
+  --d-splash-div: 24px;
+}
+
+[data-density="compact"] {
+  --d-hero: 17px;
+  --d-display: 23px;
+  --d-band-num: 18px;
+  --d-dialog-title: 19px;
+  --d-arrow: 14px;
+  --d-lead: 13px;
+  --d-body: 12px;
+  --d-small: 11px;
+  --d-caption: 10px;
+  --d-micro: 9px;
+  --d-tiny: 8px;
+  --d-page-fs: 14px;
+  --d-page: 12px 14px;
+  --d-shell: 14px 12px 28px;
+  --d-section: 14px;
+  --d-stack: 10px;
+  --d-stack-sm: 9px;
+  --d-bar-gap: 8px;
+  --d-foot-gap: 20px;
+  --d-gap-lg: 12px;
+  --d-gap: 9px;
+  --d-opt-gap: 6px;
+  --d-gap-xs: 4px;
+  --d-mini-gap: 4px;
+  --d-gap-2xs: 3px;
+  --d-hero-pad: 14px 18px;
+  --d-hero-radius: 12px;
+  --d-hero-gap: 14px;
+  --d-hero-div: 36px;
+  --d-gear: 34px;
+  --d-pill-pad: 6px 10px;
+  --d-pill-gap: 5px;
+  --d-pill-radius: 8px;
+  --d-count-pad: 1px 5px;
+  --d-pill-sm-radius: 4px;
+  --d-band-h: 56px;
+  --d-band-pad: 3px;
+  --d-seg-min: 46px;
+  --d-seg-pad: 0 4px;
+  --d-kpi-gap: 7px;
+  --d-kpi-min: 130px;
+  --d-kpi-pad: 11px 13px 10px;
+  --d-card-radius: 10px;
+  --d-chart-pad: 13px 13px 8px;
+  --d-sect-title-gap: 11px;
+  --d-field-gap: 5px;
+  --d-bar-pad: 8px 10px;
+  --d-bar-radius: 9px;
+  --d-btn-pad: 5px 10px;
+  --d-btn-radius: 7px;
+  --d-mini-pad: 3px 7px;
+  --d-mini-radius: 5px;
+  --d-check-gap: 7px;
+  --d-chk: 14px;
+  --d-input-y: 7px;
+  --d-input-x: 10px;
+  --d-search-l: 30px;
+  --d-search-icon: 9px;
+  --d-sel-pad: 7px 8px;
+  --d-input-radius: 8px;
+  --d-cell-pad: 7px 10px;
+  --d-arrow-pad: 7px 9px;
+  --d-nc-pad: 2px 6px;
+  --d-empty-pad: 38px;
+  --d-page-btn: 28px;
+  --d-rowchk: 13px;
+  --d-badge-xs-fs: 9px;
+  --d-badge-xs-pad: 1px 6px;
+  --d-badge-sm-fs: 10px;
+  --d-badge-sm-pad: 2px 7px;
+  --d-badge-md-fs: 11px;
+  --d-badge-md-pad: 3px 9px;
+  --d-badge-dot: 5px;
+  --d-badge-dot-xs: 4px;
+  --d-dialog-w: 520px;
+  --d-dialog-radius: 16px;
+  --d-dialog-head: 15px 18px 12px;
+  --d-dialog-body: 15px 18px;
+  --d-dialog-tab: 9px 16px;
+  --d-details-gap: 12px 15px;
+  --d-status-gap: 11px 15px;
+  --d-block-gap: 17px;
+  --d-div-gap: 14px;
+  --d-row-pad: 10px 11px;
+  --d-row-radius: 8px;
+  --d-close-btn: 30px;
+  --d-history-gap: 12px;
+  --d-panel-w: 380px;
+  --d-panel-title: 16px;
+  --d-panel-body: 16px;
+  --d-panel-gap-lg: 19px;
+  --d-panel-gap: 13px;
+  --d-panel-tab: 8px 6px;
+  --d-opt-pad: 11px 6px;
+  --d-opt-radius: 10px;
+  --d-thumb: 34px;
+  --d-thumb-radius: 8px;
+  --d-swatch: 30px;
+  --d-preview-pad: 11px 13px;
+  --d-soon-pad: 16px;
+  --d-chip-pad: 4px 10px;
+  --d-chip-radius: 6px;
+  --d-reset-pad: 8px 13px;
+  --d-foot-pad: 11px 18px;
+  --d-toggle-w: 40px;
+  --d-toggle-h: 22px;
+  --d-toggle-knob: 16px;
+  --d-density-pad: 11px 5px 10px;
+  --d-density-hint: 8.5px;
+  --d-alert-pad: 10px 14px;
+  --d-alert-btn: 5px 11px;
+  --d-tip-pad: 8px 11px;
+  --d-splash-pad: 36px 42px;
+  --d-splash-radius: 20px;
+  --d-splash-gap: 22px;
+  --d-splash-div: 18px;
+}
+
+[data-density="spacious"] {
+  --d-hero: 21px;
+  --d-display: 31px;
+  --d-band-num: 22px;
+  --d-dialog-title: 23px;
+  --d-arrow: 18px;
+  --d-lead: 15px;
+  --d-body: 14px;
+  --d-small: 13px;
+  --d-caption: 12px;
+  --d-micro: 11px;
+  --d-tiny: 10px;
+  --d-page-fs: 16px;
+  --d-page: 26px 32px;
+  --d-shell: 28px 24px 52px;
+  --d-section: 26px;
+  --d-stack: 18px;
+  --d-stack-sm: 15px;
+  --d-bar-gap: 12px;
+  --d-foot-gap: 36px;
+  --d-gap-lg: 20px;
+  --d-gap: 15px;
+  --d-opt-gap: 10px;
+  --d-gap-xs: 8px;
+  --d-mini-gap: 6px;
+  --d-gap-2xs: 5px;
+  --d-hero-pad: 26px 34px;
+  --d-hero-radius: 16px;
+  --d-hero-gap: 22px;
+  --d-hero-div: 48px;
+  --d-gear: 42px;
+  --d-pill-pad: 10px 18px;
+  --d-pill-gap: 9px;
+  --d-pill-radius: 12px;
+  --d-count-pad: 2px 9px;
+  --d-pill-sm-radius: 6px;
+  --d-band-h: 80px;
+  --d-band-pad: 5px;
+  --d-seg-min: 62px;
+  --d-seg-pad: 0 6px;
+  --d-kpi-gap: 14px;
+  --d-kpi-min: 170px;
+  --d-kpi-pad: 19px 21px 17px;
+  --d-card-radius: 14px;
+  --d-chart-pad: 23px 23px 13px;
+  --d-sect-title-gap: 17px;
+  --d-field-gap: 9px;
+  --d-bar-pad: 14px 18px;
+  --d-bar-radius: 13px;
+  --d-btn-pad: 9px 16px;
+  --d-btn-radius: 9px;
+  --d-mini-pad: 5px 11px;
+  --d-mini-radius: 7px;
+  --d-check-gap: 11px;
+  --d-chk: 18px;
+  --d-input-y: 11px;
+  --d-input-x: 14px;
+  --d-search-l: 38px;
+  --d-search-icon: 13px;
+  --d-sel-pad: 11px 12px;
+  --d-input-radius: 10px;
+  --d-cell-pad: 13px 18px;
+  --d-arrow-pad: 13px 15px;
+  --d-nc-pad: 4px 10px;
+  --d-empty-pad: 66px;
+  --d-page-btn: 36px;
+  --d-rowchk: 17px;
+  --d-badge-xs-fs: 11px;
+  --d-badge-xs-pad: 3px 8px;
+  --d-badge-sm-fs: 12px;
+  --d-badge-sm-pad: 4px 10px;
+  --d-badge-md-fs: 13px;
+  --d-badge-md-pad: 5px 13px;
+  --d-badge-dot: 7px;
+  --d-badge-dot-xs: 6px;
+  --d-dialog-w: 640px;
+  --d-dialog-radius: 24px;
+  --d-dialog-head: 25px 27px 20px;
+  --d-dialog-body: 25px 27px;
+  --d-dialog-tab: 13px 24px;
+  --d-details-gap: 20px 25px;
+  --d-status-gap: 17px 25px;
+  --d-block-gap: 27px;
+  --d-div-gap: 22px;
+  --d-row-pad: 14px 17px;
+  --d-row-radius: 12px;
+  --d-close-btn: 38px;
+  --d-history-gap: 20px;
+  --d-panel-w: 460px;
+  --d-panel-title: 20px;
+  --d-panel-body: 28px;
+  --d-panel-gap-lg: 32px;
+  --d-panel-gap: 23px;
+  --d-panel-tab: 12px 10px;
+  --d-opt-pad: 17px 10px;
+  --d-opt-radius: 14px;
+  --d-thumb: 46px;
+  --d-thumb-radius: 12px;
+  --d-swatch: 42px;
+  --d-preview-pad: 17px 19px;
+  --d-soon-pad: 24px;
+  --d-chip-pad: 6px 14px;
+  --d-chip-radius: 8px;
+  --d-reset-pad: 12px 19px;
+  --d-foot-pad: 17px 26px;
+  --d-toggle-w: 48px;
+  --d-toggle-h: 26px;
+  --d-toggle-knob: 20px;
+  --d-density-pad: 17px 7px 14px;
+  --d-density-hint: 10.5px;
+  --d-alert-pad: 16px 22px;
+  --d-alert-btn: 9px 17px;
+  --d-tip-pad: 12px 17px;
+  --d-splash-pad: 60px 70px;
+  --d-splash-radius: 28px;
+  --d-splash-gap: 38px;
+  --d-splash-div: 30px;
+}
+
+/* Core keyframes */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(5px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes fadeInFast {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@keyframes scaleIn {
+  from {
+    opacity: 0;
+    transform: scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes slideInL {
+  from {
+    opacity: 0;
+    transform: translateX(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes slideInR {
+  from {
+    transform: translateX(100%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+@keyframes slideOutR {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(100%);
+  }
+}
+@keyframes rowAppear {
+  from {
+    opacity: 0;
+    transform: translateY(3px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+/* Chart row entrance — backwards fill (not both) so the inline opacity
+   used for hover-dimming takes over once the entrance finishes. */
+@keyframes chartRowIn {
+  from {
+    opacity: 0;
+    transform: translateY(7px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes cardAppear {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes numChange {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes panelIn {
+  from {
+    opacity: 0;
+    transform: translateX(20px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: .45;
+  }
+}
+@keyframes shimmer {
+  from {
+    background-position: -200% 0;
+  }
+  to {
+    background-position: 200% 0;
+  }
+}
+@keyframes orb {
+  0%,
+  100% {
+    transform: translate(0,0) scale(1);
+  }
+  50% {
+    transform: translate(8px,-6px) scale(1.04);
+  }
+}
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+@keyframes swatchSel {
+  from {
+    opacity: .7;
+    transform: scale(0.92);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1.08);
+  }
+}
+@keyframes themeSel {
+  from {
+    opacity: .5;
+    transform: scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+@keyframes filterOn {
+  from {
+    opacity: .6;
+    transform: scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+@keyframes checkIn {
+  from {
+    opacity: 0;
+    transform: scale(0.7);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+@keyframes progressFill {
+  from {
+    width: 0;
+  }
+  to {
+    width: 100%;
+  }
+}
+@keyframes metricIn {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes glowAnim {
+  0%,
+  100% {
+    box-shadow: 0 0 12px var(--glow);
+  }
+  50% {
+    box-shadow: 0 0 24px var(--glow);
+  }
+}
+/* Incandescent connection bulb (Header hero dot). Breathing = powered,
+   flicker = sputtering/reconnecting. Both animate the halo only; the
+   white-hot core stays put. html.no-anim + prefers-reduced-motion below
+   neutralize them, leaving the static halo. */
+@keyframes bulbBreathe {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: .72;
+  }
+}
+@keyframes bulbFlicker {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  7% {
+    opacity: .55;
+  }
+  9% {
+    opacity: .95;
+  }
+  43% {
+    opacity: .7;
+  }
+  46% {
+    opacity: 1;
+  }
+  71% {
+    opacity: .82;
+  }
+  73% {
+    opacity: 1;
+  }
+}
+
+/* Utility classes */
+.animate-fade-in {
+  animation: fadeIn 0.28s var(--ease-out) both;
+}
+.animate-scale-in {
+  animation: scaleIn 0.25s var(--ease-out) both;
+}
+.animate-slide-up {
+  animation: slideUp 0.3s var(--ease-out) both;
+}
+.animate-card-in {
+  animation: cardAppear 0.32s var(--ease-out) both;
+}
+.animate-row-in {
+  animation: rowAppear 0.22s var(--ease-out) both;
+}
+.animate-chart-row {
+  animation: chartRowIn 0.38s var(--ease-out) backwards;
+}
+.animate-settings-in {
+  animation: panelIn 0.3s var(--ease-out) both;
+}
+.animate-filter-on {
+  animation: filterOn 0.2s var(--ease-std) both;
+}
+.animate-swatch {
+  animation: swatchSel 0.2s var(--ease-out) both;
+}
+.animate-theme {
+  animation: themeSel 0.2s var(--ease-out) both;
+}
+.animate-num {
+  animation: numChange 0.35s var(--ease-out) both;
+}
+.animate-check {
+  animation: checkIn 0.18s var(--ease-out) both;
+}
+
+/* ── Button lift — professional hover with NO bounce ──────────────────────── */
+.lift {
+  transition:
+    transform 0.18s var(--ease-std),
+    box-shadow 0.18s var(--ease-std) !important;
+}
+.lift:hover {
+  transform: translateY(-1px) !important;
+  box-shadow: 0 6px 20px var(--glow) !important;
+}
+.lift:active {
+  transform: translateY(0) scale(0.98) !important;
+  transition-duration: 0.08s !important;
+}
+
+/* Mouse-glow effect class (applied by JS) */
+.mouse-glow {
+  transition: box-shadow 0.25s var(--ease-std);
+}
+.mouse-glow:hover {
+  box-shadow: 0 0 30px var(--glow), var(--shadow-sm);
+}
+
+/* ── Pagination jump ellipsis (idle mirrors the gap "…", focus grows it) ──── */
+.goto-input {
+  height: var(--d-page-btn);
+  text-align: center;
+  font-size: var(--d-body);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  background: var(--au-data);
+  border: 1px solid var(--au-data-border);
+  border-radius: var(--d-chip-radius);
+  color: var(--au-pill-text);
+  outline: none;
+  box-sizing: border-box;
+  padding: 0 6px;
+  cursor: pointer;
+  transition:
+    width 0.18s var(--ease-std),
+    border-color 0.18s var(--ease-std),
+    box-shadow 0.18s var(--ease-std);
+}
+.goto-input:hover {
+  border-color: var(--au-pill-border);
+}
+.goto-input::placeholder {
+  color: var(--au-sub);
+  font-weight: 400;
+}
+.goto-input:focus {
+  cursor: text;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--glow);
+  color: var(--text-primary);
+}
+
+/* ── Disable all animations ─────────────────────────────────────────────────── */
+html.no-anim *,
+html.no-anim *::before,
+html.no-anim *::after {
+  animation-duration: 0.01ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.01ms !important;
+  scroll-behavior: auto !important;
+}
+
+/* Honour OS preference */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* ── Print report (exportToPDF) ─────────────────────────────────────────────
+   The report node is hidden on screen. While printing, the app is hidden
+   and only the report prints, landscape with page numbers. */
+#print-report {
+  display: none;
+}
+
+@media print {
+  body.printing-report > *:not(#print-report) {
+    display: none !important;
+  }
+  body.printing-report #print-report {
+    display: block !important;
+  }
+  @page {
+    size: A4 landscape;
+    margin: 12mm 10mm 14mm 10mm;
+    @bottom-center {
+      content: "Monitor de Barreiras · Página "
+        counter(page) " de " counter(pages);
+      font-size: 7pt;
+      color: #94a3b8;
+    }
+  }
+}

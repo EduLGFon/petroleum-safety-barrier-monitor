@@ -48,6 +48,26 @@ export interface WireKpiSnapshot {
   naoConforme: number;
   pctConforme: number;
   criticasNC: number;
+  // Dynamic buckets - keyed by numeric id as string (JSON keys are strings),
+  // e.g. byDisponibilidade {"0": 12, "6": 3}. resolveKpi translates these to
+  // display-string keys. Optional so old servers still parse; when absent the
+  // UI falls back to fixed fields (known statuses only). New statuses must
+  // appear here or they vanish from the band over HTTP.
+  byDisponibilidade?: Record<string, number>;
+  byConformidade?: Record<string, number>;
+  byCriticidade?: Record<string, number>;
+  // Server time when the snapshot was computed (ISO). Lets the UI show
+  // staleness once the dashboard moves to server-paginated mode.
+  syncedAt?: string;
+}
+
+// Per-category Conforme totals for the chart. naoConforme is derived as
+// total - conforme (fail-closed: novel conformidade counts as NC, same as
+// computeChartData), so new values never split the chart from the KPI.
+export interface WireCategoryConformidade {
+  categoriaId: number;
+  conforme: number;
+  total: number;
 }
 
 /** Query params accepted by GET /api/barriers */
@@ -57,10 +77,16 @@ export interface BarriersQuery {
   conformidadeId?: number;
   categoriaId?: number;
   query?: string;
+  // Inclusive ISO-date bounds (YYYY-MM-DD) applied to status_since.
+  since?: string;
+  until?: string;
   page?: number;
   pageSize?: number;
   sortCol?: string;
   sortDir?: "asc" | "desc";
+  // Admin deleted listing only (GET /api/barriers/deleted): flips the
+  // soft-delete filter to deleted-only. The dashboard never sets this.
+  includeDeleted?: boolean;
 }
 
 export interface BarriersResponse {

@@ -1,40 +1,66 @@
-"use client";
-import { useState } from "react";
-import type { FilterState } from "@/lib/types";
-import { CATEGORIES } from "@/lib/constants";
-import { CloseIcon, FilterIcon, SearchIcon } from "./ui/Icons";
+// Filter bar - Aurora glass search plus faceted selects fed by the data.
+// This is why it exists: vocabularies are dynamic (new statuses, 70+
+// categories), so option lists arrive as props derived from the loaded
+// barriers; the seed constants below are fallback only for empty data.
+import { FALLBACK_CONF, FALLBACK_DISP } from "./filter/filter-fallbacks.ts";
+import { CloseIcon, FilterIcon, SearchIcon } from "./ui/Icons.tsx";
+import { GLASS_INPUT, Sel } from "./filter/FilterSelect.tsx";
+import { useEffect, useState } from "preact/hooks";
+import type { FilterState } from "../lib/types.ts";
+import { CATEGORIES } from "../lib/constants.ts";
+import { AURORA } from "../lib/aurora.ts";
 
 interface Props {
   filters: FilterState;
   filteredTotal: number;
   hasActiveFilters: boolean;
+  disponibilidades: string[];
+  conformidades: string[];
+  categorias: string[];
   onFilter: (p: Partial<FilterState>) => void;
   onReset: () => void;
 }
 
-const DISP_OPTS = [
-  "Disponível",
-  "Fora de Operação",
-  "Indisponível Contingenciado",
-  "Degradado Contingenciado",
-  "Degradado",
-  "Indisponível",
-];
-const CONF_OPTS = ["Conforme", "Não Conforme"];
-
+// FilterBar: controlled search + three faceted selects over live vocab props (fallbacks for empty data); onFilter patches state, onReset clears.
 export function FilterBar(
-  { filters, filteredTotal, hasActiveFilters, onFilter, onReset }: Props,
+  {
+    filters,
+    filteredTotal,
+    hasActiveFilters,
+    disponibilidades,
+    conformidades,
+    categorias,
+    onFilter,
+    onReset,
+  }: Props,
 ) {
   const [focused, setFocused] = useState(false);
+  // Local search draft: typing updates the draft instantly but propagates to
+  // the dashboard pipeline debounced, so each keystroke no longer triggers a
+  // full filter + O(N log N) sort over tens of thousands of rows.
+  const [draft, setDraft] = useState(filters.query);
+  // External query changes (reset, restored state) overwrite the draft.
+  useEffect(() => {
+    setDraft(filters.query);
+  }, [filters.query]);
+  useEffect(() => {
+    if (draft === filters.query) return;
+    const t = setTimeout(() => onFilter({ query: draft }), 200);
+    return () => clearTimeout(t);
+  }, [draft, filters.query, onFilter]);
+  // Props carry the live vocabulary; seed lists only fill empty datasets.
+  const dispOpts = disponibilidades.length ? disponibilidades : FALLBACK_DISP;
+  const confOpts = conformidades.length ? conformidades : FALLBACK_CONF;
+  const catOpts = categorias.length ? categorias : [...CATEGORIES];
 
   return (
     <div
       style={{
         display: "flex",
-        gap: 8,
+        gap: "var(--d-opt-gap)",
         flexWrap: "wrap",
         alignItems: "center",
-        marginBottom: 12,
+        marginBottom: "var(--d-stack-sm)",
       }}
     >
       {/* Search */}
@@ -42,7 +68,7 @@ export function FilterBar(
         <span
           style={{
             position: "absolute",
-            left: 11,
+            left: "var(--d-search-icon)",
             top: "50%",
             transform: "translateY(-50%)",
             pointerEvents: "none",
@@ -53,29 +79,26 @@ export function FilterBar(
         >
           <SearchIcon
             size={14}
-            color={focused || filters.query
-              ? "var(--accent)"
-              : "var(--text-muted)"}
+            color={focused || draft ? "var(--accent-2)" : AURORA.sub}
           />
         </span>
         <input
           type="search"
           placeholder="TAG, localização, categoria…"
-          value={filters.query}
-          onChange={(e) => onFilter({ query: e.target.value })}
+          value={draft}
+          // NOTE: onInput, not onChange (see BarriersTable goto field).
+          onInput={(e) => setDraft(e.currentTarget.value)}
           onFocus={() => setFocused(true)}
           onBlur={() => setFocused(false)}
           style={{
             width: "100%",
-            padding: "9px 12px 9px 34px",
-            fontSize: 14,
-            background: "var(--bg-surface)",
-            border: focused || filters.query
-              ? "1.5px solid var(--accent)"
-              : "1.5px solid var(--border)",
-            borderRadius: 9,
-            color: "var(--text-primary)",
-            outline: "none",
+            padding:
+              "var(--d-input-y) var(--d-input-x) var(--d-input-y) var(--d-search-l)",
+            fontSize: "var(--d-lead)",
+            ...GLASS_INPUT,
+            border: focused || draft
+              ? "1px solid var(--accent)"
+              : `1px solid ${AURORA.segBorder}`,
             boxSizing: "border-box",
             boxShadow: focused ? "0 0 0 3px var(--glow)" : "none",
             transition: "border .2s, box-shadow .2s",
@@ -87,41 +110,42 @@ export function FilterBar(
         value={filters.disponibilidade}
         onChange={(v) => onFilter({ disponibilidade: v })}
         placeholder="Disponibilidade"
-        opts={DISP_OPTS}
+        opts={dispOpts}
       />
       <Sel
         value={filters.conformidade}
         onChange={(v) => onFilter({ conformidade: v })}
         placeholder="Conformidade"
-        opts={CONF_OPTS}
+        opts={confOpts}
       />
       <Sel
         value={filters.categoria}
         onChange={(v) => onFilter({ categoria: v })}
-        placeholder="Categoria"
-        opts={[...CATEGORIES]}
+        placeholder={`Categoria (${catOpts.length})`}
+        opts={catOpts}
       />
 
       {hasActiveFilters && (
         <button
+          type="button"
           onClick={onReset}
           className="lift animate-filter-on"
           style={{
             display: "flex",
             alignItems: "center",
-            gap: 5,
-            padding: "9px 12px",
-            fontSize: 13,
-            fontWeight: 600,
-            background: "rgba(239,68,68,.07)",
-            border: "1.5px solid rgba(239,68,68,.22)",
-            borderRadius: 9,
-            color: "#ef4444",
+            gap: "var(--d-mini-gap)",
+            padding: "var(--d-input-y) var(--d-input-x)",
+            fontSize: "var(--d-body)",
+            fontWeight: 700,
+            background: AURORA.dangerBg,
+            border: "1px solid rgba(239,68,68,.35)",
+            borderRadius: 10,
+            color: AURORA.dangerFg,
             cursor: "pointer",
             whiteSpace: "nowrap",
           }}
         >
-          <CloseIcon size={12} color="#ef4444" />Limpar filtros
+          <CloseIcon size={12} color={AURORA.dangerFg} />Limpar filtros
         </button>
       )}
 
@@ -129,18 +153,19 @@ export function FilterBar(
         style={{
           display: "flex",
           alignItems: "center",
-          gap: 5,
+          gap: "var(--d-mini-gap)",
           marginLeft: "auto",
         }}
       >
         <FilterIcon
           size={12}
-          color={hasActiveFilters ? "var(--accent)" : "var(--text-muted)"}
+          color={hasActiveFilters ? "var(--accent-2)" : AURORA.sub}
         />
         <span
+          className="tnum"
           style={{
-            fontSize: 13,
-            color: hasActiveFilters ? "var(--accent)" : "var(--text-muted)",
+            fontSize: "var(--d-body)",
+            color: hasActiveFilters ? "var(--accent-2)" : AURORA.sub,
             fontWeight: hasActiveFilters ? 600 : 400,
             whiteSpace: "nowrap",
             transition: "color .2s",
@@ -151,41 +176,5 @@ export function FilterBar(
         </span>
       </div>
     </div>
-  );
-}
-
-function Sel(
-  { value, onChange, placeholder, opts }: {
-    value: string;
-    onChange: (v: string) => void;
-    placeholder: string;
-    opts: string[];
-  },
-) {
-  const a = !!value;
-  return (
-    <select
-      value={value}
-      onChange={(e) => onChange(e.target.value)}
-      className={a ? "animate-filter-on" : ""}
-      style={{
-        padding: "9px 10px",
-        fontSize: 13,
-        background: a
-          ? "color-mix(in srgb,var(--accent) 7%,var(--bg-surface))"
-          : "var(--bg-surface)",
-        border: a ? "1.5px solid var(--accent)" : "1.5px solid var(--border)",
-        borderRadius: 9,
-        color: a ? "var(--accent)" : "var(--text-muted)",
-        outline: "none",
-        cursor: "pointer",
-        fontWeight: a ? 700 : 400,
-        boxShadow: a ? "0 0 0 3px var(--glow)" : "none",
-        transition: "all .2s var(--ease-std)",
-      }}
-    >
-      <option value="">{placeholder}</option>
-      {opts.map((o) => <option key={o} value={o}>{o}</option>)}
-    </select>
   );
 }
