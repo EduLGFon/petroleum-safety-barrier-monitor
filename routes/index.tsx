@@ -24,15 +24,19 @@ function getApiMode(): "mock" | "http" {
 
 // Home page: server-loads the dashboard seed (list or vocabularies by mode)
 // plus company name for the Dashboard island.
-export default define.page(async function Home() {
+export default define.page(async function Home({ url }: { url: URL }) {
   const apiMode = getApiMode();
   const companyName = getCompanyName();
   if (apiMode === "http") {
+    // Empty PUBLIC_API_BASE_URL falls back to the request origin so the
+    // island fetches /api/* from wherever this same Fresh app is actually
+    // served (dev auto-picks its port, start binds 8000). Set the variable
+    // explicitly only when the API lives on a different origin.
     const baseUrl = (() => {
       try {
-        return Deno.env.get("PUBLIC_API_BASE_URL") ?? "";
+        return Deno.env.get("PUBLIC_API_BASE_URL")?.trim() || url.origin;
       } catch {
-        return "";
+        return url.origin;
       }
     })();
     const vocabularies: Vocabularies = await getVocabularies();
