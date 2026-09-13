@@ -7,17 +7,17 @@ function barrier(over: Partial<Barrier> = {}): Barrier {
   return {
     id: 1,
     tag: "T-1",
-    tipologia: "Estação Coletora",
-    instalacao: "FAL",
+    typology: "Estação Coletora",
+    location: "FAL",
     locDesc: "Rig",
-    criticidade: "Não Crítica",
-    categoria: "Cat",
-    agrupamento: "Ag",
-    dono: "",
-    disponibilidade: "Disponível",
-    conformidade: "Conforme",
-    comentarios: "",
-    planoAcao: "",
+    criticality: "Não Crítica",
+    category: "Cat",
+    grouping: "Ag",
+    owner: "",
+    availability: "Disponível",
+    compliance: "Conforme",
+    comments: "",
+    actionPlan: "",
     statusSince: "2026-01-01",
     statusHistory: [],
     ...over,
@@ -27,34 +27,34 @@ function barrier(over: Partial<Barrier> = {}): Barrier {
 Deno.test("computeKpi of empty list is all zeros", () => {
   const k = computeKpi([]);
   assertStrictEquals(k.total, 0);
-  assertStrictEquals(k.pctConforme, 0);
-  assertEquals(k.byDisponibilidade, {});
+  assertStrictEquals(k.pctCompliant, 0);
+  assertEquals(k.byAvailability, {});
 });
 
 Deno.test("computeKpi splits known values and reconciles", () => {
   const k = computeKpi([
-    barrier({ disponibilidade: "Disponível", conformidade: "Conforme" }),
+    barrier({ availability: "Disponível", compliance: "Conforme" }),
     barrier({
       id: 2,
-      disponibilidade: "Degradado",
-      conformidade: "Não Conforme",
-      criticidade: "Crítica",
+      availability: "Degradado",
+      compliance: "Não Conforme",
+      criticality: "Crítica",
     }),
   ]);
   assertStrictEquals(k.total, 2);
-  assertStrictEquals(k.disponivel, 1);
-  assertStrictEquals(k.degradado, 1);
-  assertStrictEquals(k.conforme, 1);
-  assertStrictEquals(k.naoConforme, 1);
-  assertStrictEquals(k.criticasNC, 1);
-  assertStrictEquals(k.pctConforme, 50);
+  assertStrictEquals(k.available, 1);
+  assertStrictEquals(k.degraded, 1);
+  assertStrictEquals(k.compliant, 1);
+  assertStrictEquals(k.nonCompliant, 1);
+  assertStrictEquals(k.criticalNonCompliant, 1);
+  assertStrictEquals(k.pctCompliant, 50);
 });
 
-Deno.test("computeKpi fails novel conformidade closed into NC", () => {
+Deno.test("computeKpi fails novel compliance closed into NC", () => {
   const k = computeKpi([
-    barrier({ disponibilidade: "Em Comissionamento", conformidade: "Parcial" }),
+    barrier({ availability: "Em Comissionamento", compliance: "Parcial" }),
   ]);
-  assertStrictEquals(k.conforme + k.naoConforme, k.total);
-  assertStrictEquals(k.naoConforme, 1);
-  assertStrictEquals(k.byConformidade?.["Parcial"], 1);
+  assertStrictEquals(k.compliant + k.nonCompliant, k.total);
+  assertStrictEquals(k.nonCompliant, 1);
+  assertStrictEquals(k.byCompliance?.["Parcial"], 1);
 });

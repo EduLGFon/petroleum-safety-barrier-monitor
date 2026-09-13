@@ -1,6 +1,5 @@
 // Unit tests for ops failure notifications (P3) - console always, email
 // optional, and a throwing notifier must never break the fanout.
-import { assertStrictEquals } from "jsr:@std/assert@^1";
 import {
   consoleNotifier,
   failureBody,
@@ -9,6 +8,9 @@ import {
   smtpEmailNotifier,
   type SyncFailureInfo,
 } from "./notify.ts";
+
+import { assertStrictEquals } from "jsr:@std/assert@^1";
+
 import type { SmtpConfig } from "./smtp.ts";
 
 const info: SyncFailureInfo = {

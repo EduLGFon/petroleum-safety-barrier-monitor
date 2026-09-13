@@ -8,16 +8,16 @@ function wire(over: Partial<WireBarrier> = {}): WireBarrier {
   return {
     id: 1,
     tag: "FAL-EQ-001",
-    tipologiaId: 3,
+    typologyId: 3,
     locationId: 1,
     locDescId: 0,
-    criticidadeId: 1,
-    categoriaId: 1,
-    agrupamentoId: 0,
-    donoId: -1,
-    disponibilidadeId: 5,
-    comentarios: "",
-    planoAcao: "",
+    criticalityId: 1,
+    categoryId: 1,
+    groupingId: 0,
+    ownerId: -1,
+    availabilityId: 5,
+    comments: "",
+    actionPlan: "",
     statusSince: "2026-09-13",
     statusHistory: [],
     ...over,
@@ -62,7 +62,7 @@ Deno.test("detectUrgentTransitions drops calm landings and gone barriers", async
     (ids) => {
       const out = new Map<number, WireBarrier>();
       for (const id of ids) {
-        if (id === 1) out.set(id, wire({ disponibilidadeId: 0 }));
+        if (id === 1) out.set(id, wire({ availabilityId: 0 }));
       }
       return Promise.resolve(out);
     },
@@ -71,7 +71,7 @@ Deno.test("detectUrgentTransitions drops calm landings and gone barriers", async
   assertStrictEquals(out.length, 0);
 });
 
-Deno.test("detectUrgentTransitions tiers critical by criticidade", async () => {
+Deno.test("detectUrgentTransitions tiers critical by criticality", async () => {
   const candidates: TransitionCandidate[] = [
     { barrierId: 9, transitionDate: "2026-09-13", statusId: 5 },
   ];
@@ -84,7 +84,7 @@ Deno.test("detectUrgentTransitions tiers critical by criticidade", async () => {
     (ids) => {
       const out = new Map<number, WireBarrier>();
       for (const id of ids) {
-        out.set(id, wire({ id, criticidadeId: 0 }));
+        out.set(id, wire({ id, criticalityId: 0 }));
       }
       return Promise.resolve(out);
     },

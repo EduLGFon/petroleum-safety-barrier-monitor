@@ -1,9 +1,12 @@
 // Unit tests for the polling runner (P3) - lock, notify-on-failure, and a
 // stop-safe cadence loop with injectable timers.
-import { assertStrictEquals } from "jsr:@std/assert@^1";
 import { createPollLoop, pollOnce, type TimerSource } from "./runner.ts";
-import type { SyncResult } from "./sync.ts";
+
+import { assertStrictEquals } from "jsr:@std/assert@^1";
+
 import type { SyncFailureInfo } from "./notify.ts";
+
+import type { SyncResult } from "./sync.ts";
 
 function okResult(): SyncResult {
   return {

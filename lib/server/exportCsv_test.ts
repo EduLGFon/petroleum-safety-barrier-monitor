@@ -1,23 +1,25 @@
 // Unit tests for the server CSV export (P4) - stream drained to text.
-import { assertStrictEquals } from "jsr:@std/assert@^1";
 import { streamExportCsv, streamToText } from "./exportCsv.ts";
+
+import { assertStrictEquals } from "jsr:@std/assert@^1";
+
 import type { Barrier } from "../types.ts";
 
 function barrier(over: Partial<Barrier> = {}): Barrier {
   return {
     id: 1,
     tag: "FAL-EQ-001",
-    tipologia: "Elétrica",
-    instalacao: "FAL",
+    typology: "Elétrica",
+    location: "FAL",
     locDesc: "Sala",
-    criticidade: "Crítica",
-    categoria: "Detecção",
-    agrupamento: "G1",
-    dono: "Operação",
-    disponibilidade: "Disponível",
-    conformidade: "Conforme",
-    comentarios: "",
-    planoAcao: "",
+    criticality: "Crítica",
+    category: "Detecção",
+    grouping: "G1",
+    owner: "Operação",
+    availability: "Disponível",
+    compliance: "Conforme",
+    comments: "",
+    actionPlan: "",
     statusSince: "2026-01-05",
     statusHistory: [],
     ...over,

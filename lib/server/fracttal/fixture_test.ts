@@ -1,19 +1,22 @@
 // Fixture sanity tests (P3): the synthetic asset fixture must parse, then
-// map to the scenarios it claims — 3 mapped inserts + 2 deliberate skips
+// map to the scenarios it claims - 3 mapped inserts + 2 deliberate skips
 // (unmapped categoria typo, unknown station). Guards drift in the fixture.
 import { assertStrictEquals } from "jsr:@std/assert@^1";
-import { parsePage } from "./client.ts";
+
 import { mapAsset, type MapContext } from "./map.ts";
+
 import { planReconcile } from "./sync.ts";
+
+import { parsePage } from "./client.ts";
 
 const ctx: MapContext = {
   locationIds: { FAL: 1 },
-  categoriaIds: {
+  categoryIds: {
     "Sistema de Combate a Incêndio": 7,
     "Sistema de Detecção de Gás": 8,
     "Válvula de Alívio de Pressão": 9,
   },
-  criticidadeIds: { "Crítica": 1, "Não Crítica": 2 },
+  criticalityIds: { "Crítica": 1, "Não Crítica": 2 },
 };
 
 async function loadFixture(): Promise<unknown[]> {
@@ -35,7 +38,7 @@ async function loadFixture(): Promise<unknown[]> {
   return json.items ?? [];
 }
 
-Deno.test("fixture parses to 5 valid rows", async () => {
+Deno.test("fixture maps to 3 inserts and 2 deliberate skips", async () => {
   const parsed = parsePage({ data: await loadFixture() });
   assertStrictEquals(parsed.items.length, 5);
   assertStrictEquals(parsed.malformed.length, 0);
@@ -62,5 +65,5 @@ Deno.test("fixture maps to 3 inserts and 2 deliberate skips", async () => {
 
   // FAL-EQ-002 is unavailable -> Indisponível.
   const unavailable = inputs.find((i) => i.externalCode === "FAL-EQ-002");
-  assertStrictEquals(unavailable?.disponibilidadeId, 5);
+  assertStrictEquals(unavailable?.availabilityId, 5);
 });

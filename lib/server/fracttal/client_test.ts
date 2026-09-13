@@ -1,11 +1,6 @@
 // Unit tests for the Fracttal read-only client - validation, pagination,
 // rate-limit, and auth flows, all against a mocked fetch.
 import {
-  assertEquals,
-  assertStrictEquals,
-  assertThrows,
-} from "jsr:@std/assert@^1";
-import {
   buildListQuery,
   createFracttalClient,
   MAX_PAGE_SIZE,
@@ -13,6 +8,12 @@ import {
   parseEnvelope,
   parsePage,
 } from "./client.ts";
+
+import {
+  assertEquals,
+  assertStrictEquals,
+  assertThrows,
+} from "jsr:@std/assert@^1";
 
 const DATA_URL = "https://app.fracttal.com/api";
 

@@ -2,10 +2,6 @@
 // Proves the acceptance behaviors: exactly one email per recipient, rerun
 // sends zero, partial delivery resumes without duplicates, failures
 // dead-letter and reprocess on demand.
-import { assertStrictEquals } from "jsr:@std/assert@^1";
-import type { WireBarrier } from "../../wireTypes.ts";
-import { MAX_SEND_RUNS, runAlertCycle } from "./run.ts";
-import type { AlertMailer } from "./mailer.ts";
 import {
   type AlertStore,
   dedupKey,
@@ -14,20 +10,28 @@ import {
   type UnsentAlert,
 } from "./store.ts";
 
+import { assertStrictEquals } from "jsr:@std/assert@^1";
+
+import { MAX_SEND_RUNS, runAlertCycle } from "./run.ts";
+
+import type { WireBarrier } from "../../wireTypes.ts";
+
+import type { AlertMailer } from "./mailer.ts";
+
 function wireBarrier(over: Partial<WireBarrier> = {}): WireBarrier {
   return {
     id: 1,
     tag: "FAL-EQ-001",
-    tipologiaId: 3,
+    typologyId: 3,
     locationId: 1,
     locDescId: 0,
-    criticidadeId: 1,
-    categoriaId: 1,
-    agrupamentoId: 0,
-    donoId: -1,
-    disponibilidadeId: 5,
-    comentarios: "",
-    planoAcao: "",
+    criticalityId: 1,
+    categoryId: 1,
+    groupingId: 0,
+    ownerId: -1,
+    availabilityId: 5,
+    comments: "",
+    actionPlan: "",
     statusSince: "2026-09-13",
     statusHistory: [],
     ...over,
@@ -202,7 +206,7 @@ Deno.test("cycle skips calm landings and missing barriers", async () => {
     { barrierId: 1, transitionDate: "2026-09-13", statusId: 0 }, // Disponível
     { barrierId: 2, transitionDate: "2026-09-13", statusId: 5 }, // gone
   ];
-  const barriers = new Map([[1, wireBarrier({ disponibilidadeId: 0 })]]);
+  const barriers = new Map([[1, wireBarrier({ availabilityId: 0 })]]);
   const { mailer, sent } = fakeMailer();
   const r = await runAlertCycle({
     store,

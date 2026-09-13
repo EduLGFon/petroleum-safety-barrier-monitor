@@ -1,6 +1,4 @@
 // Unit tests for the urgent predicate (P5).
-import { assertStrictEquals } from "jsr:@std/assert@^1";
-import type { Barrier } from "../types.ts";
 import {
   compareUrgency,
   isUrgent,
@@ -8,21 +6,25 @@ import {
   urgentBarriers,
 } from "./urgent.ts";
 
+import { assertStrictEquals } from "jsr:@std/assert@^1";
+
+import type { Barrier } from "../types.ts";
+
 function barrier(over: Partial<Barrier> = {}): Barrier {
   return {
     id: 1,
     tag: "T-1",
-    tipologia: "Estação Coletora",
-    instalacao: "FAL",
+    typology: "Estação Coletora",
+    location: "FAL",
     locDesc: "Rig",
-    criticidade: "Não Crítica",
-    categoria: "Cat",
-    agrupamento: "Ag",
-    dono: "",
-    disponibilidade: "Disponível",
-    conformidade: "Conforme",
-    comentarios: "",
-    planoAcao: "",
+    criticality: "Não Crítica",
+    category: "Cat",
+    grouping: "Ag",
+    owner: "",
+    availability: "Disponível",
+    compliance: "Conforme",
+    comments: "",
+    actionPlan: "",
     statusSince: "2026-01-01",
     statusHistory: [],
     ...over,
@@ -32,12 +34,12 @@ function barrier(over: Partial<Barrier> = {}): Barrier {
 Deno.test("urgencyOf tiers critical / urgent / none", () => {
   assertStrictEquals(urgencyOf(barrier()), "none");
   assertStrictEquals(
-    urgencyOf(barrier({ conformidade: "Não Conforme" })),
+    urgencyOf(barrier({ compliance: "Não Conforme" })),
     "urgent",
   );
   assertStrictEquals(
     urgencyOf(
-      barrier({ conformidade: "Não Conforme", criticidade: "Crítica" }),
+      barrier({ compliance: "Não Conforme", criticality: "Crítica" }),
     ),
     "critical",
   );
@@ -45,12 +47,12 @@ Deno.test("urgencyOf tiers critical / urgent / none", () => {
 
 Deno.test("urgencyOf is fail-closed on novel values", () => {
   assertStrictEquals(
-    urgencyOf(barrier({ conformidade: "Em Auditoria" })),
+    urgencyOf(barrier({ compliance: "Em Auditoria" })),
     "urgent",
   );
   assertStrictEquals(
     urgencyOf(
-      barrier({ conformidade: "Em Auditoria", criticidade: "Crítica" }),
+      barrier({ compliance: "Em Auditoria", criticality: "Crítica" }),
     ),
     "critical",
   );
@@ -58,9 +60,9 @@ Deno.test("urgencyOf is fail-closed on novel values", () => {
 
 Deno.test("isUrgent matches the NcAlert card population exactly", () => {
   const list = [
-    barrier({ conformidade: "Conforme" }),
-    barrier({ conformidade: "Não Conforme" }),
-    barrier({ conformidade: "Em Auditoria" }),
+    barrier({ compliance: "Conforme" }),
+    barrier({ compliance: "Não Conforme" }),
+    barrier({ compliance: "Em Auditoria" }),
   ];
   assertStrictEquals(list.filter(isUrgent).length, 2);
 });
@@ -68,18 +70,18 @@ Deno.test("isUrgent matches the NcAlert card population exactly", () => {
 Deno.test("compareUrgency orders critical, then oldest, then id", () => {
   const criticalNew = barrier({
     id: 3,
-    conformidade: "Não Conforme",
-    criticidade: "Crítica",
+    compliance: "Não Conforme",
+    criticality: "Crítica",
     statusSince: "2026-06-01",
   });
   const urgentOld = barrier({
     id: 1,
-    conformidade: "Não Conforme",
+    compliance: "Não Conforme",
     statusSince: "2026-01-01",
   });
   const urgentNew = barrier({
     id: 2,
-    conformidade: "Não Conforme",
+    compliance: "Não Conforme",
     statusSince: "2026-05-01",
   });
   const calm = barrier({ id: 4 });
@@ -90,12 +92,12 @@ Deno.test("compareUrgency orders critical, then oldest, then id", () => {
 Deno.test("compareUrgency pushes missing statusSince last", () => {
   const noDate = barrier({
     id: 1,
-    conformidade: "Não Conforme",
+    compliance: "Não Conforme",
     statusSince: "",
   });
   const dated = barrier({
     id: 2,
-    conformidade: "Não Conforme",
+    compliance: "Não Conforme",
     statusSince: "2026-01-01",
   });
   assertStrictEquals([noDate, dated].sort(compareUrgency)[0]!.id, 2);
@@ -104,11 +106,11 @@ Deno.test("compareUrgency pushes missing statusSince last", () => {
 Deno.test("urgentBarriers filters and orders in one pass", () => {
   const out = urgentBarriers([
     barrier({ id: 1 }),
-    barrier({ id: 2, conformidade: "Não Conforme", statusSince: "2026-03-01" }),
+    barrier({ id: 2, compliance: "Não Conforme", statusSince: "2026-03-01" }),
     barrier({
       id: 3,
-      conformidade: "Não Conforme",
-      criticidade: "Crítica",
+      compliance: "Não Conforme",
+      criticality: "Crítica",
       statusSince: "2026-04-01",
     }),
   ]);

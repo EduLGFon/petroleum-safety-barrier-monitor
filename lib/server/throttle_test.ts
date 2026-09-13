@@ -1,6 +1,7 @@
 // Unit tests for the fixed-window throttle (P4) - injected clock, no sleeps.
-import { assertStrictEquals } from "jsr:@std/assert@^1";
 import { createThrottle, throttleKey } from "./throttle.ts";
+
+import { assertStrictEquals } from "jsr:@std/assert@^1";
 
 Deno.test("throttle allows up to the limit then denies with retry-after", () => {
   const at = 0;

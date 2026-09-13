@@ -1,6 +1,4 @@
 // Unit tests for lib/resolve.ts - wire numeric ids to domain strings.
-import { assert, assertEquals, assertStrictEquals } from "jsr:@std/assert@^1";
-import type { WireKpiSnapshot } from "./wireTypes.ts";
 import {
   resolveBarrier,
   resolveBarriers,
@@ -8,21 +6,26 @@ import {
   resolveHistoryEntry,
   resolveKpi,
 } from "./resolve.ts";
+
+import { assert, assertEquals, assertStrictEquals } from "jsr:@std/assert@^1";
+
+import type { WireKpiSnapshot } from "./wireTypes.ts";
+
 import type { WireBarrier } from "./wireTypes.ts";
 
 function snapshot(over: Partial<WireKpiSnapshot> = {}): WireKpiSnapshot {
   return {
     total: 0,
-    disponivel: 0,
-    foraDeOp: 0,
-    indispCont: 0,
-    degrCont: 0,
-    degradado: 0,
-    indisponivel: 0,
-    conforme: 0,
-    naoConforme: 0,
-    pctConforme: 0,
-    criticasNC: 0,
+    available: 0,
+    outOfService: 0,
+    contingencyOutage: 0,
+    degradedContingency: 0,
+    degraded: 0,
+    unavailable: 0,
+    compliant: 0,
+    nonCompliant: 0,
+    pctCompliant: 0,
+    criticalNonCompliant: 0,
     ...over,
   };
 }
@@ -30,31 +33,31 @@ function snapshot(over: Partial<WireKpiSnapshot> = {}): WireKpiSnapshot {
 Deno.test("resolveKpi translates numeric buckets to labels", () => {
   const k = resolveKpi(snapshot({
     total: 3,
-    byDisponibilidade: { "0": 1, "4": 2 },
-    byConformidade: { "0": 1, "1": 2 },
-    byCriticidade: { "1": 2 },
+    byAvailability: { "0": 1, "4": 2 },
+    byCompliance: { "0": 1, "1": 2 },
+    byCriticality: { "1": 2 },
     syncedAt: "2026-09-10T00:00:00.000Z",
   }));
-  assertEquals(k.byDisponibilidade, { "Disponível": 1, "Degradado": 2 });
-  assertEquals(k.byConformidade, { "Conforme": 1, "Não Conforme": 2 });
-  assertEquals(k.byCriticidade, { "Crítica": 2 });
+  assertEquals(k.byAvailability, { "Disponível": 1, "Degradado": 2 });
+  assertEquals(k.byCompliance, { "Conforme": 1, "Não Conforme": 2 });
+  assertEquals(k.byCriticality, { "Crítica": 2 });
   assertStrictEquals(k.syncedAt, "2026-09-10T00:00:00.000Z");
 });
 
 Deno.test("resolveKpi passes string buckets through for old servers", () => {
-  const k = resolveKpi(snapshot({ byDisponibilidade: { "Disponível": 5 } }));
-  assertEquals(k.byDisponibilidade, { "Disponível": 5 });
+  const k = resolveKpi(snapshot({ byAvailability: { "Disponível": 5 } }));
+  assertEquals(k.byAvailability, { "Disponível": 5 });
 });
 
 Deno.test("resolveKpi omits absent buckets and timestamp", () => {
   const k = resolveKpi(snapshot({ total: 1 }));
-  assertStrictEquals(k.byDisponibilidade, undefined);
+  assertStrictEquals(k.byAvailability, undefined);
   assertStrictEquals(k.syncedAt, undefined);
 });
 
-Deno.test("resolveChartData derives NC as total minus conforme", () => {
+Deno.test("resolveChartData derives NC as total minus compliant", () => {
   const rows = resolveChartData([
-    { categoriaId: 0, conforme: 2, total: 5 },
+    { categoryId: 0, compliant: 2, total: 5 },
   ]);
   assertStrictEquals(rows.length, 1);
   assertStrictEquals(rows[0].Conforme, 2);
@@ -66,65 +69,65 @@ function wireBarrier(over: Partial<WireBarrier> = {}): WireBarrier {
   return {
     id: 7,
     tag: "PSV-071",
-    tipologiaId: 0,
+    typologyId: 0,
     locationId: 1,
     locDescId: 1,
-    criticidadeId: 1,
-    categoriaId: 0,
-    agrupamentoId: 0,
-    donoId: 0,
-    disponibilidadeId: 4,
-    comentarios: "vazar",
-    planoAcao: "calibrar",
+    criticalityId: 1,
+    categoryId: 0,
+    groupingId: 0,
+    ownerId: 0,
+    availabilityId: 4,
+    comments: "vazar",
+    actionPlan: "calibrar",
     statusSince: "2026-01-01",
     statusHistory: [],
     ...over,
   };
 }
 
-Deno.test("resolveBarrier maps known ids; conformidade is derived, never trusted from wire", () => {
+Deno.test("resolveBarrier maps known ids; compliance is derived, never trusted from wire", () => {
   const b = resolveBarrier(wireBarrier());
   assertStrictEquals(b.id, 7);
   assertStrictEquals(b.tag, "PSV-071");
-  assertStrictEquals(b.tipologia, "Estação Coletora");
-  assertStrictEquals(b.instalacao, "FAL");
-  assertStrictEquals(b.criticidade, "Crítica");
-  assertStrictEquals(b.categoria, "Válvula de Alívio de Pressão");
-  assertStrictEquals(b.agrupamento, "Sistemas de Alívio");
-  assertStrictEquals(b.dono, "Equipe de Manutenção");
-  assertStrictEquals(b.disponibilidade, "Degradado");
-  assertStrictEquals(b.conformidade, "Não Conforme");
+  assertStrictEquals(b.typology, "Estação Coletora");
+  assertStrictEquals(b.location, "FAL");
+  assertStrictEquals(b.criticality, "Crítica");
+  assertStrictEquals(b.category, "Válvula de Alívio de Pressão");
+  assertStrictEquals(b.grouping, "Sistemas de Alívio");
+  assertStrictEquals(b.owner, "Equipe de Manutenção");
+  assertStrictEquals(b.availability, "Degradado");
+  assertStrictEquals(b.compliance, "Não Conforme");
 });
 
 Deno.test("resolveBarrier maps unknown numeric ids to explicit sentinels", () => {
   const b = resolveBarrier(
     wireBarrier({
-      tipologiaId: 99,
+      typologyId: 99,
       locationId: 99,
-      categoriaId: 99,
-      criticidadeId: 99,
-      donoId: 99,
-      agrupamentoId: 99,
+      categoryId: 99,
+      criticalityId: 99,
+      ownerId: 99,
+      groupingId: 99,
     }),
   );
-  assertStrictEquals(b.tipologia, "Tipologia (99)");
-  assertStrictEquals(b.instalacao, "ST-99");
-  assertStrictEquals(b.categoria, "Categoria (99)");
-  assertStrictEquals(b.criticidade, "Criticidade (99)");
-  assertStrictEquals(b.dono, "Dono (99)");
-  assertStrictEquals(b.agrupamento, "Agrupamento (99)");
+  assertStrictEquals(b.typology, "Tipologia (99)");
+  assertStrictEquals(b.location, "ST-99");
+  assertStrictEquals(b.category, "Categoria (99)");
+  assertStrictEquals(b.criticality, "Criticidade (99)");
+  assertStrictEquals(b.owner, "Dono (99)");
+  assertStrictEquals(b.grouping, "Agrupamento (99)");
 });
 
-Deno.test("resolveBarrier derives conformidade from disponibilidade (Conforme case)", () => {
-  const b = resolveBarrier(wireBarrier({ disponibilidadeId: 0 }));
-  assertStrictEquals(b.conformidade, "Conforme");
+Deno.test("resolveBarrier derives compliance from availability (Conforme case)", () => {
+  const b = resolveBarrier(wireBarrier({ availabilityId: 0 }));
+  assertStrictEquals(b.compliance, "Conforme");
 });
 
-Deno.test("resolveBarrier maps negative dono and unknown disp id", () => {
-  const b = resolveBarrier(wireBarrier({ donoId: -1, disponibilidadeId: 42 }));
-  assertStrictEquals(b.dono, "");
-  assertStrictEquals(b.disponibilidade, "Disponibilidade (42)");
-  assertStrictEquals(b.conformidade, "Não Conforme");
+Deno.test("resolveBarrier maps negative owner and unknown disp id", () => {
+  const b = resolveBarrier(wireBarrier({ ownerId: -1, availabilityId: 42 }));
+  assertStrictEquals(b.owner, "");
+  assertStrictEquals(b.availability, "Disponibilidade (42)");
+  assertStrictEquals(b.compliance, "Não Conforme");
 });
 
 Deno.test("resolveHistoryEntry maps ids and passes date/note through", () => {

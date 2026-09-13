@@ -1,5 +1,4 @@
 // Unit tests for the API error envelope (P4).
-import { assertStrictEquals } from "jsr:@std/assert@^1";
 import {
   apiError,
   badRequest,
@@ -8,6 +7,8 @@ import {
   rateLimited,
   unauthorized,
 } from "./errors.ts";
+
+import { assertStrictEquals } from "jsr:@std/assert@^1";
 
 async function body(res: Response) {
   return await res.json() as {

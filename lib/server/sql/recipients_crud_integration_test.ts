@@ -1,13 +1,15 @@
 // Recipients CRUD integration (P5) - exercises the real SQL, including the
 // parameterized UPDATE. Skipped without DATABASE_URL.
-import { assertStrictEquals } from "jsr:@std/assert@^1";
-import { queryRows } from "../db.ts";
 import {
   createRecipient,
   deleteRecipient,
   listRecipients,
   updateRecipient,
 } from "./recipients.ts";
+
+import { assertStrictEquals } from "jsr:@std/assert@^1";
+
+import { queryRows } from "../db.ts";
 
 Deno.test("recipients CRUD round-trips through Postgres", async () => {
   if (!Deno.env.get("DATABASE_URL")) {

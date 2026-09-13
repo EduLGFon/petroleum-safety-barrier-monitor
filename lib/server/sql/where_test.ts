@@ -29,10 +29,10 @@ Deno.test("buildWhere includeDeleted composes with other filters", () => {
 });
 
 Deno.test("buildWhere binds ids as numbered args", () => {
-  const { text, args } = buildWhere({ locationId: 1, categoriaId: 4 });
+  const { text, args } = buildWhere({ locationId: 1, categoryId: 4 });
   assertEquals(args, [1, 4]);
   assert(text.includes("b.location_id = $1"));
-  assert(text.includes("b.categoria_id = $2"));
+  assert(text.includes("b.category_id = $2"));
   assert(text.includes("b.deleted_at is null"));
 });
 

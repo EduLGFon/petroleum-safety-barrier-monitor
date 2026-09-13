@@ -1,5 +1,4 @@
 // Unit tests for lib/dashboard/filters.ts - sanitizers and pipeline.
-import { assert, assertEquals, assertStrictEquals } from "jsr:@std/assert@^1";
 import {
   applyFilters,
   applySorting,
@@ -8,23 +7,26 @@ import {
   sanitizeFilterPatch,
   sanitizeFilters,
 } from "./filters.ts";
+
+import { assert, assertEquals, assertStrictEquals } from "jsr:@std/assert@^1";
+
 import type { Barrier } from "../types.ts";
 
 function barrier(over: Partial<Barrier> = {}): Barrier {
   return {
     id: 1,
     tag: "PSV-1-FAL",
-    tipologia: "Tip",
-    instalacao: "FAL",
+    typology: "Tip",
+    location: "FAL",
     locDesc: "Rig",
-    criticidade: "Não Crítica",
-    categoria: "Cat",
-    agrupamento: "Ag",
-    dono: "",
-    disponibilidade: "Disponível",
-    conformidade: "Conforme",
-    comentarios: "",
-    planoAcao: "",
+    criticality: "Não Crítica",
+    category: "Cat",
+    grouping: "Ag",
+    owner: "",
+    availability: "Disponível",
+    compliance: "Conforme",
+    comments: "",
+    actionPlan: "",
     statusSince: "2026-01-01",
     statusHistory: [],
     ...over,
@@ -38,7 +40,7 @@ Deno.test("sanitizeFilterPatch drops malformed keys only", () => {
     pageSize: 999,
     sortCol: "hacker",
     sortDir: "sideways",
-    disponibilidade: 42,
+    availability: 42,
   });
   assertEquals(patch, { query: "abc" });
 });

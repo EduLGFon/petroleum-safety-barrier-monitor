@@ -1,6 +1,5 @@
 // Unit tests for the SMTP submission client (P3). A scripted fake socket
 // replays a server conversation; the real TLS path is never exercised here.
-import { assertEquals, assertStrictEquals } from "jsr:@std/assert@^1";
 import {
   composeMessage,
   encodeSubject,
@@ -9,6 +8,8 @@ import {
   type SmtpConnector,
   type SmtpSocket,
 } from "./smtp.ts";
+
+import { assertEquals, assertStrictEquals } from "jsr:@std/assert@^1";
 
 // fakeSocket: a scripted SMTP server. Each command \n-line the client sends
 // consumes the next scripted reply; after a DATA command the dot-terminated

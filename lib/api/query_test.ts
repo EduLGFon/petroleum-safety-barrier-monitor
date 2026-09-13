@@ -1,17 +1,18 @@
 // Unit tests for lib/api/query.ts - domain filters to wire query.
-import { assertEquals, assertStrictEquals } from "jsr:@std/assert@^1";
 import { buildQueryString, cleanDateParam, toWireQuery } from "./query.ts";
+
+import { assertEquals, assertStrictEquals } from "jsr:@std/assert@^1";
 
 Deno.test("toWireQuery encodes known values to ids", () => {
   const q = toWireQuery({
     location: "FAL",
-    disponibilidade: "Degradado",
+    availability: "Degradado",
     page: 2,
     pageSize: 25,
   });
   assertEquals(q, {
     locationId: 1,
-    disponibilidadeId: 4,
+    availabilityId: 4,
     page: 2,
     pageSize: 25,
   });
@@ -22,7 +23,7 @@ Deno.test("toWireQuery skips ALL location and unknown values", () => {
   const orig = console.warn;
   console.warn = (m: string) => warnings.push(m);
   try {
-    const q = toWireQuery({ location: "ALL", categoria: "Nope" });
+    const q = toWireQuery({ location: "ALL", category: "Nope" });
     assertEquals(q, {});
     assertStrictEquals(warnings.length, 1);
   } finally {
@@ -59,9 +60,9 @@ Deno.test("toWireQuery warns and skips each unknown vocabulary value", () => {
   const warnings = collectWarnings(() => {
     const q = toWireQuery({
       location: "MARS",
-      disponibilidade: "Futuro",
-      conformidade: "Em análise",
-      categoria: "Nope",
+      availability: "Futuro",
+      compliance: "Em análise",
+      category: "Nope",
     });
     assertEquals(q, {});
   });
@@ -69,24 +70,24 @@ Deno.test("toWireQuery warns and skips each unknown vocabulary value", () => {
   assertStrictEquals(warnings[0], "[toWireQuery] unknown location: MARS");
 });
 
-Deno.test("toWireQuery drops invalid disponibilidade/conformidade but keeps the rest", () => {
+Deno.test("toWireQuery drops invalid availability/compliance but keeps the rest", () => {
   const warnings = collectWarnings(() => {
     const q = toWireQuery({
-      disponibilidade: "Degradado", // known - id 4
-      conformidade: "Raro",
+      availability: "Degradado", // known - id 4
+      compliance: "Raro",
       query: "pump",
       sortCol: "tag",
       sortDir: "desc",
     });
     assertEquals(q, {
-      disponibilidadeId: 4,
+      availabilityId: 4,
       query: "pump",
       sortCol: "tag",
       sortDir: "desc",
     });
   });
   assertStrictEquals(warnings.length, 1);
-  assertEquals(warnings[0], "[toWireQuery] unknown conformidade: Raro");
+  assertEquals(warnings[0], "[toWireQuery] unknown compliance: Raro");
 });
 
 Deno.test("cleanDateParam accepts bare or longer ISO dates, rejects garbage", () => {
@@ -104,7 +105,7 @@ Deno.test("cleanDateParam accepts bare or longer ISO dates, rejects garbage", ()
 Deno.test("toWireQuery passes through known ids with pageSize/sort intact", () => {
   const q = toWireQuery({
     location: "SPL",
-    categoria: "Detector de H₂S",
+    category: "Detector de H₂S",
     query: "",
     page: 2,
     pageSize: 50,
@@ -113,7 +114,7 @@ Deno.test("toWireQuery passes through known ids with pageSize/sort intact", () =
   });
   assertEquals(q, {
     locationId: 6,
-    categoriaId: 9,
+    categoryId: 9,
     page: 2,
     pageSize: 50,
     sortCol: "statusSince",

@@ -1,20 +1,22 @@
 // Unit tests for the Fracttal -> app barrier mapper (P3). Exact label
 // resolution is the contract; unknown values skip with a reason, never guess.
-import { assertStrictEquals } from "jsr:@std/assert@^1";
 import {
-  DISPONIBILIDADE_DISPONIVEL,
-  DISPONIBILIDADE_INDISPONIVEL,
+  AVAILABILITY_AVAILABLE,
+  AVAILABILITY_UNAVAILABLE,
   IMPORT_DEFAULTS,
   mapAsset,
   type MapContext,
   type MappedRow,
 } from "./map.ts";
+
+import { assertStrictEquals } from "jsr:@std/assert@^1";
+
 import type { FracttalAsset } from "./types.ts";
 
 const ctx: MapContext = {
   locationIds: { FAL: 1, "SANTA-MONICA": 2 },
-  categoriaIds: { "Sistema de Combate a Incêndio": 7 },
-  criticidadeIds: { "Crítico": 1, "Não Crítica": 2 },
+  categoryIds: { "Sistema de Combate a Incêndio": 7 },
+  criticalityIds: { "Crítico": 1, "Não Crítica": 2 },
 };
 
 function asset(over: Partial<FracttalAsset> = {}): FracttalAsset {
@@ -41,18 +43,18 @@ function asset(over: Partial<FracttalAsset> = {}): FracttalAsset {
   };
 }
 
-Deno.test("disponibilidadeFromAsset: unavailable is Indisponível, else Disponível", () => {
+Deno.test("availabilityFromAsset: unavailable is Indisponível, else Disponível", () => {
   const unavailable = mapAsset(asset({ available: false }), ctx);
   if (!unavailable.ok) throw new Error("expected ok");
   assertStrictEquals(
-    unavailable.input.disponibilidadeId,
-    DISPONIBILIDADE_INDISPONIVEL,
+    unavailable.input.availabilityId,
+    AVAILABILITY_UNAVAILABLE,
   );
   const available = mapAsset(asset({ available: true }), ctx);
   if (!available.ok) throw new Error("expected ok");
   assertStrictEquals(
-    available.input.disponibilidadeId,
-    DISPONIBILIDADE_DISPONIVEL,
+    available.input.availabilityId,
+    AVAILABILITY_AVAILABLE,
   );
 });
 
@@ -62,14 +64,14 @@ Deno.test("mapAsset resolves labels case-insensitively and applies defaults", ()
   assertStrictEquals(mapped.input.externalCode, "FAL-EQ-001");
   assertStrictEquals(mapped.input.tag, "FAL-EQ-001");
   assertStrictEquals(mapped.input.locationId, 1);
-  assertStrictEquals(mapped.input.categoriaId, 7);
-  assertStrictEquals(mapped.input.criticidadeId, 1);
-  assertStrictEquals(mapped.input.tipologiaId, IMPORT_DEFAULTS.tipologiaId);
-  assertStrictEquals(mapped.input.agrupamentoId, IMPORT_DEFAULTS.agrupamentoId);
+  assertStrictEquals(mapped.input.categoryId, 7);
+  assertStrictEquals(mapped.input.criticalityId, 1);
+  assertStrictEquals(mapped.input.typologyId, IMPORT_DEFAULTS.typologyId);
+  assertStrictEquals(mapped.input.groupingId, IMPORT_DEFAULTS.groupingId);
   assertStrictEquals(mapped.input.locDescId, IMPORT_DEFAULTS.locDescId);
-  assertStrictEquals(mapped.input.donoId, null);
-  assertStrictEquals(mapped.input.comentarios, "");
-  assertStrictEquals(mapped.input.planoAcao, "");
+  assertStrictEquals(mapped.input.ownerId, null);
+  assertStrictEquals(mapped.input.comments, "");
+  assertStrictEquals(mapped.input.actionPlan, "");
   assertStrictEquals(mapped.input.sourceUpdatedAt, null);
 });
 
@@ -82,7 +84,7 @@ Deno.test("mapAsset falls back to groups_description when groups_1 is absent", (
     ctx,
   );
   if (!mapped.ok) throw new Error("expected ok");
-  assertStrictEquals(mapped.input.categoriaId, 7);
+  assertStrictEquals(mapped.input.categoryId, 7);
 });
 
 const expectSkip = (mapped: MappedRow, fragment: string) => {
@@ -102,16 +104,16 @@ Deno.test("mapAsset skips unknown locations", () => {
   );
 });
 
-Deno.test("mapAsset skips unmapped categoria labels", () => {
+Deno.test("mapAsset skips unmapped category labels", () => {
   expectSkip(
     mapAsset(asset({ groups_1_description: "Typo Isolada" }), ctx),
-    "unmapped categoria",
+    "unmapped category",
   );
 });
 
-Deno.test("mapAsset skips unmapped criticidade labels", () => {
+Deno.test("mapAsset skips unmapped criticality labels", () => {
   expectSkip(
     mapAsset(asset({ priorities_description: "Sem Prioridade" }), ctx),
-    "unmapped criticidade",
+    "unmapped criticality",
   );
 });

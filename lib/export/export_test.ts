@@ -1,26 +1,31 @@
 // Unit tests for lib/export - row mapping, KPI/summary reconciliation, escaping.
 import { assertEquals, assertStrictEquals } from "jsr:@std/assert@^1";
-import type { Barrier } from "../types.ts";
-import { csvCell } from "./csv.ts";
-import { escHtml } from "./html.ts";
-import { row } from "./rows.ts";
+
 import { kpiStats, summaryRows } from "./summary.ts";
+
+import type { Barrier } from "../types.ts";
+
+import { escHtml } from "./html.ts";
+
+import { csvCell } from "./csv.ts";
+
+import { row } from "./rows.ts";
 
 function mk(over: Partial<Barrier> = {}): Barrier {
   return {
     id: 1,
     tag: "PSV-001",
-    tipologia: "Estação Coletora",
-    instalacao: "FAL",
+    typology: "Estação Coletora",
+    location: "FAL",
     locDesc: "FAL - Olinda",
-    criticidade: "Não Crítica",
-    categoria: "Válvula de Alívio de Pressão",
-    agrupamento: "Sistemas de Alívio",
-    dono: "Equipe de Manutenção",
-    disponibilidade: "Disponível",
-    conformidade: "Conforme",
-    comentarios: "",
-    planoAcao: "",
+    criticality: "Não Crítica",
+    category: "Válvula de Alívio de Pressão",
+    grouping: "Sistemas de Alívio",
+    owner: "Equipe de Manutenção",
+    availability: "Disponível",
+    compliance: "Conforme",
+    comments: "",
+    actionPlan: "",
     statusSince: "2026-01-01",
     statusHistory: [],
     ...over,
@@ -44,8 +49,8 @@ Deno.test("row renders empty who-equals for Conforme rows despite statusSince", 
 
 Deno.test("row renders NC duration + desde only when statusSince exists", () => {
   const nc = mk({
-    conformidade: "Não Conforme",
-    disponibilidade: "Indisponível",
+    compliance: "Não Conforme",
+    availability: "Indisponível",
     statusSince: "2020-01-01",
   });
   const r = row(nc);
@@ -54,17 +59,17 @@ Deno.test("row renders NC duration + desde only when statusSince exists", () => 
   const bare = row(
     mk({
       statusSince: "",
-      conformidade: "Não Conforme",
-      disponibilidade: "Indisponível",
+      compliance: "Não Conforme",
+      availability: "Indisponível",
     }),
   );
   assertStrictEquals(bare[10], "");
 });
 
 Deno.test("row treats any non-Conforme as NC and falls back empty dono", () => {
-  const novel = row(mk({ conformidade: "Em análise" })); // fail-closed
+  const novel = row(mk({ compliance: "Em análise" })); // fail-closed
   assertStrictEquals(novel[11], "Em análise");
-  const none = row(mk({ dono: "" }));
+  const none = row(mk({ owner: "" }));
   assertStrictEquals(none[8], "Não informado");
 });
 
@@ -72,10 +77,10 @@ Deno.test("kpiStats yields zeros for empty input", () => {
   const s = kpiStats([]);
   assertEquals(s, {
     total: "0",
-    conformes: "0",
-    naoConformes: "0",
+    compliant: "0",
+    nonCompliant: "0",
     pct: "0%",
-    criticas: "0",
+    critical: "0",
   });
 });
 
@@ -84,23 +89,23 @@ Deno.test("kpiStats formats one Conforme and one critical NC", () => {
     mk(),
     mk({
       id: 2,
-      conformidade: "Não Conforme",
-      disponibilidade: "Indisponível",
-      criticidade: "Crítica",
+      compliance: "Não Conforme",
+      availability: "Indisponível",
+      criticality: "Crítica",
     }),
   ]);
   assertEquals(s.total, "2");
-  assertEquals(s.conformes, "1");
-  assertEquals(s.naoConformes, "1");
+  assertEquals(s.compliant, "1");
+  assertEquals(s.nonCompliant, "1");
   assertEquals(s.pct, "50%");
-  assertEquals(s.criticas, "1");
+  assertEquals(s.critical, "1");
 });
 
 Deno.test("summaryRows keeps novel statuses and reconciles totals", () => {
   const s = summaryRows([
     mk(),
-    mk({ id: 2, disponibilidade: "Degradado", conformidade: "Não Conforme" }),
-    mk({ id: 3, disponibilidade: "Novo Estado", conformidade: "Não Conforme" }),
+    mk({ id: 2, availability: "Degradado", compliance: "Não Conforme" }),
+    mk({ id: 3, availability: "Novo Estado", compliance: "Não Conforme" }),
   ]);
   const labels = s.map(([k]) => k);
   assertEquals(labels[0], "Total");

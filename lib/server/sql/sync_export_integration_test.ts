@@ -3,14 +3,21 @@
 // so `deno task test` stays green without a database. When set, it inserts
 // two uniquely-coded rows, reads them back through the same functions the
 // routes call, checks the export totals, then removes its own rows.
-import { assertStrictEquals } from "jsr:@std/assert@^1";
-import { queryRows } from "../db.ts";
-import { defaultSyncIo } from "./sync.ts";
-import { runSync } from "../fracttal/sync.ts";
-import { getKpi, listBarriers } from "./barriers.ts";
-import { getChartData } from "./chart.ts";
-import { resolveBarriers } from "../../resolve.ts";
 import { streamExportCsv, streamToText } from "../exportCsv.ts";
+
+import { assertStrictEquals } from "jsr:@std/assert@^1";
+
+import { getKpi, listBarriers } from "./barriers.ts";
+
+import { resolveBarriers } from "../../resolve.ts";
+
+import { runSync } from "../fracttal/sync.ts";
+
+import { defaultSyncIo } from "./sync.ts";
+
+import { getChartData } from "./chart.ts";
+
+import { queryRows } from "../db.ts";
 
 async function cleanup(scope: string): Promise<void> {
   await queryRows(
@@ -32,10 +39,10 @@ Deno.test("fixture rows land, read back, export totals match", async () => {
     "select code from locations limit 1",
   );
   const cats = await queryRows<{ label: string }>(
-    "select label from categorias limit 1",
+    "select label from categories limit 1",
   );
   const crits = await queryRows<{ label: string }>(
-    "select label from criticidades limit 1",
+    "select label from criticality_levels limit 1",
   );
   assertStrictEquals(locs.length > 0 && cats.length > 0, true);
   const raw = (n: number, code: string, available: boolean) => ({

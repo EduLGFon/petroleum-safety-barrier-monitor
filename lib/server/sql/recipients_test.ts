@@ -1,6 +1,7 @@
 // Unit tests for recipient validation (P5) - pure, no DB.
-import { assertStrictEquals } from "jsr:@std/assert@^1";
 import { normalizeEmail, normalizeName } from "./recipients.ts";
+
+import { assertStrictEquals } from "jsr:@std/assert@^1";
 
 Deno.test("normalizeEmail lowercases, trims, accepts normal addresses", () => {
   assertStrictEquals(

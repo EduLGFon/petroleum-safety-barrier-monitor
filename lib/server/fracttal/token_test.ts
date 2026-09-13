@@ -1,11 +1,12 @@
 // Unit tests for the Fracttal OAuth2 token cache - grants, single-flight,
 // expiry-driven refresh. No network: fetchToken is injected.
-import { assertEquals, assertStrictEquals } from "jsr:@std/assert@^1";
 import {
   createTokenCache,
   type FracttalToken,
   type TokenCredentials,
 } from "./token.ts";
+
+import { assertEquals, assertStrictEquals } from "jsr:@std/assert@^1";
 
 const creds: TokenCredentials = { key: "k", secret: "s" };
 

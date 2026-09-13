@@ -19,9 +19,9 @@ Deno.test("humanDuration collapses tiny and huge spans", () => {
   assertStrictEquals(humanDuration(730), "2 anos");
 });
 
-Deno.test("humanDuration renders non-finite as em dash", () => {
-  assertStrictEquals(humanDuration(NaN), "—");
-  assertStrictEquals(humanDuration(Infinity), "—");
+Deno.test("humanDuration renders non-finite as dash", () => {
+  assertStrictEquals(humanDuration(NaN), "-");
+  assertStrictEquals(humanDuration(Infinity), "-");
 });
 
 Deno.test("daysSince clamps invalid and future dates to zero", () => {

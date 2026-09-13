@@ -1,12 +1,14 @@
 // Unit tests for the alert mailer + templates (P5).
-import { assertStrictEquals } from "jsr:@std/assert@^1";
 import {
   type AlertMailer,
   sendWithRetry,
   smtpAlertConfigFromEnv,
   smtpAlertMailer,
 } from "./mailer.ts";
+
 import { urgentDigestBody, urgentDigestSubject } from "./templates.ts";
+
+import { assertStrictEquals } from "jsr:@std/assert@^1";
 
 Deno.test("smtpAlertMailer sends one session per recipient", async () => {
   const sent: Array<{ to: string; subject: string }> = [];
@@ -128,9 +130,9 @@ Deno.test("urgentDigestBody lists events with flags and run stamp", () => {
   const body = urgentDigestBody(
     [{
       tag: "FAL-EQ-001",
-      instalacao: "FAL",
-      disponibilidade: "Indisponível",
-      criticidade: "Crítica",
+      location: "FAL",
+      availability: "Indisponível",
+      criticality: "Crítica",
       transitionDate: "2026-09-13",
       urgency: "critical",
     }],

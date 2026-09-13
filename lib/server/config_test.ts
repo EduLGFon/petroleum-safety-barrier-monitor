@@ -1,7 +1,8 @@
 // Unit tests for server boot config (P4) - injected env getters, no
 // Deno.env permission needed.
-import { assertStrictEquals } from "jsr:@std/assert@^1";
 import { loadServerConfig, loadSyncConfig } from "./config.ts";
+
+import { assertStrictEquals } from "jsr:@std/assert@^1";
 
 function env(vars: Record<string, string>): (k: string) => string | undefined {
   return (k) => vars[k];

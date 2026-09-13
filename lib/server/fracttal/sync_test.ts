@@ -1,6 +1,5 @@
 // Unit tests for the reconcile planner + runSync orchestrator (P3). The
 // planner is pure so these run headless; runSync gets an injected fake io.
-import { assertStrictEquals } from "jsr:@std/assert@^1";
 import {
   fieldsSignature,
   type LocalBarrier,
@@ -10,12 +9,15 @@ import {
   runSync,
   type SyncIo,
 } from "./sync.ts";
+
 import type { MapContext, SyncBarrierInput } from "./map.ts";
+
+import { assertStrictEquals } from "jsr:@std/assert@^1";
 
 const ctx: MapContext = {
   locationIds: { FAL: 1 },
-  categoriaIds: { "Sistema de Combate a Incêndio": 7 },
-  criticidadeIds: { "Crítico": 1 },
+  categoryIds: { "Sistema de Combate a Incêndio": 7 },
+  criticalityIds: { "Crítico": 1 },
 };
 
 function baseInput(over: Partial<SyncBarrierInput> = {}): SyncBarrierInput {
@@ -23,15 +25,15 @@ function baseInput(over: Partial<SyncBarrierInput> = {}): SyncBarrierInput {
     externalCode: "FAL-EQ-001",
     tag: "FAL-EQ-001",
     locationId: 1,
-    tipologiaId: 3,
+    typologyId: 3,
     locDescId: 0,
-    criticidadeId: 1,
-    categoriaId: 7,
-    agrupamentoId: 0,
-    donoId: null,
-    disponibilidadeId: 0,
-    comentarios: "",
-    planoAcao: "",
+    criticalityId: 1,
+    categoryId: 7,
+    groupingId: 0,
+    ownerId: null,
+    availabilityId: 0,
+    comments: "",
+    actionPlan: "",
     sourceUpdatedAt: null,
     ...over,
   };
@@ -41,7 +43,7 @@ function localRow(over: Partial<LocalBarrier> = {}): LocalBarrier {
   const base: LocalBarrier = {
     id: 10,
     externalCode: "FAL-EQ-001",
-    disponibilidadeId: 0,
+    availabilityId: 0,
     deletedAt: null,
     signature: fieldsSignature(baseInput()),
   };
@@ -73,9 +75,9 @@ Deno.test("planReconcile updates on signature change", () => {
   assertStrictEquals(entry.statusChanged, false);
 });
 
-Deno.test("planReconcile flags statusChanged when disponibilidade flips", () => {
+Deno.test("planReconcile flags statusChanged when availability flips", () => {
   const local = [localRow()];
-  const plan = planReconcile([baseInput({ disponibilidadeId: 5 })], local);
+  const plan = planReconcile([baseInput({ availabilityId: 5 })], local);
   const entry = plan.entries[0];
   assertStrictEquals(entry.kind, "update");
   if (entry.kind !== "update") throw new Error("unreachable");
@@ -93,7 +95,7 @@ Deno.test("planReconcile restores a deleted row reappearing upstream", () => {
 
 Deno.test("planReconcile restores with statusChanged on a deleted status flip", () => {
   const local = [localRow({ deletedAt: "2026-09-01T00:00:00Z" })];
-  const plan = planReconcile([baseInput({ disponibilidadeId: 5 })], local);
+  const plan = planReconcile([baseInput({ availabilityId: 5 })], local);
   const entry = plan.entries[0];
   assertStrictEquals(entry.kind, "restore");
   if (entry.kind !== "restore") throw new Error("unreachable");

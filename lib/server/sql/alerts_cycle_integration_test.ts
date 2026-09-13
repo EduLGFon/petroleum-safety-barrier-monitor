@@ -2,12 +2,17 @@
 // Real sqlAlertStore + fake mailer: a seeded barrier transitions into
 // urgent, the first run sends exactly one digest, the rerun sends zero.
 // Skipped with a log line when DATABASE_URL is unset.
-import { assertStrictEquals } from "jsr:@std/assert@^1";
-import { queryRows } from "../db.ts";
 import { getBarriersByIds, transitionBarrierStatus } from "./barriers.ts";
-import { sqlAlertStore } from "./alerts.ts";
-import { runAlertCycle } from "../alerts/run.ts";
+
+import { assertStrictEquals } from "jsr:@std/assert@^1";
+
 import type { AlertMailer } from "../alerts/mailer.ts";
+
+import { runAlertCycle } from "../alerts/run.ts";
+
+import { sqlAlertStore } from "./alerts.ts";
+
+import { queryRows } from "../db.ts";
 
 async function cleanup(barrierId: number): Promise<void> {
   await queryRows(`delete from alert_events where barrier_id = $1`, [
@@ -20,12 +25,12 @@ Deno.test("urgent transition sends one digest, rerun sends zero", async () => {
     console.log("skip: DATABASE_URL unset - needs a real Postgres");
     return;
   }
-  const seed = await queryRows<{ id: number; disponibilidade_id: number }>(
-    `select id, disponibilidade_id from barriers
+  const seed = await queryRows<{ id: number; availability_id: number }>(
+    `select id, availability_id from barriers
      where deleted_at is null order by id limit 1`,
   );
   const barrierId = seed[0]!.id;
-  const original = seed[0]!.disponibilidade_id;
+  const original = seed[0]!.availability_id;
 
   const sent: Array<{ to: string[]; subject: string }> = [];
   const mailer: AlertMailer = {
