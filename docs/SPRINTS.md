@@ -9,7 +9,7 @@ replay, never write to prod); auth starts as single `ADMIN_TOKEN` and grows
 into a users table only when needed; server export is CSV only (Excel/PDF
 stay client-side); deleted Fracttal assets use soft-delete.
 
-## P1: Front-end polish + test — COMPLETE
+## P1: Front-end polish + test - COMPLETE
 
 Status (as-built): checklist closed. `deno task test` green at 86 tests,
 `deno task check` green (12 baseline lint items), `vite build` + preview
@@ -112,7 +112,7 @@ is written. Soft-deleted rows are auditable through the token-guarded
 views hide them). Cutover procedure (backup-first migrate, dual-run
 mock-vs-http compare, checklist, rollback) in docs/API.md. Polling cadence landed (`lib/server/fracttal/runner.ts` +
 `scripts/fracttal-poll.ts`): per-scope locks via `syncScopeRunning` (stale
-after 10 min; verified against real Postgres — fresh `running` blocks, stale /
+after 10 min; verified against real Postgres - fresh `running` blocks, stale /
 `ok` / `failed` do not), crashed ticks reschedule instead of killing the loop.
 Live prod run remains blocked on prod credentials (production-only).
 
@@ -148,7 +148,7 @@ Status (as-built): error envelope `{ error, code, requestId }` +
 internals); boot validation via `loadServerConfig` (http mode without
 `DATABASE_URL` fails fast naming the variable); `PATCH .../status` requires
 `Authorization: Bearer <ADMIN_TOKEN>` and fail-closes when unset; GET
-openness decided and documented (reads open, writes token-gated —
+openness decided and documented (reads open, writes token-gated -
 docs/API.md); in-memory throttle per remote IP (120/30/10 per min for
 read/write/export, health exempt); `GET /api/export?format=csv` streams the
 filtered set (BOM + 14-col rows + RESUMO via shared `row()`/`csvCell()`/

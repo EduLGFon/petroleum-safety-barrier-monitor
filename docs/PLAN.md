@@ -35,8 +35,8 @@ Snapshotted check/lint/fmt status and file inventory; committed the plan itself.
 
 ### Phase 2 - contract plus mappers
 
-- `WireKpiSnapshot` carries optional `byDisponibilidade/byConformidade/
-  byCriticidade` (numeric-id keys) plus `syncedAt`; `resolveKpi` translates
+- `WireKpiSnapshot` carries optional `byAvailability/byCompliance/
+  byCriticality` (numeric-id keys) plus `syncedAt`; `resolveKpi` translates
   keys to display strings (string keys pass through for old servers).
 - SQL `getKpi` returns the buckets via `GROUP BY`; mock `getKpi` stamps time.
 - `toXId` returns `undefined` on unknown (callers skip + warn) instead of a
@@ -62,9 +62,9 @@ Snapshotted check/lint/fmt status and file inventory; committed the plan itself.
 
 ### Phase 4 - scale plus reconcile
 
-- Fail-closed novel conformidade everywhere (`computeKpi`, `computeChartData`,
-  KPI grid, alert now driven by `kpi.naoConforme`, exports); chaos-scale
-  proves `conforme + naoConforme === total` with novel values.
+- Fail-closed novel compliance everywhere (`computeKpi`, `computeChartData`,
+  KPI grid, alert now driven by `kpi.nonCompliant`, exports); chaos-scale
+  proves `compliant + nonCompliant === total` with novel values.
 - Export summaries derive from one `computeKpi` pass (was ~9 passes);
   `DISP_KNOWN_ORDER` shared by band and exports; DOM-heavy formats capped at
   10k rows with CSV guidance.

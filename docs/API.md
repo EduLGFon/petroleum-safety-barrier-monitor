@@ -1,15 +1,15 @@
-# Camada de API — Monitor de Barreiras
+# API layer - Barrier Monitor
 
-## Visão geral
+## Overview
 
-Todo dado que alimenta o dashboard passa por um único ponto de entrada:
-**`lib/api.ts`** (barrel sobre `lib/api/*`). Nenhum componente ou hook acessa
-o gerador mock ou um backend real diretamente — todos chamam
+Every piece of data that feeds the dashboard goes through a single entry point:
+**`lib/api.ts`** (barrel over `lib/api/*`). No component or hook accesses
+the mock generator or a real backend directly - they all call
 `api.getBarriers(...)`, `api.getAllBarriers(...)`, `api.getBarrierById(...)`,
-`api.getKpi(...)` ou `api.getChartData(...)`.
+`api.getKpi(...)` or `api.getChartData(...)`.
 
 ```
-routes/index.tsx (SSR: lista full em mock, vocabulários em http)
+routes/index.tsx (SSR: full list in mock, vocabularies in http)
         │
         ▼
 islands/Dashboard.tsx (island root: Settings + Theme providers)
@@ -17,26 +17,26 @@ islands/Dashboard.tsx (island root: Settings + Theme providers)
         ▼
 islands/dashboard/DashboardView.tsx (ClientView vs ServerView)
         │
-        ├── mock: hooks/useDashboard.ts (agregação client-side)
-        └── http: hooks/dashboard/server.ts (páginas via fetch)
+        ├── mock: hooks/useDashboard.ts (client-side aggregation)
+        └── http: hooks/dashboard/server.ts (pages via fetch)
                 │
                 ▼
-           lib/api.ts  ◄── ponto único de entrada
-           ├── mockAdapter (lib/api/mock.ts sobre lib/mock/generator.ts)
-           └── httpAdapterFactory(baseUrl) (lib/api/http.ts sobre fetch)
+           lib/api.ts  ◄── single entry point
+           ├── mockAdapter (lib/api/mock.ts over lib/mock/generator.ts)
+           └── httpAdapterFactory(baseUrl) (lib/api/http.ts over fetch)
 ```
 
-## Formato "wire" (números, não texto)
+## Wire format (numbers, not text)
 
-Um backend real troca dados por **códigos numéricos**, nunca strings de
-exibição. Isso evita payloads grandes, problemas de localização e permite
-renomear rótulos sem quebrar contratos.
+A real backend exchanges data using **numeric codes**, never display strings.
+This avoids large payloads, localization issues, and lets you rename labels
+without breaking contracts.
 
-Todo domínio enumerável tem um resolver em **`lib/enums/`** (barrel
-`lib/enums.ts` sobre `codes.ts`, `taxonomy.ts`, `context.ts`):
+Every enumerable domain has a resolver in **`lib/enums/`** (barrel
+`lib/enums.ts` over `codes.ts`, `taxonomy.ts`, `context.ts`):
 
 ```ts
-// Localização (instalação)
+// Location (installation)
 LOCATION_CODES = {
   0: "ALL",
   1: "FAL",
@@ -49,8 +49,8 @@ LOCATION_CODES = {
 toLocationId("FAL"); // -> 1
 fromLocationId(1); // -> 'FAL'
 
-// Disponibilidade
-DISPONIBILIDADE_CODES = {
+// Availability
+AVAILABILITY_CODES = {
   0: "Disponível",
   1: "Fora de Operação",
   2: "Indisponível Contingenciado",
@@ -59,233 +59,234 @@ DISPONIBILIDADE_CODES = {
   5: "Indisponível",
 };
 
-// Conformidade
-CONFORMIDADE_CODES = { 0: "Conforme", 1: "Não Conforme" };
+// Compliance
+COMPLIANCE_CODES = { 0: "Conforme", 1: "Não Conforme" };
 
-// Criticidade
-CRITICIDADE_CODES = { 0: "Não Crítica", 1: "Crítica" };
+// Criticality
+CRITICALITY_CODES = { 0: "Não Crítica", 1: "Crítica" };
 
-// Categoria da barreira, Agrupamento, Tipologia, Dono, Local descritivo,
-// Autor do histórico — todos seguem o mesmo padrão (veja lib/enums/).
+// Barrier category, grouping, typology, owner, descriptive location, and
+// history author - all follow the same pattern (see lib/enums/).
 ```
 
-Cada domínio expõe `toXId(string) -> number | undefined` (undefined = valor
-desconhecido, o filtro é ignorado com warning) e `fromXId(number) -> string`
-(sentindela explícita tipo `ST-7`, nunca um rótulo conhecido plausível).
+Each domain exposes `toXId(string) -> number | undefined` (undefined = unknown
+value, the filter is skipped with a warning) and `fromXId(number) -> string`
+(an explicit sentinel like `ST-7`, never a plausible known label).
 
-## Tipos "wire" vs tipos de domínio
+## Wire types vs domain types
 
-- **`lib/wireTypes.ts`** — `WireBarrier`, `WireStatusHistoryEntry`,
-  `WireKpiSnapshot`, `WireCategoryConformidade`, `BarriersQuery`,
-  `BarriersResponse`: exatamente o que trafega na rede (só números + poucos
-  campos de texto livre como `tag`, `comentarios`, `planoAcao`).
-- **`lib/types.ts`** — `Barrier`, `KpiSnapshot`, `CategoryConformidade`,
-  `Vocabularies`, `FilterState`, `SortableColumn`, `StatusHistoryEntry`: os
-  tipos de domínio que a UI usa, sempre com strings já resolvidas e legíveis.
-  Vocabulários usam uniões abertas (`string & {}`) para valores novos de
-  estação compilarem sem code change.
-- **`lib/api/types.ts`** — `BarriersApi` (5 métodos) + `DomainQuery` (filtros
-  em strings que a UI usa).
-- **`lib/resolve.ts`** — `resolveBarrier(s)`, `resolveHistoryEntry`,
-  `resolveKpi`, `resolveChartData`: converte wire -> domínio (o inverso não é
-  necessário, pois o frontend nunca precisa reconverter para IDs ao exibir).
+- **`lib/wireTypes.ts`** - `WireBarrier`, `WireStatusHistoryEntry`,
+  `WireKpiSnapshot`, `WireCategoryCompliance`, `BarriersQuery`,
+  `BarriersResponse`: exactly what travels over the network (only numbers + a
+  few free-text fields like `tag`, `comments`, `actionPlan`).
+- **`lib/types.ts`** - `Barrier`, `KpiSnapshot`, `CategoryCompliance`,
+  `Vocabularies`, `FilterState`, `SortableColumn`, `StatusHistoryEntry`: the
+  domain types the UI uses, always with already-resolved, readable strings.
+  Vocabularies use open unions (`string & {}`) so new station values compile
+  without a code change.
+- **`lib/api/types.ts`** - `BarriersApi` (5 methods) + `DomainQuery` (filters
+  as strings that the UI uses).
+- **`lib/resolve.ts`** - `resolveBarrier(s)`, `resolveHistoryEntry`,
+  `resolveKpi`, `resolveChartData`: converts wire -> domain (the inverse is not
+  needed, since the frontend never has to convert back to IDs when displaying).
 
-Importante: `conformidade` **nunca** trafega em `WireBarrier` — é sempre
-derivada de `disponibilidadeId` via `isConforme()`, no mock
-(`lib/api/mock.ts`), no resolver (`resolveBarrier`) e no banco via trigger
-(`trg_barriers_set_conformidade` sobre a coluna armazenada
-`barriers.conformidade_id`, usada só para filtro/agregação SQL).
+Important: `compliance` **never** travels in `WireBarrier` - it is always
+derived from `availabilityId` via `isCompliant()`, in the mock
+(`lib/api/mock.ts`), in the resolver (`resolveBarrier`), and in the DB via the
+trigger (`trg_barriers_set_compliance` on the stored column
+`barriers.compliance_id`, used only for SQL filter/aggregation).
 
-`WireKpiSnapshot` carrega os campos fixos mais os buckets dinâmicos opcionais
-`byDisponibilidade`, `byConformidade`, `byCriticidade` (chaves = id numérico
-como string) e `syncedAt` (ISO do servidor). `resolveKpi` traduz as chaves
-para strings de exibição (chaves já-string passam intactas para compat com
-servidores antigos); quando os buckets estão ausentes a UI usa os campos
-fixos (só cobre os status conhecidos).
+`WireKpiSnapshot` carries the fixed fields plus the optional dynamic buckets
+`byAvailability`, `byCompliance`, `byCriticality` (keys = numeric id as
+string) and `syncedAt` (server ISO). `resolveKpi` translates the keys to
+display strings (already-string keys pass through intact for compat with older
+servers); when the buckets are absent the UI uses the fixed fields (covers
+only the known statuses).
 
-`WireCategoryConformidade` carrega `{ categoriaId, conforme, total }`;
-`resolveChartData` deriva `Não Conforme = max(0, total - conforme)`
-(fail-closed, igual a `computeChartData`) e trunca nomes além de 26 chars.
+`WireCategoryCompliance` carries `{ categoryId, compliant, total }`;
+`resolveChartData` derives `Não Conforme = max(0, total - compliant)`
+(fail-closed, same as `computeChartData`) and truncates names beyond 26 chars.
 
-## Usando a API real (Postgres)
+## Using the real API (Postgres)
 
-Os handlers que `httpAdapterFactory` espera (barriers, `:id`, kpi, chart)
-mais os de escrita/admin/exportação já estão implementados em `routes/api/`,
-sobre PostgreSQL (sem ORM — SQL puro via `jsr:@db/postgres`, valores ligados
-como `$1/$2`). Inventário completo: `barriers`, `barriers/deleted`,
+The handlers `httpAdapterFactory` expects (barriers, `:id`, kpi, chart) plus
+the write/admin/export ones are already implemented in `routes/api/`, on
+PostgreSQL (no ORM - pure SQL via `jsr:@db/postgres`, values bound as `$1/$2`).
+Full inventory: `barriers`, `barriers/deleted`,
 `barriers/:id`, `barriers/:id/status`, `export`, `kpi`, `chart`, `health`,
-`recipients`, `recipients/:id` (`_params.ts` é só parsers, nunca rota):
+`recipients`, `recipients/:id` (`_params.ts` is only parsers, never a route):
 
-- `GET /api/barriers?locationId=1&disponibilidadeId=4&conformidadeId=1&categoriaId=2&query=FAL&since=2024-01-01&until=2024-12-31&page=1&pageSize=25&sortCol=statusSince&sortDir=desc` →
+- `GET /api/barriers?locationId=1&availabilityId=4&complianceId=1&categoryId=2&query=FAL&since=2024-01-01&until=2024-12-31&page=1&pageSize=25&sortCol=statusSince&sortDir=desc` →
   `BarriersResponse { items: WireBarrier[], total, page, pageSize, totalPages }`
-  - `locationId` omitido/`0` = todas; `query` casa `tag ILIKE %q% OR loc.code`
-    (`\%_` escapados, cap 200 chars); `since`/`until` = `YYYY-MM-DD` sobre
+  - `locationId` omitted/`0` = all; `query` matches `tag ILIKE %q% OR loc.code`
+    (`\%_` escaped, capped at 200 chars); `since`/`until` = `YYYY-MM-DD` over
     `status_since`; `page` default 1 (floor, min 1); `pageSize` default 25
-    (clamp `1..100000`); `sortCol` whitelist
-    (`id/tag/criticidade/categoria/disponibilidade/conformidade/statusSince`,
-    default `id`); parsers estritos em `routes/api/_params.ts`; envelope
-    `{ error, code, requestId }` em falha de DB (ver seção P4 abaixo).
-- `GET /api/barriers/:id` → `WireBarrier` (`400` id inválido, `404` ausente)
-- `PATCH /api/barriers/:id/status` com
+    (clamped `1..100000`); `sortCol` whitelist
+    (`id/tag/criticality/category/availability/compliance/statusSince`,
+    default `id`); strict parsers in `routes/api/_params.ts`; `{ error, code,
+    requestId }` envelope on DB failure (see the P4 section below).
+- `GET /api/barriers/:id` → `WireBarrier` (`400` invalid id, `404` missing)
+- `PATCH /api/barriers/:id/status` with
   `{ statusId: int >= 0, authorId: int >= 0, note?: string (cap 2000) }` →
-  `WireBarrier` atualizado via `record_status_change()` (`400` corpo
-  inválido, `404` ausente). Requer `Authorization: Bearer <ADMIN_TOKEN>`
-  (`401` sem token ou com token errado; `401` também quando `ADMIN_TOKEN`
-  não está configurado — escrita nunca é liberada por omissão).
-- `GET /api/export?format=csv` (+ os mesmos filtros de `/api/barriers`) →
-  CSV com BOM, cabeçalho de 14 colunas, linhas, bloco `RESUMO`
-  (byte-idêntico ao CSV do dashboard: `row()` + `csvCell()` + `summaryRows()`).
-  Stream via `ReadableStream` (chunks de 500 linhas), cap de 10.000 linhas
-  (`400` com o total filtrado quando excede — refine os filtros),
-  `Content-Disposition: attachment`, `X-Export-Total` com o total filtrado.
-- `GET /api/barriers/deleted` (+ os mesmos filtros) → `BarriersResponse`
-  só com linhas deletadas (auditoria do soft-delete do sync). Exige
-  `ADMIN_TOKEN`; o detalhe `/api/barriers/:id` segue escondendo deletados.
-- `GET /api/kpi?locationId=1` → `WireKpiSnapshot` (só `locationId`;
-  omitido/`0` = todas; demais params ignorados)
-- `GET /api/chart?locationId=1` → `WireCategoryConformidade[]` (mesmo escopo)
-- `GET /api/health` → `{ ok, time }` (liveness, sem DB)
+  updated `WireBarrier` via `record_status_change()` (`400` invalid body,
+  `404` missing). Requires `Authorization: Bearer <ADMIN_TOKEN>`
+  (`401` without a token or with a wrong token; `401` also when `ADMIN_TOKEN`
+  is not configured - writes are never allowed by omission).
+- `GET /api/export?format=csv` (+ the same filters as `/api/barriers`) →
+  CSV with BOM, 14-column header, data rows, `RESUMO` block
+  (byte-identical to the dashboard CSV: `row()` + `csvCell()` + `summaryRows()`).
+  Stream via `ReadableStream` (chunks of 500 rows), cap of 10,000 rows
+  (`400` with the filtered total when exceeded - refine the filters),
+  `Content-Disposition: attachment`, `X-Export-Total` with the filtered total.
+- `GET /api/barriers/deleted` (+ the same filters) → `BarriersResponse`
+  with only deleted rows (soft-delete sync audit). Requires
+  `ADMIN_TOKEN`; the `/api/barriers/:id` detail keeps hiding deleted ones.
+- `GET /api/kpi?locationId=1` → `WireKpiSnapshot` (only `locationId`;
+  omitted/`0` = all; remaining params ignored)
+- `GET /api/chart?locationId=1` → `WireCategoryCompliance[]` (same scope)
+- `GET /api/health` → `{ ok, time }` (liveness, no DB)
 - `GET /api/recipients` (+ `?activeOnly=1`), `POST /api/recipients`
-  `{ email, name? }` (upsert por email, `201`), `PATCH /api/recipients/:id`
-  `{ name?, active? }`, `DELETE /api/recipients/:id` → `{ ok: true }` —
-  todas exigem `Authorization: Bearer <ADMIN_TOKEN>` (inclusive GET:
-  endereços são dado admin).
+  `{ email, name? }` (upsert by email, `201`), `PATCH /api/recipients/:id`
+  `{ name?, active? }`, `DELETE /api/recipients/:id` → `{ ok: true }` -
+  all require `Authorization: Bearer <ADMIN_TOKEN>` (including GET: addresses
+  are admin data).
 
-## Erros, auth e throttle (P4)
+## Errors, auth, and throttle (P4)
 
-Toda falha responde o envelope `{ error, code, requestId }` + header
-`x-request-id` (`code`: `BAD_REQUEST` / `NOT_FOUND` / `UNAUTHORIZED` /
-`RATE_LIMITED` / `INTERNAL`; `500` nunca vaza stack ou coluna — a mensagem
-pública é fixa por rota e o detalhe vai ao log com o `requestId`).
+Every failure responds with the `{ error, code, requestId }` envelope + the
+`x-request-id` header (`code`: `BAD_REQUEST` / `NOT_FOUND` / `UNAUTHORIZED` /
+`RATE_LIMITED` / `INTERNAL`; `500` never leaks a stack or column - the public
+message is fixed per route and the detail goes to the log with the `requestId`).
 
-Abertura decidida explicitamente: **GETs do dashboard são abertos**
-(`barriers`, `:id`, `kpi`, `chart`, `export`) — dado operacional de leitura;
-**escritas e auditoria exigem `ADMIN_TOKEN`** (`PATCH .../status`, recipients,
-`GET /api/barriers/deleted`). Sem token configurado, escrita responde `401`.
+Explicitly decided openness: **dashboard GETs are open** (`barriers`, `:id`,
+`kpi`, `chart`, `export`) - operational read data; **writes and audit require
+`ADMIN_TOKEN`** (`PATCH .../status`, recipients, `GET /api/barriers/deleted`).
+With no token configured, writes respond `401`.
 
-Throttle in-memory por IP remoto (nunca `X-Forwarded-For`, forjável):
-120 req/min em leitura, 30 req/min em escrita, 10 req/min no export
-(`429 { error, code: RATE_LIMITED }` + `Retry-After`). `/api/health` não é
-throttled (liveness probe). Boot valida `DATABASE_URL` com
-`PUBLIC_API_MODE=http` na primeira chamada (`500` nomeando a variável).
+In-memory throttle by remote IP (never `X-Forwarded-For`, which is forgeable):
+120 req/min on reads, 30 req/min on writes, 10 req/min on export
+(`429 { error, code: RATE_LIMITED }` + `Retry-After`). `/api/health` is not
+throttled (liveness probe). Boot validates `DATABASE_URL` with
+`PUBLIC_API_MODE=http` on the first call (`500` naming the variable).
 
-Sem rota `/api/vocabularies`: em modo http `routes/index.tsx` faz SSR de
-`getVocabularies()` (`lib/server/sql/vocabularies.ts`) e entrega
-`Vocabularies { locations, disponibilidades, conformidades, categorias }`
-como prop da island. Em modo mock o cliente deriva as opções via
+No `/api/vocabularies` route: in http mode `routes/index.tsx` SSR's
+`getVocabularies()` (`lib/server/sql/vocabularies.ts`) and delivers
+`Vocabularies { locations, availabilities, compliances, categories }`
+as an island prop. In mock mode the client derives the options via
 `useDashboardVocabularies` (`islands/dashboard/vocabularies.ts`).
 
-Em `PUBLIC_API_MODE=http` o dashboard pagina pelo servidor
-(`useServerDashboard` em `hooks/dashboard/server.ts`): páginas via
-`getBarriers` (filtros completos), KPI via `getKpi` e gráfico via
-`getChartData` (ambos só com `locationId`), com cancelamento, loading, error
-card/banner e retry. `getAllBarriers` em http força `pageSize: 100000`.
-Export cobre a página carregada; detalhe resolve da página atual.
+In `PUBLIC_API_MODE=http` the dashboard pages through the server
+(`useServerDashboard` in `hooks/dashboard/server.ts`): pages via
+`getBarriers` (full filters), KPI via `getKpi`, and chart via
+`getChartData` (both `locationId`-only), with cancellation, loading, error
+card/banner, and retry. `getAllBarriers` in http forces `pageSize: 100000`.
+Export covers the loaded page; detail resolves from the current page.
 
-Para ativar:
+To enable:
 
-1. Suba um Postgres e rode as migrações + seed (veja **docs/DATABASE.md** para o
-   passo a passo completo).
-2. Defina as variáveis de ambiente (veja `.env.example`):
+1. Start a Postgres and run the migrations + seed (see **docs/DATABASE.md**
+   for the full step-by-step).
+2. Set the environment variables (see `.env.example`):
    ```
    PUBLIC_API_MODE=http
-   PUBLIC_API_BASE_URL=          # vazio = mesma origem da página (recomendado)
+   PUBLIC_API_BASE_URL=          # empty = same page origin (recommended)
    DATABASE_URL=postgres://user:password@localhost:5432/barreiras
    ```
-   (`dev` lê do shell — `export $(cat .env | xargs)`; `start`/`db:*` leem `.env`.) Quando `PUBLIC_API_BASE_URL` é vazio, a rota
-   `routes/index.tsx` usa a própria origem da requisição — o browser busca
-   `/api/*` same-origin em qualquer porta que o app esteja servindo. Defina a
-   variável explicitamente apenas quando a API estiver em outra origem (essa
-   origem precisa então de headers CORS).
-3. Nenhum componente precisa mudar. `api` em `lib/api.ts` passa a apontar para
-   `httpAdapter` automaticamente, que agora conversa com essas rotas.
+   (`dev` reads from the shell - `export $(cat .env | xargs)`; `start`/`db:*`
+   read `.env`.) When `PUBLIC_API_BASE_URL` is empty, the
+   `routes/index.tsx` route uses the request's own origin - the browser
+   fetches `/api/*` same-origin on whatever port the app is serving. Set the
+   variable explicitly only when the API is on another origin (that origin
+   then needs CORS headers on the API).
+3. No component needs to change. `api` in `lib/api.ts` points to
+   `httpAdapter` automatically, which now talks to these routes.
 
-Toda a camada SQL (`lib/server/db.ts`, `lib/server/sql/*`) é server-only
-(nunca importada em `islands/`) — a connection string do Postgres nunca chega
-ao bundle do cliente. `lib/server/db.ts` usa pool lazy em
-`globalThis.__barrierPool` (import nunca lança; primeira query lança sem
-`DATABASE_URL`).
+The entire SQL layer (`lib/server/db.ts`, `lib/server/sql/*`) is server-only
+(never imported in `islands/`) - the Postgres connection string never reaches
+the client bundle. `lib/server/db.ts` uses a lazy pool on
+`globalThis.__barrierPool` (the import never throws; the first query throws
+without `DATABASE_URL`).
 
-## Query de filtros (string -> wire)
+## Filter query (string -> wire)
 
-A função `toWireQuery()` em `lib/api/query.ts` (re-exportada por
-`lib/api.ts`) converte os filtros que a UI usa (strings como `'Degradado'`,
-`'FAL'`) para o `BarriersQuery` numérico que tanto o mock quanto o backend
-real esperam. Valores desconhecidos são pulados com `console.warn`.
-`cleanDateParam` aceita `YYYY-MM-DD` (ou ISO mais longo) e `buildQueryString`
-serializa para a URL:
+The `toWireQuery()` function in `lib/api/query.ts` (re-exported by
+`lib/api.ts`) converts the filters the UI uses (strings like `'Degradado'`,
+`'FAL'`) into the numeric `BarriersQuery` both the mock and the real backend
+expect. Unknown values are skipped with `console.warn`.
+`cleanDateParam` accepts `YYYY-MM-DD` (or longer ISO) and `buildQueryString`
+serializes to the URL:
 
 ```ts
-toWireQuery({ location: "FAL", disponibilidade: "Degradado", page: 1 });
-// -> { locationId: 1, disponibilidadeId: 4, page: 1 }
+toWireQuery({ location: "FAL", availability: "Degradado", page: 1 });
+// -> { locationId: 1, availabilityId: 4, page: 1 }
 ```
 
-## Arquivos desta camada
+## Files in this layer
 
-| Arquivo                              | Responsabilidade                                                                         |
-| ------------------------------------ | ---------------------------------------------------------------------------------------- |
-| `lib/api.ts`                         | Barrel: escolhe mock vs HTTP via `PUBLIC_API_MODE`, re-exporta `toWireQuery` + `mockApi` |
-| `lib/api/types.ts`                   | `BarriersApi` (5 métodos) + `DomainQuery` (filtros em strings)                           |
-| `lib/api/query.ts`                   | `toWireQuery`, `cleanDateParam`, `buildQueryString`                                      |
-| `lib/api/mock.ts`                    | `mockAdapter`: `matchesQuery` + `sortWire` numéricos, resolve só a página final          |
-| `lib/api/http.ts`                    | `httpAdapterFactory(baseUrl)`: fetch sobre `routes/api/*`; `null` só em 404              |
-| `lib/enums.ts`                       | Barrel sobre `lib/enums/`                                                                |
-| `lib/enums/codes.ts`                 | `LOCATION/DISPONIBILIDADE/CONFORMIDADE/CRITICIDADE` + `to/fromXId`                       |
-| `lib/enums/taxonomy.ts`              | `CATEGORIA/AGRUPAMENTO/TIPOLOGIA/DONO` (`donoId -1` = vazio)                             |
-| `lib/enums/context.ts`               | `LOC_DESC/AUTHOR` (`from*` apenas)                                                       |
-| `lib/wireTypes.ts`                   | Formato de rede (ids numéricos; sem `conformidadeId` em `WireBarrier`)                   |
-| `lib/types.ts`                       | Domínio da UI (strings resolvidas, uniões abertas, `Vocabularies`)                       |
-| `lib/resolve.ts`                     | `resolveBarrier(s)`, `resolveHistoryEntry`, `resolveKpi`, `resolveChartData`             |
-| `lib/data.ts`                        | Barrel sobre `lib/mock/` (gerador determinístico)                                        |
-| `lib/mock/generator.ts`              | `getWireBarriers()` cached (`0xdeadbeef`, dists de status/estação)                       |
-| `lib/mock/history.ts`                | `generateHistory` + comentários/planos/notas por status                                  |
-| `lib/mock/tags.ts`                   | `buildTag` + prefixos por categoria                                                      |
-| `lib/mock/rng.ts`                    | PRNG com seed (`next/int/pick/bool`)                                                     |
-| `lib/constants.ts`                   | Barrel sobre `lib/constants/`                                                            |
-| `lib/constants/locations.ts`         | `LOCATIONS`, `LOCATION_DIST_BY_ID`, `SIM_DATE`, `PAGE_SIZE(_OPTS)`                       |
-| `lib/constants/catalog.ts`           | Listas seed (categorias, agrupamentos, tipologias, donos, locs, autores)                 |
-| `lib/constants/helpers.ts`           | `isConforme()` + `distinctBy()`                                                          |
-| `lib/constants/colors.ts`            | Cores por status + `DISP_KNOWN_ORDER`, `shortStatusLabel`                                |
-| `lib/server/db.ts`                   | Pool Postgres lazy server-only (`globalThis.__barrierPool`)                              |
-| `lib/server/sql/barriers.ts`         | `listBarriers`, `getBarrierById`, `getKpi`, `transitionBarrierStatus`                    |
-| `lib/server/sql/chart.ts`            | `getChartData` (`GROUP BY categoria_id`)                                                 |
-| `lib/server/sql/vocabularies.ts`     | `getVocabularies()` SSR-only (sem rota HTTP)                                             |
-| `lib/server/sql/where.ts`            | `buildWhere`, `resolveOrderBy` (whitelist), `escapeLike`                                 |
-| `lib/server/sql/mappers.ts`          | `SELECT_COLUMNS`, `HISTORY_JOIN` (lateral `json_agg`), `toWireBarrier`                   |
-| `routes/api/_params.ts`              | Parsers estritos (`parseInt/parseDate/parseQueryParam`); nunca é rota (`_` prefix)       |
-| `routes/api/barriers.ts`             | `GET /api/barriers` (aberto, throttle leitura)                                           |
-| `routes/api/barriers/deleted.ts`     | `GET /api/barriers/deleted` (só deleted, exige `ADMIN_TOKEN`)                            |
-| `routes/api/barriers/[id].ts`        | `GET /api/barriers/:id` (aberto, throttle leitura)                                       |
-| `routes/api/barriers/[id]/status.ts` | `PATCH /api/barriers/:id/status` (exige `ADMIN_TOKEN`, throttle escrita)                 |
-| `routes/api/export.ts`               | `GET /api/export?format=csv` (aberto, throttle export, cap 10k, stream)                  |
-| `routes/api/kpi.ts`                  | `GET /api/kpi` (aberto, throttle leitura)                                                |
-| `routes/api/chart.ts`                | `GET /api/chart` (aberto, throttle leitura)                                              |
-| `routes/api/health.ts`               | `GET /api/health` (liveness, sem DB, sem throttle)                                       |
-| `routes/api/recipients.ts`           | `GET/POST /api/recipients` (admin, upsert por email)                                     |
-| `routes/api/recipients/[id].ts`      | `PATCH/DELETE /api/recipients/:id` (admin)                                               |
-| `lib/server/config.ts`               | `loadServerConfig` (boot http), `loadSyncConfig` (credenciais Fracttal p/ scripts)       |
-| `lib/server/errors.ts`               | Envelope `{ error, code, requestId }` + `x-request-id`                                   |
-| `lib/server/auth.ts`                 | `checkAdminAuth` (Bearer `ADMIN_TOKEN`, fail-closed, com `role`)                         |
-| `lib/server/throttle.ts`             | `createThrottle` (janela fixa, sem deps) + buckets por rota                              |
-| `lib/server/exportCsv.ts`            | `streamExportCsv` (BOM + `row()` + `summaryRows()`, chunks de 500)                       |
-| `lib/server/sql/recipients.ts`       | CRUD `alert_recipients` (validação pura + store fino)                                    |
-| `lib/server/alerts/store.ts`         | Contrato `AlertStore` (dedup, `delivered[]` por recipient)                               |
-| `lib/server/alerts/detect.ts`        | `detectUrgentTransitions` (histórico → `isUrgent`, mesmo predicado do dashboard)         |
-| `lib/server/alerts/run.ts`           | `runAlertCycle` (detect→enqueue→digest→mark, dry-run default, `--reprocess`)             |
-| `lib/server/alerts/mailer.ts`        | `AlertMailer` + provider SMTP (reuso P3) + `sendWithRetry`                               |
-| `lib/server/alerts/templates.ts`     | Digest urgente pt-BR (assunto conta críticas, corpo ordena críticas primeiro)            |
-| `lib/server/sql/alerts.ts`           | `sqlAlertStore` (`ON CONFLICT dedup_key DO NOTHING`, dead-letter no payload)             |
-| `lib/dashboard/urgent.ts`            | `urgencyOf`/`isUrgent`/`compareUrgency`/`urgentBarriers` (base fail-closed = NcAlert)    |
-| `islands/dashboard/vocabularies.ts`  | Hook client `useDashboardVocabularies` (só mock mode)                                    |
-| `db/schema.sql`                      | DDL: tabelas de lookup, `barriers`, `barrier_status_history`                             |
-| `db/seed_lookups.sql`                | Seed das tabelas de lookup, espelhando `lib/enums/`                                      |
+| File                                 | Responsibility                                                                            |
+| ------------------------------------ | ----------------------------------------------------------------------------------------- |
+| `lib/api.ts`                         | Barrel: picks mock vs HTTP via `PUBLIC_API_MODE`, re-exports `toWireQuery` + `mockApi`    |
+| `lib/api/types.ts`                   | `BarriersApi` (5 methods) + `DomainQuery` (string filters)                                |
+| `lib/api/query.ts`                   | `toWireQuery`, `cleanDateParam`, `buildQueryString`                                       |
+| `lib/api/mock.ts`                    | `mockAdapter`: numeric `matchesQuery` + `sortWire`, resolves only the final page          |
+| `lib/api/http.ts`                    | `httpAdapterFactory(baseUrl)`: fetch over `routes/api/*`; `null` only on 404              |
+| `lib/enums.ts`                       | Barrel over `lib/enums/`                                                                  |
+| `lib/enums/codes.ts`                 | `LOCATION/AVAILABILITY/COMPLIANCE/CRITICALITY` + `to/fromXId`                             |
+| `lib/enums/taxonomy.ts`              | `CATEGORY/GROUPING/TYPOLOGY/OWNER` (`ownerId -1` = empty)                                 |
+| `lib/enums/context.ts`               | `LOC_DESC/AUTHOR` (from* only)                                                            |
+| `lib/wireTypes.ts`                   | Wire format (numeric ids; no `complianceId` in `WireBarrier`)                             |
+| `lib/types.ts`                       | UI domain (resolved strings, open unions, `Vocabularies`)                                 |
+| `lib/resolve.ts`                     | `resolveBarrier(s)`, `resolveHistoryEntry`, `resolveKpi`, `resolveChartData`              |
+| `lib/data.ts`                        | Barrel over `lib/mock/` (deterministic generator)                                         |
+| `lib/mock/generator.ts`              | `getWireBarriers()` cached (`0xdeadbeef`, status/station distributions)                   |
+| `lib/mock/history.ts`                | `generateHistory` + comments/plans/notes per status                                       |
+| `lib/mock/tags.ts`                   | `buildTag` + prefixes per category                                                        |
+| `lib/mock/rng.ts`                    | PRNG with seed (`next/int/pick/bool`)                                                     |
+| `lib/constants.ts`                   | Barrel over `lib/constants/`                                                              |
+| `lib/constants/locations.ts`         | `LOCATIONS`, `LOCATION_DIST_BY_ID`, `SIM_DATE`, `PAGE_SIZE(_OPTS)`                        |
+| `lib/constants/catalog.ts`           | Seed lists (categories, groupings, typologies, owners, locs, authors)                     |
+| `lib/constants/helpers.ts`           | `isCompliant()` + `distinctBy()`                                                          |
+| `lib/constants/colors.ts`            | Colors per status + `DISP_KNOWN_ORDER`, `shortStatusLabel`                                |
+| `lib/server/db.ts`                   | Lazy server-only Postgres pool (`globalThis.__barrierPool`)                               |
+| `lib/server/sql/barriers.ts`         | `listBarriers`, `getBarrierById`, `getKpi`, `transitionBarrierStatus`                     |
+| `lib/server/sql/chart.ts`            | `getChartData` (`GROUP BY category_id`)                                                   |
+| `lib/server/sql/vocabularies.ts`     | `getVocabularies()` SSR-only (no HTTP route)                                              |
+| `lib/server/sql/where.ts`            | `buildWhere`, `resolveOrderBy` (whitelist), `escapeLike`                                  |
+| `lib/server/sql/mappers.ts`          | `SELECT_COLUMNS`, `HISTORY_JOIN` (lateral `json_agg`), `toWireBarrier`                    |
+| `routes/api/_params.ts`              | Strict parsers (`parseInt/parseDate/parseQueryParam`); never a route (`_` prefix)         |
+| `routes/api/barriers.ts`             | `GET /api/barriers` (open, read throttle)                                                 |
+| `routes/api/barriers/deleted.ts`     | `GET /api/barriers/deleted` (deleted only, requires `ADMIN_TOKEN`)                        |
+| `routes/api/barriers/[id].ts`        | `GET /api/barriers/:id` (open, read throttle)                                             |
+| `routes/api/barriers/[id]/status.ts` | `PATCH /api/barriers/:id/status` (requires `ADMIN_TOKEN`, write throttle)                 |
+| `routes/api/export.ts`               | `GET /api/export?format=csv` (open, export throttle, 10k cap, stream)                     |
+| `routes/api/kpi.ts`                  | `GET /api/kpi` (open, read throttle)                                                      |
+| `routes/api/chart.ts`                | `GET /api/chart` (open, read throttle)                                                    |
+| `routes/api/health.ts`               | `GET /api/health` (liveness, no DB, no throttle)                                          |
+| `routes/api/recipients.ts`           | `GET/POST /api/recipients` (admin, upsert by email)                                       |
+| `routes/api/recipients/[id].ts`      | `PATCH/DELETE /api/recipients/:id` (admin)                                                |
+| `lib/server/config.ts`               | `loadServerConfig` (http boot), `loadSyncConfig` (Fracttal credentials for scripts)       |
+| `lib/server/errors.ts`               | Envelope `{ error, code, requestId }` + `x-request-id`                                    |
+| `lib/server/auth.ts`                 | `checkAdminAuth` (Bearer `ADMIN_TOKEN`, fail-closed, with `role`)                         |
+| `lib/server/throttle.ts`             | `createThrottle` (fixed window, no deps) + per-route buckets                              |
+| `lib/server/exportCsv.ts`            | `streamExportCsv` (BOM + `row()` + `summaryRows()`, chunks of 500)                        |
+| `lib/server/sql/recipients.ts`       | CRUD `alert_recipients` (pure validation + thin store)                                    |
+| `lib/server/alerts/store.ts`         | `AlertStore` contract (dedup, `delivered[]` per recipient)                                |
+| `lib/server/alerts/detect.ts`        | `detectUrgentTransitions` (history → `isUrgent`, same predicate as the dashboard)         |
+| `lib/server/alerts/run.ts`           | `runAlertCycle` (detect→enqueue→digest→mark, dry-run default, `--reprocess`)              |
+| `lib/server/alerts/mailer.ts`        | `AlertMailer` + SMTP provider (P3 reuse) + `sendWithRetry`                                |
+| `lib/server/alerts/templates.ts`     | Urgent digest pt-BR (subject counts criticals, body lists criticals first)                |
+| `lib/server/sql/alerts.ts`           | `sqlAlertStore` (`ON CONFLICT dedup_key DO NOTHING`, dead-letter in payload)              |
+| `lib/dashboard/urgent.ts`            | `urgencyOf`/`isUrgent`/`compareUrgency`/`urgentBarriers` (fail-closed baseline = NcAlert) |
+| `islands/dashboard/vocabularies.ts`  | Client hook `useDashboardVocabularies` (mock mode only)                                   |
+| `db/schema.sql`                      | DDL: lookup tables, `barriers`, `barrier_status_history`                                  |
+| `db/seed_lookups.sql`                | Seeds the lookup tables, mirroring `lib/enums/`                                           |
 
-Veja **docs/DATABASE.md** para o schema completo e o passo a passo de setup,
-e **docs/ARCHITECTURE.md** para os fluxos mock vs http e a topologia da island.
+See **docs/DATABASE.md** for the full schema and setup walkthrough, and
+**docs/ARCHITECTURE.md** for the mock vs http flows and the island topology.
 
-## Operação (P5)
+## Operations (P5)
 
-Serviço (`deno task start` lê `.env`):
+Service (`deno task start` reads `.env`):
 
 ```ini
 # /etc/systemd/system/barrier-monitor.service
@@ -304,27 +305,27 @@ Restart=on-failure
 WantedBy=multi-user.target
 ```
 
-Agendamento (sync contínuo + digest de alertas; logs no journal):
+Scheduling (continuous sync + alert digest; logs in the journal):
 
-- `scripts/fracttal-poll.ts` roda como serviço próprio (mesmo molde acima,
-  `ExecStart=... deno run -A scripts/fracttal-poll.ts` com
-  `FRACTTAL_SYNC_SCOPES` no EnvironmentFile).
+- `scripts/fracttal-poll.ts` runs as its own service (same template as above,
+  `ExecStart=... deno run -A scripts/fracttal-poll.ts` with
+  `FRACTTAL_SYNC_SCOPES` in the EnvironmentFile).
 - Digest: `*/15 * * * *` →
   `deno run -A scripts/alerts-check.ts --apply >> /var/log/alerts.log 2>&1`
-  (dry-run sem `--apply`; `--reprocess` só manual, após ler o log).
-- Falha de relay não perde evento: tenta 3×, carimba `attempts`/`last_error`
-  no payload, estaciona (`dead_letter`) após 5 runs com falha; o log nomeia
-  `event <id> <tag>` para retry via `--reprocess`.
+  (dry-run without `--apply`; `--reprocess` manual only, after reading the log).
+- A relay failure never loses an event: it tries 3 times, stamps
+  `attempts`/`last_error` on the payload, and parks it (`dead_letter`) after 5
+  failing runs; the log names `event <id> <tag>` for retry via `--reprocess`.
 
-Smoke pós-deploy (aceite):
+Post-deploy smoke (acceptance):
 
 ```
 curl -s -o /dev/null -w "root=%{http_code}\n" "$BASE/"
 curl -s "$BASE/api/health"  # {"ok":true,"time":"..."}
 ```
 
-Backup/restore (verificado: `pg_dump -Fc` → restore em DB vazio com as
-mesmas contagens de `barriers` e `barrier_status_history`):
+Backup/restore (verified: `pg_dump -Fc` → restore into an empty DB with the
+same `barriers` and `barrier_status_history` counts):
 
 ```
 pg_dump "$DATABASE_URL" -Fc -f barreiras.dump
@@ -332,31 +333,31 @@ createdb -O monitor barreiras_restore
 pg_restore -d "$RESTORE_URL" barreiras.dump
 ```
 
-Rollback para mock (sem tocar no banco): `PUBLIC_API_MODE=mock` (o cliente
-volta ao gerador determinístico; as rotas `/api/*` seguem exigindo
-`DATABASE_URL`, mas nada as chama). Rollback total: build anterior +
-modo mock.
+Rollback to mock (without touching the DB): `PUBLIC_API_MODE=mock` (the client
+returns to the deterministic generator; the `/api/*` routes still require
+`DATABASE_URL`, but nothing calls them). Total rollback: previous build +
+mock mode.
 
-## Cutover para produção (P3, primeira ida)
+## Production cutover (P3, first pass)
 
-Ordem fechada — cada passo depende do anterior verde:
+Strict order - each step depends on the previous one being green:
 
 1. **Backup**: `pg_dump "$DATABASE_URL" -Fc -f barreiras-pre-cutover.dump`
-   (restaurável via `pg_restore`; contagens conferidas no § Operação).
-2. **Migrate contra o backup, nunca direto**: suba um banco vazio a partir
-   do dump, rode `deno task db:migrate`, confira `barriers`/`lookups`/`sync_state`/`alert_events`/`alert_recipients` presentes; só então migre o prod.
-3. **Dual-run mock-vs-http**: com o banco migrado + seedado, compare os
-   totais do dashboard nos dois modos (mesmos filtros):
-   - mock: `PUBLIC_API_MODE=mock` → anote KPI total, Não Conformes, linhas do grid;
-   - http: `PUBLIC_API_MODE=http` + `DATABASE_URL` → mesmos números devem
-     reconciliar com o seed (mock é determinístico, seed é fixo — qualquer
-     divergência além do esperado é stop-ship);
-   - `GET /api/export?format=csv` com o filtro cheio: total de linhas de
-     dados == `X-Export-Total` == total da rota `/api/barriers`.
-4. **Checklist de cutover**: sync dry-run limpo no fixture
-   (`scripts/fracttal-sync.ts`, sem `--apply`); `ADMIN_TOKEN` + `OPS_SMTP_*`
-   configurados; um recipient ativo cadastrado; `alerts-check.ts` dry-run
-   verde; smoke `/` + `/api/health` no build de prod.
-5. **Ligar**: serviço systemd + poll + cron do digest (ver § Operação);
-   primeiro `--apply` do sync em sessão revisada (P3: produção é só leitura
-   até esse ponto).
+   (restorable via `pg_restore`; counts checked in the Operations section).
+2. **Migrate against the backup, never directly**: start an empty DB from the
+   dump, run `deno task db:migrate`, verify `barriers`/`lookups`/`sync_state`/`alert_events`/`alert_recipients` are present; only then migrate prod.
+3. **Dual-run mock-vs-http**: with the DB migrated + seeded, compare the
+   dashboard totals in both modes (same filters):
+   - mock: `PUBLIC_API_MODE=mock` → record KPI total, non-compliant count, grid rows;
+   - http: `PUBLIC_API_MODE=http` + `DATABASE_URL` → the same numbers must
+     reconcile with the seed (mock is deterministic, seed is fixed - any
+     divergence beyond expected is stop-ship);
+   - `GET /api/export?format=csv` with full filters: total data rows ==
+     `X-Export-Total` == total from the `/api/barriers` route.
+4. **Cutover checklist**: clean sync dry-run on the fixture
+   (`scripts/fracttal-sync.ts`, without `--apply`); `ADMIN_TOKEN` + `OPS_SMTP_*`
+   configured; an active recipient registered; `alerts-check.ts` dry-run
+   green; smoke `/` + `/api/health` on the prod build.
+5. **Switch on**: systemd service + poll + digest cron (see the Operations
+   section); first sync `--apply` in a reviewed session (P3: production is
+   read-only until this point).

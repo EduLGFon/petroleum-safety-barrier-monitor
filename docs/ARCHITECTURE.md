@@ -1,4 +1,4 @@
-# Arquitetura — Monitor de Barreiras
+# Architecture - Safety Barrier Monitor
 
 Single source of truth for modules, data flows, runtime lifecycle, island
 bridge topology, persistence, and config. Read this before any architectural
@@ -12,16 +12,16 @@ Stack: Deno-only Fresh 2 + Vite + Preact islands. No ORM, no `package.json`.
 plus `fsRoutes()`. `client.ts` only imports `static/styles.css` for HMR.
 `vite.config.ts` enables `@fresh/plugin-vite`.
 
-| Task         | Command                                                | Env source                                                  |
-| ------------ | ------------------------------------------------------ | ----------------------------------------------------------- |
-| `check`      | `deno fmt --check . && deno lint . && deno check`      | none                                                        |
-| `test`       | `deno test .`                                          | shell only (pure modules)                                   |
-| `dev`        | `vite`                                                 | shell only, no `--env-file`; `export $(cat .env \| xargs)`  |
-| `build`      | `vite build`                                           | shell at build time; request-time env still needed at serve |
-| `preview`    | `deno serve -A _fresh/server.js`                       | shell only, no `--env-file`                                 |
-| `start`      | `deno serve --env-file=.env -A _fresh/server.js`       | `.env`                                                      |
-| `db:migrate` | `deno run -A --env-file=.env scripts/migrate.ts`     | `.env` (`DATABASE_URL`)                                       |
-| `db:seed`    | `deno run -A --env-file=.env scripts/seed.ts`        | `.env` (`DATABASE_URL`)                                       |
+| Task         | Command                                           | Env source                                                  |
+| ------------ | ------------------------------------------------- | ----------------------------------------------------------- |
+| `check`      | `deno fmt --check . && deno lint . && deno check` | none                                                        |
+| `test`       | `deno test .`                                     | shell only (pure modules)                                   |
+| `dev`        | `vite`                                            | shell only, no `--env-file`; `export $(cat .env \| xargs)`  |
+| `build`      | `vite build`                                      | shell at build time; request-time env still needed at serve |
+| `preview`    | `deno serve -A _fresh/server.js`                  | shell only, no `--env-file`                                 |
+| `start`      | `deno serve --env-file=.env -A _fresh/server.js`  | `.env`                                                      |
+| `db:migrate` | `deno run -A --env-file=.env scripts/migrate.ts`  | `.env` (`DATABASE_URL`)                                     |
+| `db:seed`    | `deno run -A --env-file=.env scripts/seed.ts`     | `.env` (`DATABASE_URL`)                                     |
 
 `build` emits `_fresh/server.js` + `_fresh/server/` + `_fresh/client/`.
 `COMPANY_NAME` is read per request, not baked at build time.
@@ -30,22 +30,22 @@ theme/accent/density/motion from `barrier-settings` before hydration.
 
 ## Layer boundaries
 
-- `routes/` — SSR + HTTP edge only. `_app.tsx` shell, `index.tsx` mode
+- `routes/` - SSR + HTTP edge only. `_app.tsx` shell, `index.tsx` mode
   switch, `api/*` handlers parse via `_params.ts` and call
   `lib/server/sql/*`. Never render dashboard UI.
-- `lib/` — pure/shared logic. No Preact, no `localStorage`. Barrels
+- `lib/` - pure/shared logic. No Preact, no `localStorage`. Barrels
   (`lib/api.ts`, `lib/data.ts`, `lib/enums.ts`, `lib/constants.ts`,
   `lib/utils.ts`) re-export split modules underneath.
-- `islands/` — only hydrated JS. `islands/Dashboard.tsx` is the single
+- `islands/` - only hydrated JS. `islands/Dashboard.tsx` is the single
   island root; `islands/dashboard/` holds the mode switch, sections, and
   server-error UI. May import `components/`, `hooks/`, `context/`, `lib/`
   (non-server). Must never import `lib/server/*`.
-- `components/` — static presentational UI, bundled as part of the island
+- `components/` - static presentational UI, bundled as part of the island
   subtree. Props-driven; vocabularies arrive via props.
-- `hooks/dashboard/` + `hooks/useDashboard.ts` — client state (island-only).
-- `context/` — `SettingsContext` + `ThemeContext`, provided inside the
+- `hooks/dashboard/` + `hooks/useDashboard.ts` - client state (island-only).
+- `context/` - `SettingsContext` + `ThemeContext`, provided inside the
   island root because server route context does not reach hydrated islands.
-- `lib/server/` — server-only Postgres pool (`db.ts`) + SQL repositories.
+- `lib/server/` - server-only Postgres pool (`db.ts`) + SQL repositories.
   Only `routes/index.tsx` and `routes/api/*` may import it.
 
 Server-only boundary is enforced by convention: `lib/server/db.ts` holds a
@@ -110,16 +110,16 @@ island import stays safe.
 Full contract lives in `docs/API.md`. Summary:
 
 - Wire (`lib/wireTypes.ts`): numeric ids only (`WireBarrier`,
-  `WireKpiSnapshot`, `WireCategoryConformidade`, `BarriersQuery`,
-  `BarriersResponse`). `conformidadeId` is intentionally omitted from
+  `WireKpiSnapshot`, `WireCategoryCompliance`, `BarriersQuery`,
+  `BarriersResponse`). `complianceId` is intentionally omitted from
   `WireBarrier`.
 - Domain (`lib/types.ts`): resolved display strings (`Barrier`,
-  `KpiSnapshot`, `CategoryConformidade`, `Vocabularies`, `FilterState`).
+  `KpiSnapshot`, `CategoryCompliance`, `Vocabularies`, `FilterState`).
   Open `string & {}` unions keep novel station values compilable.
 - Bridge (`lib/enums/*` + `lib/resolve.ts` + `lib/api/query.ts`):
   `toXId` returns `undefined` on unknown (caller skips + warns),
   `fromXId` returns explicit sentinels (`ST-7`), `resolveBarrier` always
-  derives `conformidade` via `isConforme()`.
+  derives `compliance` via `isCompliant()`.
 - `BarriersApi` (`lib/api/types.ts`): `getBarriers`, `getAllBarriers`
   (http forces `pageSize: 100000`), `getBarrierById` (`null` only on 404),
   `getKpi` / `getChartData` (both `locationId`-scoped).
@@ -132,7 +132,7 @@ Full contract lives in `docs/API.md`. Summary:
 ## Persistence
 
 - Postgres (`docs/DATABASE.md`): lookup tables + `barriers` +
-  `barrier_status_history`. `conformidade_id` is trigger-derived, the only
+  `barrier_status_history`. `compliance_id` is trigger-derived, the only
   write path is `record_status_change()`. `scripts/migrate.ts` applies
   `db/schema.sql` + `db/seed_lookups.sql` (idempotent);
   `scripts/seed.ts` bulk-inserts `getWireBarriers()` output in batches of
@@ -155,6 +155,6 @@ tasks. `dev` needs shell exports; `start`/`db:*` read `.env`.
   `distinctBy`).
 - Reconcile everywhere: fixed KPI fields + `by*` `GROUP BY` buckets,
   `resolveKpi` translates numeric-id keys, chart derives NC as
-  `total - conforme` fail-closed, so novel values never vanish.
+  `total - compliant` fail-closed, so novel values never vanish.
 - Layouts survive scale: paginated/server-paged regions, capped export rows
   (`MAX_DOM_ROWS`), debounced search, precomputed sort keys.

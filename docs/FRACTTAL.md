@@ -4,7 +4,7 @@
 > This note records what the real API looks like, how provenance is designed,
 > and the field-to-enum mapping draft. Source: official Fracttal docs
 > (api.fracttal.com) captured 2026-09-12; verified against the documented
-> contract only — no live calls were made (Fracttal access is
+> contract only - no live calls were made (Fracttal access is
 > production-only by locked decision).
 
 ## Safe-harbor rules
@@ -50,19 +50,19 @@ normalizes `data: []` when missing. Neo limits: every query returns at most
 Goal: make every DB row traceable to its Fracttal source and every sync run
 auditable, with deletions soft.
 
-- `barriers.external_code` (text, UNIQUE, nullable) — the Fracttal asset
+- `barriers.external_code` (text, UNIQUE, nullable) - the Fracttal asset
   `code`. The upsert matching key (not `id`: Fracttal ids are tenant-local
   and unreadable; `code` is the stable business key).
-- `barriers.source_updated_at` (timestamptz, nullable) — the best available
+- `barriers.source_updated_at` (timestamptz, nullable) - the best available
   remote modification signal. Gap: `GET /items` does not return a
   last-modified timestamp in the documented shape, so `source_updated_at`
   stays null until a real capture shows an `updated`-like field.
-- `barriers.deleted_at` (timestamptz, nullable) — soft delete. Items missing
+- `barriers.deleted_at` (timestamptz, nullable) - soft delete. Items missing
   from Fracttal (a full-scope crawl sees none for that `external_code`) set
   `deleted_at`; the row stays so history/audit survives. `is_deleted`
   derived = `deleted_at IS NOT NULL`. Default dashboard views filter it out;
   retired rows are auditable via `GET /api/barriers/deleted` (admin token).
-- `sync_state` table — one row per run:
+- `sync_state` table - one row per run:
   `id, started_at, finished_at, scope (location_code), cursor (start),
   counts (insert/update/skip/error), status (running/ok/failed),
   note`. Ops diagnosis + rerun pointer; does not carry secrets.
@@ -73,18 +73,18 @@ auditable, with deletions soft.
 
 ## Mapping draft (Fracttal → app enums / wire types)
 
-The app models barriers with a `disponibilidade`, `conformidade`, and
-`criticidade`. Fracttal assets expose `active` and `available` plus
-operational fields; there is **no direct conformidade field**, so the draft
-is provisional and reviewed against a real fixture before P3.
+The app models barriers with `availability`, `compliance`, and `criticality`.
+Fracttal assets expose `active` and `available` plus operational fields;
+there is **no direct compliance field**, so the draft is provisional and
+reviewed against a real fixture before P3.
 
 | App concept                     | Fracttal source (draft)                                                 | Notes                                                                                                                                 |
 | ------------------------------- | ----------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
 | `externalCode` (new wire field) | `code`                                                                  | Upsert match key                                                                                                                      |
-| `disponibilidade`               | `available` + `initial_date_out_of_service`/`last_final_date_available` | `available:false` → some Indisponível bucket; contingent/degraded buckets need a secondary signal (work orders), **unmapped for now** |
-| `conformidade`                  | derived: open/corrective work order on the asset — endpoint TBD         | **Unmapped**: needs the work-order contract + fixture review                                                                          |
-| `criticidade`                   | `priorities_description` → map                                          | resolved in P3 against the seed: `'Crítica'`/`'Não Crítica'` exact match, anything else is listed and skipped                         |
-| `categoria`                     | `groups_1_description`/`groups_2_description`                           | category taxonomy differs per tenant; list, don't force                                                                               |
+| `availability`                  | `available` + `initial_date_out_of_service`/`last_final_date_available` | `available:false` → some Indisponível bucket; contingent/degraded buckets need a secondary signal (work orders), **unmapped for now** |
+| `compliance`                    | derived: open/corrective work order on the asset - endpoint TBD         | **Unmapped**: needs the work-order contract + fixture review                                                                          |
+| `criticality`                   | `priorities_description` → map                                          | resolved in P3 against the seed: `'Crítica'`/`'Não Crítica'` exact match, anything else is listed and skipped                         |
+| `category`                      | `groups_1_description`/`groups_2_description`                           | category taxonomy differs per tenant; list, don't force                                                                               |
 | `location`                      | `location_code` / `parent_description`                                  | station grouping                                                                                                                      |
 | `tag` (barcode label)           | `code`                                                                  | display tag                                                                                                                           |
 
@@ -106,18 +106,18 @@ Pipeline: quoted raw rows → parse (`parsePage`, malformed listed) → map
 (`mapAsset`, label→id exact resolution, skip+reason on unmapped) → pure
 reconcile plan → apply (or dry-run report) → `sync_state` audit row.
 
-- `lib/server/fracttal/map.ts` — `disponibilidadeFromAsset` (unavailable →
+- `lib/server/fracttal/map.ts` - `availabilityFromAsset` (unavailable →
   Indisponível id 5, else Disponível id 0) + `IMPORT_DEFAULTS`
-  (`tipologiaId=3`, `agrupamentoId=0`, `locDescId=0`, `donoId=null`).
+  (`typologyId=3`, `groupingId=0`, `locDescId=0`, `ownerId=null`).
   Unmapped labels are listed in the run report, never guessed.
-- `lib/server/fracttal/sync.ts` — `planReconcile` (pure) + `runSync`
+- `lib/server/fracttal/sync.ts` - `planReconcile` (pure) + `runSync`
   (orchestrator). Change detection via a stored `signature` (see module
   comment; ORDER IS PART OF THE CONTRACT). Dry-run is the default; nothing
   is written without an explicit flag. Restores reappearing rows, flags
   `statusChanged` on availability flips.
-- `lib/server/sql/sync.ts` — the default `SyncIo`: builds label→id context
+- `lib/server/sql/sync.ts` - the default `SyncIo`: builds label→id context
   from the lookup tables, loads scoped locals, applies the plan (inserts via
-  `INSERT ... ON CONFLICT (external_code) DO NOTHING` — the UNIQUE constraint
+  `INSERT ... ON CONFLICT (external_code) DO NOTHING` - the UNIQUE constraint
   is the dedup authority; status changes go through the one sanctioned
   `record_status_change()` with author 10 "Sincronização Fracttal"), and
   writes the run audit. Also exposes `syncScopeRunning(scope, staleMinutes=10)`
@@ -128,21 +128,21 @@ reconcile plan → apply (or dry-run report) → `sync_state` audit row.
   email) and exits non-zero; the `failed` audit row is still written first, so
   the DB agrees with the alert. This channel is separate from barrier alerts
   (P5 `alert_events`), which stay untouched.
-- `lib/server/fracttal/smtp.ts` — a small Deno-native SMTP submission client
+- `lib/server/fracttal/smtp.ts` - a small Deno-native SMTP submission client
   (EHLO, optional STARTTLS upgrade, AUTH PLAIN, MAIL/RCPT/DATA with
   dot-stuffing, QUIT). No external dependency: the reader is released before
   `Deno.startTls` takes the socket, since the TLS handshake requires both
   streams unlocked.
-- `lib/server/fracttal/notify.ts` — `OpsNotifier` list, `smtpEmailNotifier`
+- `lib/server/fracttal/notify.ts` - `OpsNotifier` list, `smtpEmailNotifier`
   plus `smtpConfigFromEnv()` (`OPS_SMTP_HOST` + `OPS_EMAIL_TO` required; port
   465 means implicit TLS), and `notifyFailureToAll` which is best-effort: one
   failing channel never blocks the others.
-- `lib/server/fracttal/runner.ts` — `pollOnce` (scope lock → run → notify on
+- `lib/server/fracttal/runner.ts` - `pollOnce` (scope lock → run → notify on
   failure) and `createPollLoop` per scope: a single crashed tick (lock query
   down, upstream down) is reported and the cadence continues; `stop()` is
   stop-safe. `scripts/fracttal-poll.ts` wires it: env-configured scopes
   (`FRACTTAL_SYNC_SCOPES`), cadence (`FRACTTAL_POLL_SECONDS`, min 5), graceful
-  SIGINT/SIGTERM shutdown. The lock is the runner's own overlap guard — one
+  SIGINT/SIGTERM shutdown. The lock is the runner's own overlap guard - one
   scope never runs two syncs at once.
 - History rule: history appends only on a real status change. Freshly
   imported rows get one stamp (`Importado do Fracttal`), so the timeline is
@@ -157,7 +157,7 @@ reconcile plan → apply (or dry-run report) → `sync_state` audit row.
 - `alert_events`: consumed by the P5 alert cycle (`scripts/alerts-check.ts`):
   dedup on barrier + transition date, `sent_at` null until sent. The sync
   pipeline itself still records transitions in `barrier_status_history`
-  only — it never enqueues alerts.
+  only - it never enqueues alerts.
 
 Run shapes:
 
@@ -176,4 +176,4 @@ FRACTTAL_SYNC_SCOPES=FAL deno run -A scripts/fracttal-poll.ts
 
 - Webhook receiver (polling first; webhooks only if Fracttal supports them,
   with signature check).
-- A real fixture (needs prod access) — captured by the procedure above.
+- A real fixture (needs prod access) - captured by the procedure above.
