@@ -11,30 +11,33 @@ export function csvCell(v: unknown): string {
   return `"${String(v ?? "").replace(/"/g, '""')}"`;
 }
 
+// The 14 export columns, single-sourced: the browser CSV and the server
+// /api/export route both build from this, so the files always agree.
+export const CSV_HEADERS = [
+  "ID",
+  "TAG",
+  "Instalação",
+  "Tipologia",
+  "Localização",
+  "Categoria",
+  "Agrupamento",
+  "Criticidade",
+  "Dono",
+  "Disponibilidade",
+  "Sem Cont. há",
+  "Conformidade",
+  "Comentários",
+  "Plano de Ação",
+];
+
 // Builds ;-separated, quote-escaped CSV with BOM for pt-BR Excel; reuses row(); browser-only.
 export function exportToCSV(
   barriers: Barrier[],
   filename = "barreiras",
 ): void {
   assertBrowser();
-  const hdrs = [
-    "ID",
-    "TAG",
-    "Instalação",
-    "Tipologia",
-    "Localização",
-    "Categoria",
-    "Agrupamento",
-    "Criticidade",
-    "Dono",
-    "Disponibilidade",
-    "Sem Cont. há",
-    "Conformidade",
-    "Comentários",
-    "Plano de Ação",
-  ];
   const csv = [
-    hdrs.map(csvCell).join(";"),
+    CSV_HEADERS.map(csvCell).join(";"),
     ...barriers.map((b) => row(b).map(csvCell).join(";")),
   ].join("\r\n");
   download(

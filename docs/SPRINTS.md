@@ -139,6 +139,21 @@ Do:
 Acceptance: unauthenticated PATCH rejected, export total matches filtered
 total, fixture integration green.
 
+Status (as-built): error envelope `{ error, code, requestId }` +
+`x-request-id` on all routes (500s keep their messages, never leak
+internals); boot validation via `loadServerConfig` (http mode without
+`DATABASE_URL` fails fast naming the variable); `PATCH .../status` requires
+`Authorization: Bearer <ADMIN_TOKEN>` and fail-closes when unset; GET
+openness decided and documented (reads open, writes token-gated —
+docs/API.md); in-memory throttle per remote IP (120/30/10 per min for
+read/write/export, health exempt); `GET /api/export?format=csv` streams the
+filtered set (BOM + 14-col rows + RESUMO via shared `row()`/`csvCell()`/
+`summaryRows()`, 10k cap with the filtered total named on overflow);
+`CSV_HEADERS` single-sourced between browser and server exports. 170 tests
+green (config/auth/throttle/errors/export units + DB-gated fixture→upsert→
+GET/export integration, verified against real Postgres); check at the
+12-problem baseline.
+
 ## P5: Contingency + email alerts + prod readiness
 
 Goal: urgent detection reaches people; routines are operable.

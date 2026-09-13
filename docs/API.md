@@ -120,18 +120,43 @@ valores ligados como `$1/$2`):
     `status_since`; `page` default 1 (floor, min 1); `pageSize` default 25
     (clamp `1..100000`); `sortCol` whitelist
     (`id/tag/criticidade/categoria/disponibilidade/conformidade/statusSince`,
-    default `id`); parsers estritos em `routes/api/_params.ts`; `500 {error}`
-    em falha de DB.
+    default `id`); parsers estritos em `routes/api/_params.ts`; envelope
+    `{ error, code, requestId }` em falha de DB (ver seção P4 abaixo).
 - `GET /api/barriers/:id` → `WireBarrier` (`400` id inválido, `404` ausente)
 - `PATCH /api/barriers/:id/status` com
   `{ statusId: int >= 0, authorId: int >= 0, note?: string (cap 2000) }` →
   `WireBarrier` atualizado via `record_status_change()` (`400` corpo
-  inválido, `404` ausente). Bonus: único caminho de escrita, ainda não
-  chamado pela UI — veja docs/DATABASE.md.
+  inválido, `404` ausente). Requer `Authorization: Bearer <ADMIN_TOKEN>`
+  (`401` sem token ou com token errado; `401` também quando `ADMIN_TOKEN`
+  não está configurado — escrita nunca é liberada por omissão).
+- `GET /api/export?format=csv` (+ os mesmos filtros de `/api/barriers`) →
+  CSV com BOM, cabeçalho de 14 colunas, linhas, bloco `RESUMO`
+  (byte-idêntico ao CSV do dashboard: `row()` + `csvCell()` + `summaryRows()`).
+  Stream via `ReadableStream` (chunks de 500 linhas), cap de 10.000 linhas
+  (`400` com o total filtrado quando excede — refine os filtros),
+  `Content-Disposition: attachment`, `X-Export-Total` com o total filtrado.
 - `GET /api/kpi?locationId=1` → `WireKpiSnapshot` (só `locationId`;
   omitido/`0` = todas; demais params ignorados)
 - `GET /api/chart?locationId=1` → `WireCategoryConformidade[]` (mesmo escopo)
 - `GET /api/health` → `{ ok, time }` (liveness, sem DB)
+
+## Erros, auth e throttle (P4)
+
+Toda falha responde o envelope `{ error, code, requestId }` + header
+`x-request-id` (`code`: `BAD_REQUEST` / `NOT_FOUND` / `UNAUTHORIZED` /
+`RATE_LIMITED` / `INTERNAL`; `500` nunca vaza stack ou coluna — a mensagem
+pública é fixa por rota e o detalhe vai ao log com o `requestId`).
+
+Abertura decidida explicitamente: **GETs do dashboard são abertos**
+(`barriers`, `:id`, `kpi`, `chart`, `export`) — dado operacional de leitura;
+**escritas exigem `ADMIN_TOKEN`** (`PATCH .../status`, futuras rotas
+admin/recipients). Sem token configurado, escrita responde `401`.
+
+Throttle in-memory por IP remoto (nunca `X-Forwarded-For`, forjável):
+120 req/min em leitura, 30 req/min em escrita, 10 req/min no export
+(`429 { error, code: RATE_LIMITED }` + `Retry-After`). `/api/health` não é
+throttled (liveness probe). Boot valida `DATABASE_URL` com
+`PUBLIC_API_MODE=http` na primeira chamada (`500` nomeando a variável).
 
 Sem rota `/api/vocabularies`: em modo http `routes/index.tsx` faz SSR de
 `getVocabularies()` (`lib/server/sql/vocabularies.ts`) e entrega
@@ -214,12 +239,18 @@ toWireQuery({ location: "FAL", disponibilidade: "Degradado", page: 1 });
 | `lib/server/sql/where.ts`            | `buildWhere`, `resolveOrderBy` (whitelist), `escapeLike`                                 |
 | `lib/server/sql/mappers.ts`          | `SELECT_COLUMNS`, `HISTORY_JOIN` (lateral `json_agg`), `toWireBarrier`                   |
 | `routes/api/_params.ts`              | Parsers estritos (`parseInt/parseDate/parseQueryParam`); nunca é rota (`_` prefix)       |
-| `routes/api/barriers.ts`             | `GET /api/barriers`                                                                      |
-| `routes/api/barriers/[id].ts`        | `GET /api/barriers/:id`                                                                  |
-| `routes/api/barriers/[id]/status.ts` | `PATCH /api/barriers/:id/status` (bonus)                                                 |
-| `routes/api/kpi.ts`                  | `GET /api/kpi`                                                                           |
-| `routes/api/chart.ts`                | `GET /api/chart`                                                                         |
-| `routes/api/health.ts`               | `GET /api/health` (liveness, sem DB)                                                     |
+| `routes/api/barriers.ts`             | `GET /api/barriers` (aberto, throttle leitura)                                           |
+| `routes/api/barriers/[id].ts`        | `GET /api/barriers/:id` (aberto, throttle leitura)                                       |
+| `routes/api/barriers/[id]/status.ts` | `PATCH /api/barriers/:id/status` (exige `ADMIN_TOKEN`, throttle escrita)                 |
+| `routes/api/export.ts`               | `GET /api/export?format=csv` (aberto, throttle export, cap 10k, stream)                  |
+| `routes/api/kpi.ts`                  | `GET /api/kpi` (aberto, throttle leitura)                                                |
+| `routes/api/chart.ts`                | `GET /api/chart` (aberto, throttle leitura)                                              |
+| `routes/api/health.ts`               | `GET /api/health` (liveness, sem DB, sem throttle)                                       |
+| `lib/server/config.ts`               | `loadServerConfig` (boot http), `loadSyncConfig` (credenciais Fracttal p/ scripts)       |
+| `lib/server/errors.ts`               | Envelope `{ error, code, requestId }` + `x-request-id`                                   |
+| `lib/server/auth.ts`                 | `checkAdminAuth` (Bearer `ADMIN_TOKEN`, fail-closed, com `role`)                         |
+| `lib/server/throttle.ts`             | `createThrottle` (janela fixa, sem deps) + buckets por rota                              |
+| `lib/server/exportCsv.ts`            | `streamExportCsv` (BOM + `row()` + `summaryRows()`, chunks de 500)                       |
 | `islands/dashboard/vocabularies.ts`  | Hook client `useDashboardVocabularies` (só mock mode)                                    |
 | `db/schema.sql`                      | DDL: tabelas de lookup, `barriers`, `barrier_status_history`                             |
 | `db/seed_lookups.sql`                | Seed das tabelas de lookup, espelhando `lib/enums/`                                      |
