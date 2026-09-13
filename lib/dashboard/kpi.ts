@@ -9,66 +9,65 @@ export function computeKpi(b: Barrier[]): KpiSnapshot {
   // Single pass - counts every value actually present (dynamic buckets)
   // alongside the well-known fast-path fields, so future statuses are
   // included in totals instead of silently dropped.
-  const byDisponibilidade: Record<string, number> = {};
-  const byConformidade: Record<string, number> = {};
-  const byCriticidade: Record<string, number> = {};
-  let disponivel = 0,
-    foraDeOp = 0,
-    indispCont = 0,
-    degrCont = 0,
-    degradado = 0,
-    indisponivel = 0,
-    conforme = 0,
-    naoConforme = 0,
-    criticasNC = 0;
+  const byAvailability: Record<string, number> = {};
+  const byCompliance: Record<string, number> = {};
+  const byCriticality: Record<string, number> = {};
+  let available = 0,
+    outOfService = 0,
+    contingencyOutage = 0,
+    degradedContingency = 0,
+    degraded = 0,
+    unavailable = 0,
+    compliant = 0,
+    nonCompliant = 0,
+    criticalNonCompliant = 0;
   for (const x of b) {
-    byDisponibilidade[x.disponibilidade] =
-      (byDisponibilidade[x.disponibilidade] ?? 0) + 1;
-    byConformidade[x.conformidade] = (byConformidade[x.conformidade] ?? 0) + 1;
-    byCriticidade[x.criticidade] = (byCriticidade[x.criticidade] ?? 0) + 1;
-    switch (x.disponibilidade) {
+    byAvailability[x.availability] = (byAvailability[x.availability] ?? 0) + 1;
+    byCompliance[x.compliance] = (byCompliance[x.compliance] ?? 0) + 1;
+    byCriticality[x.criticality] = (byCriticality[x.criticality] ?? 0) + 1;
+    switch (x.availability) {
       case "Disponível":
-        disponivel++;
+        available++;
         break;
       case "Fora de Operação":
-        foraDeOp++;
+        outOfService++;
         break;
       case "Indisponível Contingenciado":
-        indispCont++;
+        contingencyOutage++;
         break;
       case "Degradado Contingenciado":
-        degrCont++;
+        degradedContingency++;
         break;
       case "Degradado":
-        degradado++;
+        degraded++;
         break;
       case "Indisponível":
-        indisponivel++;
+        unavailable++;
         break;
     }
-    if (x.conformidade === "Conforme") conforme++;
+    if (x.compliance === "Conforme") compliant++;
     else {
-      // Fail-closed: any novel conformidade counts as Não Conforme, so the
-      // fixed fields always reconcile (conforme + naoConforme === total) and
+      // Fail-closed: any novel compliance counts as "Não Conforme", so the
+      // fixed fields always reconcile (compliant + nonCompliant === total) and
       // match computeChartData, which already buckets non-Conforme as NC.
-      naoConforme++;
-      if (x.criticidade === "Crítica") criticasNC++;
+      nonCompliant++;
+      if (x.criticality === "Crítica") criticalNonCompliant++;
     }
   }
   return {
     total: t,
-    disponivel,
-    foraDeOp,
-    indispCont,
-    degrCont,
-    degradado,
-    indisponivel,
-    conforme,
-    naoConforme,
-    criticasNC,
-    pctConforme: t > 0 ? Math.round(conforme / t * 100) : 0,
-    byDisponibilidade,
-    byConformidade,
-    byCriticidade,
+    available,
+    outOfService,
+    contingencyOutage,
+    degradedContingency,
+    degraded,
+    unavailable,
+    compliant,
+    nonCompliant,
+    criticalNonCompliant,
+    pctCompliant: t > 0 ? Math.round(compliant / t * 100) : 0,
+    byAvailability,
+    byCompliance,
+    byCriticality,
   };
 }

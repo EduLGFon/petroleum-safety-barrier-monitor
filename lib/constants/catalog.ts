@@ -12,7 +12,7 @@ export const CATEGORIES = [
   "Detector de H₂S",
 ] as const;
 
-export const AGRUPAMENTOS = [
+export const GROUPINGS = [
   "Sistemas de Alívio",
   "Evacuação, Resgate e Abandono",
   "Detecção e Monitoramento",
@@ -21,7 +21,7 @@ export const AGRUPAMENTOS = [
   "Proteção Elétrica",
 ] as const;
 
-export const TIPOLOGIAS = [
+export const TYPOLOGIES = [
   "Estação Coletora",
   "Planta de Processamento",
   "Duto de Transferência",
@@ -30,7 +30,7 @@ export const TIPOLOGIAS = [
   "Unidade de Medição",
 ] as const;
 
-export const DONOS = [
+export const OWNERS = [
   "Equipe de Manutenção",
   "Operação FAL",
   "Engenharia de Processo",
@@ -78,7 +78,7 @@ export const AUTHORS = [
 export const HISTORY_NOTES: Record<string, readonly string[]> = {
   "Disponível": [
     "Equipamento retornou ao serviço após manutenção corretiva.",
-    "Inspeção de rotina concluída — dentro dos parâmetros operacionais.",
+    "Inspeção de rotina concluída - dentro dos parâmetros operacionais.",
     "Comissionamento realizado com sucesso pela equipe técnica.",
   ],
   "Fora de Operação": [
@@ -87,13 +87,13 @@ export const HISTORY_NOTES: Record<string, readonly string[]> = {
     "Aguardando janela de manutenção na próxima parada geral.",
   ],
   "Indisponível Contingenciado": [
-    "Plano de contingência ativado — operação via sistema redundante.",
+    "Plano de contingência ativado - operação via sistema redundante.",
     "Indisponibilidade contingenciada conforme procedimento operacional.",
     "Contingência definida pelo time de engenharia. Monitoramento intensificado.",
   ],
   "Degradado Contingenciado": [
     "Degradação controlada com contingência ativa. Peça em pedido.",
-    "Atuador com resposta lenta — contingência ativada conforme procedimento.",
+    "Atuador com resposta lenta - contingência ativada conforme procedimento.",
     "Sensor fora da faixa. Contingência operacional aplicada.",
   ],
   "Degradado": [
@@ -110,13 +110,13 @@ export const HISTORY_NOTES: Record<string, readonly string[]> = {
 
 export const COMMENTS = [
   "Aguardando aprovação para manutenção programada.",
-  "Inspeção realizada em campo — peça em pedido ao almoxarifado.",
+  "Inspeção realizada em campo - peça em pedido ao almoxarifado.",
   "Leitura instável nas últimas 48h. Monitorando.",
 ] as const;
 
 export const ACTION_PLANS = [
   "Substituição programada para próxima janela de manutenção.",
-  "Solicitação de compra emitida — OS #47221.",
+  "Solicitação de compra emitida - OS #47221.",
   "Aguardando liberação da área para intervenção corretiva.",
   "Avaliação de risco em andamento pelo time de engenharia.",
 ] as const;

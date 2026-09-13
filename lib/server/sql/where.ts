@@ -8,10 +8,10 @@ import type { BarriersQuery } from "../../wireTypes.ts";
 export const SORTABLE: Record<string, string> = {
   id: "b.id",
   tag: "b.tag",
-  criticidade: "b.criticidade_id",
-  categoria: "b.categoria_id",
-  disponibilidade: "b.disponibilidade_id",
-  conformidade: "b.conformidade_id",
+  criticality: "b.criticality_id",
+  category: "b.category_id",
+  availability: "b.availability_id",
+  compliance: "b.compliance_id",
   statusSince: "b.status_since",
 };
 
@@ -41,14 +41,14 @@ export function buildWhere(
   if (q.locationId !== undefined && q.locationId !== 0) {
     push("and b.location_id = ", q.locationId);
   }
-  if (q.disponibilidadeId !== undefined) {
-    push("and b.disponibilidade_id = ", q.disponibilidadeId);
+  if (q.availabilityId !== undefined) {
+    push("and b.availability_id = ", q.availabilityId);
   }
-  if (q.conformidadeId !== undefined) {
-    push("and b.conformidade_id = ", q.conformidadeId);
+  if (q.complianceId !== undefined) {
+    push("and b.compliance_id = ", q.complianceId);
   }
-  if (q.categoriaId !== undefined) {
-    push("and b.categoria_id = ", q.categoriaId);
+  if (q.categoryId !== undefined) {
+    push("and b.category_id = ", q.categoryId);
   }
   if (q.query) {
     const lit = `%${escapeLike(q.query)}%`;

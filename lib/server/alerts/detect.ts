@@ -3,10 +3,13 @@
 // urgent (a barrier that was already urgent last run is not news), resolved
 // through the same isUrgent predicate the dashboard uses, so the email
 // digest and the NcAlert card never disagree on what counts.
-import { isUrgent, urgencyOf } from "../../dashboard/urgent.ts";
-import { resolveBarrier } from "../../resolve.ts";
-import type { WireBarrier } from "../../wireTypes.ts";
 import { type AlertStore, dedupKey, type NewAlertEvent } from "./store.ts";
+
+import { isUrgent, urgencyOf } from "../../dashboard/urgent.ts";
+
+import type { WireBarrier } from "../../wireTypes.ts";
+
+import { resolveBarrier } from "../../resolve.ts";
 
 export interface DetectedUrgent extends NewAlertEvent {
   urgency: "critical" | "urgent";
@@ -38,9 +41,9 @@ export async function detectUrgentTransitions(
       dedupKey: dedupKey(c.barrierId, c.transitionDate, c.statusId),
       payload: {
         tag: barrier.tag,
-        instalacao: barrier.instalacao,
-        disponibilidade: barrier.disponibilidade,
-        criticidade: barrier.criticidade,
+        location: barrier.location,
+        availability: barrier.availability,
+        criticality: barrier.criticality,
         urgency,
         attempts: 0,
         lastError: null,

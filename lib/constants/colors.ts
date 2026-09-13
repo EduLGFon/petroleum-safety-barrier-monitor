@@ -73,7 +73,7 @@ export const CRIT_COLORS: Record<
   },
 };
 
-// Canonical order for the well-known disponibilidade values. Anything new
+// Canonical order for the well-known availability values. Anything new
 // sorts after these (by volume) so bands and reports stay stable across
 // deploys. Shared by StatusBand and export summaries - single source.
 export const DISP_KNOWN_ORDER = [
@@ -116,11 +116,11 @@ export function fallbackColors(key: string): ColorSet {
 export function dispColorFor(key: string): ColorSet {
   return { ...fallbackColors(key), ...DISP_COLORS[key] };
 }
-// Conformidade colors with deterministic fallback for new values.
+// Compliance colors with deterministic fallback for new values.
 export function confColorFor(key: string): ColorSet {
   return { ...fallbackColors(key), ...CONF_COLORS[key] };
 }
-// Criticidade colors with deterministic fallback for new values.
+// Criticality colors with deterministic fallback for new values.
 export function critColorFor(key: string): ColorSet {
   return { ...fallbackColors(key), ...CRIT_COLORS[key] };
 }

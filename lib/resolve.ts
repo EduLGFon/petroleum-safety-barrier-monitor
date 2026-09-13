@@ -1,33 +1,33 @@
 /**
  * ══════════════════════════════════════════════════════════════════════════
- * RESOLVE — converts wire (numeric-id) records into domain objects the UI uses
+ * RESOLVE - converts wire (numeric-id) records into domain objects the UI uses
  * ══════════════════════════════════════════════════════════════════════════
  */
 
 import {
-  fromAgrupamentoId,
   fromAuthorId,
-  fromCategoriaId,
-  fromConformidadeId,
-  fromCriticidadeId,
-  fromDisponibilidadeId,
-  fromDonoId,
+  fromAvailabilityId,
+  fromCategoryId,
+  fromComplianceId,
+  fromCriticalityId,
+  fromGroupingId,
   fromLocationId,
   fromLocDescId,
-  fromTipologiaId,
+  fromOwnerId,
+  fromTypologyId,
 } from "./enums.ts";
 import type {
   WireBarrier,
-  WireCategoryConformidade,
+  WireCategoryCompliance,
   WireKpiSnapshot,
   WireStatusHistoryEntry,
 } from "./wireTypes.ts";
 import type {
   Barrier,
-  CategoryConformidade,
+  CategoryCompliance,
   StatusHistoryEntry,
 } from "./types.ts";
-import { isConforme } from "./constants.ts";
+import { isCompliant } from "./constants.ts";
 import type { KpiSnapshot } from "./types.ts";
 
 // Maps a wire history entry's numeric IDs to display strings; date/note pass through unchanged.
@@ -36,31 +36,31 @@ export function resolveHistoryEntry(
 ): StatusHistoryEntry {
   return {
     date: w.date,
-    status: fromDisponibilidadeId(w.statusId),
+    status: fromAvailabilityId(w.statusId),
     author: fromAuthorId(w.authorId),
     note: w.note,
   };
 }
 
-// Maps wire numeric IDs to Barrier strings; conformidade is derived from disponibilidade, never trusted from wire.
+// Maps wire numeric IDs to Barrier strings; compliance is derived from availability, never trusted from wire.
 export function resolveBarrier(w: WireBarrier): Barrier {
-  const disponibilidade = fromDisponibilidadeId(w.disponibilidadeId);
+  const availability = fromAvailabilityId(w.availabilityId);
   return {
     id: w.id,
     tag: w.tag,
-    tipologia: fromTipologiaId(w.tipologiaId),
-    instalacao: fromLocationId(w.locationId),
+    typology: fromTypologyId(w.typologyId),
+    location: fromLocationId(w.locationId),
     locDesc: fromLocDescId(w.locDescId),
-    criticidade: fromCriticidadeId(w.criticidadeId),
-    categoria: fromCategoriaId(w.categoriaId),
-    agrupamento: fromAgrupamentoId(w.agrupamentoId),
-    dono: fromDonoId(w.donoId),
-    disponibilidade,
-    // Conformidade is always DERIVED from disponibilidade — never trusted
-    // from the wire — so the two values can never disagree.
-    conformidade: isConforme(disponibilidade) ? "Conforme" : "Não Conforme",
-    comentarios: w.comentarios,
-    planoAcao: w.planoAcao,
+    criticality: fromCriticalityId(w.criticalityId),
+    category: fromCategoryId(w.categoryId),
+    grouping: fromGroupingId(w.groupingId),
+    owner: fromOwnerId(w.ownerId),
+    availability,
+    // Compliance is always DERIVED from availability - never trusted
+    // from the wire - so the two values can never disagree.
+    compliance: isCompliant(availability) ? "Conforme" : "Não Conforme",
+    comments: w.comments,
+    actionPlan: w.actionPlan,
     statusSince: w.statusSince,
     statusHistory: w.statusHistory.map(resolveHistoryEntry),
   };
@@ -71,15 +71,15 @@ export function resolveBarriers(items: WireBarrier[]): Barrier[] {
   return items.map(resolveBarrier);
 }
 
-/** KPI snapshots are already numeric on the wire — pass-through with type narrowing.
+/** KPI snapshots are already numeric on the wire - pass-through with type narrowing.
  *  Dynamic buckets arrive keyed by numeric id (as string) and are translated
  *  to display-string keys here; already-string keys pass through untouched
  *  for backward compat. syncedAt rides along when present. */
 export function resolveKpi(w: WireKpiSnapshot): KpiSnapshot {
   const {
-    byDisponibilidade,
-    byConformidade,
-    byCriticidade,
+    byAvailability,
+    byCompliance,
+    byCriticality,
     syncedAt,
     ...fixed
   } = w as WireKpiSnapshot & Partial<KpiSnapshot>;
@@ -100,33 +100,33 @@ export function resolveKpi(w: WireKpiSnapshot): KpiSnapshot {
   };
   return {
     ...fixed,
-    ...(byDisponibilidade
+    ...(byAvailability
       ? {
-        byDisponibilidade: mapBucket(byDisponibilidade, fromDisponibilidadeId),
+        byAvailability: mapBucket(byAvailability, fromAvailabilityId),
       }
       : {}),
-    ...(byConformidade
-      ? { byConformidade: mapBucket(byConformidade, fromConformidadeId) }
+    ...(byCompliance
+      ? { byCompliance: mapBucket(byCompliance, fromComplianceId) }
       : {}),
-    ...(byCriticidade
-      ? { byCriticidade: mapBucket(byCriticidade, fromCriticidadeId) }
+    ...(byCriticality
+      ? { byCriticality: mapBucket(byCriticality, fromCriticalityId) }
       : {}),
     ...(syncedAt ? { syncedAt } : {}),
   };
 }
 
-// Maps wire per-category totals to chart rows; naoConforme is total minus
-// conforme (fail-closed novel handling, same as computeChartData). Names
+// Maps wire per-category totals to chart rows; nonCompliant is total minus
+// compliant (fail-closed novel handling, same as computeChartData). Names
 // truncate past 26 chars like the client derivation; SQL order is preserved.
 export function resolveChartData(
-  items: WireCategoryConformidade[],
-): CategoryConformidade[] {
+  items: WireCategoryCompliance[],
+): CategoryCompliance[] {
   return items.map((w) => {
-    const name = fromCategoriaId(w.categoriaId);
+    const name = fromCategoryId(w.categoryId);
     return {
       name: name.length > 26 ? name.slice(0, 26) + "…" : name,
-      Conforme: w.conforme,
-      "Não Conforme": Math.max(0, w.total - w.conforme),
+      Conforme: w.compliant,
+      "Não Conforme": Math.max(0, w.total - w.compliant),
     };
   });
 }

@@ -1,8 +1,8 @@
 /**
  * ══════════════════════════════════════════════════════════════════════════
- * TYPES — canonical domain types shared by UI, utils, hooks, and API layer
+ * TYPES - canonical domain types shared by UI, utils, hooks, and API layer
  * ══════════════════════════════════════════════════════════════════════════
- * Open string unions (Disponibilidade, Conformidade, Criticidade) plus
+ * Open string unions (Availability, Compliance, Criticality) plus
  * Barrier, KpiSnapshot, FilterState and table types. Central contract so
  * new station values compile without code changes (dynamic-data principle).
  */
@@ -22,7 +22,7 @@ export type AccentColor =
 // categories, owners, etc. compilable without a code change (dynamic-data
 // principle in agents.md). Never narrow these back to closed unions.
 // (The ban-types ignores below are intentional: openness is the design.)
-export type Disponibilidade =
+export type Availability =
   | "Disponível"
   | "Fora de Operação"
   | "Indisponível Contingenciado"
@@ -33,13 +33,13 @@ export type Disponibilidade =
   | (string & {});
 
 // deno-lint-ignore ban-types
-export type Conformidade = "Conforme" | "Não Conforme" | (string & {});
+export type Compliance = "Conforme" | "Não Conforme" | (string & {});
 // deno-lint-ignore ban-types
-export type Criticidade = "Crítica" | "Não Crítica" | (string & {});
+export type Criticality = "Crítica" | "Não Crítica" | (string & {});
 
 export interface StatusHistoryEntry {
   date: string;
-  status: Disponibilidade;
+  status: Availability;
   author: string;
   note: string;
 }
@@ -47,17 +47,17 @@ export interface StatusHistoryEntry {
 export interface Barrier {
   id: number;
   tag: string;
-  tipologia: string;
-  instalacao: string;
+  typology: string;
+  location: string;
   locDesc: string;
-  criticidade: Criticidade;
-  categoria: string;
-  agrupamento: string;
-  dono: string;
-  disponibilidade: Disponibilidade;
-  conformidade: Conformidade;
-  comentarios: string;
-  planoAcao: string;
+  criticality: Criticality;
+  category: string;
+  grouping: string;
+  owner: string;
+  availability: Availability;
+  compliance: Compliance;
+  comments: string;
+  actionPlan: string;
   statusSince: string;
   statusHistory: StatusHistoryEntry[];
 }
@@ -65,35 +65,35 @@ export interface Barrier {
 export interface Location {
   code: string;
   name: string;
-  tipo: string;
+  type: string;
 }
 
 export interface KpiSnapshot {
   total: number;
-  disponivel: number;
-  foraDeOp: number;
-  indispCont: number;
-  degrCont: number;
-  degradado: number;
-  indisponivel: number;
-  conforme: number;
-  naoConforme: number;
-  pctConforme: number;
-  criticasNC: number;
+  available: number;
+  outOfService: number;
+  contingencyOutage: number;
+  degradedContingency: number;
+  degraded: number;
+  unavailable: number;
+  compliant: number;
+  nonCompliant: number;
+  pctCompliant: number;
+  criticalNonCompliant: number;
   // Dynamic buckets - the fixed fields above are the well-known fast path,
   // these maps carry EVERY value present in the data (including future ones)
   // so totals always reconcile and new statuses never go missing. Keyed by
   // display string (computeKpi and resolveKpi both produce string keys).
   // Optional for backward compat with old wire snapshots; StatusBand falls
   // back to fixed fields when absent (known statuses only).
-  byDisponibilidade?: Record<string, number>;
-  byConformidade?: Record<string, number>;
-  byCriticidade?: Record<string, number>;
+  byAvailability?: Record<string, number>;
+  byCompliance?: Record<string, number>;
+  byCriticality?: Record<string, number>;
   // Server time when the snapshot was computed (ISO). Absent in mock mode.
   syncedAt?: string;
 }
 
-export interface CategoryConformidade {
+export interface CategoryCompliance {
   name: string;
   Conforme: number;
   "Não Conforme": number;
@@ -103,27 +103,27 @@ export interface CategoryConformidade {
 // for server-paginated mode, where the client never holds the full dataset.
 export interface Vocabularies {
   locations: { code: string; count: number }[];
-  disponibilidades: string[];
-  conformidades: string[];
-  categorias: string[];
+  availabilities: string[];
+  compliances: string[];
+  categories: string[];
 }
 
 export type SortableColumn = keyof Pick<
   Barrier,
   | "id"
   | "tag"
-  | "criticidade"
-  | "categoria"
-  | "disponibilidade"
-  | "conformidade"
+  | "criticality"
+  | "category"
+  | "availability"
+  | "compliance"
   | "statusSince"
 >;
 
 export interface FilterState {
   query: string;
-  disponibilidade: string;
-  conformidade: string;
-  categoria: string;
+  availability: string;
+  compliance: string;
+  category: string;
   page: number;
   pageSize: number;
   sortCol: SortableColumn;

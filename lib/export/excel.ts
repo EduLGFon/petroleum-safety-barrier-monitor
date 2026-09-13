@@ -9,10 +9,15 @@ import {
   pill,
   ts,
 } from "./html.ts";
+
 import { CONF_COLORS, DISP_COLORS } from "../constants.ts";
+
 import { kpiStats, summaryRows } from "./summary.ts";
-import { withBrand } from "../company.ts";
+
 import type { Barrier } from "../types.ts";
+
+import { withBrand } from "../company.ts";
+
 import { row } from "./rows.ts";
 
 const HEADERS = [
@@ -102,19 +107,19 @@ export function exportToExcel(
     kpiCell("Total", stats.total, "#EFF6FF", "#1E3A5F", 4) +
     kpiCell(
       "Conformes",
-      `${stats.conformes} · ${stats.pct}`,
+      `${stats.compliant} · ${stats.pct}`,
       "#ECFDF5",
       "#15803D",
       4,
     ) +
-    kpiCell("Não conformes", stats.naoConformes, "#FEF2F2", "#B91C1C", 3) +
-    kpiCell("Críticas NC", stats.criticas, "#FFF7ED", "#C2410C", 3) +
+    kpiCell("Não conformes", stats.nonCompliant, "#FEF2F2", "#B91C1C", 3) +
+    kpiCell("Críticas NC", stats.critical, "#FFF7ED", "#C2410C", 3) +
     `</tr>`;
   const body = barriers.map((b, idx) => {
     const bg = idx % 2 === 0 ? "#F8FAFC" : "#FFFFFF";
-    const disp = DISP_COLORS[String(b.disponibilidade)]?.solid ?? "#64748b";
-    const conf = CONF_COLORS[String(b.conformidade)]?.solid ?? "#64748b";
-    const isCrit = b.criticidade === "Crítica";
+    const disp = DISP_COLORS[String(b.availability)]?.solid ?? "#64748b";
+    const conf = CONF_COLORS[String(b.compliance)]?.solid ?? "#64748b";
+    const isCrit = b.criticality === "Crítica";
     const cells = data[idx].map((v, ci) => {
       const base =
         "font-size:9pt;color:#1E293B;padding:3px 5px;white-space:normal;word-wrap:break-word;vertical-align:top;border:1pt solid #E2E8F0;";

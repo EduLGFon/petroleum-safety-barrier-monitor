@@ -4,22 +4,22 @@
 import type { Barrier, FilterState, SortableColumn } from "../types.ts";
 import { PAGE_SIZE_OPTS } from "../constants.ts";
 
-// Applies case-insensitive query (tag/loc/instalação/categoria) plus exact filters; empty strings mean no filter.
+// Applies case-insensitive query (tag/loc/location/category) plus exact filters; empty strings mean no filter.
 export function applyFilters(b: Barrier[], f: FilterState): Barrier[] {
   let d = b;
   if (f.query) {
     const q = f.query.toLowerCase();
     d = d.filter((x) =>
       x.tag.toLowerCase().includes(q) || x.locDesc.toLowerCase().includes(q) ||
-      x.instalacao.toLowerCase().includes(q) ||
-      x.categoria.toLowerCase().includes(q)
+      x.location.toLowerCase().includes(q) ||
+      x.category.toLowerCase().includes(q)
     );
   }
-  if (f.disponibilidade) {
-    d = d.filter((x) => x.disponibilidade === f.disponibilidade);
+  if (f.availability) {
+    d = d.filter((x) => x.availability === f.availability);
   }
-  if (f.conformidade) d = d.filter((x) => x.conformidade === f.conformidade);
-  if (f.categoria) d = d.filter((x) => x.categoria === f.categoria);
+  if (f.compliance) d = d.filter((x) => x.compliance === f.compliance);
+  if (f.category) d = d.filter((x) => x.category === f.category);
   return d;
 }
 
@@ -54,9 +54,9 @@ export function paginate<T>(a: T[], p: number, s: number): T[] {
 export function defaultFilters(): FilterState {
   return {
     query: "",
-    disponibilidade: "",
-    conformidade: "",
-    categoria: "",
+    availability: "",
+    compliance: "",
+    category: "",
     page: 1,
     pageSize: 25,
     sortCol: "id",
@@ -68,10 +68,10 @@ export function defaultFilters(): FilterState {
 const SORT_COLS: SortableColumn[] = [
   "id",
   "tag",
-  "criticidade",
-  "categoria",
-  "disponibilidade",
-  "conformidade",
+  "criticality",
+  "category",
+  "availability",
+  "compliance",
   "statusSince",
 ];
 
@@ -86,12 +86,12 @@ export function sanitizeFilterPatch(raw: unknown): Partial<FilterState> {
     typeof v === "string" ? v.trim().slice(0, 200) : undefined;
   const query = text(r.query);
   if (query !== undefined) patch.query = query;
-  const disp = text(r.disponibilidade);
-  if (disp !== undefined) patch.disponibilidade = disp;
-  const conf = text(r.conformidade);
-  if (conf !== undefined) patch.conformidade = conf;
-  const cat = text(r.categoria);
-  if (cat !== undefined) patch.categoria = cat;
+  const disp = text(r.availability);
+  if (disp !== undefined) patch.availability = disp;
+  const conf = text(r.compliance);
+  if (conf !== undefined) patch.compliance = conf;
+  const cat = text(r.category);
+  if (cat !== undefined) patch.category = cat;
   if (Number.isInteger(r.page) && (r.page as number) > 0) {
     patch.page = Math.min(r.page as number, 100000);
   }

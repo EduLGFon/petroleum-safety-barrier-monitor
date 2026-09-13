@@ -3,10 +3,15 @@
 // a dedicated report node with print CSS (see static/styles.css) prints
 // only the data table.
 import { assertBrowser, escHtml, MAX_DOM_ROWS, pill, ts } from "./html.ts";
+
 import { CONF_COLORS, DISP_COLORS } from "../constants.ts";
+
 import { daysSince, humanDuration } from "../utils.ts";
-import { withBrand } from "../company.ts";
+
 import type { Barrier } from "../types.ts";
+
+import { withBrand } from "../company.ts";
+
 import { kpiStats } from "./summary.ts";
 
 const REPORT_ID = "print-report";
@@ -43,17 +48,17 @@ export function buildPrintReport(
     }</div></div>`;
   const chips = `<div style="display:flex;gap:8px;margin:10px 0 2px 0;">` +
     chip("Total", stats.total, "#EFF6FF", "#1E3A5F") +
-    chip(`Conformes · ${stats.pct}`, stats.conformes, "#ECFDF5", "#15803D") +
-    chip("Não conformes", stats.naoConformes, "#FEF2F2", "#B91C1C") +
-    chip("Críticas NC", stats.criticas, "#FFF7ED", "#C2410C") +
+    chip(`Conformes · ${stats.pct}`, stats.compliant, "#ECFDF5", "#15803D") +
+    chip("Não conformes", stats.nonCompliant, "#FEF2F2", "#B91C1C") +
+    chip("Críticas NC", stats.critical, "#FFF7ED", "#C2410C") +
     `</div>`;
   const body = barriers.map((b, idx) => {
     const bg = idx % 2 === 0 ? "#F8FAFC" : "#FFFFFF";
-    const disp = DISP_COLORS[String(b.disponibilidade)]?.solid ?? "#94a3b8";
-    const conf = CONF_COLORS[String(b.conformidade)]?.solid ?? "#94a3b8";
-    const dur = b.conformidade !== "Conforme" && b.statusSince
+    const disp = DISP_COLORS[String(b.availability)]?.solid ?? "#94a3b8";
+    const conf = CONF_COLORS[String(b.compliance)]?.solid ?? "#94a3b8";
+    const dur = b.compliance !== "Conforme" && b.statusSince
       ? humanDuration(daysSince(b.statusSince))
-      : "—";
+      : "-";
     const cell = (v: string, style = "") =>
       `<td style="font-size:7.5pt;padding:5px;color:#0F172A;border-bottom:1pt solid #E2E8F0;vertical-align:top;${style}">${
         escHtml(v)
@@ -61,20 +66,20 @@ export function buildPrintReport(
     return `<tr style="background:${bg};">` +
       cell(String(b.id), "text-align:right;color:#64748B;") +
       cell(b.tag, "font-family:Courier,monospace;font-weight:bold;") +
-      cell(b.instalacao) +
-      cell(b.categoria) +
-      cell(b.criticidade) +
+      cell(b.location) +
+      cell(b.category) +
+      cell(b.criticality) +
       `<td style="font-size:7.5pt;padding:5px;border-bottom:1pt solid #E2E8F0;text-align:center;">${
-        pill(b.disponibilidade, disp)
+        pill(b.availability, disp)
       }</td>` +
       cell(
         dur,
-        dur === "—" ? "text-align:center;" : "color:#EA580C;font-style:italic;",
+        dur === "-" ? "text-align:center;" : "color:#EA580C;font-style:italic;",
       ) +
       `<td style="font-size:7.5pt;padding:5px;border-bottom:1pt solid #E2E8F0;text-align:center;">${
-        pill(b.conformidade, conf)
+        pill(b.compliance, conf)
       }</td>` +
-      cell(b.planoAcao || "—") +
+      cell(b.actionPlan || "-") +
       `</tr>`;
   }).join("");
   const eyebrow = companyName

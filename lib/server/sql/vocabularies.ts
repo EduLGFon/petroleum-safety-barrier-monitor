@@ -16,29 +16,29 @@ export async function getVocabularies(): Promise<Vocabularies> {
     ),
     queryRows<{ label: string }>(
       `select distinct disp.label as label from barriers b
-       join disponibilidades disp on disp.id = b.disponibilidade_id
+       join availability_statuses disp on disp.id = b.availability_id
        where b.deleted_at is null
        order by disp.label`,
     ),
     queryRows<{ label: string }>(
-      `select distinct case when disp.is_conforme then 'Conforme'
+      `select distinct case when disp.is_compliant then 'Conforme'
          else 'Não Conforme' end as label
        from barriers b
-       join disponibilidades disp on disp.id = b.disponibilidade_id
+       join availability_statuses disp on disp.id = b.availability_id
        where b.deleted_at is null
        order by label`,
     ),
     queryRows<{ label: string }>(
       `select distinct cat.label as label from barriers b
-       join categorias cat on cat.id = b.categoria_id
+       join categories cat on cat.id = b.category_id
        where b.deleted_at is null
        order by cat.label`,
     ),
   ]);
   return {
     locations: locRows.map((r) => ({ code: r.code, count: Number(r.count) })),
-    disponibilidades: dispRows.map((r) => r.label),
-    conformidades: confRows.map((r) => r.label),
-    categorias: catRows.map((r) => r.label),
+    availabilities: dispRows.map((r) => r.label),
+    compliances: confRows.map((r) => r.label),
+    categories: catRows.map((r) => r.label),
   };
 }

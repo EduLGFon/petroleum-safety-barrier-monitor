@@ -1,5 +1,5 @@
-// Enum codes for location and barrier status (location/disponibilidade/conformidade/criticidade) - split from lib/enums.ts to keep files small; why: isolates core status resolvers used by filters and API wire format.
-import type { Conformidade, Criticidade, Disponibilidade } from "../types.ts";
+// Enum codes for location and barrier status (location/availability/compliance/criticality) - split from lib/enums.ts to keep files small; why: isolates core status resolvers used by filters and API wire format.
+import type { Availability, Compliance, Criticality } from "../types.ts";
 
 // ─── Generic helpers ──────────────────────────────────────────────────────
 
@@ -17,7 +17,7 @@ export function buildReverse<T extends string>(
 // ─── Location (Instalação) ────────────────────────────────────────────────
 // 0 = ALL is intentionally reserved as the "no filter / all locations" sentinel
 // Pattern for every domain below: toXId maps display string -> wire id
-// (undefined when unknown — callers must skip the filter and warn, never
+// (undefined when unknown - callers must skip the filter and warn, never
 // silently substitute a wrong known id). fromXId maps wire id -> display
 // string (explicit unknown sentinel, never a plausible known label).
 
@@ -39,9 +39,9 @@ export function fromLocationId(id: number): string {
   return LOCATION_CODES[id] ?? `ST-${id}`;
 }
 
-// ─── Disponibilidade (barrier availability status) ───────────────────────
+// ─── Availability (barrier status) ────────────────────────────────────────
 
-export const DISPONIBILIDADE_CODES: Record<number, Disponibilidade> = {
+export const AVAILABILITY_CODES: Record<number, Availability> = {
   0: "Disponível",
   1: "Fora de Operação",
   2: "Indisponível Contingenciado",
@@ -49,41 +49,41 @@ export const DISPONIBILIDADE_CODES: Record<number, Disponibilidade> = {
   4: "Degradado",
   5: "Indisponível",
 };
-export const DISPONIBILIDADE_IDS = buildReverse(DISPONIBILIDADE_CODES);
+export const AVAILABILITY_IDS = buildReverse(AVAILABILITY_CODES);
 
-export function toDisponibilidadeId(v: Disponibilidade): number | undefined {
-  return DISPONIBILIDADE_IDS[v];
+export function toAvailabilityId(v: Availability): number | undefined {
+  return AVAILABILITY_IDS[v];
 }
-export function fromDisponibilidadeId(id: number): Disponibilidade {
-  return DISPONIBILIDADE_CODES[id] ?? `Disponibilidade (${id})`;
+export function fromAvailabilityId(id: number): Availability {
+  return AVAILABILITY_CODES[id] ?? `Disponibilidade (${id})`;
 }
 
-// ─── Conformidade ─────────────────────────────────────────────────────────
+// ─── Compliance ───────────────────────────────────────────────────────────
 
-export const CONFORMIDADE_CODES: Record<number, Conformidade> = {
+export const COMPLIANCE_CODES: Record<number, Compliance> = {
   0: "Conforme",
   1: "Não Conforme",
 };
-export const CONFORMIDADE_IDS = buildReverse(CONFORMIDADE_CODES);
+export const COMPLIANCE_IDS = buildReverse(COMPLIANCE_CODES);
 
-export function toConformidadeId(v: Conformidade): number | undefined {
-  return CONFORMIDADE_IDS[v];
+export function toComplianceId(v: Compliance): number | undefined {
+  return COMPLIANCE_IDS[v];
 }
-export function fromConformidadeId(id: number): Conformidade {
-  return CONFORMIDADE_CODES[id] ?? `Conformidade (${id})`;
+export function fromComplianceId(id: number): Compliance {
+  return COMPLIANCE_CODES[id] ?? `Conformidade (${id})`;
 }
 
-// ─── Criticidade ──────────────────────────────────────────────────────────
+// ─── Criticality ──────────────────────────────────────────────────────────
 
-export const CRITICIDADE_CODES: Record<number, Criticidade> = {
+export const CRITICALITY_CODES: Record<number, Criticality> = {
   0: "Não Crítica",
   1: "Crítica",
 };
-export const CRITICIDADE_IDS = buildReverse(CRITICIDADE_CODES);
+export const CRITICALITY_IDS = buildReverse(CRITICALITY_CODES);
 
-export function toCriticidadeId(v: Criticidade): number | undefined {
-  return CRITICIDADE_IDS[v];
+export function toCriticalityId(v: Criticality): number | undefined {
+  return CRITICALITY_IDS[v];
 }
-export function fromCriticidadeId(id: number): Criticidade {
-  return CRITICIDADE_CODES[id] ?? `Criticidade (${id})`;
+export function fromCriticalityId(id: number): Criticality {
+  return CRITICALITY_CODES[id] ?? `Criticidade (${id})`;
 }

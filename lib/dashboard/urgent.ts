@@ -12,8 +12,8 @@ export type Urgency = "critical" | "urgent" | "none";
 // urgent is any other non-conforme (fail-closed: novel statuses count,
 // same as computeKpi and the NcAlert card); Conforme is none.
 export function urgencyOf(b: Barrier): Urgency {
-  if (b.conformidade === "Conforme") return "none";
-  return b.criticidade === "Crítica" ? "critical" : "urgent";
+  if (b.compliance === "Conforme") return "none";
+  return b.criticality === "Crítica" ? "critical" : "urgent";
 }
 
 // isUrgent: the detector and digest gate. Matches the NcAlert card count

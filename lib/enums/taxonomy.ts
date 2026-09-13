@@ -1,9 +1,9 @@
-// Enum codes for barrier taxonomy (categoria/agrupamento/tipologia/dono) - split from lib/enums.ts to keep files small; why: groups catalog-like domains used by filters and mock generator.
+// Enum codes for barrier taxonomy (category/grouping/typology/owner) - split from lib/enums.ts to keep files small; why: groups catalog-like domains used by filters and mock generator.
 import { buildReverse } from "./codes.ts";
 
-// ─── Categoria da barreira ────────────────────────────────────────────────
+// ─── Barrier category ────────────────────────────────────────────────────
 
-export const CATEGORIA_CODES: Record<number, string> = {
+export const CATEGORY_CODES: Record<number, string> = {
   0: "Válvula de Alívio de Pressão",
   1: "Alarmes de Emergência e Sirene",
   2: "Sistema de Detecção de Gás",
@@ -15,18 +15,18 @@ export const CATEGORIA_CODES: Record<number, string> = {
   8: "Sistema de Ventilação de Emergência",
   9: "Detector de H₂S",
 };
-export const CATEGORIA_IDS = buildReverse(CATEGORIA_CODES);
+export const CATEGORY_IDS = buildReverse(CATEGORY_CODES);
 
-export function toCategoriaId(v: string): number | undefined {
-  return CATEGORIA_IDS[v];
+export function toCategoryId(v: string): number | undefined {
+  return CATEGORY_IDS[v];
 }
-export function fromCategoriaId(id: number): string {
-  return CATEGORIA_CODES[id] ?? `Categoria (${id})`;
+export function fromCategoryId(id: number): string {
+  return CATEGORY_CODES[id] ?? `Categoria (${id})`;
 }
 
-// ─── Agrupamento ──────────────────────────────────────────────────────────
+// ─── Grouping ─────────────────────────────────────────────────────────────
 
-export const AGRUPAMENTO_CODES: Record<number, string> = {
+export const GROUPING_CODES: Record<number, string> = {
   0: "Sistemas de Alívio",
   1: "Evacuação, Resgate e Abandono",
   2: "Detecção e Monitoramento",
@@ -34,15 +34,15 @@ export const AGRUPAMENTO_CODES: Record<number, string> = {
   4: "Controle de Processo",
   5: "Proteção Elétrica",
 };
-export const AGRUPAMENTO_IDS = buildReverse(AGRUPAMENTO_CODES);
+export const GROUPING_IDS = buildReverse(GROUPING_CODES);
 
-export function fromAgrupamentoId(id: number): string {
-  return AGRUPAMENTO_CODES[id] ?? `Agrupamento (${id})`;
+export function fromGroupingId(id: number): string {
+  return GROUPING_CODES[id] ?? `Agrupamento (${id})`;
 }
 
-// ─── Tipologia da instalação ──────────────────────────────────────────────
+// ─── Installation typology ────────────────────────────────────────────────
 
-export const TIPOLOGIA_CODES: Record<number, string> = {
+export const TYPOLOGY_CODES: Record<number, string> = {
   0: "Estação Coletora",
   1: "Planta de Processamento",
   2: "Duto de Transferência",
@@ -50,15 +50,15 @@ export const TIPOLOGIA_CODES: Record<number, string> = {
   4: "Unidade de Compressão",
   5: "Unidade de Medição",
 };
-export const TIPOLOGIA_IDS = buildReverse(TIPOLOGIA_CODES);
+export const TYPOLOGY_IDS = buildReverse(TYPOLOGY_CODES);
 
-export function fromTipologiaId(id: number): string {
-  return TIPOLOGIA_CODES[id] ?? `Tipologia (${id})`;
+export function fromTypologyId(id: number): string {
+  return TYPOLOGY_CODES[id] ?? `Tipologia (${id})`;
 }
 
-// ─── Dono da barreira ─────────────────────────────────────────────────────
+// ─── Barrier owner ────────────────────────────────────────────────────────
 
-export const DONO_CODES: Record<number, string> = {
+export const OWNER_CODES: Record<number, string> = {
   0: "Equipe de Manutenção",
   1: "Operação FAL",
   2: "Engenharia de Processo",
@@ -66,9 +66,9 @@ export const DONO_CODES: Record<number, string> = {
   4: "Instrumentação",
   5: "Utilidades",
 };
-export const DONO_IDS = buildReverse(DONO_CODES);
+export const OWNER_IDS = buildReverse(OWNER_CODES);
 
-export function fromDonoId(id: number): string {
+export function fromOwnerId(id: number): string {
   if (id < 0) return "";
-  return DONO_CODES[id] ?? `Dono (${id})`;
+  return OWNER_CODES[id] ?? `Dono (${id})`;
 }

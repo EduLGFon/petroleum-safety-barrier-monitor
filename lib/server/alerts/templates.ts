@@ -6,9 +6,9 @@ import type { Urgency } from "../../dashboard/urgent.ts";
 
 export interface DigestEvent {
   tag: string;
-  instalacao: string;
-  disponibilidade: string;
-  criticidade: string;
+  location: string;
+  availability: string;
+  criticality: string;
   transitionDate: string;
   urgency: Urgency;
 }
@@ -28,8 +28,8 @@ export function urgentDigestSubject(count: number, critical: number): string {
 export function urgentDigestBody(events: DigestEvent[], runAt: string): string {
   const line = (e: DigestEvent): string => {
     const flag = e.urgency === "critical" ? "[CRÍTICA] " : "";
-    return `• ${flag}${e.tag} (${e.instalacao}) — ${e.disponibilidade} ` +
-      `desde ${e.transitionDate} · criticidade ${e.criticidade}`;
+    return `• ${flag}${e.tag} (${e.location}) - ${e.availability} ` +
+      `desde ${e.transitionDate} · criticidade ${e.criticality}`;
   };
   return [
     "Novas barreiras em estado urgente detectadas pelo monitor:",

@@ -7,16 +7,16 @@ import type { WireBarrier } from "../../wireTypes.ts";
 export interface BarrierRow {
   id: number;
   tag: string;
-  tipologia_id: number;
+  typology_id: number;
   location_id: number;
   loc_desc_id: number;
-  criticidade_id: number;
-  categoria_id: number;
-  agrupamento_id: number;
-  dono_id: number; // coalesced to -1 in SQL when NULL
-  disponibilidade_id: number;
-  comentarios: string;
-  plano_acao: string;
+  criticality_id: number;
+  category_id: number;
+  grouping_id: number;
+  owner_id: number; // coalesced to -1 in SQL when NULL
+  availability_id: number;
+  comments: string;
+  action_plan: string;
   status_since: string; // YYYY-MM-DD via to_char
   status_history: unknown; // json array (parsed object or string)
 }
@@ -47,16 +47,16 @@ export function toWireBarrier(r: BarrierRow): WireBarrier {
   return {
     id: r.id,
     tag: r.tag,
-    tipologiaId: r.tipologia_id,
+    typologyId: r.typology_id,
     locationId: r.location_id,
     locDescId: r.loc_desc_id,
-    criticidadeId: r.criticidade_id,
-    categoriaId: r.categoria_id,
-    agrupamentoId: r.agrupamento_id,
-    donoId: r.dono_id,
-    disponibilidadeId: r.disponibilidade_id,
-    comentarios: r.comentarios,
-    planoAcao: r.plano_acao,
+    criticalityId: r.criticality_id,
+    categoryId: r.category_id,
+    groupingId: r.grouping_id,
+    ownerId: r.owner_id,
+    availabilityId: r.availability_id,
+    comments: r.comments,
+    actionPlan: r.action_plan,
     statusSince: r.status_since,
     statusHistory: toHistory(r.status_history),
   };
@@ -64,9 +64,9 @@ export function toWireBarrier(r: BarrierRow): WireBarrier {
 
 // Shared column list + lateral history aggregation (one row per barrier).
 export const SELECT_COLUMNS = `
-  b.id, b.tag, b.tipologia_id, b.location_id, b.loc_desc_id, b.criticidade_id,
-  b.categoria_id, b.agrupamento_id, coalesce(b.dono_id, -1) as dono_id,
-  b.disponibilidade_id, b.comentarios, b.plano_acao,
+  b.id, b.tag, b.typology_id, b.location_id, b.loc_desc_id, b.criticality_id,
+  b.category_id, b.grouping_id, coalesce(b.owner_id, -1) as owner_id,
+  b.availability_id, b.comments, b.action_plan,
   to_char(b.status_since, 'YYYY-MM-DD') as status_since,
   coalesce(h.history, '[]'::json) as status_history
 `;

@@ -112,50 +112,50 @@ export async function getKpi(locationId?: number): Promise<WireKpiSnapshot> {
   const [rows, dispRows, confRows, critRows] = await Promise.all([
     queryRows<{
       total: string;
-      disponivel: string;
-      fora_de_op: string;
-      indisp_cont: string;
-      degr_cont: string;
-      degradado: string;
-      indisponivel: string;
-      conforme: string;
-      nao_conforme: string;
-      criticas_nc: string;
+      available: string;
+      out_of_service: string;
+      contingency_outage: string;
+      degraded_contingency: string;
+      degraded: string;
+      unavailable: string;
+      compliant: string;
+      non_compliant: string;
+      critical_non_compliant: string;
     }>(
       `select
         count(*)::text as total,
-        count(*) filter (where b.disponibilidade_id = 0)::text as disponivel,
-        count(*) filter (where b.disponibilidade_id = 1)::text as fora_de_op,
-        count(*) filter (where b.disponibilidade_id = 2)::text as indisp_cont,
-        count(*) filter (where b.disponibilidade_id = 3)::text as degr_cont,
-        count(*) filter (where b.disponibilidade_id = 4)::text as degradado,
-        count(*) filter (where b.disponibilidade_id = 5)::text as indisponivel,
-        count(*) filter (where b.conformidade_id = 0)::text as conforme,
-        count(*) filter (where b.conformidade_id = 1)::text as nao_conforme,
-        count(*) filter (where b.conformidade_id = 1 and b.criticidade_id = 1)::text as criticas_nc
+        count(*) filter (where b.availability_id = 0)::text as available,
+        count(*) filter (where b.availability_id = 1)::text as out_of_service,
+        count(*) filter (where b.availability_id = 2)::text as contingency_outage,
+        count(*) filter (where b.availability_id = 3)::text as degraded_contingency,
+        count(*) filter (where b.availability_id = 4)::text as degraded,
+        count(*) filter (where b.availability_id = 5)::text as unavailable,
+        count(*) filter (where b.compliance_id = 0)::text as compliant,
+        count(*) filter (where b.compliance_id = 1)::text as non_compliant,
+        count(*) filter (where b.compliance_id = 1 and b.criticality_id = 1)::text as critical_non_compliant
       from barriers b ${scopeText}`,
       scopeArgs,
     ),
     queryRows<{ id: string; count: string }>(
-      `select b.disponibilidade_id::text as id, count(*)::text as count
-       from barriers b ${scopeText} group by b.disponibilidade_id`,
+      `select b.availability_id::text as id, count(*)::text as count
+       from barriers b ${scopeText} group by b.availability_id`,
       scopeArgs,
     ),
     queryRows<{ id: string; count: string }>(
-      `select b.conformidade_id::text as id, count(*)::text as count
-       from barriers b ${scopeText} group by b.conformidade_id`,
+      `select b.compliance_id::text as id, count(*)::text as count
+       from barriers b ${scopeText} group by b.compliance_id`,
       scopeArgs,
     ),
     queryRows<{ id: string; count: string }>(
-      `select b.criticidade_id::text as id, count(*)::text as count
-       from barriers b ${scopeText} group by b.criticidade_id`,
+      `select b.criticality_id::text as id, count(*)::text as count
+       from barriers b ${scopeText} group by b.criticality_id`,
       scopeArgs,
     ),
   ]);
 
   const r = rows[0];
   const total = Number(r?.total ?? 0);
-  const conforme = Number(r?.conforme ?? 0);
+  const compliant = Number(r?.compliant ?? 0);
 
   // Collects GROUP BY rows into id-keyed buckets (wire keys stay numeric).
   const toBucket = (bucketRows: { id: string; count: string }[]) => {
@@ -166,26 +166,26 @@ export async function getKpi(locationId?: number): Promise<WireKpiSnapshot> {
 
   return {
     total,
-    disponivel: Number(r?.disponivel ?? 0),
-    foraDeOp: Number(r?.fora_de_op ?? 0),
-    indispCont: Number(r?.indisp_cont ?? 0),
-    degrCont: Number(r?.degr_cont ?? 0),
-    degradado: Number(r?.degradado ?? 0),
-    indisponivel: Number(r?.indisponivel ?? 0),
-    conforme,
-    naoConforme: Number(r?.nao_conforme ?? 0),
-    criticasNC: Number(r?.criticas_nc ?? 0),
-    pctConforme: total > 0 ? Math.round((conforme / total) * 100) : 0,
-    byDisponibilidade: toBucket(dispRows),
-    byConformidade: toBucket(confRows),
-    byCriticidade: toBucket(critRows),
+    available: Number(r?.available ?? 0),
+    outOfService: Number(r?.out_of_service ?? 0),
+    contingencyOutage: Number(r?.contingency_outage ?? 0),
+    degradedContingency: Number(r?.degraded_contingency ?? 0),
+    degraded: Number(r?.degraded ?? 0),
+    unavailable: Number(r?.unavailable ?? 0),
+    compliant,
+    nonCompliant: Number(r?.non_compliant ?? 0),
+    criticalNonCompliant: Number(r?.critical_non_compliant ?? 0),
+    pctCompliant: total > 0 ? Math.round((compliant / total) * 100) : 0,
+    byAvailability: toBucket(dispRows),
+    byCompliance: toBucket(confRows),
+    byCriticality: toBucket(critRows),
     syncedAt: new Date().toISOString(),
   };
 }
 
 // The one write path: calls record_status_change() (see db/schema.sql),
-// which updates disponibilidade_id + status_since and appends history.
-// Never UPDATE disponibilidade_id directly from application code.
+// which updates availability_id + status_since and appends history.
+// Never UPDATE availability_id directly from application code.
 export async function transitionBarrierStatus(
   barrierId: number,
   statusId: number,

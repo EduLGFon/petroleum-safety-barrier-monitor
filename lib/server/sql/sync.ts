@@ -3,7 +3,6 @@
 // barriers + history + sync_state. Every write is idempotent (UNIQUE
 // external_code + where guards), status changes go through the one sanctioned
 // record_status_change() path, and deletions are soft (deleted_at).
-import { queryRows } from "../db.ts";
 import {
   fieldsSignature,
   type LocalBarrier,
@@ -11,7 +10,10 @@ import {
   type PlanEntry,
   type SyncIo,
 } from "../fracttal/sync.ts";
+
 import type { MapContext } from "../fracttal/map.ts";
+
+import { queryRows } from "../db.ts";
 
 export const SYNC_AUTHOR_ID = 10; // authors.id, see db/seed_lookups.sql
 
@@ -41,18 +43,18 @@ export const defaultSyncIo: SyncIo = {
         `select id, code from locations`,
       ),
       queryRows<{ id: number; label: string }>(
-        `select id, label from categorias`,
+        `select id, label from categories`,
       ),
       queryRows<{ id: number; label: string }>(
-        `select id, label from criticidades`,
+        `select id, label from criticality_levels`,
       ),
     ]);
     const ctx: MapContext = {
       locationIds: Object.fromEntries(
         locRows.map((r) => [r.code.toUpperCase(), r.id]),
       ),
-      categoriaIds: Object.fromEntries(catRows.map((r) => [r.label, r.id])),
-      criticidadeIds: Object.fromEntries(critRows.map((r) => [r.label, r.id])),
+      categoryIds: Object.fromEntries(catRows.map((r) => [r.label, r.id])),
+      criticalityIds: Object.fromEntries(critRows.map((r) => [r.label, r.id])),
     };
     return ctx;
   },
@@ -63,21 +65,21 @@ export const defaultSyncIo: SyncIo = {
       id: number;
       external_code: string;
       location_id: number;
-      disponibilidade_id: number;
+      availability_id: number;
       deleted_at: string | null;
       tag: string;
-      tipologia_id: number;
+      typology_id: number;
       loc_desc_id: number;
-      criticidade_id: number;
-      categoria_id: number;
-      agrupamento_id: number;
-      dono_id: number | null;
-      comentarios: string;
-      plano_acao: string;
+      criticality_id: number;
+      category_id: number;
+      grouping_id: number;
+      owner_id: number | null;
+      comments: string;
+      action_plan: string;
     }>(
-      `select id, external_code, location_id, disponibilidade_id, deleted_at,
-        tag, tipologia_id, loc_desc_id, criticidade_id, categoria_id,
-        agrupamento_id, dono_id, comentarios, plano_acao
+      `select id, external_code, location_id, availability_id, deleted_at,
+        tag, typology_id, loc_desc_id, criticality_id, category_id,
+        grouping_id, owner_id, comments, action_plan
        from barriers
        where external_code is not null
        order by id`,
@@ -88,19 +90,19 @@ export const defaultSyncIo: SyncIo = {
       .map((r) => ({
         id: r.id,
         externalCode: r.external_code,
-        disponibilidadeId: r.disponibilidade_id,
+        availabilityId: r.availability_id,
         deletedAt: r.deleted_at,
         signature: fieldsSignature({
           tag: r.tag,
           locationId: r.location_id,
-          tipologiaId: r.tipologia_id,
+          typologyId: r.typology_id,
           locDescId: r.loc_desc_id,
-          criticidadeId: r.criticidade_id,
-          categoriaId: r.categoria_id,
-          agrupamentoId: r.agrupamento_id,
-          donoId: r.dono_id,
-          comentarios: r.comentarios,
-          planoAcao: r.plano_acao,
+          criticalityId: r.criticality_id,
+          categoryId: r.category_id,
+          groupingId: r.grouping_id,
+          ownerId: r.owner_id,
+          comments: r.comments,
+          actionPlan: r.action_plan,
         }),
       }));
   },
@@ -141,14 +143,14 @@ export const defaultSyncIo: SyncIo = {
             "select record_status_change($1, $2, $3, $4)",
             [
               id,
-              input.disponibilidadeId,
+              input.availabilityId,
               SYNC_AUTHOR_ID,
               "Importado do Fracttal",
             ],
           );
           counts.inserts++;
         } else {
-          // Race: the unique external_code constraint won — another run
+          // Race: the unique external_code constraint won - another run
           // inserted this row first. Count as a skip, not an error.
           counts.skips++;
         }
@@ -157,22 +159,22 @@ export const defaultSyncIo: SyncIo = {
       // update / restore: same field write; restore clears deleted_at.
       await queryRows(
         `update barriers set
-           tag = $2, tipologia_id = $3, loc_desc_id = $4, criticidade_id = $5,
-           categoria_id = $6, agrupamento_id = $7, dono_id = $8,
-           comentarios = $9, plano_acao = $10, source_updated_at = $11,
+           tag = $2, typology_id = $3, loc_desc_id = $4, criticality_id = $5,
+           category_id = $6, grouping_id = $7, owner_id = $8,
+           comments = $9, action_plan = $10, source_updated_at = $11,
            deleted_at = case when $12 then null else deleted_at end
          where id = $1`,
         [
           entry.local.id,
           input.tag,
-          input.tipologiaId,
+          input.typologyId,
           input.locDescId,
-          input.criticidadeId,
-          input.categoriaId,
-          input.agrupamentoId,
-          input.donoId,
-          input.comentarios,
-          input.planoAcao,
+          input.criticalityId,
+          input.categoryId,
+          input.groupingId,
+          input.ownerId,
+          input.comments,
+          input.actionPlan,
           input.sourceUpdatedAt,
           entry.kind === "restore",
         ],
@@ -182,7 +184,7 @@ export const defaultSyncIo: SyncIo = {
           "select record_status_change($1, $2, $3, $4)",
           [
             entry.local.id,
-            input.disponibilidadeId,
+            input.availabilityId,
             SYNC_AUTHOR_ID,
             "Sincronização Fracttal",
           ],
@@ -224,22 +226,22 @@ async function insertBarrier(input: {
   externalCode: string;
   tag: string;
   locationId: number;
-  tipologiaId: number;
+  typologyId: number;
   locDescId: number;
-  criticidadeId: number;
-  categoriaId: number;
-  agrupamentoId: number;
-  donoId: number | null;
-  disponibilidadeId: number;
-  comentarios: string;
-  planoAcao: string;
+  criticalityId: number;
+  categoryId: number;
+  groupingId: number;
+  ownerId: number | null;
+  availabilityId: number;
+  comments: string;
+  actionPlan: string;
   sourceUpdatedAt: string | null;
 }): Promise<number | null> {
   const rows = await queryRows<{ id: number }>(
     `insert into barriers
-       (external_code, tag, location_id, tipologia_id, loc_desc_id,
-        criticidade_id, categoria_id, agrupamento_id, dono_id,
-        disponibilidade_id, comentarios, plano_acao, status_since,
+       (external_code, tag, location_id, typology_id, loc_desc_id,
+        criticality_id, category_id, grouping_id, owner_id,
+        availability_id, comments, action_plan, status_since,
         source_updated_at)
      values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, current_date, $13)
      on conflict (external_code) do nothing
@@ -248,15 +250,15 @@ async function insertBarrier(input: {
       input.externalCode,
       input.tag,
       input.locationId,
-      input.tipologiaId,
+      input.typologyId,
       input.locDescId,
-      input.criticidadeId,
-      input.categoriaId,
-      input.agrupamentoId,
-      input.donoId,
-      input.disponibilidadeId,
-      input.comentarios,
-      input.planoAcao,
+      input.criticalityId,
+      input.categoryId,
+      input.groupingId,
+      input.ownerId,
+      input.availabilityId,
+      input.comments,
+      input.actionPlan,
       input.sourceUpdatedAt,
     ],
   );

@@ -1,6 +1,6 @@
 /**
  * ══════════════════════════════════════════════════════════════════════════
- * WIRE TYPES — the shape of data as it travels over the network
+ * WIRE TYPES - the shape of data as it travels over the network
  * ══════════════════════════════════════════════════════════════════════════
  * These mirror what a real backend would return: compact records using
  * numeric ids (see lib/enums.ts) instead of display strings. The API layer
@@ -11,7 +11,7 @@
 
 export interface WireStatusHistoryEntry {
   date: string; // ISO date
-  statusId: number; // -> Disponibilidade via fromDisponibilidadeId
+  statusId: number; // -> availability status via fromAvailabilityId
   authorId: number; // -> author name via fromAuthorId
   note: string;
 }
@@ -19,63 +19,63 @@ export interface WireStatusHistoryEntry {
 export interface WireBarrier {
   id: number;
   tag: string;
-  tipologiaId: number;
-  locationId: number; // instalação
+  typologyId: number;
+  locationId: number; // installation
   locDescId: number;
-  criticidadeId: number;
-  categoriaId: number;
-  agrupamentoId: number;
-  donoId: number; // -1 = none
-  disponibilidadeId: number;
-  // conformidadeId is intentionally OMITTED — it is always derived
-  // server-side (and re-derived client-side) from disponibilidadeId,
+  criticalityId: number;
+  categoryId: number;
+  groupingId: number;
+  ownerId: number; // -1 = none
+  availabilityId: number;
+  // complianceId is intentionally OMITTED - it is always derived
+  // server-side (and re-derived client-side) from availabilityId,
   // so it can never drift out of sync.
-  comentarios: string;
-  planoAcao: string;
+  comments: string;
+  actionPlan: string;
   statusSince: string; // ISO date
   statusHistory: WireStatusHistoryEntry[];
 }
 
 export interface WireKpiSnapshot {
   total: number;
-  disponivel: number;
-  foraDeOp: number;
-  indispCont: number;
-  degrCont: number;
-  degradado: number;
-  indisponivel: number;
-  conforme: number;
-  naoConforme: number;
-  pctConforme: number;
-  criticasNC: number;
+  available: number;
+  outOfService: number;
+  contingencyOutage: number;
+  degradedContingency: number;
+  degraded: number;
+  unavailable: number;
+  compliant: number;
+  nonCompliant: number;
+  pctCompliant: number;
+  criticalNonCompliant: number;
   // Dynamic buckets - keyed by numeric id as string (JSON keys are strings),
-  // e.g. byDisponibilidade {"0": 12, "6": 3}. resolveKpi translates these to
+  // e.g. byAvailability {"0": 12, "6": 3}. resolveKpi translates these to
   // display-string keys. Optional so old servers still parse; when absent the
   // UI falls back to fixed fields (known statuses only). New statuses must
   // appear here or they vanish from the band over HTTP.
-  byDisponibilidade?: Record<string, number>;
-  byConformidade?: Record<string, number>;
-  byCriticidade?: Record<string, number>;
+  byAvailability?: Record<string, number>;
+  byCompliance?: Record<string, number>;
+  byCriticality?: Record<string, number>;
   // Server time when the snapshot was computed (ISO). Lets the UI show
   // staleness once the dashboard moves to server-paginated mode.
   syncedAt?: string;
 }
 
-// Per-category Conforme totals for the chart. naoConforme is derived as
-// total - conforme (fail-closed: novel conformidade counts as NC, same as
+// Per-category compliant totals for the chart. nonCompliant is derived as
+// total - compliant (fail-closed: novel compliance counts as NC, same as
 // computeChartData), so new values never split the chart from the KPI.
-export interface WireCategoryConformidade {
-  categoriaId: number;
-  conforme: number;
+export interface WireCategoryCompliance {
+  categoryId: number;
+  compliant: number;
   total: number;
 }
 
 /** Query params accepted by GET /api/barriers */
 export interface BarriersQuery {
   locationId?: number;
-  disponibilidadeId?: number;
-  conformidadeId?: number;
-  categoriaId?: number;
+  availabilityId?: number;
+  complianceId?: number;
+  categoryId?: number;
   query?: string;
   // Inclusive ISO-date bounds (YYYY-MM-DD) applied to status_since.
   since?: string;

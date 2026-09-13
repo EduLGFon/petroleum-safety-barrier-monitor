@@ -2,18 +2,23 @@
 // This is why it exists: filters operate on raw WireBarrier[] using numeric
 // ids, exactly like a real SQL WHERE clause would, then resolves only the
 // final page to domain objects.
-import type { BarriersQuery, WireBarrier } from "../wireTypes.ts";
 import { computeChartData, computeKpi as computeKpiLocal } from "../utils.ts";
+
+import type { BarriersQuery, WireBarrier } from "../wireTypes.ts";
+
 import { resolveBarriers } from "../resolve.ts";
-import { fromLocationId } from "../enums.ts";
+
 import type { BarriersApi } from "./types.ts";
+
+import { fromLocationId } from "../enums.ts";
+
 import { getWireBarriers } from "../data.ts";
 
-const CONFORME_STATUS_IDS = new Set([0, 1, 2, 3]); // Disponível, Fora de Op., Ind.Cont., Degr.Cont.
+const COMPLIANT_STATUS_IDS = new Set([0, 1, 2, 3]); // Disponível, Fora de Op., Ind.Cont., Degr.Cont.
 
-// Derives conformidade id (0 Conforme / 1 Não Conforme) from disponibilidade id.
-function wireConformidadeId(dispId: number): number {
-  return CONFORME_STATUS_IDS.has(dispId) ? 0 : 1; // 0=Conforme 1=Não Conforme
+// Derives compliance id (0 Conforme / 1 Não Conforme) from availability id.
+function wireComplianceId(dispId: number): number {
+  return COMPLIANT_STATUS_IDS.has(dispId) ? 0 : 1; // 0=Conforme 1=Não Conforme
 }
 
 // Checks a wire barrier against numeric query filters (mock WHERE clause).
@@ -23,14 +28,14 @@ function matchesQuery(w: WireBarrier, q: BarriersQuery): boolean {
     w.locationId !== q.locationId
   ) return false;
   if (
-    q.disponibilidadeId !== undefined &&
-    w.disponibilidadeId !== q.disponibilidadeId
+    q.availabilityId !== undefined &&
+    w.availabilityId !== q.availabilityId
   ) return false;
   if (
-    q.conformidadeId !== undefined &&
-    wireConformidadeId(w.disponibilidadeId) !== q.conformidadeId
+    q.complianceId !== undefined &&
+    wireComplianceId(w.availabilityId) !== q.complianceId
   ) return false;
-  if (q.categoriaId !== undefined && w.categoriaId !== q.categoriaId) {
+  if (q.categoryId !== undefined && w.categoryId !== q.categoryId) {
     return false;
   }
   if (q.query) {
@@ -57,15 +62,15 @@ function sortWire(
         return (a.id - b.id) * dir;
       case "tag":
         return a.tag.localeCompare(b.tag, "pt-BR") * dir;
-      case "criticidade":
-        return (a.criticidadeId - b.criticidadeId) * dir;
-      case "categoria":
-        return (a.categoriaId - b.categoriaId) * dir;
-      case "disponibilidade":
-        return (a.disponibilidadeId - b.disponibilidadeId) * dir;
-      case "conformidade":
-        return (wireConformidadeId(a.disponibilidadeId) -
-          wireConformidadeId(b.disponibilidadeId)) * dir;
+      case "criticality":
+        return (a.criticalityId - b.criticalityId) * dir;
+      case "category":
+        return (a.categoryId - b.categoryId) * dir;
+      case "availability":
+        return (a.availabilityId - b.availabilityId) * dir;
+      case "compliance":
+        return (wireComplianceId(a.availabilityId) -
+          wireComplianceId(b.availabilityId)) * dir;
       case "statusSince":
         return a.statusSince.localeCompare(b.statusSince) * dir;
       default:

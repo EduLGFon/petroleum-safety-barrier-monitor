@@ -1,10 +1,10 @@
 /**
  * ══════════════════════════════════════════════════════════════════════════
- * MOCK DATA SOURCE — generates deterministic WireBarrier[] records
+ * MOCK DATA SOURCE - generates deterministic WireBarrier[] records
  * ══════════════════════════════════════════════════════════════════════════
  * This simulates what a real backend database would return: rows keyed by
  * numeric ids (see lib/enums.ts), never display strings. Swap this file for
- * a real HTTP fetch and nothing else in the app needs to change — the
+ * a real HTTP fetch and nothing else in the app needs to change - the
  * contract is `WireBarrier[]`, resolved later by lib/resolve.ts.
  */
 

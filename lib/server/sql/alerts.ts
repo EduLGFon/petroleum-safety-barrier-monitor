@@ -2,7 +2,6 @@
 // This is why it exists: enqueue is INSERT ... ON CONFLICT DO NOTHING on
 // the UNIQUE dedup_key (reruns enqueue zero), sends flip sent_at, failures
 // accumulate in the payload until the dead-letter budget is spent.
-import { queryRows } from "../db.ts";
 import type {
   AlertPayload,
   AlertStore,
@@ -10,6 +9,8 @@ import type {
   TransitionCandidate,
   UnsentAlert,
 } from "../alerts/store.ts";
+
+import { queryRows } from "../db.ts";
 
 interface EventRow {
   id: number;

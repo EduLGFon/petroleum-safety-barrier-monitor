@@ -15,9 +15,9 @@ export function daysSince(d: string): number {
 }
 
 // Formats day count as pt-BR duration (dia/semana/mês/ano); days < 2 collapses to "1 dia".
-// Non-finite input renders "—" instead of "NaN anos".
+// Non-finite input renders "-" instead of "NaN anos".
 export function humanDuration(days: number): string {
-  if (!Number.isFinite(days)) return "—";
+  if (!Number.isFinite(days)) return "-";
   if (days < 2) return "1 dia";
   if (days < 7) return `${days} dias`;
   if (days < 14) return "1 semana";

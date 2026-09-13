@@ -5,13 +5,15 @@
 // a dry-run flag. Real SQL I/O comes from lib/server/sql/sync.ts via
 // defaultSyncIo (imported lazily so fixtures/tests can run without a DB).
 import type { MapContext, SyncBarrierInput } from "./map.ts";
-import { mapAsset } from "./map.ts";
+
 import { parsePage } from "./client.ts";
+
+import { mapAsset } from "./map.ts";
 
 export interface LocalBarrier {
   id: number;
   externalCode: string;
-  disponibilidadeId: number;
+  availabilityId: number;
   deletedAt: string | null;
   signature: string;
 }
@@ -67,31 +69,31 @@ export type SignatureSource = Pick<
   SyncBarrierInput,
   | "tag"
   | "locationId"
-  | "tipologiaId"
+  | "typologyId"
   | "locDescId"
-  | "criticidadeId"
-  | "categoriaId"
-  | "agrupamentoId"
-  | "donoId"
-  | "comentarios"
-  | "planoAcao"
+  | "criticalityId"
+  | "categoryId"
+  | "groupingId"
+  | "ownerId"
+  | "comments"
+  | "actionPlan"
 >;
 
 // fieldsSignature: two rows with the same signature and status are identical
-// and never rewritten. ORDER IS PART OF THE CONTRACT — keep in step with the
+// and never rewritten. ORDER IS PART OF THE CONTRACT - keep in step with the
 // stored signature built by lib/server/sql/sync.ts.
 export function fieldsSignature(input: SignatureSource): string {
   return JSON.stringify([
     input.tag,
     input.locationId,
-    input.tipologiaId,
+    input.typologyId,
     input.locDescId,
-    input.criticidadeId,
-    input.categoriaId,
-    input.agrupamentoId,
-    input.donoId,
-    input.comentarios,
-    input.planoAcao,
+    input.criticalityId,
+    input.categoryId,
+    input.groupingId,
+    input.ownerId,
+    input.comments,
+    input.actionPlan,
   ]);
 }
 
@@ -114,8 +116,7 @@ export function planReconcile(
       continue;
     }
     const signature = fieldsSignature(input);
-    const statusChanged =
-      existing.disponibilidadeId !== input.disponibilidadeId;
+    const statusChanged = existing.availabilityId !== input.availabilityId;
     if (existing.deletedAt !== null) {
       entries.push({ kind: "restore", local: existing, input, statusChanged });
       continue;
@@ -188,7 +189,7 @@ export function getDefaultSyncIo(): Promise<SyncIo> {
 // runSync: parse -> map -> reconcile -> (apply unless dry-run), then an
 // audit row in sync_state. Failed runs are recorded and rethrown so the
 // caller (script / later ops notifier) can alert separately from barrier
-// alerts — failures must never go silent.
+// alerts - failures must never go silent.
 export async function runSync(
   source: () => Promise<unknown[]>,
   options: SyncOptions = {},

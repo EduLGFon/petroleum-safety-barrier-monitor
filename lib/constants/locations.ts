@@ -2,13 +2,13 @@
 import type { Location } from "../types.ts";
 
 export const LOCATIONS: Location[] = [
-  { code: "ALL", name: "Todas", tipo: "Todas as Instalações" },
-  { code: "FAL", name: "FAL", tipo: "Estação Coletora" },
-  { code: "CNC", name: "CNC", tipo: "Concessão Norte-Centro" },
-  { code: "CNS", name: "CNS", tipo: "Concessão Norte-Sul" },
-  { code: "FAP", name: "FAP", tipo: "Planta de Processamento" },
-  { code: "RJO", name: "RJO", tipo: "Base Operacional Rio" },
-  { code: "SPL", name: "SPL", tipo: "Base Operacional SP" },
+  { code: "ALL", name: "Todas", type: "Todas as Instalações" },
+  { code: "FAL", name: "FAL", type: "Estação Coletora" },
+  { code: "CNC", name: "CNC", type: "Concessão Norte-Centro" },
+  { code: "CNS", name: "CNS", type: "Concessão Norte-Sul" },
+  { code: "FAP", name: "FAP", type: "Planta de Processamento" },
+  { code: "RJO", name: "RJO", type: "Base Operacional Rio" },
+  { code: "SPL", name: "SPL", type: "Base Operacional SP" },
 ];
 
 // id-keyed variant used by the mock data generator (mirrors LOCATION_CODES in lib/enums.ts)

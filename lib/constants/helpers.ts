@@ -1,15 +1,15 @@
 // Small pure helpers for status checks and distinct lists - split from lib/constants.ts to keep files small; why: shared data utilities used by filters and resolve logic.
-import type { Disponibilidade } from "../types.ts";
+import type { Availability } from "../types.ts";
 
-const CONFORME_STATUSES: Disponibilidade[] = [
+const COMPLIANT_STATUSES: Availability[] = [
   "Disponível",
   "Fora de Operação",
   "Indisponível Contingenciado",
   "Degradado Contingenciado",
 ];
-// True for statuses counted as Conforme (Disponível + contingenciados).
-export function isConforme(s: Disponibilidade): boolean {
-  return CONFORME_STATUSES.includes(s);
+// True for statuses counted as "Conforme" (Disponível + contingency ones).
+export function isCompliant(s: Availability): boolean {
+  return COMPLIANT_STATUSES.includes(s);
 }
 
 /** Distinct option values present in the data, sorted by frequency then name.

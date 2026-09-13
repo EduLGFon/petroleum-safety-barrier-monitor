@@ -5,7 +5,7 @@
 import type {
   BarriersResponse,
   WireBarrier,
-  WireCategoryConformidade,
+  WireCategoryCompliance,
   WireKpiSnapshot,
 } from "../wireTypes.ts";
 import { resolveBarriers, resolveChartData, resolveKpi } from "../resolve.ts";
@@ -61,7 +61,7 @@ export function httpAdapterFactory(baseUrl: string): BarriersApi {
     // HTTP getChartData: fetches wire per-category totals and resolves rows.
     async getChartData(query) {
       const qs = buildQueryString(query);
-      const items = await fetchJson<WireCategoryConformidade[]>(
+      const items = await fetchJson<WireCategoryCompliance[]>(
         `/api/chart?${qs}`,
       );
       return resolveChartData(items);

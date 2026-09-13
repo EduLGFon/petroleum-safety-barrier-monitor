@@ -1,6 +1,6 @@
 /**
  * ══════════════════════════════════════════════════════════════════════════
- * ENUM RESOLVERS — numeric ⇄ string mapping for every domain constant
+ * ENUM RESOLVERS - numeric ⇄ string mapping for every domain constant
  * ══════════════════════════════════════════════════════════════════════════
  * A real backend/API exchanges compact integer codes instead of strings
  * (smaller payloads, locale-independent, safe to rename display labels

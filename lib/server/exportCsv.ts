@@ -4,9 +4,12 @@
 // mapping), csvCell (quoting) and summaryRows (RESUMO block). Only the
 // transport differs: here a ReadableStream instead of a browser Blob.
 import { CSV_HEADERS, csvCell } from "../export/csv.ts";
-import { row } from "../export/rows.ts";
+
 import { summaryRows } from "../export/summary.ts";
+
 import type { Barrier } from "../types.ts";
+
+import { row } from "../export/rows.ts";
 
 // EXPORT_MAX_ROWS: hard cap on one export. listBarriers allows far larger
 // pages, but a CSV beyond this is a report job, not a download - the route

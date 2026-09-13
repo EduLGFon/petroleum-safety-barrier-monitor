@@ -1,6 +1,6 @@
 /**
  * ══════════════════════════════════════════════════════════════════════════
- * UNIFIED API CLIENT — single entry point that feeds the entire dashboard
+ * UNIFIED API CLIENT - single entry point that feeds the entire dashboard
  * ══════════════════════════════════════════════════════════════════════════
  * Barrel over lib/api/*: types, query conversion, mock and HTTP adapters.
  * Every consumer reads data exclusively through this module (`api.*`).
@@ -38,5 +38,5 @@ export const api: BarriersApi = API_MODE === "http" && API_BASE_URL
   ? httpAdapterFactory(API_BASE_URL)
   : mockAdapter;
 
-/** Always the in-memory mock, regardless of API_MODE — useful for tests/debugging */
+/** Always the in-memory mock, regardless of API_MODE - useful for tests/debugging */
 export const mockApi = mockAdapter;

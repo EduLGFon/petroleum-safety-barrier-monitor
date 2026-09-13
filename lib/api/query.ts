@@ -2,9 +2,9 @@
 // This is why it exists: one place for toWireQuery (with unknown-value
 // warnings) and buildQueryString, shared by mock and HTTP adapters.
 import {
-  toCategoriaId,
-  toConformidadeId,
-  toDisponibilidadeId,
+  toAvailabilityId,
+  toCategoryId,
+  toComplianceId,
   toLocationId,
 } from "../enums.ts";
 import type { BarriersQuery } from "../wireTypes.ts";
@@ -19,7 +19,7 @@ export function cleanDateParam(v: string | undefined): string | undefined {
 
 /** Converts UI-facing string filters into the numeric wire query the API expects.
  *  Unknown vocabulary values are skipped (with a warning) instead of silently
- *  mapping to a wrong known id — the server will learn the new value first. */
+ *  mapping to a wrong known id - the server will learn the new value first. */
 export function toWireQuery(f: DomainQuery): BarriersQuery {
   const q: BarriersQuery = {};
   if (f.location && f.location !== "ALL") {
@@ -28,25 +28,25 @@ export function toWireQuery(f: DomainQuery): BarriersQuery {
       console.warn(`[toWireQuery] unknown location: ${f.location}`);
     } else q.locationId = id;
   }
-  if (f.disponibilidade) {
-    const id = toDisponibilidadeId(f.disponibilidade as never);
+  if (f.availability) {
+    const id = toAvailabilityId(f.availability as never);
     if (id === undefined) {
       console.warn(
-        `[toWireQuery] unknown disponibilidade: ${f.disponibilidade}`,
+        `[toWireQuery] unknown availability: ${f.availability}`,
       );
-    } else q.disponibilidadeId = id;
+    } else q.availabilityId = id;
   }
-  if (f.conformidade) {
-    const id = toConformidadeId(f.conformidade as never);
+  if (f.compliance) {
+    const id = toComplianceId(f.compliance as never);
     if (id === undefined) {
-      console.warn(`[toWireQuery] unknown conformidade: ${f.conformidade}`);
-    } else q.conformidadeId = id;
+      console.warn(`[toWireQuery] unknown compliance: ${f.compliance}`);
+    } else q.complianceId = id;
   }
-  if (f.categoria) {
-    const id = toCategoriaId(f.categoria);
+  if (f.category) {
+    const id = toCategoryId(f.category);
     if (id === undefined) {
-      console.warn(`[toWireQuery] unknown categoria: ${f.categoria}`);
-    } else q.categoriaId = id;
+      console.warn(`[toWireQuery] unknown category: ${f.category}`);
+    } else q.categoryId = id;
   }
   if (f.query) q.query = f.query;
   const since = cleanDateParam(f.since);

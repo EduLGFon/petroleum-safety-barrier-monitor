@@ -2,8 +2,10 @@
 // This is why it exists: the lightweight plain-text fallback when styled
 // spreadsheet or print output is overkill. Headers and pt-BR formatting only.
 import { assertBrowser, download } from "./html.ts";
-import { row } from "./rows.ts";
+
 import type { Barrier } from "../types.ts";
+
+import { row } from "./rows.ts";
 
 // ;-quote-escapes one CSV cell (double quotes double); shared by export so tests
 // can cover the escaping that otherwise only runs inside a browser download.

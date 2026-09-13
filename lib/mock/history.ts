@@ -30,7 +30,7 @@ const STATUS_DIST: [number, number][] = [
 const HISTORY_NOTES_BY_STATUS_ID: Record<number, readonly string[]> = {
   0: [
     "Equipamento retornou ao serviço após manutenção corretiva.",
-    "Inspeção de rotina concluída — dentro dos parâmetros operacionais.",
+    "Inspeção de rotina concluída - dentro dos parâmetros operacionais.",
     "Comissionamento realizado com sucesso pela equipe técnica.",
   ],
   1: [
@@ -39,13 +39,13 @@ const HISTORY_NOTES_BY_STATUS_ID: Record<number, readonly string[]> = {
     "Aguardando janela de manutenção na próxima parada geral.",
   ],
   2: [
-    "Plano de contingência ativado — operação via sistema redundante.",
+    "Plano de contingência ativado - operação via sistema redundante.",
     "Indisponibilidade contingenciada conforme procedimento operacional.",
     "Contingência definida pelo time de engenharia. Monitoramento intensificado.",
   ],
   3: [
     "Degradação controlada com contingência ativa. Peça em pedido.",
-    "Atuador com resposta lenta — contingência ativada conforme procedimento.",
+    "Atuador com resposta lenta - contingência ativada conforme procedimento.",
     "Sensor fora da faixa. Contingência operacional aplicada.",
   ],
   4: [
@@ -62,13 +62,13 @@ const HISTORY_NOTES_BY_STATUS_ID: Record<number, readonly string[]> = {
 
 export const COMMENTS = [
   "Aguardando aprovação para manutenção programada.",
-  "Inspeção realizada em campo — peça em pedido ao almoxarifado.",
+  "Inspeção realizada em campo - peça em pedido ao almoxarifado.",
   "Leitura instável nas últimas 48h. Monitorando.",
 ] as const;
 
 export const ACTION_PLANS = [
   "Substituição programada para próxima janela de manutenção.",
-  "Solicitação de compra emitida — OS #47221.",
+  "Solicitação de compra emitida - OS #47221.",
   "Aguardando liberação da área para intervenção corretiva.",
   "Avaliação de risco em andamento pelo time de engenharia.",
 ] as const;

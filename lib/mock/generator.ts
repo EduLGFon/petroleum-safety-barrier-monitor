@@ -1,10 +1,10 @@
 // Deterministic mock WireBarrier dataset generator with cache - split from lib/data.ts to keep files small; why: assembles the full mock API payload from rng/tags/history pieces.
 import {
-  AGRUPAMENTO_CODES,
-  CATEGORIA_CODES,
-  DONO_CODES,
+  CATEGORY_CODES,
+  GROUPING_CODES,
   LOC_DESC_CODES,
-  TIPOLOGIA_CODES,
+  OWNER_CODES,
+  TYPOLOGY_CODES,
 } from "../enums.ts";
 import { ACTION_PLANS, COMMENTS, generateHistory } from "./history.ts";
 import { LOCATION_DIST_BY_ID } from "../constants.ts";
@@ -47,37 +47,37 @@ export function getWireBarriers(): WireBarrier[] {
   const barriers: WireBarrier[] = [];
   let id = 1;
 
-  const catCount = Object.keys(CATEGORIA_CODES).length;
-  const tipoCount = Object.keys(TIPOLOGIA_CODES).length;
-  const agrCount = Object.keys(AGRUPAMENTO_CODES).length;
-  const donoCount = Object.keys(DONO_CODES).length;
+  const catCount = Object.keys(CATEGORY_CODES).length;
+  const typCount = Object.keys(TYPOLOGY_CODES).length;
+  const grpCount = Object.keys(GROUPING_CODES).length;
+  const ownerCount = Object.keys(OWNER_CODES).length;
   const locDescCount = Object.keys(LOC_DESC_CODES).length;
 
   for (const loc of LOCATION_DIST_BY_ID) {
-    const locCode = loc.code; // e.g. 'FAL' — used only for TAG text, not stored
+    const locCode = loc.code; // e.g. 'FAL' - used only for TAG text, not stored
 
     for (let i = 0; i < loc.count; i++) {
-      const catId = rng.int(0, catCount);
-      const dispId = pickStatusId(rng.next());
-      const { history, statusSince } = generateHistory(rng, dispId);
+      const categoryId = rng.int(0, catCount);
+      const availabilityId = pickStatusId(rng.next());
+      const { history, statusSince } = generateHistory(rng, availabilityId);
 
-      const hasDono = rng.bool(0.65);
-      const isNC = ![0, 1, 2, 3].includes(dispId); // matches isConforme logic by id
+      const hasOwner = rng.bool(0.65);
+      const isNC = ![0, 1, 2, 3].includes(availabilityId); // matches isCompliant logic by id
       const hasAction = isNC && rng.bool(0.4);
 
       barriers.push({
         id,
-        tag: buildTag(catId, rng, locCode),
-        tipologiaId: rng.int(0, tipoCount),
+        tag: buildTag(categoryId, rng, locCode),
+        typologyId: rng.int(0, typCount),
         locationId: loc.id,
         locDescId: rng.int(0, locDescCount),
-        criticidadeId: rng.bool(0.78) ? 1 : 0, // 1=Crítica 0=Não Crítica
-        categoriaId: catId,
-        agrupamentoId: rng.int(0, agrCount),
-        donoId: hasDono ? rng.int(0, donoCount) : -1,
-        disponibilidadeId: dispId,
-        comentarios: rng.bool(0.15) ? rng.pick(COMMENTS) : "",
-        planoAcao: hasAction ? rng.pick(ACTION_PLANS) : "",
+        criticalityId: rng.bool(0.78) ? 1 : 0, // 1=Crítica 0=Não Crítica
+        categoryId,
+        groupingId: rng.int(0, grpCount),
+        ownerId: hasOwner ? rng.int(0, ownerCount) : -1,
+        availabilityId,
+        comments: rng.bool(0.15) ? rng.pick(COMMENTS) : "",
+        actionPlan: hasAction ? rng.pick(ACTION_PLANS) : "",
         statusSince,
         statusHistory: history,
       });

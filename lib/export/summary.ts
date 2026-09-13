@@ -2,15 +2,17 @@
 // This is why it exists: spreadsheet and print report share the same
 // formatted totals, so exports always match the dashboard KPI cards.
 import { DISP_KNOWN_ORDER } from "../constants.ts";
-import { computeKpi } from "../utils.ts";
+
 import type { Barrier } from "../types.ts";
+
+import { computeKpi } from "../utils.ts";
 
 export interface KpiStats {
   total: string;
-  conformes: string;
-  naoConformes: string;
+  compliant: string;
+  nonCompliant: string;
   pct: string;
-  criticas: string;
+  critical: string;
 }
 
 // Derives pt-BR formatted KPI totals from one computeKpi pass; empty input
@@ -21,10 +23,10 @@ export function kpiStats(barriers: Barrier[]): KpiStats {
   const n = (v: number) => v.toLocaleString("pt-BR");
   return {
     total: n(k.total),
-    conformes: n(k.conforme),
-    naoConformes: n(k.naoConforme),
-    pct: `${k.pctConforme}%`,
-    criticas: n(k.criticasNC),
+    compliant: n(k.compliant),
+    nonCompliant: n(k.nonCompliant),
+    pct: `${k.pctCompliant}%`,
+    critical: n(k.criticalNonCompliant),
   };
 }
 
@@ -35,20 +37,20 @@ export function kpiStats(barriers: Barrier[]): KpiStats {
 export function summaryRows(barriers: Barrier[]): Array<[string, string]> {
   const k = computeKpi(barriers);
   const n = (v: number) => v.toLocaleString("pt-BR");
-  const byDisp = k.byDisponibilidade ?? {};
-  const keys = Object.keys(byDisp).sort((a, b) => {
+  const byAvailability = k.byAvailability ?? {};
+  const keys = Object.keys(byAvailability).sort((a, b) => {
     const ia = DISP_KNOWN_ORDER.indexOf(a), ib = DISP_KNOWN_ORDER.indexOf(b);
     if (ia !== -1 || ib !== -1) {
       return (ia === -1 ? 99 : ia) - (ib === -1 ? 99 : ib);
     }
-    return byDisp[b] - byDisp[a];
+    return byAvailability[b] - byAvailability[a];
   });
   return [
     ["Total", n(k.total)],
-    ...keys.map((key): [string, string] => [key, n(byDisp[key] ?? 0)]),
-    ["Conformes", n(k.conforme)],
-    ["Não Conformes", n(k.naoConforme)],
-    ["Críticas NC", n(k.criticasNC)],
-    ["% Conformidade", `${k.pctConforme}%`],
+    ...keys.map((key): [string, string] => [key, n(byAvailability[key] ?? 0)]),
+    ["Conformes", n(k.compliant)],
+    ["Não Conformes", n(k.nonCompliant)],
+    ["Críticas NC", n(k.criticalNonCompliant)],
+    ["% Conformidade", `${k.pctCompliant}%`],
   ];
 }

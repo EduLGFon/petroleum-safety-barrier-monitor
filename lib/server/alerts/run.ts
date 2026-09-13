@@ -5,22 +5,28 @@
 // re-sends to someone who already got the digest; failures dead-letter
 // with the error attached and --reprocess retries them), so the script is
 // wiring and every behavior is unit-testable.
-import { compareUrgency } from "../../dashboard/urgent.ts";
-import type { Barrier } from "../../types.ts";
-import type { WireBarrier } from "../../wireTypes.ts";
-import { detectUrgentTransitions } from "./detect.ts";
-import { type AlertMailer, type RetryPolicy, sendWithRetry } from "./mailer.ts";
 import {
   type DigestEvent,
   urgentDigestBody,
   urgentDigestSubject,
 } from "./templates.ts";
+
 import {
   type AlertStore,
   isDead,
   type UnsentAlert,
   withFailure,
 } from "./store.ts";
+
+import { type AlertMailer, type RetryPolicy, sendWithRetry } from "./mailer.ts";
+
+import { compareUrgency } from "../../dashboard/urgent.ts";
+
+import type { WireBarrier } from "../../wireTypes.ts";
+
+import { detectUrgentTransitions } from "./detect.ts";
+
+import type { Barrier } from "../../types.ts";
 
 // MAX_SEND_RUNS: failed send runs per event before it dead-letters. Retries
 // inside one run (sendWithRetry) don't count - only whole-run failures do,
@@ -63,17 +69,17 @@ function asBarrier(e: UnsentAlert): Barrier {
   return {
     id: e.id,
     tag: e.payload.tag,
-    tipologia: "",
-    instalacao: e.payload.instalacao,
+    typology: "",
+    location: e.payload.location,
     locDesc: "",
-    criticidade: e.payload.criticidade as Barrier["criticidade"],
-    categoria: "",
-    agrupamento: "",
-    dono: "",
-    disponibilidade: e.payload.disponibilidade as Barrier["disponibilidade"],
-    conformidade: "Não Conforme",
-    comentarios: "",
-    planoAcao: "",
+    criticality: e.payload.criticality as Barrier["criticality"],
+    category: "",
+    grouping: "",
+    owner: "",
+    availability: e.payload.availability as Barrier["availability"],
+    compliance: "Não Conforme",
+    comments: "",
+    actionPlan: "",
     statusSince: e.transitionDate,
     statusHistory: [],
   };
@@ -82,9 +88,9 @@ function asBarrier(e: UnsentAlert): Barrier {
 function toDigest(e: UnsentAlert): DigestEvent {
   return {
     tag: e.payload.tag,
-    instalacao: e.payload.instalacao,
-    disponibilidade: e.payload.disponibilidade,
-    criticidade: e.payload.criticidade,
+    location: e.payload.location,
+    availability: e.payload.availability,
+    criticality: e.payload.criticality,
     transitionDate: e.transitionDate,
     urgency: e.payload.urgency,
   };

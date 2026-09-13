@@ -21,9 +21,9 @@ export interface NewAlertEvent {
 
 export interface AlertPayload {
   tag: string;
-  instalacao: string;
-  disponibilidade: string;
-  criticidade: string;
+  location: string;
+  availability: string;
+  criticality: string;
   urgency: Urgency;
   attempts: number;
   lastError: string | null;
