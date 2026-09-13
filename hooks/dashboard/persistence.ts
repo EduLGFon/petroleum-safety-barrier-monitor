@@ -1,4 +1,4 @@
-// persistence.ts — dashboard localStorage slice; split out so reducer/state stay pure and SSR-safe.
+// persistence.ts - dashboard localStorage slice; split out so reducer/state stay pure and SSR-safe.
 import type { FilterState } from "../../lib/types.ts";
 
 export const STORE_KEY = "barrier-dashboard";

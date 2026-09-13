@@ -4,18 +4,27 @@
 // and the return contract stay identical to client (mock) mode.
 import type {
   Barrier,
-  CategoryConformidade,
+  CategoryCompliance,
   KpiSnapshot,
 } from "../../lib/types.ts";
+
 import { useCallback, useEffect, useMemo, useState } from "preact/hooks";
-import { loadDash, saveDash } from "./persistence.ts";
+
 import { restoreSelection, useSelection } from "./selection.ts";
-import { useFilterState } from "./filter-state.ts";
+
 import { httpAdapterFactory } from "../../lib/api/http.ts";
-import { toWireQuery } from "../../lib/api/query.ts";
-import { computeKpi } from "../../lib/utils.ts";
-import { LOCATIONS } from "../../lib/constants.ts";
+
 import type { BarriersApi } from "../../lib/api/types.ts";
+
+import { loadDash, saveDash } from "./persistence.ts";
+
+import { toWireQuery } from "../../lib/api/query.ts";
+
+import { useFilterState } from "./filter-state.ts";
+
+import { LOCATIONS } from "../../lib/constants.ts";
+
+import { computeKpi } from "../../lib/utils.ts";
 
 // Server-driven dashboard store; same 22-key contract as useDashboard plus
 // loading/error/retry. Export covers the current page only (see note below).
@@ -35,7 +44,7 @@ export function useServerDashboard(
     setFilter,
     setSort,
     resetFilters: resetFil,
-    showUrgentes,
+    showUrgent,
   } = useFilterState(defaultLocation);
   const {
     selectedIds,
@@ -54,7 +63,7 @@ export function useServerDashboard(
   const [total, setTotal] = useState(0);
   const [pages, setPages] = useState(1);
   const [kpi, setKpi] = useState<KpiSnapshot>(() => computeKpi([]));
-  const [chartData, setChartData] = useState<CategoryConformidade[]>([]);
+  const [chartData, setChartData] = useState<CategoryCompliance[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [reloadKey, setReloadKey] = useState(0);
@@ -86,9 +95,9 @@ export function useServerDashboard(
     setError(null);
     const wq = toWireQuery({
       location,
-      disponibilidade: filters.disponibilidade || undefined,
-      conformidade: filters.conformidade || undefined,
-      categoria: filters.categoria || undefined,
+      availability: filters.availability || undefined,
+      compliance: filters.compliance || undefined,
+      category: filters.category || undefined,
       query: filters.query || undefined,
       page: filters.page,
       pageSize: filters.pageSize,
@@ -123,7 +132,7 @@ export function useServerDashboard(
     () =>
       LOCATIONS.find((l) => l.code === location) ??
         (location !== "ALL"
-          ? { code: location, name: location, tipo: "Instalação" }
+          ? { code: location, name: location, type: "Instalação" }
           : LOCATIONS[0]),
     [location],
   );
@@ -182,7 +191,7 @@ export function useServerDashboard(
     setFilter,
     setSort,
     resetFilters,
-    showUrgentes,
+    showUrgent,
     toggleSelect,
     selectAll,
     clearAll,

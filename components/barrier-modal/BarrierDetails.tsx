@@ -14,9 +14,9 @@ import type { Barrier } from "../../lib/types.ts";
 import { Badge } from "../ui/Badge.tsx";
 // BarrierDetails shows metadata grid, current status duration, comments, and action plan.
 export function BarrierDetails({ b }: { b: Barrier }) {
-  const dc = DISP_COLORS[b.disponibilidade],
-    cc = CONF_COLORS[b.conformidade],
-    crc = CRIT_COLORS[b.criticidade];
+  const dc = DISP_COLORS[b.availability],
+    cc = CONF_COLORS[b.compliance],
+    crc = CRIT_COLORS[b.criticality];
   return (
     <div style={{ padding: "var(--d-dialog-body)" }}>
       <div
@@ -27,22 +27,22 @@ export function BarrierDetails({ b }: { b: Barrier }) {
           marginBottom: "var(--d-block-gap)",
         }}
       >
-        <FR Icon={BuildingIcon} label="Instalação" value={b.instalacao} />
-        <FR Icon={BuildingIcon} label="Tipologia" value={b.tipologia} />
-        <FR Icon={LayersIcon} label="Categoria" value={b.categoria} full />
-        <FR Icon={LayersIcon} label="Agrupamento" value={b.agrupamento} full />
+        <FR Icon={BuildingIcon} label="Instalação" value={b.location} />
+        <FR Icon={BuildingIcon} label="Tipologia" value={b.typology} />
+        <FR Icon={LayersIcon} label="Categoria" value={b.category} full />
+        <FR Icon={LayersIcon} label="Agrupamento" value={b.grouping} full />
         <FR
           Icon={ShieldCheckIcon}
           label="Criticidade"
-          value={b.criticidade}
+          value={b.criticality}
           accent={crc?.solid}
         />
         <FR
           Icon={UserIcon}
           label="Dono"
-          value={b.dono || "Não informado"}
-          accent={!b.dono ? "var(--text-muted)" : undefined}
-          italic={!b.dono}
+          value={b.owner || "Não informado"}
+          accent={!b.owner ? "var(--text-muted)" : undefined}
+          italic={!b.owner}
         />
       </div>
       <Div />
@@ -57,11 +57,11 @@ export function BarrierDetails({ b }: { b: Barrier }) {
       >
         <div>
           <Lbl>Disponibilidade</Lbl>
-          <Badge label={b.disponibilidade} {...dc} />
+          <Badge label={b.availability} {...dc} />
         </div>
         <div>
           <Lbl>Conformidade</Lbl>
-          <Badge label={b.conformidade} {...cc} />
+          <Badge label={b.compliance} {...cc} />
         </div>
         {b.statusSince && (
           <div
@@ -78,12 +78,12 @@ export function BarrierDetails({ b }: { b: Barrier }) {
                 style={{
                   fontSize: "var(--d-lead)",
                   fontWeight: 700,
-                  color: b.conformidade === "Não Conforme"
+                  color: b.compliance === "Não Conforme"
                     ? "var(--alert-nc-text)"
                     : "var(--text-secondary)",
                 }}
               >
-                {b.conformidade === "Não Conforme"
+                {b.compliance === "Não Conforme"
                   ? `${
                     humanDuration(daysSince(b.statusSince))
                   } sem contingenciamento`
@@ -105,15 +105,15 @@ export function BarrierDetails({ b }: { b: Barrier }) {
       <Div />
       <Sec>Comentários</Sec>
       <Txt
-        value={b.comentarios || "Sem comentários registrados."}
-        muted={!b.comentarios}
+        value={b.comments || "Sem comentários registrados."}
+        muted={!b.comments}
       />
       <Div />
       <Sec>Plano de Ação</Sec>
       <Txt
-        value={b.planoAcao || "Nenhum plano definido."}
-        muted={!b.planoAcao}
-        accent={b.planoAcao ? "#f59e0b" : undefined}
+        value={b.actionPlan || "Nenhum plano definido."}
+        muted={!b.actionPlan}
+        accent={b.actionPlan ? "#f59e0b" : undefined}
       />
     </div>
   );

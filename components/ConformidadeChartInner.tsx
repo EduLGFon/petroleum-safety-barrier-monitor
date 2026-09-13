@@ -1,6 +1,6 @@
 // Conformidade chart inner - stacked horizontal bars as pure SVG.
 // This is why it exists: dependency-free replacement for recharts with
-// the same data contract (Conforme vs Nao Conforme per category), axis,
+// the same data contract (Conforme / Não Conforme per category), axis,
 // gridlines and hover tooltip. All SVG text styling goes through `style`
 // (never textAnchor/fontSize props) so hydration keeps it intact.
 // Bars morph via CSS transitions on geometry attributes (staggered per
@@ -16,14 +16,14 @@ import {
   TOP,
 } from "./chart/geometry.ts";
 import { useSettings } from "../context/SettingsContext.tsx";
-import type { CategoryConformidade } from "../lib/types.ts";
+import type { CategoryCompliance } from "../lib/types.ts";
 import { ChartTooltip } from "./chart/ChartTooltip.tsx";
 import { useEffect, useState } from "preact/hooks";
 import { ChartRow } from "./chart/ChartRow.tsx";
 import type { CSSProperties } from "preact";
 
 interface Props {
-  data: CategoryConformidade[];
+  data: CategoryCompliance[];
 }
 
 // ConformidadeChartInner: stacked Conforme / Não Conforme SVG bars with hover tip and density geometry.
@@ -124,8 +124,8 @@ export default function ConformidadeChartInner({ data }: Props) {
           x={hover.x}
           y={hover.y}
           title={hovered.name}
-          conforme={hovered.Conforme}
-          naoConforme={hovered["Não Conforme"]}
+          compliant={hovered.Conforme}
+          nonCompliant={hovered["Não Conforme"]}
         />
       )}
       <div

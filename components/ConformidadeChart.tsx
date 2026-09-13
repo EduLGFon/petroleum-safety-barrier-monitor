@@ -1,12 +1,12 @@
-// Conformidade chart card - Aurora glass section around the SVG bars.
+// Compliance chart card - Aurora glass section around the SVG bars.
 // This is why it exists: keeps the card frame stable while the inner
 // chart stays dependency-free (no dynamic import needed in Fresh).
-import type { CategoryConformidade } from "../lib/types.ts";
+import type { CategoryCompliance } from "../lib/types.ts";
 import Chart from "./ConformidadeChartInner.tsx";
 import { AURORA } from "../lib/aurora.ts";
 
 interface Props {
-  data: CategoryConformidade[];
+  data: CategoryCompliance[];
 }
 
 // Scroll budget: past this many rows the plot scrolls inside the card

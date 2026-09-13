@@ -1,4 +1,4 @@
-// NcAlert - non-conforme urgency card with show-urgentes toggle action.
+// NcAlert - non-compliant urgency card with show-urgent toggle action.
 // This is why it exists: isolates the red-glass alert markup from DashboardView
 // so the island root stays slim while preserving the urgency treatment.
 import {
@@ -8,14 +8,14 @@ import {
 
 interface NcAlertProps {
   ncCount: number;
-  isUrgentesActive: boolean;
-  showUrgentes: () => void;
+  isUrgentActive: boolean;
+  showUrgent: () => void;
   resetFilters: () => void;
 }
 
-// NcAlert: red glass urgency card; null when nothing is non-conforme.
+// NcAlert: red glass urgency card; null when nothing is non-compliant.
 export function NcAlert(
-  { ncCount, isUrgentesActive, showUrgentes, resetFilters }: NcAlertProps,
+  { ncCount, isUrgentActive, showUrgent, resetFilters }: NcAlertProps,
 ) {
   if (ncCount <= 0) return null;
   return (
@@ -64,7 +64,7 @@ export function NcAlert(
       <button
         type="button"
         className="lift"
-        onClick={() => isUrgentesActive ? resetFilters() : showUrgentes()}
+        onClick={() => isUrgentActive ? resetFilters() : showUrgent()}
         style={{
           display: "flex",
           alignItems: "center",
@@ -81,7 +81,7 @@ export function NcAlert(
           whiteSpace: "nowrap",
         }}
       >
-        {isUrgentesActive ? "Limpar filtro" : (
+        {isUrgentActive ? "Limpar filtro" : (
           <>
             <ArrowRightIcon
               size={12}

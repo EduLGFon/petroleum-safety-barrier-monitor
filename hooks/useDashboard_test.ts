@@ -1,30 +1,34 @@
 // Hook tests for hooks/useDashboard.ts- composed dashboard state: derived rows/KPI,
 // selection semantics, validated restore, page clamp, and persistence.
 import { assertEquals, assertStrictEquals } from "jsr:@std/assert@^1";
+
 import { memoryStorage, renderHook } from "../scripts/test-dom.ts";
-import type { Barrier } from "../lib/types.ts";
+
 import { loadDash, STORE_KEY } from "./dashboard/persistence.ts";
+
 import { useDashboard } from "./useDashboard.ts";
+
+import type { Barrier } from "../lib/types.ts";
 
 function mk(
   id: number,
-  instalacao: string,
+  location: string,
   over: Partial<Barrier> = {},
 ): Barrier {
   return {
     id,
     tag: `BAR-${id}`,
-    tipologia: "Estação Coletora",
-    instalacao,
-    locDesc: `${instalacao} - Local`,
-    criticidade: "Não Crítica",
-    categoria: "Detector de Gás",
-    agrupamento: "Detecção e Monitoramento",
-    dono: "Equipe de Manutenção",
-    disponibilidade: "Disponível",
-    conformidade: "Conforme",
-    comentarios: "",
-    planoAcao: "",
+    typology: "Estação Coletora",
+    location,
+    locDesc: `${location} - Local`,
+    criticality: "Não Crítica",
+    category: "Detector de Gás",
+    grouping: "Detecção e Monitoramento",
+    owner: "Equipe de Manutenção",
+    availability: "Disponível",
+    compliance: "Conforme",
+    comments: "",
+    actionPlan: "",
     statusSince: "2026-01-01",
     statusHistory: [],
     ...over,
@@ -33,7 +37,7 @@ function mk(
 
 const ALL = [
   mk(1, "FAL"),
-  mk(2, "FAL", { disponibilidade: "Degradado", conformidade: "Não Conforme" }),
+  mk(2, "FAL", { availability: "Degradado", compliance: "Não Conforme" }),
   mk(3, "CNC"),
 ];
 

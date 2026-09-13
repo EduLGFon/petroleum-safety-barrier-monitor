@@ -1,13 +1,7 @@
 // API: PATCH /api/barriers/:id/status - status transition write path.
-// This is why it exists: the one sanctioned way to change disponibilidade,
+// This is why it exists: the one sanctioned way to change availability,
 // via record_status_change() (see db/schema.sql). Guarded by ADMIN_TOKEN
 // (fail-closed when unset); reads stay open, writes do not.
-import {
-  getBarrierById,
-  transitionBarrierStatus,
-} from "../../../../lib/server/sql/barriers.ts";
-import { checkAdminAuth } from "../../../../lib/server/auth.ts";
-import { loadServerConfig } from "../../../../lib/server/config.ts";
 import {
   badRequest,
   internal,
@@ -16,10 +10,21 @@ import {
   rateLimited,
   unauthorized,
 } from "../../../../lib/server/errors.ts";
+
+import {
+  getBarrierById,
+  transitionBarrierStatus,
+} from "../../../../lib/server/sql/barriers.ts";
+
 import {
   routeClientKey,
   writeThrottle,
 } from "../../../../lib/server/throttle.ts";
+
+import { loadServerConfig } from "../../../../lib/server/config.ts";
+
+import { checkAdminAuth } from "../../../../lib/server/auth.ts";
+
 import { define } from "../../../../utils.ts";
 
 interface StatusBody {

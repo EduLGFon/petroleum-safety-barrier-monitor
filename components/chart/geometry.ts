@@ -1,21 +1,21 @@
-// chart geometry - shared sizes and pure scale helpers for the conformidade SVG.
+// chart geometry - shared sizes and pure scale helpers for the compliance SVG.
 // Why it exists: single source of truth for density heights, plot width and
 // tooltip offsets so rows, tooltip and frame stay in sync without duplication.
-import type { CategoryConformidade } from "../../lib/types.ts";
+import type { CategoryCompliance } from "../../lib/types.ts";
 
 export const COUNT_W = 56;
 export const TOP = 6;
 export const AXIS_H = 26;
 export const PLOT_W = 440;
 
-/* Floating tooltip geometry — offset from the cursor, margin from edges. */
+/* Floating tooltip geometry - offset from the cursor, margin from edges. */
 export const TIP_OFFSET = 14;
 export const TIP_MARGIN = 8;
 // Above app overlays (barrier modal 991, settings 1000/1001) so the tip is
 // never painted underneath them, below the loading splash (9999).
 export const TIP_Z = 2000;
 
-/* Bar geometry per density — tighter rows on compact, roomier on spacious. */
+/* Bar geometry per density - tighter rows on compact, roomier on spacious. */
 export const GEO = {
   compact: { ROW_H: 21, BAR_H: 14, LABEL_W: 180 },
   comfortable: { ROW_H: 26, BAR_H: 18, LABEL_W: 200 },
@@ -25,13 +25,13 @@ export const GEO = {
 // DensityKey: valid density names matching the GEO keys.
 export type DensityKey = keyof typeof GEO;
 
-// rowTotal: combined Conforme + Nao Conforme count for one category.
-export function rowTotal(d: CategoryConformidade): number {
+// rowTotal: combined Conforme + Não Conforme count for one category.
+export function rowTotal(d: CategoryCompliance): number {
   return d.Conforme + d["Não Conforme"];
 }
 
 // computeMax: largest row total, floored at 1 to avoid divide-by-zero.
-export function computeMax(data: CategoryConformidade[]): number {
+export function computeMax(data: CategoryCompliance[]): number {
   return Math.max(1, ...data.map(rowTotal));
 }
 

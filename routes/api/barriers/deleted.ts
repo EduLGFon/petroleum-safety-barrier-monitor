@@ -4,18 +4,25 @@
 // flag to show them, so this token-guarded listing is the only way to see
 // what sync retired. Same filters and shape as /api/barriers; every item
 // in it is deleted by construction.
-import { checkAdminAuth } from "../../../lib/server/auth.ts";
-import { loadServerConfig } from "../../../lib/server/config.ts";
 import {
   internal,
   newRequestId,
   rateLimited,
   unauthorized,
 } from "../../../lib/server/errors.ts";
-import { listBarriers } from "../../../lib/server/sql/barriers.ts";
+
 import { readThrottle, routeClientKey } from "../../../lib/server/throttle.ts";
+
 import { parseDateParam, parseIntParam, parseQueryParam } from "../_params.ts";
+
+import { listBarriers } from "../../../lib/server/sql/barriers.ts";
+
+import { loadServerConfig } from "../../../lib/server/config.ts";
+
 import type { BarriersQuery } from "../../../lib/wireTypes.ts";
+
+import { checkAdminAuth } from "../../../lib/server/auth.ts";
+
 import { define } from "../../../utils.ts";
 
 export const handler = define.handlers({
@@ -46,9 +53,9 @@ export const handler = define.handlers({
     const sp = ctx.url.searchParams;
     const query: BarriersQuery = {
       locationId: parseIntParam(sp.get("locationId")),
-      disponibilidadeId: parseIntParam(sp.get("disponibilidadeId")),
-      conformidadeId: parseIntParam(sp.get("conformidadeId")),
-      categoriaId: parseIntParam(sp.get("categoriaId")),
+      availabilityId: parseIntParam(sp.get("availabilityId")),
+      complianceId: parseIntParam(sp.get("complianceId")),
+      categoryId: parseIntParam(sp.get("categoryId")),
       query: parseQueryParam(sp.get("query")),
       since: parseDateParam(sp.get("since")),
       until: parseDateParam(sp.get("until")),

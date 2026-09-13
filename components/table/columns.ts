@@ -7,10 +7,10 @@ import type { CSSProperties } from "preact";
 export const COLS: { col: SortableColumn; label: string; w?: string }[] = [
   { col: "id", label: "#", w: "52px" },
   { col: "tag", label: "TAG / Identificação" },
-  { col: "criticidade", label: "Criticidade", w: "140px" },
-  { col: "categoria", label: "Categoria" },
-  { col: "disponibilidade", label: "Disponibilidade", w: "230px" },
-  { col: "conformidade", label: "Conformidade", w: "148px" },
+  { col: "criticality", label: "Criticidade", w: "140px" },
+  { col: "category", label: "Categoria" },
+  { col: "availability", label: "Disponibilidade", w: "230px" },
+  { col: "compliance", label: "Conformidade", w: "148px" },
 ];
 
 export const thSt: CSSProperties = {

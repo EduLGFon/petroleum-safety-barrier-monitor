@@ -1,8 +1,6 @@
 // API: GET /api/barriers/:id - single wire barrier or 404.
 // This is why it exists: Fresh port of the Next route with identical
 // id validation. Open GET, throttled, envelope errors.
-import { getBarrierById } from "../../../lib/server/sql/barriers.ts";
-import { loadServerConfig } from "../../../lib/server/config.ts";
 import {
   badRequest,
   internal,
@@ -10,7 +8,13 @@ import {
   notFound,
   rateLimited,
 } from "../../../lib/server/errors.ts";
+
 import { readThrottle, routeClientKey } from "../../../lib/server/throttle.ts";
+
+import { getBarrierById } from "../../../lib/server/sql/barriers.ts";
+
+import { loadServerConfig } from "../../../lib/server/config.ts";
+
 import { define } from "../../../utils.ts";
 
 export const handler = define.handlers({

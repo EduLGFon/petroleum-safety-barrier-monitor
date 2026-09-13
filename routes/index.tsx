@@ -6,10 +6,15 @@
 // (context does not cross the island boundary on the client). The shell
 // stays transparent so the Aurora mesh canvas paints edge to edge.
 import { getVocabularies } from "../lib/server/sql/vocabularies.ts";
+
 import { Dashboard } from "../islands/Dashboard.tsx";
-import { getCompanyName } from "../lib/company.ts";
+
 import type { Vocabularies } from "../lib/types.ts";
+
+import { getCompanyName } from "../lib/company.ts";
+
 import { define } from "../utils.ts";
+
 import { api } from "../lib/api.ts";
 
 // Reads server env (islands cannot: no Deno in the browser, so mode and base

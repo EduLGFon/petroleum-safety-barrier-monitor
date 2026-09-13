@@ -10,7 +10,7 @@ import { reducer } from "./reducer.ts";
 // Filter/sort/location state; restores validated persisted filters once.
 // Selection clearing on navigation stays with the caller (it owns selection).
 export function useFilterState(defaultLocation = "ALL") {
-  // Always start with consistent defaults for SSR — restore after mount
+  // Always start with consistent defaults for SSR - restore after mount
   const [state, dispatch] = useReducer(reducer, {
     location: "ALL",
     filters: defaultFilters(),
@@ -52,14 +52,14 @@ export function useFilterState(defaultLocation = "ALL") {
 
   /** Show NC barriers sorted oldest-first (most urgent); clears text and
    *  category first so a stale query cannot render an unexplained empty list. */
-  const showUrgentes = useCallback(() => {
+  const showUrgent = useCallback(() => {
     dispatch({
       type: "SET_FILTER",
       payload: {
         query: "",
-        disponibilidade: "",
-        conformidade: "Não Conforme",
-        categoria: "",
+        availability: "",
+        compliance: "Não Conforme",
+        category: "",
         sortCol: "statusSince" as SortableColumn,
         sortDir: "asc",
         page: 1,
@@ -69,8 +69,8 @@ export function useFilterState(defaultLocation = "ALL") {
 
   const hasActiveFilters = state.location !== "ALL" ||
     !!state.filters.query ||
-    !!state.filters.disponibilidade || !!state.filters.conformidade ||
-    !!state.filters.categoria;
+    !!state.filters.availability || !!state.filters.compliance ||
+    !!state.filters.category;
 
   return {
     location: state.location,
@@ -81,6 +81,6 @@ export function useFilterState(defaultLocation = "ALL") {
     setFilter,
     setSort,
     resetFilters,
-    showUrgentes,
+    showUrgent,
   };
 }

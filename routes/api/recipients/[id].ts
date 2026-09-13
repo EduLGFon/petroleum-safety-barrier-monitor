@@ -1,6 +1,4 @@
 // API: /api/recipients/:id - single-recipient admin writes.
-import { checkAdminAuth } from "../../../lib/server/auth.ts";
-import { loadServerConfig } from "../../../lib/server/config.ts";
 import {
   badRequest,
   internal,
@@ -9,11 +7,18 @@ import {
   rateLimited,
   unauthorized,
 } from "../../../lib/server/errors.ts";
+
 import {
   deleteRecipient,
   updateRecipient,
 } from "../../../lib/server/sql/recipients.ts";
+
 import { routeClientKey, writeThrottle } from "../../../lib/server/throttle.ts";
+
+import { loadServerConfig } from "../../../lib/server/config.ts";
+
+import { checkAdminAuth } from "../../../lib/server/auth.ts";
+
 import { define } from "../../../utils.ts";
 
 export const handler = define.handlers({

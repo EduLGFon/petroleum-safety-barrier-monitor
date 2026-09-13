@@ -9,15 +9,15 @@ import { useMemo } from "preact/hooks";
 // new statuses/categories become filterable with no code change.
 export function useDashboardVocabularies(barriers: Barrier[]) {
   const dispOpts = useMemo(
-    () => distinctBy(barriers, (b) => b.disponibilidade),
+    () => distinctBy(barriers, (b) => b.availability),
     [barriers],
   );
   const confOpts = useMemo(
-    () => distinctBy(barriers, (b) => b.conformidade),
+    () => distinctBy(barriers, (b) => b.compliance),
     [barriers],
   );
   const catOpts = useMemo(
-    () => distinctBy(barriers, (b) => b.categoria),
+    () => distinctBy(barriers, (b) => b.category),
     [barriers],
   );
   return { dispOpts, confOpts, catOpts };

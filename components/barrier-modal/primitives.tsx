@@ -51,7 +51,7 @@ export function FR({
           lineHeight: 1.45,
         }}
       >
-        {value || "—"}
+        {value || "-"}
       </div>
     </div>
   );

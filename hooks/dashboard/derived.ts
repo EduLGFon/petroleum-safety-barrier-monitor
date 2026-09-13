@@ -1,4 +1,4 @@
-// derived.ts — dashboard derived memos (kpi/chart/rows/details); split out so composer stays state-only.
+// derived.ts - dashboard derived memos (kpi/chart/rows/details); split out so composer stays state-only.
 import {
   applyFilters,
   applySorting,
@@ -20,7 +20,7 @@ export function useDashboardDerived(
     () =>
       location === "ALL"
         ? allBarriers
-        : allBarriers.filter((b) => b.instalacao === location),
+        : allBarriers.filter((b) => b.location === location),
     [allBarriers, location],
   );
 
@@ -53,7 +53,7 @@ export function useDashboardDerived(
   // later fall back to their own code so details never render undefined.
   const locationDetails = LOCATIONS.find((l) => l.code === location) ??
     (location !== "ALL"
-      ? { code: location, name: location, tipo: "Instalação" }
+      ? { code: location, name: location, type: "Instalação" }
       : LOCATIONS[0]);
 
   return {

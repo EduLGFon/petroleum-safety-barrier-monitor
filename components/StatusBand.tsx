@@ -18,13 +18,13 @@ interface Props {
 export function StatusBand({ kpi, activeFilter, onFilter }: Props) {
   // Prefer the dynamic buckets; the wire path only carries fixed fields, so
   // reconstruct from those when buckets are absent (known statuses only).
-  const counts = kpi.byDisponibilidade ?? {
-    "Disponível": kpi.disponivel,
-    "Fora de Operação": kpi.foraDeOp,
-    "Indisponível Contingenciado": kpi.indispCont,
-    "Degradado Contingenciado": kpi.degrCont,
-    "Degradado": kpi.degradado,
-    "Indisponível": kpi.indisponivel,
+  const counts = kpi.byAvailability ?? {
+    "Disponível": kpi.available,
+    "Fora de Operação": kpi.outOfService,
+    "Indisponível Contingenciado": kpi.contingencyOutage,
+    "Degradado Contingenciado": kpi.degradedContingency,
+    "Degradado": kpi.degraded,
+    "Indisponível": kpi.unavailable,
   };
   // Sort comparator: known statuses in KNOWN_ORDER first; unknowns trail by volume.
   const keys = Object.keys(counts).sort((a, b) => {

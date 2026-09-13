@@ -6,12 +6,19 @@ import {
   type Density,
   useSettings,
 } from "../context/SettingsContext.tsx";
+
 import { PanelFooter, PanelHeader } from "./settings/PanelChrome.tsx";
+
 import { AppearanceSection } from "./settings/AppearanceSection.tsx";
+
 import { FiltersSection } from "./settings/FiltersSection.tsx";
+
 import { lockBody, unlockBody } from "../lib/body-lock.ts";
-import { FilterIcon, SunIcon } from "./ui/Icons.tsx";
+
 import { useEffect, useRef, useState } from "preact/hooks";
+
+import { FilterIcon, SunIcon } from "./ui/Icons.tsx";
+
 import type { Theme } from "../lib/types.ts";
 
 interface Props {

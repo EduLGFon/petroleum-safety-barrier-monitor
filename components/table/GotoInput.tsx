@@ -41,7 +41,7 @@ export function GotoInput({ page, totalPages, onChange }: GotoInputProps) {
       autoComplete="off"
       spellcheck={false}
       aria-label="Ir para a página"
-      title={`Ir para a página (1–${totalPages})`}
+      title={`Ir para a página (1-${totalPages})`}
       placeholder={focused ? String(page) : "…"}
       value={draft ?? ""}
       // NOTE: onInput, not onChange. Preact 10 binds onChange to the

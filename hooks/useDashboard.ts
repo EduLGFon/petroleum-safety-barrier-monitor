@@ -1,6 +1,6 @@
 /**
  * ══════════════════════════════════════════════════════════════════════════
- * USE-DASHBOARD — central dashboard state + derived data for the main page
+ * USE-DASHBOARD - central dashboard state + derived data for the main page
  * ══════════════════════════════════════════════════════════════════════════
  * Composer over dashboard slices (filter-state, selection, persistence,
  * derived): filter semantics, selection/open-row state with localStorage
@@ -27,7 +27,7 @@ export function useDashboard(allBarriers: Barrier[], defaultLocation = "ALL") {
     setFilter,
     setSort,
     resetFilters: resetFil,
-    showUrgentes,
+    showUrgent,
   } = useFilterState(defaultLocation);
   const {
     selectedIds,
@@ -110,7 +110,7 @@ export function useDashboard(allBarriers: Barrier[], defaultLocation = "ALL") {
     setFilter,
     setSort,
     resetFilters,
-    showUrgentes,
+    showUrgent,
     toggleSelect,
     selectAll,
     clearAll,

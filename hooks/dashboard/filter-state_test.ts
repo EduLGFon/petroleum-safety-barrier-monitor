@@ -1,9 +1,12 @@
 // Hook tests for hooks/dashboard/filter-state.ts- location/filter/sort semantics,
 // validated restore, and hydrated flag - through the linkedom renderHook harness.
 import { assertEquals, assertStrictEquals } from "jsr:@std/assert@^1";
+
 import { memoryStorage, renderHook } from "../../scripts/test-dom.ts";
-import { STORE_KEY } from "./persistence.ts";
+
 import { useFilterState } from "./filter-state.ts";
+
+import { STORE_KEY } from "./persistence.ts";
 
 Deno.test("useFilterState starts from defaults and hydrates with empty storage", async () => {
   const hh = await renderHook(useFilterState);
@@ -12,9 +15,9 @@ Deno.test("useFilterState starts from defaults and hydrates with empty storage",
   assertStrictEquals(f.hydrated, true);
   assertEquals(f.filters, {
     query: "",
-    disponibilidade: "",
-    conformidade: "",
-    categoria: "",
+    availability: "",
+    compliance: "",
+    category: "",
     page: 1,
     pageSize: 25,
     sortCol: "id",
@@ -54,7 +57,7 @@ Deno.test("useFilterState sanitizes garbage filter patches on restore", async ()
       filters: {
         query: "  skid  ",
         page: "abc",
-        categoria: 7,
+        category: 7,
         sortDir: "sideways",
       },
     }),
@@ -63,7 +66,7 @@ Deno.test("useFilterState sanitizes garbage filter patches on restore", async ()
   const f = hh.get();
   assertStrictEquals(f.location, "FAL");
   assertStrictEquals(f.filters.query, "skid");
-  assertStrictEquals(f.filters.categoria, "");
+  assertStrictEquals(f.filters.category, "");
   assertStrictEquals(f.filters.page, 1);
   assertStrictEquals(f.filters.sortDir, "asc");
 });
@@ -113,17 +116,17 @@ Deno.test("useFilterState setLocation updates location and resets page", async (
   assertStrictEquals(f.hasActiveFilters, true);
 });
 
-Deno.test("useFilterState showUrgentes builds the NC-oldest-first scope", async () => {
+Deno.test("useFilterState showUrgent builds the NC-oldest-first scope", async () => {
   const hh = await renderHook(useFilterState);
-  hh.get().setFilter({ query: "x", categoria: "SIS" });
+  hh.get().setFilter({ query: "x", category: "SIS" });
   await hh.rerender();
-  hh.get().showUrgentes();
+  hh.get().showUrgent();
   await hh.rerender();
   const f = hh.get();
-  assertStrictEquals(f.filters.conformidade, "Não Conforme");
+  assertStrictEquals(f.filters.compliance, "Não Conforme");
   assertStrictEquals(f.filters.query, "");
-  assertStrictEquals(f.filters.categoria, "");
-  assertStrictEquals(f.filters.disponibilidade, "");
+  assertStrictEquals(f.filters.category, "");
+  assertStrictEquals(f.filters.availability, "");
   assertStrictEquals(f.filters.sortCol, "statusSince");
   assertStrictEquals(f.filters.sortDir, "asc");
   assertStrictEquals(f.filters.page, 1);

@@ -2,14 +2,22 @@
 // Why: mock mode aggregates the SSR'd list in the browser; HTTP mode pages
 // from the API. Both render the shared DashboardSections tree.
 import { ServerErrorBanner, ServerErrorCard } from "./ServerError.tsx";
+
 import { useServerDashboard } from "../../hooks/dashboard/server.ts";
+
 import { LoadingScreen } from "../../components/LoadingScreen.tsx";
+
 import { useSettings } from "../../context/SettingsContext.tsx";
+
 import type { Barrier, Vocabularies } from "../../lib/types.ts";
-import { DashboardSections } from "./DashboardSections.tsx";
-import { useDashboard } from "../../hooks/useDashboard.ts";
-import { useDashboardVocabularies } from "./vocabularies.ts";
+
 import { useCallback, useEffect, useState } from "preact/hooks";
+
+import { useDashboardVocabularies } from "./vocabularies.ts";
+
+import { DashboardSections } from "./DashboardSections.tsx";
+
+import { useDashboard } from "../../hooks/useDashboard.ts";
 
 interface Props {
   initialBarriers: Barrier[];
@@ -58,7 +66,7 @@ function ClientView(
   // handleLoadDone: exits LoadingScreen then fades the shell in via rAF + short delay; stable callback for LoadingScreen onDone.
   const handleLoadDone = useCallback(() => {
     setLoading(false);
-    // Short delay then fade in — smoother than instant
+    // Short delay then fade in - smoother than instant
     requestAnimationFrame(() => setTimeout(() => setVisible(true), 30));
   }, []);
 
@@ -124,9 +132,9 @@ function ServerView(
         barriers={[]}
         stations={vocabularies?.locations}
         total={vocabularies?.locations?.reduce((sum, s) => sum + s.count, 0)}
-        dispOpts={vocabularies?.disponibilidades ?? []}
-        confOpts={vocabularies?.conformidades ?? []}
-        catOpts={vocabularies?.categorias ?? []}
+        dispOpts={vocabularies?.availabilities ?? []}
+        confOpts={vocabularies?.compliances ?? []}
+        catOpts={vocabularies?.categories ?? []}
         visible={shown}
         loading={loading}
         companyName={companyName}

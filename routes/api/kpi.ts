@@ -2,15 +2,20 @@
 // This is why it exists: Fresh port of the Next route; omitted or 0
 // locationId means all installations (matches ALL=0 in lib/enums.ts).
 // Open GET, throttled, envelope errors.
-import { getKpi } from "../../lib/server/sql/barriers.ts";
-import { loadServerConfig } from "../../lib/server/config.ts";
 import {
   internal,
   newRequestId,
   rateLimited,
 } from "../../lib/server/errors.ts";
+
 import { readThrottle, routeClientKey } from "../../lib/server/throttle.ts";
+
+import { loadServerConfig } from "../../lib/server/config.ts";
+
+import { getKpi } from "../../lib/server/sql/barriers.ts";
+
 import { parseIntParam } from "./_params.ts";
+
 import { define } from "../../utils.ts";
 
 export const handler = define.handlers({

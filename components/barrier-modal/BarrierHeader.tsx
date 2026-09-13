@@ -15,10 +15,10 @@ import { Badge } from "../ui/Badge.tsx";
 export function BarrierHeader(
   { b, onClose }: { b: Barrier; onClose: () => void },
 ) {
-  const dc = DISP_COLORS[b.disponibilidade],
-    cc = CONF_COLORS[b.conformidade],
-    crc = CRIT_COLORS[b.criticidade];
-  const isNC = b.conformidade === "Não Conforme";
+  const dc = DISP_COLORS[b.availability],
+    cc = CONF_COLORS[b.compliance],
+    crc = CRIT_COLORS[b.criticality];
+  const isNC = b.compliance === "Não Conforme";
   const ncDays = isNC && b.statusSince ? daysSince(b.statusSince) : 0;
   return (
     <>
@@ -87,7 +87,7 @@ export function BarrierHeader(
                   color: "var(--text-muted)",
                 }}
               >
-                Barreira #{b.id} · {b.instalacao}
+                Barreira #{b.id} · {b.location}
               </span>
             </div>
             <div
@@ -149,9 +149,9 @@ export function BarrierHeader(
             flexWrap: "wrap",
           }}
         >
-          <Badge label={b.disponibilidade} {...dc} />
-          <Badge label={b.conformidade} {...cc} />
-          <Badge label={b.criticidade} {...crc} size="sm" />
+          <Badge label={b.availability} {...dc} />
+          <Badge label={b.compliance} {...cc} />
+          <Badge label={b.criticality} {...crc} size="sm" />
         </div>
         {isNC && b.statusSince && (
           <div
@@ -189,7 +189,7 @@ export function BarrierHeader(
                 }}
               >
                 Não conforme desde {fmtDate(b.statusSince)}
-                {!b.planoAcao ? " · Sem plano de ação definido" : ""}
+                {!b.actionPlan ? " · Sem plano de ação definido" : ""}
               </div>
             </div>
           </div>

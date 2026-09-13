@@ -1,4 +1,4 @@
-// ChartTooltip - floating hover card for conformidade rows, portalled to body.
+// ChartTooltip - floating hover card for compliance rows, portalled to body.
 // Why it exists: keeps viewport-clamped tooltip logic out of the chart frame
 // so the SVG shell stays small and the positioning math is isolated here.
 import { useLayoutEffect, useRef, useState } from "preact/hooks";
@@ -9,8 +9,8 @@ interface Props {
   x: number;
   y: number;
   title: string;
-  conforme: number;
-  naoConforme: number;
+  compliant: number;
+  nonCompliant: number;
 }
 
 // clampTooltip: flip left/above near viewport edges, then clamp to margins.
@@ -39,13 +39,13 @@ export function clampTooltip(
   return { left, top };
 }
 
-// Floating chart tooltip — portalled to document.body so no ancestor
+// Floating chart tooltip - portalled to document.body so no ancestor
 // stacking context (animated wrappers, scroll container) can trap it under
 // later cards/tables, and clamped to the viewport so it flips to the
 // left/above the cursor near the right/bottom edges instead of leaving
 // the screen. Hidden until measured to avoid a one-frame flash.
 export function ChartTooltip(
-  { x, y, title, conforme, naoConforme }: Props,
+  { x, y, title, compliant, nonCompliant }: Props,
 ) {
   const ref = useRef<HTMLDivElement>(null);
   const [pos, setPos] = useState<{ left: number; top: number } | null>(null);
@@ -59,7 +59,7 @@ export function ChartTooltip(
     const vw = globalThis.innerWidth;
     const vh = globalThis.innerHeight;
     setPos(clampTooltip(x, y, tipW, tipH, vw, vh));
-  }, [x, y, title, conforme, naoConforme]);
+  }, [x, y, title, compliant, nonCompliant]);
 
   // SSR: no hover exists on the server, but guard the portal anyway.
   if (typeof document === "undefined") return null;
@@ -106,7 +106,7 @@ export function ChartTooltip(
         }}
       >
         <span>Conforme:</span>
-        <span>{conforme.toLocaleString("pt-BR")}</span>
+        <span>{compliant.toLocaleString("pt-BR")}</span>
       </div>
       <div
         style={{
@@ -117,7 +117,7 @@ export function ChartTooltip(
         }}
       >
         <span>Não Conforme:</span>
-        <span>{naoConforme.toLocaleString("pt-BR")}</span>
+        <span>{nonCompliant.toLocaleString("pt-BR")}</span>
       </div>
     </div>
   );

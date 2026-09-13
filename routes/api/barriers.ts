@@ -2,16 +2,22 @@
 // This is why it exists: Fresh port of the Next route with the same
 // BarriersQuery contract (see lib/wireTypes.ts) for the http adapter.
 // Open GET (dashboard decision in docs/API.md), throttled, envelope errors.
-import { parseDateParam, parseIntParam, parseQueryParam } from "./_params.ts";
-import { listBarriers } from "../../lib/server/sql/barriers.ts";
-import { loadServerConfig } from "../../lib/server/config.ts";
 import {
   internal,
   newRequestId,
   rateLimited,
 } from "../../lib/server/errors.ts";
+
+import { parseDateParam, parseIntParam, parseQueryParam } from "./_params.ts";
+
 import { readThrottle, routeClientKey } from "../../lib/server/throttle.ts";
+
+import { listBarriers } from "../../lib/server/sql/barriers.ts";
+
+import { loadServerConfig } from "../../lib/server/config.ts";
+
 import type { BarriersQuery } from "../../lib/wireTypes.ts";
+
 import { define } from "../../utils.ts";
 
 export const handler = define.handlers({
@@ -40,9 +46,9 @@ export const handler = define.handlers({
     const sp = ctx.url.searchParams;
     const query: BarriersQuery = {
       locationId: parseIntParam(sp.get("locationId")),
-      disponibilidadeId: parseIntParam(sp.get("disponibilidadeId")),
-      conformidadeId: parseIntParam(sp.get("conformidadeId")),
-      categoriaId: parseIntParam(sp.get("categoriaId")),
+      availabilityId: parseIntParam(sp.get("availabilityId")),
+      complianceId: parseIntParam(sp.get("complianceId")),
+      categoryId: parseIntParam(sp.get("categoryId")),
       query: parseQueryParam(sp.get("query")),
       since: parseDateParam(sp.get("since")),
       until: parseDateParam(sp.get("until")),

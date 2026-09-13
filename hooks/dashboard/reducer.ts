@@ -1,4 +1,4 @@
-// reducer.ts — dashboard location/filters/sort reducer; split out so state transitions stay pure/testable.
+// reducer.ts - dashboard location/filters/sort reducer; split out so state transitions stay pure/testable.
 import type { FilterState, SortableColumn } from "../../lib/types.ts";
 import { defaultFilters } from "../../lib/utils.ts";
 

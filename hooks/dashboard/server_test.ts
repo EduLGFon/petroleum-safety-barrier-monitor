@@ -1,10 +1,15 @@
 // Hook tests for hooks/dashboard/server.ts- HTTP-mode gating (loading/error/retry)
 // and scope-driven refetch, with a fake BarriersApi injected via the adapter param.
 import { assertEquals, assertStrictEquals } from "jsr:@std/assert@^1";
+
 import { renderHook, waitFor } from "../../scripts/test-dom.ts";
-import { mockAdapter } from "../../lib/api/mock.ts";
-import type { BarriersApi } from "../../lib/api/types.ts";
+
 import type { BarriersQuery } from "../../lib/wireTypes.ts";
+
+import type { BarriersApi } from "../../lib/api/types.ts";
+
+import { mockAdapter } from "../../lib/api/mock.ts";
+
 import { useServerDashboard } from "./server.ts";
 
 type D = ReturnType<typeof useServerDashboard>;
@@ -49,10 +54,10 @@ Deno.test("useServerDashboard encodes the wire query for the current scope", asy
     },
   };
   const hh = await renderHook(useServerDashboard, { args: [BASE, "ALL", spy] });
-  hh.get().setFilter({ query: "pump", disponibilidade: "Degradado" });
+  hh.get().setFilter({ query: "pump", availability: "Degradado" });
   await waitFor(() => lastQuery?.query === "pump");
   assertStrictEquals(lastQuery?.query, "pump");
-  assertStrictEquals(lastQuery?.disponibilidadeId, 4);
+  assertStrictEquals(lastQuery?.availabilityId, 4);
 });
 
 Deno.test("useServerDashboard refetches on scope change", async () => {

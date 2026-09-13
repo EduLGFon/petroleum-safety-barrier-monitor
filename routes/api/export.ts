@@ -3,22 +3,30 @@
 // page; this endpoint streams the whole filtered set (capped) with byte-same
 // rows via lib/server/exportCsv.ts. Open like the other dashboard GETs
 // (decision documented in docs/API.md); throttled tighter (DB-heavy).
-import { parseDateParam, parseIntParam, parseQueryParam } from "./_params.ts";
-import { listBarriers } from "../../lib/server/sql/barriers.ts";
-import { resolveBarriers } from "../../lib/resolve.ts";
-import { loadServerConfig } from "../../lib/server/config.ts";
 import {
   badRequest,
   internal,
   newRequestId,
   rateLimited,
 } from "../../lib/server/errors.ts";
+
 import {
   EXPORT_MAX_ROWS,
   streamExportCsv,
 } from "../../lib/server/exportCsv.ts";
+
+import { parseDateParam, parseIntParam, parseQueryParam } from "./_params.ts";
+
 import { exportThrottle, routeClientKey } from "../../lib/server/throttle.ts";
+
+import { listBarriers } from "../../lib/server/sql/barriers.ts";
+
+import { loadServerConfig } from "../../lib/server/config.ts";
+
 import type { BarriersQuery } from "../../lib/wireTypes.ts";
+
+import { resolveBarriers } from "../../lib/resolve.ts";
+
 import { define } from "../../utils.ts";
 
 export const handler = define.handlers({
@@ -51,9 +59,9 @@ export const handler = define.handlers({
     }
     const query: BarriersQuery = {
       locationId: parseIntParam(sp.get("locationId")),
-      disponibilidadeId: parseIntParam(sp.get("disponibilidadeId")),
-      conformidadeId: parseIntParam(sp.get("conformidadeId")),
-      categoriaId: parseIntParam(sp.get("categoriaId")),
+      availabilityId: parseIntParam(sp.get("availabilityId")),
+      complianceId: parseIntParam(sp.get("complianceId")),
+      categoryId: parseIntParam(sp.get("categoryId")),
       query: parseQueryParam(sp.get("query")),
       since: parseDateParam(sp.get("since")),
       until: parseDateParam(sp.get("until")),

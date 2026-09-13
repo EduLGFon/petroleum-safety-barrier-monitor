@@ -43,7 +43,7 @@ export function Pagination(
       }}
     >
       <span style={{ fontSize: "var(--d-body)", color: "var(--text-muted)" }}>
-        {from.toLocaleString("pt-BR")}–{to.toLocaleString("pt-BR")} de{" "}
+        {from.toLocaleString("pt-BR")}-{to.toLocaleString("pt-BR")} de{" "}
         {total.toLocaleString("pt-BR")}
       </span>
       <div

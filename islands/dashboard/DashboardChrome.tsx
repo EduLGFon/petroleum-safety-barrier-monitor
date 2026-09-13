@@ -2,9 +2,12 @@
 // Why: keeps DashboardView to section composition; footer and modal wiring
 // render once and change rarely.
 import { SettingsPanel } from "../../components/SettingsPanel.tsx";
+
 import { BarrierModal } from "../../components/BarrierModal.tsx";
-import { withBrand } from "../../lib/company.ts";
+
 import type { Barrier } from "../../lib/types.ts";
+
+import { withBrand } from "../../lib/company.ts";
 
 // DashboardFooter: centered brand line closing the page.
 export function DashboardFooter({ companyName }: { companyName: string }) {

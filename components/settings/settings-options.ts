@@ -27,8 +27,8 @@ export const CONF_OPTS = ["Conforme", "Não Conforme"];
 export const SORT_OPTS = [
   { value: "id", label: "ID" },
   { value: "tag", label: "TAG" },
-  { value: "disponibilidade", label: "Disponibilidade" },
-  { value: "conformidade", label: "Conformidade" },
+  { value: "availability", label: "Disponibilidade" },
+  { value: "compliance", label: "Conformidade" },
   { value: "statusSince", label: "Tempo sem contingência" },
 ];
 

@@ -62,13 +62,15 @@ function AnimVal({ n, isPercent }: { n: number; isPercent?: boolean }) {
   );
 }
 
-// KpiGrid: six glass cards from KpiSnapshot + location label; shares divide by total||1, Contingenciadas sums indisp + degr.
+// KpiGrid: six glass cards from KpiSnapshot + location label; shares divide by total||1, contingency card sums contingencyOutage + degradedContingency.
 export function KpiGrid({ kpi, location }: Props) {
   const t = kpi.total || 1;
   const loc = location === "ALL" ? "total geral" : `em ${location}`;
-  const dispShare = Math.round(kpi.disponivel / t * 100);
-  const ncShare = Math.round(kpi.naoConforme / t * 100);
-  const contShare = Math.round((kpi.indispCont + kpi.degrCont) / t * 100);
+  const dispShare = Math.round(kpi.available / t * 100);
+  const ncShare = Math.round(kpi.nonCompliant / t * 100);
+  const contShare = Math.round(
+    (kpi.contingencyOutage + kpi.degradedContingency) / t * 100,
+  );
   const cards: C[] = [
     {
       label: "Total de Barreiras",
@@ -79,14 +81,14 @@ export function KpiGrid({ kpi, location }: Props) {
     },
     {
       label: "Disponíveis",
-      rawNum: kpi.disponivel,
+      rawNum: kpi.available,
       sub: pct(dispShare) + " do inv.",
       share: dispShare,
       delay: 50,
     },
     {
       label: "Não Conformes",
-      rawNum: kpi.naoConforme,
+      rawNum: kpi.nonCompliant,
       sub: pct(ncShare) + " do inv.",
       share: ncShare,
       alert: true,
@@ -94,24 +96,24 @@ export function KpiGrid({ kpi, location }: Props) {
     },
     {
       label: "Contingenciadas",
-      rawNum: kpi.indispCont + kpi.degrCont,
+      rawNum: kpi.contingencyOutage + kpi.degradedContingency,
       sub: "Ind. + Degr. contingenciadas",
       share: contShare,
       delay: 150,
     },
     {
       label: "% Conformidade",
-      rawNum: kpi.pctConforme,
+      rawNum: kpi.pctCompliant,
       isPercent: true,
-      sub: fmt(kpi.conforme) + " conformes",
-      share: kpi.pctConforme,
+      sub: fmt(kpi.compliant) + " conformes",
+      share: kpi.pctCompliant,
       delay: 200,
     },
     {
       label: "Críticas NC",
-      rawNum: kpi.criticasNC,
+      rawNum: kpi.criticalNonCompliant,
       sub: "Críticas não conformes",
-      alert: kpi.criticasNC > 0,
+      alert: kpi.criticalNonCompliant > 0,
       delay: 250,
     },
   ];

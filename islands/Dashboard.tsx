@@ -4,9 +4,12 @@
 // config (mode, base URL, vocabularies) crosses the island boundary as props
 // because islands cannot read Deno env in the browser.
 import { SettingsProvider } from "../context/SettingsContext.tsx";
-import { ThemeProvider } from "../context/ThemeContext.tsx";
+
 import { DashboardView } from "./dashboard/DashboardView.tsx";
+
 import type { Barrier, Vocabularies } from "../lib/types.ts";
+
+import { ThemeProvider } from "../context/ThemeContext.tsx";
 
 interface Props {
   initialBarriers: Barrier[];

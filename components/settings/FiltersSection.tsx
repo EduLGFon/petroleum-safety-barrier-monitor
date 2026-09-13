@@ -37,7 +37,7 @@ export function FiltersSection(
       >
         Aplicados automaticamente ao iniciar o sistema.
       </p>
-      {/* Default location — ITEM 7 */}
+      {/* Default location - ITEM 7 */}
       <div>
         <FieldLabel>Instalação (localização)</FieldLabel>
         <select
@@ -48,7 +48,7 @@ export function FiltersSection(
           {LOCATIONS.map((l) => (
             <option key={l.code} value={l.code}>
               {l.name}
-              {l.code !== "ALL" ? ` — ${l.tipo}` : ""}
+              {l.code !== "ALL" ? ` - ${l.type}` : ""}
             </option>
           ))}
         </select>
@@ -56,11 +56,11 @@ export function FiltersSection(
       {[
         {
           label: "Disponibilidade",
-          key: "disponibilidade",
+          key: "availability",
           opts: DISP_OPTS,
         },
-        { label: "Conformidade", key: "conformidade", opts: CONF_OPTS },
-        { label: "Categoria", key: "categoria", opts: [...CATEGORIES] },
+        { label: "Conformidade", key: "compliance", opts: CONF_OPTS },
+        { label: "Categoria", key: "category", opts: [...CATEGORIES] },
       ].map(({ label, key, opts }) => (
         <div key={key}>
           <FieldLabel>{label}</FieldLabel>

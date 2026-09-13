@@ -25,7 +25,7 @@ export function BarrierRow(
   { barrier: b, index: i, selected: isSel, onToggleSelect, onSelect }:
     BarrierRowProps,
 ) {
-  const isNC = b.conformidade === "Não Conforme";
+  const isNC = b.compliance === "Não Conforme";
   const ncDays = isNC && b.statusSince ? daysSince(b.statusSince) : 0;
   return (
     <tr
@@ -111,7 +111,7 @@ export function BarrierRow(
         <div style={{ fontSize: 12, color: AURORA.loc, marginTop: 2 }}>
           {b.locDesc}
         </div>
-        {/* "X tempo sem contingenciamento" for NC items */}
+        {/* "sem contingenciamento" duration label for NC items */}
         {isNC && b.statusSince && (
           <div
             style={{
@@ -132,15 +132,15 @@ export function BarrierRow(
           </div>
         )}
       </td>
-      {/* Criticidade */}
+      {/* Criticality */}
       <td onClick={() => onSelect(b)} style={{ padding: "var(--d-cell-pad)" }}>
         <Badge
-          label={b.criticidade}
-          {...critColorFor(b.criticidade)}
+          label={b.criticality}
+          {...critColorFor(b.criticality)}
           size="sm"
         />
       </td>
-      {/* Categoria */}
+      {/* Category */}
       <td
         onClick={() => onSelect(b)}
         style={{
@@ -149,15 +149,15 @@ export function BarrierRow(
           color: "var(--text-secondary)",
         }}
       >
-        {b.categoria}
+        {b.category}
       </td>
-      {/* Disponibilidade */}
+      {/* Availability */}
       <td onClick={() => onSelect(b)} style={{ padding: "var(--d-cell-pad)" }}>
-        <Badge label={b.disponibilidade} {...dispColorFor(b.disponibilidade)} />
+        <Badge label={b.availability} {...dispColorFor(b.availability)} />
       </td>
-      {/* Conformidade */}
+      {/* Compliance */}
       <td onClick={() => onSelect(b)} style={{ padding: "var(--d-cell-pad)" }}>
-        <Badge label={b.conformidade} {...confColorFor(b.conformidade)} />
+        <Badge label={b.compliance} {...confColorFor(b.compliance)} />
       </td>
       {/* Arrow */}
       <td

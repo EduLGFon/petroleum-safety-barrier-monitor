@@ -1,8 +1,11 @@
 // Unit tests for hooks/dashboard/reducer.ts - pure location/filter/sort transitions.
-import { assertEquals } from "jsr:@std/assert@^1";
 import { defaultFilters } from "../../lib/utils.ts";
-import { reducer } from "./reducer.ts";
+
+import { assertEquals } from "jsr:@std/assert@^1";
+
 import type { State } from "./reducer.ts";
+
+import { reducer } from "./reducer.ts";
 
 function state(over: Partial<State> = {}): State {
   return {
@@ -59,7 +62,7 @@ Deno.test("RESET_FILTERS returns fresh defaults", () => {
     filters: {
       ...defaultFilters(),
       query: "x",
-      categoria: "SIS",
+      category: "SIS",
       page: 9,
       sortCol: "statusSince",
       sortDir: "desc",

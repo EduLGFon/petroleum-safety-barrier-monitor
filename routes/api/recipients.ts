@@ -2,8 +2,6 @@
 // This is why it exists: the send path reads recipients from the database;
 // only token holders may list or change them (P4 checkAdminAuth on every
 // method, including GET - recipient addresses are admin data).
-import { checkAdminAuth } from "../../lib/server/auth.ts";
-import { loadServerConfig } from "../../lib/server/config.ts";
 import {
   badRequest,
   internal,
@@ -11,16 +9,23 @@ import {
   rateLimited,
   unauthorized,
 } from "../../lib/server/errors.ts";
-import {
-  createRecipient,
-  listRecipients,
-} from "../../lib/server/sql/recipients.ts";
+
 import {
   readThrottle,
   routeClientKey,
   type Throttle,
   writeThrottle,
 } from "../../lib/server/throttle.ts";
+
+import {
+  createRecipient,
+  listRecipients,
+} from "../../lib/server/sql/recipients.ts";
+
+import { loadServerConfig } from "../../lib/server/config.ts";
+
+import { checkAdminAuth } from "../../lib/server/auth.ts";
+
 import { define } from "../../utils.ts";
 
 function guard(

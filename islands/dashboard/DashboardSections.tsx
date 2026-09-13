@@ -2,17 +2,28 @@
 // Why: client (mock) and server (HTTP) modes share one render tree; only the
 // data hook feeding `dash` differs. Settings defaults gate lives here too.
 import { DashboardFooter, DashboardOverlays } from "./DashboardChrome.tsx";
+
 import { LocationFilter } from "../../components/LocationFilter.tsx";
+
 import { ExportToolbar } from "../../components/ExportToolbar.tsx";
+
 import { BarriersTable } from "../../components/BarriersTable.tsx";
+
 import { useSettings } from "../../context/SettingsContext.tsx";
+
 import type { useDashboard } from "../../hooks/useDashboard.ts";
+
 import { FilterBar } from "../../components/FilterBar.tsx";
-import { Header } from "../../components/Header.tsx";
+
 import { sanitizeFilterPatch } from "../../lib/utils.ts";
-import { KpiSections } from "./KpiSections.tsx";
+
+import { Header } from "../../components/Header.tsx";
+
 import { useEffect, useState } from "preact/hooks";
+
 import type { Barrier } from "../../lib/types.ts";
+
+import { KpiSections } from "./KpiSections.tsx";
 
 // Either data hook return, plus optional server-only fetch state.
 export type Dash =
@@ -76,7 +87,7 @@ export function DashboardSections(
     setFilter,
     setSort,
     resetFilters,
-    showUrgentes,
+    showUrgent,
     toggleSelect,
     selectAll,
     clearAll,
@@ -97,8 +108,8 @@ export function DashboardSections(
 
   // Unified NC count: every non-Conforme barrier (fail-closed, novel statuses
   // included) drives the alert, matching KpiGrid and the chart.
-  const ncCount = kpi.naoConforme;
-  const isUrgentesActive = filters.conformidade === "Não Conforme" &&
+  const ncCount = kpi.nonCompliant;
+  const isUrgentActive = filters.compliance === "Não Conforme" &&
     filters.sortCol === "statusSince";
 
   return (
@@ -140,11 +151,11 @@ export function DashboardSections(
           kpi={kpi}
           chartData={chartData}
           location={location}
-          activeDisponibilidade={filters.disponibilidade}
-          onDispFilter={(v) => setFilter({ disponibilidade: v })}
+          activeAvailability={filters.availability}
+          onDispFilter={(v) => setFilter({ availability: v })}
           ncCount={ncCount}
-          isUrgentesActive={isUrgentesActive}
-          showUrgentes={showUrgentes}
+          isUrgentActive={isUrgentActive}
+          showUrgent={showUrgent}
           resetFilters={resetFilters}
         />
 
@@ -162,9 +173,9 @@ export function DashboardSections(
             filters={filters}
             filteredTotal={filteredTotal}
             hasActiveFilters={hasActiveFilters}
-            disponibilidades={dispOpts}
-            conformidades={confOpts}
-            categorias={catOpts}
+            availabilities={dispOpts}
+            compliances={confOpts}
+            categories={catOpts}
             onFilter={setFilter}
             onReset={resetFilters}
           />

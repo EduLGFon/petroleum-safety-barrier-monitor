@@ -14,9 +14,9 @@ interface Props {
   filters: FilterState;
   filteredTotal: number;
   hasActiveFilters: boolean;
-  disponibilidades: string[];
-  conformidades: string[];
-  categorias: string[];
+  availabilities: string[];
+  compliances: string[];
+  categories: string[];
   onFilter: (p: Partial<FilterState>) => void;
   onReset: () => void;
 }
@@ -27,9 +27,9 @@ export function FilterBar(
     filters,
     filteredTotal,
     hasActiveFilters,
-    disponibilidades,
-    conformidades,
-    categorias,
+    availabilities,
+    compliances,
+    categories,
     onFilter,
     onReset,
   }: Props,
@@ -49,9 +49,9 @@ export function FilterBar(
     return () => clearTimeout(t);
   }, [draft, filters.query, onFilter]);
   // Props carry the live vocabulary; seed lists only fill empty datasets.
-  const dispOpts = disponibilidades.length ? disponibilidades : FALLBACK_DISP;
-  const confOpts = conformidades.length ? conformidades : FALLBACK_CONF;
-  const catOpts = categorias.length ? categorias : [...CATEGORIES];
+  const dispOpts = availabilities.length ? availabilities : FALLBACK_DISP;
+  const confOpts = compliances.length ? compliances : FALLBACK_CONF;
+  const catOpts = categories.length ? categories : [...CATEGORIES];
 
   return (
     <div
@@ -107,20 +107,20 @@ export function FilterBar(
       </div>
 
       <Sel
-        value={filters.disponibilidade}
-        onChange={(v) => onFilter({ disponibilidade: v })}
+        value={filters.availability}
+        onChange={(v) => onFilter({ availability: v })}
         placeholder="Disponibilidade"
         opts={dispOpts}
       />
       <Sel
-        value={filters.conformidade}
-        onChange={(v) => onFilter({ conformidade: v })}
+        value={filters.compliance}
+        onChange={(v) => onFilter({ compliance: v })}
         placeholder="Conformidade"
         opts={confOpts}
       />
       <Sel
-        value={filters.categoria}
-        onChange={(v) => onFilter({ categoria: v })}
+        value={filters.category}
+        onChange={(v) => onFilter({ category: v })}
         placeholder={`Categoria (${catOpts.length})`}
         opts={catOpts}
       />

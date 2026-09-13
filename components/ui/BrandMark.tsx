@@ -50,7 +50,7 @@ export function BrandMark(
   const wave = light ? "#ffffff" : "#0a1628";
 
   if (variant === "adaptive") {
-    // Uses CSS currentColor — adapts to theme automatically
+    // Uses CSS currentColor - adapts to theme automatically
     return (
       <svg
         width={height}

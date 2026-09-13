@@ -1,12 +1,12 @@
-// ChartRow - per-category <g> row for the conformidade stacked bars.
+// ChartRow - per-category <g> row for the compliance stacked bars.
 // Why it exists: isolates row geometry and hover wiring from the SVG frame
 // so the inner chart stays a thin shell over scales, axis and legend.
-import type { CategoryConformidade } from "../../lib/types.ts";
+import type { CategoryCompliance } from "../../lib/types.ts";
 import type { CSSProperties } from "preact";
 import { PLOT_W, px } from "./geometry.ts";
 
 interface Props {
-  d: CategoryConformidade;
+  d: CategoryCompliance;
   index: number;
   y: number;
   dimmed: boolean;
@@ -18,7 +18,7 @@ interface Props {
   onLeave: () => void;
 }
 
-// ChartRow: stacked Conforme / Nao Conforme segments plus count and hover target.
+// ChartRow: stacked Conforme / Não Conforme segments plus count and hover target.
 export function ChartRow(
   { d, index, y, dimmed, labelW, barH, rowH, w, onHover, onLeave }: Props,
 ) {

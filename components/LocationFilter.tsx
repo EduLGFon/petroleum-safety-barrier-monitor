@@ -29,7 +29,7 @@ export function LocationFilter(
       for (const s of stations) counts.set(s.code, s.count);
     } else {
       for (const b of allBarriers) {
-        counts.set(b.instalacao, (counts.get(b.instalacao) ?? 0) + 1);
+        counts.set(b.location, (counts.get(b.location) ?? 0) + 1);
       }
     }
     const codes = [...counts.keys()].sort((a, b) =>
@@ -38,7 +38,7 @@ export function LocationFilter(
     return codes.map((code) => ({
       code,
       name: meta.get(code)?.name ?? code,
-      tipo: meta.get(code)?.tipo ?? "Instalação",
+      type: meta.get(code)?.type ?? "Instalação",
       count: counts.get(code) ?? 0,
     }));
   }, [allBarriers, stations]);
@@ -57,7 +57,7 @@ export function LocationFilter(
     >
       <Tab
         name="Todas"
-        tipo="Todas as Instalações"
+        type="Todas as Instalações"
         count={total ?? allBarriers.length}
         active={selected === "ALL"}
         index={0}
@@ -67,7 +67,7 @@ export function LocationFilter(
         <Tab
           key={t.code}
           name={t.name}
-          tipo={t.tipo}
+          type={t.type}
           count={t.count}
           active={selected === t.code}
           index={i + 1}
@@ -80,9 +80,9 @@ export function LocationFilter(
 
 // Tab: single glass pill tab with count badge and staggered entrance.
 function Tab(
-  { name, tipo, count, active, index, onClick }: {
+  { name, type, count, active, index, onClick }: {
     name: string;
-    tipo: string;
+    type: string;
     count: number;
     active: boolean;
     index: number;
@@ -94,7 +94,7 @@ function Tab(
       type="button"
       onClick={onClick}
       aria-pressed={active}
-      title={tipo}
+      title={type}
       style={{
         display: "flex",
         alignItems: "center",

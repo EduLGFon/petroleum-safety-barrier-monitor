@@ -7,27 +7,35 @@ import {
   type Density,
   type SettingsState,
 } from "./settings/presets.ts";
-export type {
-  AccentColor,
-  Density,
-  SettingsState,
-} from "./settings/presets.ts";
+
 import {
   applyAccent,
   applyDensity,
   applyMotion,
   applyTheme,
 } from "./settings/appliers.ts";
+
 export {
   ACCENT_PRESETS,
   DEFAULTS,
   DENSITY_PRESETS,
   KEY,
 } from "./settings/presets.ts";
+
+export type {
+  AccentColor,
+  Density,
+  SettingsState,
+} from "./settings/presets.ts";
+
 import { useCallback, useContext, useEffect, useState } from "preact/hooks";
+
 import { loadSettings, saveSettings } from "./settings/storage.ts";
+
 import type { FilterState, Theme } from "../lib/types.ts";
+
 import type { ComponentChildren } from "preact";
+
 import { createContext } from "preact";
 
 interface Ctx {
@@ -54,7 +62,7 @@ const SettingsCtx = createContext<Ctx>({
 export function SettingsProvider(
   { children }: { children: ComponentChildren },
 ) {
-  // Start with DEFAULTS for SSR consistency — hydrate from localStorage after mount
+  // Start with DEFAULTS for SSR consistency - hydrate from localStorage after mount
   const [settings, setSettings] = useState<SettingsState>(DEFAULTS);
 
   useEffect(() => {

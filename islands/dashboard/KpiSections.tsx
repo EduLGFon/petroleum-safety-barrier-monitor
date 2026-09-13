@@ -2,20 +2,24 @@
 // Why: one data-driven block (KPI snapshot + chart rows) shared verbatim by
 // both dashboard modes; keeps DashboardSections to shell composition.
 import { ConformidadeChart } from "../../components/ConformidadeChart.tsx";
+
+import type { CategoryCompliance, KpiSnapshot } from "../../lib/types.ts";
+
 import { StatusBand } from "../../components/StatusBand.tsx";
+
 import { KpiGrid } from "../../components/KpiGrid.tsx";
-import type { CategoryConformidade, KpiSnapshot } from "../../lib/types.ts";
+
 import { NcAlert } from "./NcAlert.tsx";
 
 interface KpiSectionsProps {
   kpi: KpiSnapshot;
-  chartData: CategoryConformidade[];
+  chartData: CategoryCompliance[];
   location: string;
-  activeDisponibilidade: string;
+  activeAvailability: string;
   onDispFilter: (v: string) => void;
   ncCount: number;
-  isUrgentesActive: boolean;
-  showUrgentes: () => void;
+  isUrgentActive: boolean;
+  showUrgent: () => void;
   resetFilters: () => void;
 }
 
@@ -25,11 +29,11 @@ export function KpiSections(
     kpi,
     chartData,
     location,
-    activeDisponibilidade,
+    activeAvailability,
     onDispFilter,
     ncCount,
-    isUrgentesActive,
-    showUrgentes,
+    isUrgentActive,
+    showUrgent,
     resetFilters,
   }: KpiSectionsProps,
 ) {
@@ -39,7 +43,7 @@ export function KpiSections(
       <div style={{ animation: "slideUp .3s .08s var(--ease-out) both" }}>
         <StatusBand
           kpi={kpi}
-          activeFilter={activeDisponibilidade}
+          activeFilter={activeAvailability}
           onFilter={onDispFilter}
         />
       </div>
@@ -55,8 +59,8 @@ export function KpiSections(
       {/* NC alert - red glass with the signature red glow */}
       <NcAlert
         ncCount={ncCount}
-        isUrgentesActive={isUrgentesActive}
-        showUrgentes={showUrgentes}
+        isUrgentActive={isUrgentActive}
+        showUrgent={showUrgent}
         resetFilters={resetFilters}
       />
     </>
