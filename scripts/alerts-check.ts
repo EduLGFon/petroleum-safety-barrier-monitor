@@ -8,7 +8,7 @@
 // mail), FRACTTAL_* not needed. Exit 0 when the run completes (counts in
 // the log, even with dead-letters); exit 1 on unexpected failure (DB down,
 // no relay when sending) after notifying ops.
-import { getBarrierById } from "../lib/server/sql/barriers.ts";
+import { getBarriersByIds } from "../lib/server/sql/barriers.ts";
 import { sqlAlertStore } from "../lib/server/sql/alerts.ts";
 import { listRecipients } from "../lib/server/sql/recipients.ts";
 import {
@@ -92,7 +92,7 @@ async function main(): Promise<void> {
   try {
     const result = await runAlertCycle({
       store: sqlAlertStore,
-      loadBarrier: getBarrierById,
+      loadBarriers: getBarriersByIds,
       mailer,
       recipients: recipients!,
       onlyBarrierIds: flags.onlyBarrier === undefined

@@ -70,12 +70,34 @@ export async function listBarriers(
 
 // Fetches a single wire barrier by id, or null when missing/deleted.
 export async function getBarrierById(id: number): Promise<WireBarrier | null> {
-  const rows = await queryRows<BarrierRow>(
-    `select ${SELECT_COLUMNS} from barriers b
-     ${HISTORY_JOIN} where b.id = $1 and b.deleted_at is null`,
-    [id],
-  );
-  return rows[0] ? toWireBarrier(rows[0]) : null;
+  const found = await getBarriersByIds([id]);
+  return found.get(id) ?? null;
+}
+
+// getBarriersByIds: batch version of getBarrierById (the alert detector
+// resolves hundreds of candidates per run - one query each would stall it).
+// Chunked IN lists keep placeholder counts bounded; missing/deleted ids are
+// simply absent from the map.
+export async function getBarriersByIds(
+  ids: number[],
+): Promise<Map<number, WireBarrier>> {
+  const out = new Map<number, WireBarrier>();
+  const unique = [...new Set(ids)].filter((n) => Number.isInteger(n));
+  for (let at = 0; at < unique.length; at += 500) {
+    const chunk = unique.slice(at, at + 500);
+    const placeholders = chunk.map((_, i) => `$${i + 1}`).join(", ");
+    const rows = await queryRows<BarrierRow>(
+      `select ${SELECT_COLUMNS} from barriers b
+       ${HISTORY_JOIN}
+       where b.id in (${placeholders}) and b.deleted_at is null`,
+      chunk,
+    );
+    for (const r of rows) {
+      const w = toWireBarrier(r);
+      out.set(w.id, w);
+    }
+  }
+  return out;
 }
 
 // Computes KPI snapshot counts, optionally scoped to one location.

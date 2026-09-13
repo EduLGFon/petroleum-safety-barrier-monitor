@@ -4,7 +4,7 @@
 // Skipped with a log line when DATABASE_URL is unset.
 import { assertStrictEquals } from "jsr:@std/assert@^1";
 import { queryRows } from "../db.ts";
-import { getBarrierById, transitionBarrierStatus } from "./barriers.ts";
+import { getBarriersByIds, transitionBarrierStatus } from "./barriers.ts";
 import { sqlAlertStore } from "./alerts.ts";
 import { runAlertCycle } from "../alerts/run.ts";
 import type { AlertMailer } from "../alerts/mailer.ts";
@@ -37,7 +37,7 @@ Deno.test("urgent transition sends one digest, rerun sends zero", async () => {
   };
   const base = {
     store: sqlAlertStore,
-    loadBarrier: getBarrierById,
+    loadBarriers: getBarriersByIds,
     mailer,
     recipients: [{ email: "p5test@example.com" }],
     onlyBarrierIds: [barrierId],

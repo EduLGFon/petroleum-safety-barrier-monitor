@@ -125,6 +125,17 @@ class FakeStore implements AlertStore {
   }
 }
 
+function batchLoader(barriers: Map<number, WireBarrier>) {
+  return (ids: number[]): Promise<Map<number, WireBarrier>> => {
+    const out = new Map<number, WireBarrier>();
+    for (const id of ids) {
+      const w = barriers.get(id);
+      if (w !== undefined) out.set(id, w);
+    }
+    return Promise.resolve(out);
+  };
+}
+
 interface SentMail {
   to: string[];
   subject: string;
@@ -164,7 +175,7 @@ Deno.test("cycle sends exactly one digest and reruns send zero", async () => {
   const { mailer, sent } = fakeMailer();
   const base = {
     store,
-    loadBarrier: (id: number) => Promise.resolve(barriers.get(id) ?? null),
+    loadBarriers: batchLoader(barriers),
     mailer,
     recipients: [{ email: "ops@example.com" }],
     dryRun: false,
@@ -195,7 +206,7 @@ Deno.test("cycle skips calm landings and missing barriers", async () => {
   const { mailer, sent } = fakeMailer();
   const r = await runAlertCycle({
     store,
-    loadBarrier: (id: number) => Promise.resolve(barriers.get(id) ?? null),
+    loadBarriers: batchLoader(barriers),
     mailer,
     recipients: [{ email: "ops@example.com" }],
     dryRun: false,
@@ -219,7 +230,7 @@ Deno.test("cycle sends one digest per recipient with the same events", async () 
   const { mailer, sent } = fakeMailer();
   const r = await runAlertCycle({
     store,
-    loadBarrier: (id: number) => Promise.resolve(barriers.get(id) ?? null),
+    loadBarriers: batchLoader(barriers),
     mailer,
     recipients: [{ email: "a@x" }, { email: "b@x" }],
     dryRun: false,
@@ -241,7 +252,7 @@ Deno.test("cycle resumes partial delivery without duplicating", async () => {
   const failing = fakeMailer({ failTo: ["b@x"] });
   const base = {
     store,
-    loadBarrier: (id: number) => Promise.resolve(barriers.get(id) ?? null),
+    loadBarriers: batchLoader(barriers),
     mailer: failing.mailer,
     recipients: [{ email: "a@x" }, { email: "b@x" }],
     dryRun: false,
@@ -266,7 +277,7 @@ Deno.test("cycle dead-letters after the run budget, reprocess retries", async ()
   const { mailer } = fakeMailer({ failAll: true });
   const base = {
     store,
-    loadBarrier: (id: number) => Promise.resolve(barriers.get(id) ?? null),
+    loadBarriers: batchLoader(barriers),
     mailer,
     recipients: [{ email: "ops@example.com" }],
     dryRun: false,
@@ -297,7 +308,7 @@ Deno.test("dry-run detects but writes nothing and sends nothing", async () => {
   const { mailer, sent } = fakeMailer();
   const r = await runAlertCycle({
     store,
-    loadBarrier: (id: number) => Promise.resolve(barriers.get(id) ?? null),
+    loadBarriers: batchLoader(barriers),
     mailer,
     recipients: [{ email: "ops@example.com" }],
     dryRun: true,

@@ -34,7 +34,11 @@ Deno.test("detectUrgentTransitions keeps urgent landings with context", async ()
   };
   const out = await detectUrgentTransitions(
     store,
-    (id) => Promise.resolve(id === 1 ? wire() : null),
+    (ids) => {
+      const out = new Map<number, WireBarrier>();
+      for (const id of ids) if (id === 1) out.set(id, wire());
+      return Promise.resolve(out);
+    },
     null,
   );
   assertStrictEquals(out.length, 1);
@@ -55,10 +59,13 @@ Deno.test("detectUrgentTransitions drops calm landings and gone barriers", async
   };
   const out = await detectUrgentTransitions(
     store,
-    (id) =>
-      Promise.resolve(
-        id === 1 ? wire({ disponibilidadeId: 0 }) : null,
-      ),
+    (ids) => {
+      const out = new Map<number, WireBarrier>();
+      for (const id of ids) {
+        if (id === 1) out.set(id, wire({ disponibilidadeId: 0 }));
+      }
+      return Promise.resolve(out);
+    },
     "2026-09-01",
   );
   assertStrictEquals(out.length, 0);
@@ -74,7 +81,13 @@ Deno.test("detectUrgentTransitions tiers critical by criticidade", async () => {
   };
   const out = await detectUrgentTransitions(
     store,
-    () => Promise.resolve(wire({ id: 9, criticidadeId: 0 })),
+    (ids) => {
+      const out = new Map<number, WireBarrier>();
+      for (const id of ids) {
+        out.set(id, wire({ id, criticidadeId: 0 }));
+      }
+      return Promise.resolve(out);
+    },
     null,
   );
   assertStrictEquals(out.length, 1);

@@ -13,18 +13,20 @@ export interface DetectedUrgent extends NewAlertEvent {
 }
 
 // detectUrgentTransitions: candidates since the watermark, resolved to
-// domain barriers, keeping only urgent landings. loadBarrier is injected
-// (prod: getBarrierById) so tests never touch the database.
+// domain barriers, keeping only urgent landings. loadBarriers is injected
+// (prod: getBarriersByIds) and takes the whole candidate set at once - one
+// query per run, never N+1 - so tests never touch the database.
 export async function detectUrgentTransitions(
   store: Pick<AlertStore, "recentTransitions">,
-  loadBarrier: (id: number) => Promise<WireBarrier | null>,
+  loadBarriers: (ids: number[]) => Promise<Map<number, WireBarrier>>,
   since: string | null,
   onlyBarrierIds?: number[],
 ): Promise<DetectedUrgent[]> {
   const candidates = await store.recentTransitions(since, onlyBarrierIds);
+  const barriers = await loadBarriers(candidates.map((c) => c.barrierId));
   const out: DetectedUrgent[] = [];
   for (const c of candidates) {
-    const wire = await loadBarrier(c.barrierId);
+    const wire = barriers.get(c.barrierId);
     if (!wire) continue; // barrier deleted after the transition
     const barrier = resolveBarrier(wire);
     const urgency = urgencyOf(barrier);

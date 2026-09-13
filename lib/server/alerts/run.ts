@@ -33,7 +33,7 @@ export interface AlertRecipientRef {
 
 export interface AlertCycleOptions {
   store: AlertStore;
-  loadBarrier: (id: number) => Promise<WireBarrier | null>;
+  loadBarriers: (ids: number[]) => Promise<Map<number, WireBarrier>>;
   mailer: AlertMailer;
   recipients: AlertRecipientRef[];
   onlyBarrierIds?: number[];
@@ -98,7 +98,7 @@ export async function runAlertCycle(
 ): Promise<AlertCycleResult> {
   const {
     store,
-    loadBarrier,
+    loadBarriers,
     mailer,
     recipients,
     dryRun = true,
@@ -128,7 +128,7 @@ export async function runAlertCycle(
   result.watermark = await store.watermark();
   const detected = await detectUrgentTransitions(
     store,
-    loadBarrier,
+    loadBarriers,
     result.watermark,
     options.onlyBarrierIds,
   );
