@@ -1,8 +1,8 @@
 -- ═══════════════════════════════════════════════════════════════════════════
--- SCHEMA — Monitor de Barreiras
+-- SCHEMA - Safety Barrier Monitor
 -- ═══════════════════════════════════════════════════════════════════════════
 -- Every lookup table's ids are a hard contract with the frontend's
--- lib/enums.ts resolvers (fromXId/toXId) — a given id must mean the exact
+-- lib/enums.ts resolvers (fromXId/toXId) - a given id must mean the exact
 -- same thing on both sides. Rows are seeded by db/seed_lookups.sql with the
 -- ids matching lib/enums.ts exactly; do not renumber existing rows.
 --
@@ -15,38 +15,38 @@
 create table if not exists locations (
   id    integer primary key,
   code  text not null unique,          -- 'FAL','CNC','CNS','FAP','RJO','SPL' ('ALL' is UI-only, never a row)
-  tipo  text not null                   -- installation type, display only
+  type  text not null                   -- installation type, display only
 );
 
-create table if not exists disponibilidades (
-  id          integer primary key,
-  label       text    not null unique,
-  is_conforme boolean not null          -- drives barriers.conformidade_id via trigger
+create table if not exists availability_statuses (
+  id           integer primary key,
+  label        text    not null unique,
+  is_compliant boolean not null          -- drives barriers.compliance_id via trigger
 );
 
-create table if not exists criticidades (
+create table if not exists criticality_levels (
   id    integer primary key,
   label text not null unique
 );
 
-create table if not exists categorias (
+create table if not exists categories (
   id    integer primary key,
   label text not null unique
 );
 
-create table if not exists agrupamentos (
+create table if not exists groupings (
   id    integer primary key,
   label text not null unique
 );
 
-create table if not exists tipologias (
+create table if not exists typologies (
   id    integer primary key,
   label text not null unique
 );
 
-create table if not exists donos (
+create table if not exists owners (
   id    integer primary key,           -- -1 = "não informado" is NOT a row here;
-  label text not null unique            -- donoId = -1 means "no row", handled in application code
+  label text not null unique            -- ownerId = -1 means "no row", handled in application code
 );
 
 create table if not exists loc_descs (
@@ -66,30 +66,31 @@ create table if not exists barriers (
   tag                text        not null,
 
   location_id        integer    not null references locations(id),
-  tipologia_id       integer    not null references tipologias(id),
+  typology_id        integer    not null references typologies(id),
   loc_desc_id        integer    not null references loc_descs(id),
-  criticidade_id     integer    not null references criticidades(id),
-  categoria_id       integer    not null references categorias(id),
-  agrupamento_id     integer    not null references agrupamentos(id),
-  dono_id            integer    references donos(id),        -- null = "não informado"
+  criticality_id     integer    not null references criticality_levels(id),
+  category_id        integer    not null references categories(id),
+  grouping_id        integer    not null references groupings(id),
+  owner_id           integer    references owners(id),        -- null = "não informado"
 
-  disponibilidade_id integer    not null references disponibilidades(id),
+  availability_id    integer    not null references availability_statuses(id),
 
-  -- Derived, never written directly — kept in sync with disponibilidade_id
-  -- by the trg_barriers_set_conformidade trigger below (mirrors
-  -- lib/constants.ts's isConforme()). This can't be a native PostgreSQL
+  -- Derived, never written directly - kept in sync with availability_id
+  -- by the trg_barriers_set_compliance trigger below (mirrors
+  -- lib/constants.ts's isCompliant()). This can't be a native PostgreSQL
   -- GENERATED column because that syntax forbids subqueries/joins, and the
-  -- conforming-status set lives in the disponibilidades lookup table rather
-  -- than a hardcoded literal list, so a trigger is the mechanism instead.
-  conformidade_id    integer    not null default 1,
+  -- compliant status set lives in the availability_statuses lookup table
+  -- rather than a hardcoded literal list, so a trigger is the mechanism
+  -- instead.
+  compliance_id      integer    not null default 1,
 
-  comentarios        text        not null default '',
-  plano_acao         text        not null default '',
+  comments           text        not null default '',
+  action_plan        text        not null default '',
 
   status_since       date        not null default current_date,
 
   -- Provenance + soft delete (Fracttal sync, P3). external_code is the
-  -- stable upstream business key used for upsert matching — never renumber.
+  -- stable upstream business key used for upsert matching - never renumber.
   external_code       text        unique,
   source_updated_at   timestamptz,          -- best-available remote timestamp; null when upstream exposes none
   deleted_at          timestamptz,          -- set by sync when the upstream row disappears; row stays for audit
@@ -101,26 +102,26 @@ create table if not exists barriers (
 create index if not exists idx_barriers_external_code on barriers(external_code);
 create index if not exists idx_barriers_deleted_at on barriers(deleted_at);
 
-create or replace function barriers_set_conformidade() returns trigger as $$
+create or replace function barriers_set_compliance() returns trigger as $$
 begin
-  select case when d.is_conforme then 0 else 1 end
-    into new.conformidade_id
-  from disponibilidades d
-  where d.id = new.disponibilidade_id;
+  select case when d.is_compliant then 0 else 1 end
+    into new.compliance_id
+  from availability_statuses d
+  where d.id = new.availability_id;
   return new;
 end;
 $$ language plpgsql;
 
-drop trigger if exists trg_barriers_set_conformidade on barriers;
-create trigger trg_barriers_set_conformidade
-  before insert or update of disponibilidade_id on barriers
-  for each row execute function barriers_set_conformidade();
+drop trigger if exists trg_barriers_set_compliance on barriers;
+create trigger trg_barriers_set_compliance
+  before insert or update of availability_id on barriers
+  for each row execute function barriers_set_compliance();
 
 create index if not exists idx_barriers_location        on barriers(location_id);
-create index if not exists idx_barriers_disponibilidade  on barriers(disponibilidade_id);
-create index if not exists idx_barriers_conformidade      on barriers(conformidade_id);
-create index if not exists idx_barriers_categoria        on barriers(categoria_id);
-create index if not exists idx_barriers_criticidade      on barriers(criticidade_id);
+create index if not exists idx_barriers_availability    on barriers(availability_id);
+create index if not exists idx_barriers_compliance      on barriers(compliance_id);
+create index if not exists idx_barriers_category        on barriers(category_id);
+create index if not exists idx_barriers_criticality     on barriers(criticality_id);
 -- Plain btree on tag (equality + prefix LIKE). Named *_tag on purpose: a
 -- trigram GIN index would be needed for real %q% search (pg_trgm), which this
 -- schema deliberately does not require. Drops the legacy misleading name.
@@ -134,7 +135,7 @@ create table if not exists barrier_status_history (
   id          integer generated always as identity primary key,
   barrier_id  integer      not null references barriers(id) on delete cascade,
   date        date        not null,
-  status_id   integer    not null references disponibilidades(id),
+  status_id   integer    not null references availability_statuses(id),
   author_id   integer    not null references authors(id),
   note        text        not null default '',
   created_at  timestamptz not null default now()
@@ -156,11 +157,11 @@ create trigger trg_barriers_updated_at
   before update on barriers
   for each row execute function set_updated_at();
 
--- ─── Status transition — the one supported write path ──────────────────────
--- Moves a barrier to a new disponibilidade, stamps status_since to today,
+-- ─── Status transition - the one supported write path ──────────────────────
+-- Moves a barrier to a new availability status, stamps status_since to today,
 -- and appends the corresponding history row, atomically. This is the only
--- sanctioned way to change a barrier's status — never UPDATE
--- disponibilidade_id directly, or status_since/history will fall out of
+-- sanctioned way to change a barrier's status - never UPDATE
+-- availability_id directly, or status_since/history will fall out of
 -- sync with it.
 
 create or replace function record_status_change(
@@ -171,8 +172,8 @@ create or replace function record_status_change(
 ) returns void as $$
 begin
   update barriers
-     set disponibilidade_id = p_status_id,
-         status_since       = current_date
+     set availability_id = p_status_id,
+         status_since    = current_date
    where id = p_barrier_id;
 
   if not found then
@@ -213,7 +214,7 @@ create table if not exists alert_events (
   id              integer generated always as identity primary key,
   barrier_id      integer     references barriers(id) on delete set null,
   transition_date date        not null,
-  status_id       integer     not null references disponibilidades(id),
+  status_id       integer     not null references availability_statuses(id),
   kind            text        not null default 'barrier_transition',
   dedup_key       text        not null unique,   -- barrier_id:date:status_id
   payload         jsonb       not null default '{}'::jsonb,

@@ -1,17 +1,17 @@
 -- ═══════════════════════════════════════════════════════════════════════════
--- SEED — lookup tables, mirroring lib/enums.ts id-for-id
+-- SEED - lookup tables, mirroring lib/enums.ts id-for-id
 -- ═══════════════════════════════════════════════════════════════════════════
 -- Idempotent: safe to re-run. Do not change existing ids once barriers
--- reference them — add new rows with new ids instead.
+-- reference them - add new rows with new ids instead.
 
-insert into locations (id, code, tipo) values
+insert into locations (id, code, type) values
   (1, 'FAL', 'Estação Coletora'),
   (2, 'CNC', 'Concessão Norte-Centro'),
   (3, 'CNS', 'Concessão Norte-Sul'),
   (4, 'FAP', 'Planta de Processamento'),
   (5, 'RJO', 'Base Operacional Rio'),
   (6, 'SPL', 'Base Operacional SP')
-on conflict (id) do update set code = excluded.code, tipo = excluded.tipo;
+on conflict (id) do update set code = excluded.code, type = excluded.type;
 
 -- 'ALL' (id 0) is a UI filter sentinel, not a real installation: remove the
 -- legacy row when nothing references it so no barrier can point at it.
@@ -19,21 +19,21 @@ delete from locations where id = 0 and not exists (
   select 1 from barriers where location_id = 0
 );
 
-insert into disponibilidades (id, label, is_conforme) values
+insert into availability_statuses (id, label, is_compliant) values
   (0, 'Disponível', true),
   (1, 'Fora de Operação', true),
   (2, 'Indisponível Contingenciado', true),
   (3, 'Degradado Contingenciado', true),
   (4, 'Degradado', false),
   (5, 'Indisponível', false)
-on conflict (id) do update set label = excluded.label, is_conforme = excluded.is_conforme;
+on conflict (id) do update set label = excluded.label, is_compliant = excluded.is_compliant;
 
-insert into criticidades (id, label) values
+insert into criticality_levels (id, label) values
   (0, 'Não Crítica'),
   (1, 'Crítica')
 on conflict (id) do update set label = excluded.label;
 
-insert into categorias (id, label) values
+insert into categories (id, label) values
   (0, 'Válvula de Alívio de Pressão'),
   (1, 'Alarmes de Emergência e Sirene'),
   (2, 'Sistema de Detecção de Gás'),
@@ -46,7 +46,7 @@ insert into categorias (id, label) values
   (9, 'Detector de H₂S')
 on conflict (id) do update set label = excluded.label;
 
-insert into agrupamentos (id, label) values
+insert into groupings (id, label) values
   (0, 'Sistemas de Alívio'),
   (1, 'Evacuação, Resgate e Abandono'),
   (2, 'Detecção e Monitoramento'),
@@ -55,7 +55,7 @@ insert into agrupamentos (id, label) values
   (5, 'Proteção Elétrica')
 on conflict (id) do update set label = excluded.label;
 
-insert into tipologias (id, label) values
+insert into typologies (id, label) values
   (0, 'Estação Coletora'),
   (1, 'Planta de Processamento'),
   (2, 'Duto de Transferência'),
@@ -64,7 +64,7 @@ insert into tipologias (id, label) values
   (5, 'Unidade de Medição')
 on conflict (id) do update set label = excluded.label;
 
-insert into donos (id, label) values
+insert into owners (id, label) values
   (0, 'Equipe de Manutenção'),
   (1, 'Operação FAL'),
   (2, 'Engenharia de Processo'),
