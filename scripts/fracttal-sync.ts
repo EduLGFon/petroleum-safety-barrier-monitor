@@ -9,6 +9,7 @@
 // The exit code is 1 on thrown errors; mapping/unmapped skips are warnings.
 import { createFracttalClient } from "../lib/server/fracttal/client.ts";
 import { runSync, type SyncResult } from "../lib/server/fracttal/sync.ts";
+import { loadSyncConfig } from "../lib/server/config.ts";
 import {
   consoleNotifier,
   notifyFailureToAll,
@@ -78,25 +79,22 @@ async function sourceFor(
     };
   }
 
-  const key = Deno.env.get("FRACTTAL_KEY");
-  const secret = Deno.env.get("FRACTTAL_SECRET");
-  if (!key || !secret) {
-    throw new Error(
-      "FRACTTAL_KEY/FRACTTAL_SECRET required (prod tenant, reviewed; never committed)",
-    );
-  }
+  const { key, secret, baseUrl, itemType } = loadSyncConfig(
+    undefined,
+    { baseUrl: flags.baseUrl, itemType: flags.itemType },
+  );
   if (!flags.locationCode) {
     throw new Error("--location-code <station> required in --live mode");
   }
   const client = createFracttalClient({
-    baseUrl: flags.baseUrl,
+    baseUrl,
     credentials: { key, secret },
   });
   return {
     source: async () => {
       const { rows, total } = await client.listRawItems({
         locationCode: flags.locationCode,
-        itemType: flags.itemType,
+        itemType: itemType as ItemTypeValue,
         limit: 100,
       });
       console.log(

@@ -7,7 +7,7 @@
   "exports": "./main.ts",
   "nodeModulesDir": "manual",
   "tasks": {
-    "check": "deno fmt --check . && deno lint . && deno check",
+    "check": "deno fmt --check . && deno lint . && deno check main.ts routes/api/*.ts routes/api/*/*.ts routes/api/*/*/*.ts scripts/*.ts",
     "test": "deno test --allow-read=scripts/fixtures --allow-net=127.0.0.1,localhost --allow-env=OPS_SMTP_HOST,OPS_SMTP_PORT,OPS_SMTP_USER,OPS_SMTP_PASS,OPS_EMAIL_TO,OPS_EMAIL_FROM,DATABASE_URL .",
     "dev": "vite",
     "build": "vite build",

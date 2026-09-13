@@ -14,6 +14,7 @@
 //                                         failures still log via [ops] console
 import { createFracttalClient } from "../lib/server/fracttal/client.ts";
 import { runSync } from "../lib/server/fracttal/sync.ts";
+import { loadSyncConfig } from "../lib/server/config.ts";
 import { syncScopeRunning } from "../lib/server/sql/sync.ts";
 import { createPollLoop } from "../lib/server/fracttal/runner.ts";
 import {
@@ -49,14 +50,19 @@ function parseFlags(): PollFlags {
 
 function main(): void {
   const flags = parseFlags();
-  const key = Deno.env.get("FRACTTAL_KEY");
-  const secret = Deno.env.get("FRACTTAL_SECRET");
-  if (!key || !secret) {
+  let syncCfg: { key: string; secret: string };
+  try {
+    syncCfg = loadSyncConfig(undefined, {
+      baseUrl: flags.baseUrl,
+      itemType: flags.itemType,
+    });
+  } catch (err) {
     console.error(
-      "[fracttal-poll] FRACTTAL_KEY/FRACTTAL_SECRET required (prod tenant, reviewed; never committed)",
+      `[fracttal-poll] ${err instanceof Error ? err.message : String(err)}`,
     );
     Deno.exit(2);
   }
+  const { key, secret } = syncCfg;
   if (flags.scopes.length === 0) {
     console.error(
       "[fracttal-poll] FRACTTAL_SYNC_SCOPES required (comma-separated location codes)",
