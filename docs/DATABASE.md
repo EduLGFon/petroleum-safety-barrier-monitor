@@ -29,7 +29,8 @@ deno task db:seed
 # 5. Aponte o app para a API real. Em .env (para `start`) ou exportadas
 #    no shell (para `dev`):
 #    PUBLIC_API_MODE=http
-#    PUBLIC_API_BASE_URL=http://localhost:8000
+#    PUBLIC_API_BASE_URL=        # vazio = mesma origem da página (recomendado)
+#    DATABASE_URL=postgres://...
 
 deno task dev   # ou: deno task start (lê .env), deno task preview (shell only)
 ```

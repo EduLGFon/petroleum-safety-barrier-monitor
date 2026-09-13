@@ -189,11 +189,15 @@ Para ativar:
 2. Defina as variáveis de ambiente (veja `.env.example`):
    ```
    PUBLIC_API_MODE=http
-   PUBLIC_API_BASE_URL=http://localhost:8000
+   PUBLIC_API_BASE_URL=          # vazio = mesma origem da página (recomendado)
    DATABASE_URL=postgres://user:password@localhost:5432/barreiras
    ```
    (`dev` lê do shell — `export $(cat .env | xargs)`; `start` lê `.env`;
-   `db:*` leem `.env.local`.)
+   `db:*` leem `.env.local`.) Quando `PUBLIC_API_BASE_URL` é vazio, a rota
+   `routes/index.tsx` usa a própria origem da requisição — o browser busca
+   `/api/*` same-origin em qualquer porta que o app esteja servindo. Defina a
+   variável explicitamente apenas quando a API estiver em outra origem (essa
+   origem precisa então de headers CORS).
 3. Nenhum componente precisa mudar. `api` em `lib/api.ts` passa a apontar para
    `httpAdapter` automaticamente, que agora conversa com essas rotas.
 
