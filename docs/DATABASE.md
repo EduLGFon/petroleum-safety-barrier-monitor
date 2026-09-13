@@ -166,12 +166,18 @@ itens que somem do Fracttal (crawl escopado) ficam com a linha e o histórico
 intactos, mas `buildWhere`/`scopeText`/queries de `chart.ts` e
 `vocabularies.ts` já filtram `where b.deleted_at is null` por padrão; uma
 view "admin" pode listar deletados. `sync_state` registra uma linha por run
-(contagens de inserts/updates/deletes/skips, `status`, `note`). `alert_events`
-tem dedup (`dedup_key`) e `sent_at` null até o envio (P5); o sync hoje só
-apende `barrier_status_history` via `record_status_change` (author 10
-"Sincronização Fracttal") em mudança real de status — nunca enfileira alerta.
-`lib/server/sql/sync.ts` implementa o `SyncIo` default
-(`buildMapContext`/`loadLocal`/`startRun`/`applyPlan`/`finishRun`).
+(contagens de inserts/updates/deletes/skips, `status`, `note`).
+
+### Alertas (P5)
+
+`alert_events` enfileira transições para urgente: `dedup_key`
+(`barrier:date:status`, UNIQUE — rerun enfileira zero), `sent_at` null até o
+envio, `payload` com contexto (tag, instalação, disponibilidade,
+criticidade, `urgency`, `attempts`, `last_error`, `dead_letter`,
+`delivered[]` por recipient). `alert_recipients` (`email` UNIQUE, `name`,
+`active`) é o público do digest, gerenciado pelas rotas admin
+`/api/recipients*`. Ciclo em `lib/server/alerts/run.ts` + script
+`scripts/alerts-check.ts` (ver docs/API.md Operação).
 
 ## Índices
 

@@ -20,9 +20,11 @@ interface Bucket {
 
 // createThrottle: fixed window per key. now is injectable so tests never
 // sleep; the lazy sweep keeps the map bounded without a timer.
-export function createThrottle(options: ThrottleOptions): {
+export interface Throttle {
   check(key: string): ThrottleDecision;
-} {
+}
+
+export function createThrottle(options: ThrottleOptions): Throttle {
   const { limit, windowMs, now = () => Date.now() } = options;
   const buckets = new Map<string, Bucket>();
 

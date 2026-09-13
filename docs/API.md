@@ -139,6 +139,11 @@ valores ligados como `$1/$2`):
   omitido/`0` = todas; demais params ignorados)
 - `GET /api/chart?locationId=1` → `WireCategoryConformidade[]` (mesmo escopo)
 - `GET /api/health` → `{ ok, time }` (liveness, sem DB)
+- `GET /api/recipients` (+ `?activeOnly=1`), `POST /api/recipients`
+  `{ email, name? }` (upsert por email, `201`), `PATCH /api/recipients/:id`
+  `{ name?, active? }`, `DELETE /api/recipients/:id` → `{ ok: true }` —
+  todas exigem `Authorization: Bearer <ADMIN_TOKEN>` (inclusive GET:
+  endereços são dado admin).
 
 ## Erros, auth e throttle (P4)
 
@@ -246,14 +251,78 @@ toWireQuery({ location: "FAL", disponibilidade: "Degradado", page: 1 });
 | `routes/api/kpi.ts`                  | `GET /api/kpi` (aberto, throttle leitura)                                                |
 | `routes/api/chart.ts`                | `GET /api/chart` (aberto, throttle leitura)                                              |
 | `routes/api/health.ts`               | `GET /api/health` (liveness, sem DB, sem throttle)                                       |
+| `routes/api/recipients.ts`           | `GET/POST /api/recipients` (admin, upsert por email)                                     |
+| `routes/api/recipients/[id].ts`      | `PATCH/DELETE /api/recipients/:id` (admin)                                               |
 | `lib/server/config.ts`               | `loadServerConfig` (boot http), `loadSyncConfig` (credenciais Fracttal p/ scripts)       |
 | `lib/server/errors.ts`               | Envelope `{ error, code, requestId }` + `x-request-id`                                   |
 | `lib/server/auth.ts`                 | `checkAdminAuth` (Bearer `ADMIN_TOKEN`, fail-closed, com `role`)                         |
 | `lib/server/throttle.ts`             | `createThrottle` (janela fixa, sem deps) + buckets por rota                              |
 | `lib/server/exportCsv.ts`            | `streamExportCsv` (BOM + `row()` + `summaryRows()`, chunks de 500)                       |
+| `lib/server/sql/recipients.ts`       | CRUD `alert_recipients` (validação pura + store fino)                                    |
+| `lib/server/alerts/store.ts`         | Contrato `AlertStore` (dedup, `delivered[]` por recipient)                               |
+| `lib/server/alerts/detect.ts`        | `detectUrgentTransitions` (histórico → `isUrgent`, mesmo predicado do dashboard)         |
+| `lib/server/alerts/run.ts`           | `runAlertCycle` (detect→enqueue→digest→mark, dry-run default, `--reprocess`)             |
+| `lib/server/alerts/mailer.ts`        | `AlertMailer` + provider SMTP (reuso P3) + `sendWithRetry`                               |
+| `lib/server/alerts/templates.ts`     | Digest urgente pt-BR (assunto conta críticas, corpo ordena críticas primeiro)            |
+| `lib/server/sql/alerts.ts`           | `sqlAlertStore` (`ON CONFLICT dedup_key DO NOTHING`, dead-letter no payload)             |
+| `lib/dashboard/urgent.ts`            | `urgencyOf`/`isUrgent`/`compareUrgency`/`urgentBarriers` (base fail-closed = NcAlert)    |
 | `islands/dashboard/vocabularies.ts`  | Hook client `useDashboardVocabularies` (só mock mode)                                    |
 | `db/schema.sql`                      | DDL: tabelas de lookup, `barriers`, `barrier_status_history`                             |
 | `db/seed_lookups.sql`                | Seed das tabelas de lookup, espelhando `lib/enums/`                                      |
 
 Veja **docs/DATABASE.md** para o schema completo e o passo a passo de setup,
 e **docs/ARCHITECTURE.md** para os fluxos mock vs http e a topologia da island.
+
+## Operação (P5)
+
+Serviço (`deno task start` lê `.env`):
+
+```ini
+# /etc/systemd/system/barrier-monitor.service
+[Unit]
+Description=Barrier Monitor (Fresh)
+After=network.target postgresql.service
+
+[Service]
+User=barreiras
+WorkingDirectory=/opt/barrier-monitor
+EnvironmentFile=/opt/barrier-monitor/.env
+ExecStart=/home/barreiras/.deno/bin/deno task start
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target
+```
+
+Agendamento (sync contínuo + digest de alertas; logs no journal):
+
+- `scripts/fracttal-poll.ts` roda como serviço próprio (mesmo molde acima,
+  `ExecStart=... deno run -A scripts/fracttal-poll.ts` com
+  `FRACTTAL_SYNC_SCOPES` no EnvironmentFile).
+- Digest: `*/15 * * * *` →
+  `deno run -A scripts/alerts-check.ts --apply >> /var/log/alerts.log 2>&1`
+  (dry-run sem `--apply`; `--reprocess` só manual, após ler o log).
+- Falha de relay não perde evento: tenta 3×, carimba `attempts`/`last_error`
+  no payload, estaciona (`dead_letter`) após 5 runs com falha; o log nomeia
+  `event <id> <tag>` para retry via `--reprocess`.
+
+Smoke pós-deploy (aceite):
+
+```
+curl -s -o /dev/null -w "root=%{http_code}\n" "$BASE/"
+curl -s "$BASE/api/health"  # {"ok":true,"time":"..."}
+```
+
+Backup/restore (verificado: `pg_dump -Fc` → restore em DB vazio com as
+mesmas contagens de `barriers` e `barrier_status_history`):
+
+```
+pg_dump "$DATABASE_URL" -Fc -f barreiras.dump
+createdb -O monitor barreiras_restore
+pg_restore -d "$RESTORE_URL" barreiras.dump
+```
+
+Rollback para mock (sem tocar no banco): `PUBLIC_API_MODE=mock` (o cliente
+volta ao gerador determinístico; as rotas `/api/*` seguem exigindo
+`DATABASE_URL`, mas nada as chama). Rollback total: build anterior +
+modo mock.

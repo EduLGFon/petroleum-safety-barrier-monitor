@@ -173,3 +173,25 @@ Do:
 
 Acceptance: fixture transition triggers exactly one email; rerun sends
 zero; failed run is retryable from log; prod deploy smokes pass.
+
+Status (as-built): `lib/dashboard/urgent.ts` (`urgencyOf` critical/urgent/
+none sobre a mesma base fail-closed do NcAlert, `compareUrgency` críticas
+primeiro + `statusSince` mais antigo); recipients em `alert_recipients` com
+CRUD total atrás de `ADMIN_TOKEN` (upsert por email); detecção via
+`detectUrgentTransitions` (histórico → `resolveBarrier` → `isUrgent`) com
+watermark `>=` (transição no mesmo dia após o watermark não é mais perdida)
+e idempotência no UNIQUE `dedup_key`; `runAlertCycle` (dry-run default, um
+digest por recipient, entrega por recipient para nunca duplicar em falha
+parcial, dead-letter após 5 runs, `--reprocess`); mailer SMTP reusando o
+cliente P3 (uma sessão por recipient, `sendWithRetry`), templates pt-BR no
+repo; `scripts/alerts-check.ts` (`--apply`, `--reprocess`,
+`--only-barrier`, `--json`, exit 1 + notify ops só em falha inesperada).
+Verificado de ponta a ponta contra Postgres + sink SMTP de mentira: 1
+email no run (assunto/corpo conferidos), 0 no rerun, falha de relay loga
+`event <id>` e o run seguinte entrega; smoke `/` + `/api/health` verdes;
+backup `pg_dump -Fc` → restore com contagens idênticas; operação
+(systemd, cron, rollback para mock) em docs/API.md. 195 testes verdes
+(headless + integração DB-gated); check no baseline de 12 problemas.
+Bugs reais achados no caminho e corrigidos: `close()` do SMTP estourava
+`Bad resource ID` após o QUIT (email entregue virava falha + duplicata no
+retry) e `updateRecipient` não passava `args` ao `queryRows` (PATCH 500).

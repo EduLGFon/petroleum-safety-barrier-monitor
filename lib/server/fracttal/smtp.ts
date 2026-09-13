@@ -165,7 +165,12 @@ class SmtpLineIO {
     if (this.#reader !== null) {
       this.#reader.cancel().catch(() => {});
     }
-    this.#socket.close();
+    try {
+      this.#socket.close();
+    } catch {
+      // Already closed by the peer (normal right after QUIT/221) - the
+      // mail was accepted, so a close race must never fail the send.
+    }
   }
 }
 

@@ -130,6 +130,30 @@ Deno.test("sendMail walks the full plain submit sequence", async () => {
   assertStrictEquals(log.includes("QUIT"), true);
 });
 
+Deno.test("sendMail tolerates a peer-closed socket on close", async () => {
+  const fake = fakeSocket([
+    "220 fake ESMTP",
+    "250 fake",
+    "250 2.1.0 Sender ok",
+    "250 2.1.5 Recipient ok",
+    "354 End data",
+    "250 2.0.0 Message accepted",
+    "221 2.0.0 Bye",
+  ]);
+  const closing: SmtpSocket = {
+    ...fake.socket,
+    close() {
+      // Models Deno reaping the rid after the peer's FIN post-QUIT.
+      throw new Deno.errors.BadResource("Bad resource ID");
+    },
+  };
+  await sendMail(
+    config({ connector: plainConnector(closing) }),
+    "s",
+    "b",
+  );
+});
+
 Deno.test("sendMail rejects a non-220 greeting", async () => {
   const fake = fakeSocket(["421 Service not available"]);
   await assertRejectsSmpt(

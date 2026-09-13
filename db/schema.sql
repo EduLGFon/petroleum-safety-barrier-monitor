@@ -223,3 +223,13 @@ create table if not exists alert_events (
 
 create index if not exists idx_alert_events_unsent
   on alert_events(kind, sent_at) where sent_at is null;
+
+-- Alert recipients (P5): who gets the urgent digest. Managed through the
+-- auth-guarded /api/recipients routes; the send path only reads active rows.
+create table if not exists alert_recipients (
+  id         integer generated always as identity primary key,
+  email      text        not null unique,
+  name       text        not null default '',
+  active     boolean     not null default true,
+  created_at timestamptz not null default now()
+);
