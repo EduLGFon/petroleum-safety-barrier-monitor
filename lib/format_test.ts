@@ -1,5 +1,5 @@
 // Unit tests for lib/format.ts - pt-BR date/duration guards.
-import { assert, assertStrictEquals } from "jsr:@std/assert";
+import { assert, assertStrictEquals } from "jsr:@std/assert@^1";
 import { daysSince, fmtDate, humanDuration } from "./format.ts";
 
 Deno.test("fmtDate converts ISO to pt-BR", () => {

@@ -1,5 +1,5 @@
 // Unit tests for lib/server/sql/where.ts - safe WHERE/ORDER building.
-import { assert, assertEquals, assertStrictEquals } from "jsr:@std/assert";
+import { assert, assertEquals, assertStrictEquals } from "jsr:@std/assert@^1";
 import { buildWhere, resolveOrderBy } from "./where.ts";
 
 Deno.test("resolveOrderBy whitelists columns, coerces direction", () => {

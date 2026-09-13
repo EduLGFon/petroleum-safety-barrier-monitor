@@ -1,5 +1,5 @@
 // Unit tests for components/chart/geometry.ts - scale math.
-import { assert, assertEquals, assertStrictEquals } from "jsr:@std/assert";
+import { assert, assertEquals, assertStrictEquals } from "jsr:@std/assert@^1";
 import { buildTicks, scaleW } from "./geometry.ts";
 
 Deno.test("buildTicks dedupes tiny maxima", () => {

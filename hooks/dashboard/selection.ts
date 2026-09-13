@@ -2,7 +2,6 @@
 // This is why it exists: client and server dashboard modes share selection
 // semantics; select-all over filtered rows stays with the caller (it owns data).
 import { useCallback, useState } from "preact/hooks";
-import { loadDash } from "./persistence.ts";
 
 // Restores validated selection/openId from a persisted blob; shared by both
 // dashboard modes so corrupt ids fall back instead of wedging selection.

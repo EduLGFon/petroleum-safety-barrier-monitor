@@ -5,7 +5,6 @@
 import type {
   Barrier,
   CategoryConformidade,
-  FilterState,
   KpiSnapshot,
 } from "../../lib/types.ts";
 import { useCallback, useEffect, useMemo, useState } from "preact/hooks";

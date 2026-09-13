@@ -1,5 +1,5 @@
 // Unit tests for lib/dashboard/filters.ts - sanitizers and pipeline.
-import { assert, assertEquals, assertStrictEquals } from "jsr:@std/assert";
+import { assert, assertEquals, assertStrictEquals } from "jsr:@std/assert@^1";
 import {
   applyFilters,
   applySorting,

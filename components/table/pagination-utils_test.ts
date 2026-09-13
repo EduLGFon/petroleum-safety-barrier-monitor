@@ -1,5 +1,5 @@
 // Unit tests for components/table/pagination-utils.ts - page windows.
-import { assertEquals } from "jsr:@std/assert";
+import { assertEquals } from "jsr:@std/assert@^1";
 import { buildPages } from "./pagination-utils.ts";
 
 Deno.test("buildPages lists every page when few", () => {

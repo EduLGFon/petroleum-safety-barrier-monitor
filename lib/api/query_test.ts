@@ -1,5 +1,5 @@
 // Unit tests for lib/api/query.ts - domain filters to wire query.
-import { assertEquals, assertStrictEquals } from "jsr:@std/assert";
+import { assertEquals, assertStrictEquals } from "jsr:@std/assert@^1";
 import { buildQueryString, cleanDateParam, toWireQuery } from "./query.ts";
 
 Deno.test("toWireQuery encodes known values to ids", () => {

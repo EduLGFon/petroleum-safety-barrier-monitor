@@ -1,5 +1,5 @@
 // Unit tests for lib/resolve.ts - wire numeric ids to domain strings.
-import { assert, assertEquals, assertStrictEquals } from "jsr:@std/assert";
+import { assert, assertEquals, assertStrictEquals } from "jsr:@std/assert@^1";
 import type { WireKpiSnapshot } from "./wireTypes.ts";
 import {
   resolveBarrier,

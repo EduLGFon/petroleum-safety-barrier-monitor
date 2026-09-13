@@ -3,7 +3,6 @@
 // so switching PUBLIC_API_MODE needs no consumer changes. Null means 404;
 // other failures throw so callers tell "missing" from "broken".
 import type {
-  BarriersQuery,
   BarriersResponse,
   WireBarrier,
   WireCategoryConformidade,

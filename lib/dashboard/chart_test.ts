@@ -1,5 +1,5 @@
 // Unit tests for lib/dashboard/chart.ts - per-category Conforme/NC buckets.
-import { assertEquals, assertStrictEquals } from "jsr:@std/assert";
+import { assertEquals, assertStrictEquals } from "jsr:@std/assert@^1";
 import type { Barrier } from "../types.ts";
 import { computeChartData } from "./chart.ts";
 
