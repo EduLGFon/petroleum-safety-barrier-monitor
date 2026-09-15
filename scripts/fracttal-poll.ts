@@ -9,6 +9,9 @@
 //   FRACTTAL_SYNC_SCOPES                comma-separated location codes to poll
 //   FRACTTAL_POLL_SECONDS                cadence (default 300)
 //   FRACTTAL_SYNC_ITEM_TYPE              default 2 (Equipment)
+//   FRACTTAL_SYNC_MAX_PAGES              item pages per scope per tick
+//                                        (default 40 x 100 rows; a scope that
+//                                        needs more aborts loudly - raise it)
 //   FRACTTAL_WORK_DATE_GTE               optional date[gte] floor for the
 //                                        work-orders status pass
 //   OPS_SMTP_HOST / OPS_SMTP_PORT / OPS_SMTP_USER / OPS_SMTP_PASS
@@ -20,7 +23,7 @@ import {
   smtpEmailNotifier,
 } from "../lib/server/fracttal/notify.ts";
 
-import { buildWorkEvents, resolverFor } from "../lib/server/fracttal/work.ts";
+import { fetchScopeSignals } from "../lib/server/fracttal/live-scope.ts";
 
 import { createFracttalClient } from "../lib/server/fracttal/client.ts";
 
@@ -42,6 +45,7 @@ interface PollFlags {
   scopes: string[];
   seconds: number;
   itemType: ItemTypeValue;
+  maxPages: number;
   baseUrl: string;
 }
 
@@ -55,6 +59,10 @@ function parseFlags(): PollFlags {
     seconds: Math.max(5, Number(Deno.env.get("FRACTTAL_POLL_SECONDS")) || 300),
     itemType: (Number(Deno.env.get("FRACTTAL_SYNC_ITEM_TYPE")) ||
       2) as ItemTypeValue,
+    maxPages: Math.max(
+      1,
+      Math.floor(Number(Deno.env.get("FRACTTAL_SYNC_MAX_PAGES")) || 40),
+    ),
     baseUrl: Deno.env.get("FRACTTAL_BASE_URL") ?? DEFAULT_BASE_URL,
   };
 }
@@ -90,34 +98,32 @@ function main(): void {
   const smtp = smtpConfigFromEnv();
   if (smtp) notifiers.push(smtpEmailNotifier(smtp));
 
-  // run: one bounded live GET per scope plus the work-order status pass,
-  // then the standard runSync pipeline (writes are intended here - this is
-  // the production cadence). A work-endpoint failure throws before runSync
-  // starts, so the tick notifies ops with zero writes (fail-closed) instead
-  // of decaying statuses. The status pass is one recent page per work
-  // endpoint; a full backfill is the import rebuild, not the poll loop.
+  // run: complete item pages per scope (guarded, fail-closed) plus the
+  // work-order status pass, then the standard runSync pipeline (writes are
+  // intended here - this is the production cadence). A truncated scope or a
+  // work-endpoint failure throws before runSync starts, so the tick notifies
+  // ops with zero writes instead of deleting or decaying rows. The status
+  // pass is one recent page per work endpoint; a full backfill is the
+  // import rebuild, not the poll loop.
   const dateGte = Deno.env.get("FRACTTAL_WORK_DATE_GTE") ?? undefined;
   const loops = flags.scopes.map((locationCode) => {
     return createPollLoop(`fracttal-live:${locationCode}`, {
       run: async () => {
-        const [itemPage, orderPage, requestPage] = await Promise.all([
-          client.listRawItems({
-            locationCode,
-            itemType: flags.itemType,
-            limit: 100,
-          }),
-          client.listRawWorkOrders({ limit: 100, dateGte }),
-          client.listRawWorkRequests({ limit: 100 }),
-        ]);
+        const fetched = await fetchScopeSignals(client, {
+          locationCode,
+          itemType: flags.itemType,
+          maxPages: flags.maxPages,
+          dateGte,
+        });
         console.log(
-          `[fracttal-poll] ${locationCode}: fetched ${itemPage.rows.length} items, ` +
-            `${orderPage.rows.length} orders, ${requestPage.rows.length} requests`,
+          `[fracttal-poll] ${locationCode}: fetched ${fetched.itemRows.length} items ` +
+            `(${fetched.pagesFetched} pages), ${fetched.workOrders} orders, ` +
+            `${fetched.workRequests} requests`,
         );
-        const built = buildWorkEvents(orderPage.rows, requestPage.rows);
-        return await runSync(() => Promise.resolve(itemPage.rows), {
+        return await runSync(() => Promise.resolve(fetched.itemRows), {
           scope: `fracttal-live:${locationCode}`,
           dryRun: false,
-          workEvents: resolverFor(built.events),
+          workEvents: fetched.workEvents,
         });
       },
       lock: {
@@ -141,7 +147,7 @@ function main(): void {
     `[fracttal-poll] polling ${
       flags.scopes.join(", ")
     } every ${flags.seconds}s ` +
-      `(item_type=${flags.itemType})`,
+      `(item_type=${flags.itemType}, max_pages=${flags.maxPages})`,
   );
 }
 
