@@ -256,6 +256,49 @@ Deno.test("runSync counts malformed and mapping skips as skips on audit", async 
   assertStrictEquals(finish.counts.skips, 2);
 });
 
+Deno.test("runSync applies work events to availability and comments", async () => {
+  const { io, state } = makeFakeIo();
+  const result = await runSync(() => Promise.resolve([rawRow()]), {
+    io,
+    dryRun: false,
+    workEvents: (code) =>
+      code === "FAL-EQ-001"
+        ? {
+          urgent: null,
+          planned: { date: "2026-09-11", source: "OS - 7" },
+          stopAssets: false,
+        }
+        : null,
+  });
+  assertStrictEquals(result.plan.counts.inserts, 1);
+  const entry = state.calls.applyPlan[0]!.entries[0]!;
+  assertStrictEquals(entry.kind, "insert");
+  if (entry.kind !== "insert") throw new Error("unreachable");
+  assertStrictEquals(entry.input.availabilityId, 4);
+  assertStrictEquals(entry.input.comments, "OS - 7");
+  assertStrictEquals(entry.input.sourceUpdatedAt, "2026-09-11");
+});
+
+Deno.test("runSync fails closed when work events throw", async () => {
+  const { io, state } = makeFakeIo();
+  let caught: Error | null = null;
+  try {
+    await runSync(() => Promise.resolve([rawRow()]), {
+      io,
+      dryRun: false,
+      workEvents: () => {
+        throw new Error("wo down");
+      },
+    });
+  } catch (err) {
+    caught = err as Error;
+  }
+  assertStrictEquals(caught !== null, true);
+  assertStrictEquals(state.calls.applyPlan.length, 0);
+  const finish = state.calls.finishRun[0]!;
+  assertStrictEquals(finish.status, "failed");
+});
+
 Deno.test("runSync records a failed run and rethrows with the [sync] prefix", async () => {
   const { io, state } = makeFakeIo();
   let caught: Error | null = null;

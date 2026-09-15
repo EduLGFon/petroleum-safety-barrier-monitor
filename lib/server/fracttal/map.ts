@@ -63,13 +63,14 @@ export type MappedRow =
   | { ok: true; input: SyncBarrierInput; warnings: string[] }
   | { ok: false; reason: string };
 
-// MapOptions: work events feed the shared derivation (Phase 1 wires live
-// work orders here; until then the asset flag is the only live signal) and
-// today pins status_since for deterministic tests.
+// MapOptions: work events feed the shared derivation (live work orders /
+// requests merged per code; until Phase 1 callers pass none and the asset
+// flag is the only live signal) and today pins status_since for tests.
 export interface MapOptions {
   work?: {
     urgent?: StatusEvent | null;
     planned?: StatusEvent | null;
+    stopAssets?: boolean;
   } | null;
   today?: string;
 }
@@ -146,12 +147,14 @@ export function mapAsset(
   }
 
   const today = options.today ?? new Date().toISOString().slice(0, 10);
+  const work = options.work ?? null;
+  const outOfServiceDate = isoDate(asset.initial_date_out_of_service);
   const status = resolveAvailability(
     {
-      urgent: options.work?.urgent ?? null,
-      planned: options.work?.planned ?? null,
-      stopAssets: false,
-      outOfServiceDate: isoDate(asset.initial_date_out_of_service),
+      urgent: work?.urgent ?? null,
+      planned: work?.planned ?? null,
+      stopAssets: work?.stopAssets ?? false,
+      outOfServiceDate,
       assetAvailable: asset.available ?? null,
     },
     today,
@@ -175,7 +178,10 @@ export function mapAsset(
       availabilityId: status.availabilityId,
       comments: status.note,
       actionPlan: "",
-      sourceUpdatedAt: null,
+      // sourceUpdatedAt is the best remote state signal: the winning work
+      // event date, else the out-of-service date, else unknown (null).
+      sourceUpdatedAt: work?.urgent?.date ?? work?.planned?.date ??
+        outOfServiceDate,
     },
   };
 }

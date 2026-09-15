@@ -6,6 +6,8 @@
 // defaultSyncIo (imported lazily so fixtures/tests can run without a DB).
 import type { MapContext, SyncBarrierInput } from "./map.ts";
 
+import type { WorkEventsResolver } from "./work.ts";
+
 import { parsePage } from "./client.ts";
 
 import { mapAsset } from "./map.ts";
@@ -177,6 +179,10 @@ export interface SyncOptions {
   scope?: string; // label for sync_state
   now?: () => Date;
   io?: SyncIo; // default: real SQL repo (see lib/server/sql/sync.ts)
+  // workEvents: prebuilt per-code work signals (the caller fetches work
+  // orders/requests BEFORE runSync, so a fetch failure aborts with zero
+  // writes instead of decaying statuses). Null = asset signals only.
+  workEvents?: WorkEventsResolver | null;
 }
 
 // defaultSyncIo: lazily imported so tests importing this module do not pull
@@ -246,8 +252,13 @@ export async function runSync(
     const inputs: SyncBarrierInput[] = [];
     const mappingSkips: Array<{ code: string; reason: string }> = [];
     const mappingWarnings: Array<{ code: string; warning: string }> = [];
+    const workEvents = options.workEvents ?? null;
     for (const item of parsed.items) {
-      const mapped = mapAsset(item, ctx);
+      const mapped = mapAsset(
+        item,
+        ctx,
+        workEvents ? { work: workEvents(item.code) } : {},
+      );
       if (mapped.ok) {
         inputs.push(mapped.input);
         for (const warning of mapped.warnings) {

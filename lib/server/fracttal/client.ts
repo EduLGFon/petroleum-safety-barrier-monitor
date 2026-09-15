@@ -16,6 +16,7 @@ import type {
   FracttalListQuery,
   FracttalPage,
   FracttalReport,
+  FracttalWorkQuery,
 } from "./types.ts";
 
 import { toItemType } from "./itemType.ts";
@@ -47,6 +48,12 @@ export interface FracttalClient {
     query: FracttalListQuery,
     maxPages?: number,
   ): Promise<{ items: FracttalAsset[]; report: FracttalReport }>;
+  listRawWorkOrders(
+    query: FracttalWorkQuery,
+  ): Promise<{ rows: unknown[]; total: number }>;
+  listRawWorkRequests(
+    query: FracttalWorkQuery,
+  ): Promise<{ rows: unknown[]; total: number }>;
 }
 
 interface Envelope {
@@ -147,6 +154,21 @@ export function buildListQuery(q: FracttalListQuery): URLSearchParams {
   if (q.active !== undefined) params.set("active", String(q.active));
   if (q.available !== undefined) params.set("available", String(q.available));
   if (q.isTree !== undefined) params.set("is_tree", String(q.isTree));
+  const start = Math.max(0, Math.floor(q.start ?? 0));
+  const limit = Math.min(
+    MAX_PAGE_SIZE,
+    Math.max(1, Math.floor(q.limit ?? MAX_PAGE_SIZE)),
+  );
+  params.set("start", String(start));
+  params.set("limit", String(limit));
+  return params;
+}
+
+// buildWorkQuery: same paging plus the optional date[gte] floor the dump
+// capture used. No invented filters: scoping beyond this is client-side.
+export function buildWorkQuery(q: FracttalWorkQuery): URLSearchParams {
+  const params = new URLSearchParams();
+  if (q.dateGte !== undefined) params.set("date[gte]", q.dateGte);
   const start = Math.max(0, Math.floor(q.start ?? 0));
   const limit = Math.min(
     MAX_PAGE_SIZE,
@@ -278,6 +300,34 @@ export function createFracttalClient(
     };
   }
 
+  // listRawWorkOrders / listRawWorkRequests: bounded raw pages for the
+  // status pass. Rows are validated downstream by buildWorkEvents, so a
+  // drifting row is listed there instead of failing the fetch.
+  async function listRaw(
+    path: string,
+    query: FracttalWorkQuery,
+  ): Promise<{ rows: unknown[]; total: number }> {
+    const body = await getJson(`${path}?${buildWorkQuery(query).toString()}`);
+    const envelope = parseEnvelope(body);
+    const rows = Array.isArray(envelope.data) ? envelope.data : [];
+    return {
+      rows,
+      total: typeof envelope.total === "number" ? envelope.total : rows.length,
+    };
+  }
+
+  async function listRawWorkOrders(
+    query: FracttalWorkQuery,
+  ): Promise<{ rows: unknown[]; total: number }> {
+    return await listRaw("/work_orders", query);
+  }
+
+  async function listRawWorkRequests(
+    query: FracttalWorkQuery,
+  ): Promise<{ rows: unknown[]; total: number }> {
+    return await listRaw("/work_requests", query);
+  }
+
   async function collectAssets(
     query: FracttalListQuery,
     maxPages = 1,
@@ -319,5 +369,11 @@ export function createFracttalClient(
     };
   }
 
-  return { listAssets, listRawItems, collectAssets };
+  return {
+    listAssets,
+    listRawItems,
+    collectAssets,
+    listRawWorkOrders,
+    listRawWorkRequests,
+  };
 }

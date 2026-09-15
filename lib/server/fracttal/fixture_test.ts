@@ -1,6 +1,6 @@
 // Fixture sanity tests (P3): the synthetic asset fixture must parse, then
 // map to the scenarios it claims - 3 mapped inserts + 2 deliberate skips
-// (unmapped categoria typo, unknown station). Guards drift in the fixture.
+// (outside the barrier scope, unknown station). Guards drift in the fixture.
 import { assertStrictEquals } from "jsr:@std/assert@^1";
 
 import { mapAsset, type MapContext } from "./map.ts";
@@ -56,7 +56,8 @@ Deno.test("fixture maps to 3 inserts and 2 deliberate skips", async () => {
   assertStrictEquals(inputs.length, 3);
   assertStrictEquals(skips.join(","), "FAL-EQ-004,X9-UNKNOWN-LOC");
 
-  // The two deliberate skips are the typo categoria and the unknown station.
+  // The two deliberate skips are the out-of-scope taxonomy label and the
+  // unknown station.
   const plan = planReconcile(inputs, []);
   assertStrictEquals(plan.counts.inserts, 3);
   assertStrictEquals(plan.counts.updates, 0);

@@ -157,6 +157,24 @@ Deno.test("mapAsset maps out-of-service dates to Fora de Operação", () => {
   assertStrictEquals(mapped.input.availabilityId, 1);
 });
 
+Deno.test("mapAsset applies work stop flags to Fora de Operação", () => {
+  const mapped = mapAsset(asset(), ctx, {
+    work: { stopAssets: true },
+    today: "2026-09-15",
+  });
+  if (!mapped.ok) throw new Error("expected ok");
+  assertStrictEquals(mapped.input.availabilityId, 1);
+});
+
+Deno.test("mapAsset stamps sourceUpdatedAt from the winning event", () => {
+  const mapped = mapAsset(asset(), ctx, {
+    work: { planned: { date: "2026-09-11", source: "OS - 1" } },
+    today: "2026-09-15",
+  });
+  if (!mapped.ok) throw new Error("expected ok");
+  assertStrictEquals(mapped.input.sourceUpdatedAt, "2026-09-11");
+});
+
 Deno.test("mapAsset skips rows outside the barrier scope", () => {
   expectSkip(
     mapAsset(

@@ -2,6 +2,7 @@
 // rate-limit, and auth flows, all against a mocked fetch.
 import {
   buildListQuery,
+  buildWorkQuery,
   createFracttalClient,
   MAX_PAGE_SIZE,
   parseAsset,
@@ -290,6 +291,29 @@ Deno.test("collectAssets surfaces malformed rows in the report", async () => {
   const { report } = await client.collectAssets({}, 1);
   assertEquals(report.malformed?.length, 1);
   assertEquals(report.collected, 1);
+});
+
+Deno.test("buildWorkQuery serializes paging plus the date floor", () => {
+  const q = buildWorkQuery({ start: -2, limit: 500, dateGte: "2024-01-01" });
+  assertStrictEquals(q.get("date[gte]"), "2024-01-01");
+  assertStrictEquals(q.get("start"), "0");
+  assertStrictEquals(q.get("limit"), "100");
+  assertStrictEquals(buildWorkQuery({}).get("date[gte]"), null);
+});
+
+Deno.test("listRawWorkOrders and listRawWorkRequests hit their paths", async () => {
+  const client = makeClient({
+    "/work_orders": { body: { success: true, data: [{ code: "EQ-1" }] } },
+    "/work_requests": {
+      body: { success: true, data: [{ code_item: "EQ-1" }], total: 1 },
+    },
+  });
+  const orders = await client.listRawWorkOrders({ limit: 10 });
+  assertStrictEquals(orders.rows.length, 1);
+  assertStrictEquals(orders.total, 1);
+  const requests = await client.listRawWorkRequests({ limit: 10 });
+  assertStrictEquals(requests.rows.length, 1);
+  assertStrictEquals(requests.total, 1);
 });
 
 Deno.test("upstream 5xx throws after retries are exhausted", async () => {

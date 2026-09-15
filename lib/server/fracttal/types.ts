@@ -52,3 +52,41 @@ export interface FracttalReport {
   collected: number;
   malformed?: Array<{ index: number; reason: string }>;
 }
+
+// FracttalWorkOrder: the slice of GET /work_orders output that status
+// derivation consumes. Field names mirror the dump census
+// (docs/FRACTTAL-DATA.md section 4); everything but the join code may be
+// null upstream.
+export interface FracttalWorkOrder {
+  code: string;
+  done: boolean | null;
+  tasks_log_types_description: string | null;
+  types_description: string | null;
+  stop_assets: boolean | null;
+  wo_folio: string | null;
+  description: string | null;
+  initial_date: string | null;
+  date_maintenance: string | null;
+  creation_date: string | null;
+}
+
+// FracttalWorkRequest: the slice of GET /work_requests output that status
+// derivation consumes (docs/FRACTTAL-DATA.md section 5). The event date
+// mirrors the import extractor (date_maintenance only); the creation `date`
+// stays unread until live semantics are verified.
+export interface FracttalWorkRequest {
+  code_item: string;
+  id_status: number | null;
+  types_2_description: string | null;
+  wo_folio: string | null;
+  description: string | null;
+  date_maintenance: string | null;
+}
+
+// FracttalWorkQuery mirrors the documented query params for the work
+// endpoints; limit is clamped to the API ceiling (100) by the client.
+export interface FracttalWorkQuery {
+  start?: number;
+  limit?: number;
+  dateGte?: string;
+}
