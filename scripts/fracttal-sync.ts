@@ -3,8 +3,12 @@
 // is wired to SQL in lib/server/sql/sync.ts, and this CLI drives it safely:
 //   - default DRY RUN: no row is ever written unless --apply is given;
 //   - fixture mode replays scripts/fixtures/ (dev/CI) until a reviewed prod
-//     capture replaces it (visible meta.synthetic flag);
-//   - live mode reuses the read-only client: one location, 1 page, capped;
+//     capture replaces it (visible meta.synthetic flag); --work-fixture adds
+//     the work-order status pass (defaults to scripts/fixtures/
+//     fracttal-work-sample.json when present, asset signals only otherwise);
+//   - live mode reuses the read-only client: one location, 1 page, capped,
+//     plus one bounded page each of work orders/requests for statuses;
+//     a work-endpoint failure aborts before runSync (zero writes);
 //   - never sends emails - audit rows go to sync_state, nothing else mails.
 // The exit code is 1 on thrown errors; mapping/unmapped skips are warnings.
 import {
@@ -13,6 +17,10 @@ import {
   smtpConfigFromEnv,
   smtpEmailNotifier,
 } from "../lib/server/fracttal/notify.ts";
+
+import { buildWorkEvents, resolverFor } from "../lib/server/fracttal/work.ts";
+
+import type { WorkEventsResolver } from "../lib/server/fracttal/work.ts";
 
 import { runSync, type SyncResult } from "../lib/server/fracttal/sync.ts";
 
@@ -26,9 +34,15 @@ import { loadSyncConfig } from "../lib/server/config.ts";
 
 const DEFAULT_BASE_URL = "https://app.fracttal.com/api";
 const DEFAULT_FIXTURE = "scripts/fixtures/fracttal-assets-sample.json";
+const DEFAULT_WORK_FIXTURE = "scripts/fixtures/fracttal-work-sample.json";
+
+// WORK_FETCH_LIMIT bounds the status pass: one recent page per work endpoint
+// per run. A full backfill is the import rebuild, not the poll loop.
+const WORK_FETCH_LIMIT = 100;
 
 interface SyncFlags {
   fixturePath: string;
+  workFixturePath?: string;
   live: boolean;
   scope?: string;
   locationCode?: string;
@@ -52,6 +66,7 @@ function parseFlags(argv: string[]): SyncFlags {
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i];
     if (arg === "--fixture") base.fixturePath = argv[++i];
+    else if (arg === "--work-fixture") base.workFixturePath = argv[++i];
     else if (arg === "--live") base.live = true;
     else if (arg === "--scope") base.scope = argv[++i];
     else if (arg === "--location-code") base.locationCode = argv[++i];
@@ -68,9 +83,17 @@ function parseFlags(argv: string[]): SyncFlags {
 
 // sourceFor: the row generator handed to runSync - fixture rows come straight
 // from the JSON file, live rows from one bounded GET (one location only).
+// Both modes also supply prebuilt work events: the fetch happens BEFORE
+// runSync so a work-endpoint failure aborts with zero writes (fail-closed)
+// instead of decaying statuses to Disponivel.
 async function sourceFor(
   flags: SyncFlags,
-): Promise<{ source: () => Promise<unknown[]>; scope: string }> {
+): Promise<{
+  source: () => Promise<unknown[]>;
+  scope: string;
+  workEvents: WorkEventsResolver | null;
+  workNote: string;
+}> {
   if (!flags.live) {
     const text = await Deno.readTextFile(flags.fixturePath);
     const json = JSON.parse(text) as { items?: unknown[]; meta?: unknown };
@@ -78,9 +101,32 @@ async function sourceFor(
     if (items.length === 0) {
       console.warn(`[fracttal-sync] fixture ${flags.fixturePath} has no items`);
     }
+    const workPath = flags.workFixturePath ?? DEFAULT_WORK_FIXTURE;
+    let workEvents: WorkEventsResolver | null = null;
+    let workNote = "no work fixture";
+    try {
+      const workText = await Deno.readTextFile(workPath);
+      const workJson = JSON.parse(workText) as {
+        orders?: unknown[];
+        requests?: unknown[];
+      };
+      const built = buildWorkEvents(
+        Array.isArray(workJson.orders) ? workJson.orders : [],
+        Array.isArray(workJson.requests) ? workJson.requests : [],
+      );
+      workEvents = resolverFor(built.events);
+      workNote =
+        `${workPath}: ${built.events.size} coded signals, ${built.malformed.length} malformed`;
+    } catch {
+      console.warn(
+        `[fracttal-sync] no work fixture at ${workPath} (asset signals only)`,
+      );
+    }
     return {
       source: () => Promise.resolve(items),
       scope: flags.scope ?? `fixture:${flags.fixturePath}`,
+      workEvents,
+      workNote,
     };
   }
 
@@ -95,26 +141,41 @@ async function sourceFor(
     baseUrl,
     credentials: { key, secret },
   });
+  const dateGte = Deno.env.get("FRACTTAL_WORK_DATE_GTE") ?? undefined;
+  // Fail-closed: every fetch throws before runSync starts, so a work-endpoint
+  // outage notifies ops with zero writes instead of decaying statuses.
+  const [itemPage, orderPage, requestPage] = await Promise.all([
+    client.listRawItems({
+      locationCode: flags.locationCode,
+      itemType: itemType as ItemTypeValue,
+      limit: 100,
+    }),
+    client.listRawWorkOrders({ limit: WORK_FETCH_LIMIT, dateGte }),
+    client.listRawWorkRequests({ limit: WORK_FETCH_LIMIT }),
+  ]);
+  console.log(
+    `[fracttal-sync] live fetch: ${itemPage.rows.length} rows (of ${itemPage.total}) at ` +
+      `location_code=${flags.locationCode}; work orders ${orderPage.rows.length} ` +
+      `(of ${orderPage.total}), requests ${requestPage.rows.length} ` +
+      `(of ${requestPage.total})`,
+  );
+  const built = buildWorkEvents(orderPage.rows, requestPage.rows);
+  for (const m of built.malformed) {
+    console.warn(`[fracttal-sync] work row ${m.index} malformed: ${m.reason}`);
+  }
   return {
-    source: async () => {
-      const { rows, total } = await client.listRawItems({
-        locationCode: flags.locationCode,
-        itemType: itemType as ItemTypeValue,
-        limit: 100,
-      });
-      console.log(
-        `[fracttal-sync] live fetch: ${rows.length} rows (of ${total}) at ` +
-          `location_code=${flags.locationCode}`,
-      );
-      return rows;
-    },
+    source: () => Promise.resolve(itemPage.rows),
     scope: flags.scope ?? `fracttal-live:${flags.locationCode}`,
+    workEvents: resolverFor(built.events),
+    workNote:
+      `live: ${built.events.size} coded signals, ${built.malformed.length} malformed`,
   };
 }
 
 async function main(): Promise<void> {
   const flags = parseFlags(Deno.args);
-  const { source, scope } = await sourceFor(flags);
+  const { source, scope, workEvents, workNote } = await sourceFor(flags);
+  console.log(`[fracttal-sync] work signals: ${workNote}`);
 
   const notifiers: OpsNotifier[] = [consoleNotifier];
   const smtp = smtpConfigFromEnv();
@@ -123,7 +184,11 @@ async function main(): Promise<void> {
 
   let result: SyncResult;
   try {
-    result = await runSync(source, { scope, dryRun: !flags.apply });
+    result = await runSync(source, {
+      scope,
+      dryRun: !flags.apply,
+      workEvents,
+    });
   } catch (err) {
     const note = err instanceof Error ? err.message : String(err);
     await notifyFailureToAll(notifiers, {
@@ -146,6 +211,8 @@ async function main(): Promise<void> {
     parsed: result.parsed,
     malformed: result.malformed.length,
     mappingSkips: result.mappingSkips.length,
+    mappingWarnings: result.mappingWarnings.length,
+    work: workNote,
     plan: plan.counts,
     written: result.written,
     runId: result.runId,
@@ -157,6 +224,7 @@ async function main(): Promise<void> {
       `[fracttal-sync] ${scope} (${flags.apply ? "applied" : "dry-run"}): ` +
         `parsed=${result.parsed} malformed=${result.malformed.length} ` +
         `skips=${result.mappingSkips.length} ` +
+        `warnings=${result.mappingWarnings.length} ` +
         `plan { i:${plan.counts.inserts} u:${plan.counts.updates} ` +
         `d:${plan.counts.deletes} s:${plan.counts.skips} } ` +
         (result.written
@@ -166,6 +234,9 @@ async function main(): Promise<void> {
     );
     for (const skip of result.mappingSkips) {
       console.warn(`[fracttal-sync] skipped ${skip.code}: ${skip.reason}`);
+    }
+    for (const w of result.mappingWarnings) {
+      console.warn(`[fracttal-sync] warning ${w.code}: ${w.warning}`);
     }
     for (const m of result.malformed) {
       console.warn(`[fracttal-sync] row ${m.index} malformed: ${m.reason}`);

@@ -9,6 +9,8 @@
 //   FRACTTAL_SYNC_SCOPES                comma-separated location codes to poll
 //   FRACTTAL_POLL_SECONDS                cadence (default 300)
 //   FRACTTAL_SYNC_ITEM_TYPE              default 2 (Equipment)
+//   FRACTTAL_WORK_DATE_GTE               optional date[gte] floor for the
+//                                        work-orders status pass
 //   OPS_SMTP_HOST / OPS_SMTP_PORT / OPS_SMTP_USER / OPS_SMTP_PASS
 //   OPS_EMAIL_TO / OPS_EMAIL_FROM        emails are optional; without them
 //                                         failures still log via [ops] console
@@ -17,6 +19,8 @@ import {
   smtpConfigFromEnv,
   smtpEmailNotifier,
 } from "../lib/server/fracttal/notify.ts";
+
+import { buildWorkEvents, resolverFor } from "../lib/server/fracttal/work.ts";
 
 import { createFracttalClient } from "../lib/server/fracttal/client.ts";
 
@@ -86,22 +90,34 @@ function main(): void {
   const smtp = smtpConfigFromEnv();
   if (smtp) notifiers.push(smtpEmailNotifier(smtp));
 
-  // run: one bounded live GET per scope, then the standard runSync pipeline
-  // (writes are intended here - this is the production cadence).
+  // run: one bounded live GET per scope plus the work-order status pass,
+  // then the standard runSync pipeline (writes are intended here - this is
+  // the production cadence). A work-endpoint failure throws before runSync
+  // starts, so the tick notifies ops with zero writes (fail-closed) instead
+  // of decaying statuses. The status pass is one recent page per work
+  // endpoint; a full backfill is the import rebuild, not the poll loop.
+  const dateGte = Deno.env.get("FRACTTAL_WORK_DATE_GTE") ?? undefined;
   const loops = flags.scopes.map((locationCode) => {
     return createPollLoop(`fracttal-live:${locationCode}`, {
       run: async () => {
-        const { rows } = await client.listRawItems({
-          locationCode,
-          itemType: flags.itemType,
-          limit: 100,
-        });
+        const [itemPage, orderPage, requestPage] = await Promise.all([
+          client.listRawItems({
+            locationCode,
+            itemType: flags.itemType,
+            limit: 100,
+          }),
+          client.listRawWorkOrders({ limit: 100, dateGte }),
+          client.listRawWorkRequests({ limit: 100 }),
+        ]);
         console.log(
-          `[fracttal-poll] ${locationCode}: fetched ${rows.length} rows`,
+          `[fracttal-poll] ${locationCode}: fetched ${itemPage.rows.length} items, ` +
+            `${orderPage.rows.length} orders, ${requestPage.rows.length} requests`,
         );
-        return await runSync(() => Promise.resolve(rows), {
+        const built = buildWorkEvents(orderPage.rows, requestPage.rows);
+        return await runSync(() => Promise.resolve(itemPage.rows), {
           scope: `fracttal-live:${locationCode}`,
           dryRun: false,
+          workEvents: resolverFor(built.events),
         });
       },
       lock: {

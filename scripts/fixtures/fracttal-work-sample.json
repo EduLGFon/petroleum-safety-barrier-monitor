@@ -1,0 +1,42 @@
+{
+  "meta": {
+    "synthetic": true,
+    "note": "Development/CI work fixture: open planned order drives FAL-EQ-001 to Degradada; the done order and the closed request are ignored."
+  },
+  "orders": [
+    {
+      "code": "FAL-EQ-001",
+      "done": false,
+      "tasks_log_types_description": "CORR - Corretiva Planejada",
+      "types_description": null,
+      "stop_assets": false,
+      "wo_folio": "OS - 9001",
+      "description": "Sanar falha de atuacao",
+      "initial_date": null,
+      "date_maintenance": "2026-09-10",
+      "creation_date": "2026-09-09"
+    },
+    {
+      "code": "FAL-EQ-001",
+      "done": true,
+      "tasks_log_types_description": "CORR - Corretiva Planejada",
+      "types_description": null,
+      "stop_assets": false,
+      "wo_folio": "OS - 8999",
+      "description": "Concluida",
+      "initial_date": null,
+      "date_maintenance": "2026-09-01",
+      "creation_date": "2026-08-30"
+    }
+  ],
+  "requests": [
+    {
+      "code_item": "FAL-EQ-001",
+      "id_status": 4,
+      "types_2_description": "CORR - Planejada",
+      "wo_folio": null,
+      "description": "Resolvida sem OS",
+      "date_maintenance": null
+    }
+  ]
+}
