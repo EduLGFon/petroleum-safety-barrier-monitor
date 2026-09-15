@@ -1,6 +1,7 @@
 // Unit tests for the reconcile planner + runSync orchestrator (P3). The
 // planner is pure so these run headless; runSync gets an injected fake io.
 import {
+  assertCompletePage,
   fieldsSignature,
   type LocalBarrier,
   type PlanCounts,
@@ -52,6 +53,24 @@ function localRow(over: Partial<LocalBarrier> = {}): LocalBarrier {
 
 const kinds = (plan: { entries: PlanEntry[] }) =>
   plan.entries.map((e) => e.kind).sort();
+
+Deno.test("assertCompletePage throws on truncated pages", () => {
+  let caught: Error | null = null;
+  try {
+    assertCompletePage(["a"], 3, "FAL");
+  } catch (err) {
+    caught = err as Error;
+  }
+  assertStrictEquals(caught !== null, true);
+  assertStrictEquals(caught!.message.includes("truncated page"), true);
+  assertStrictEquals(caught!.message.includes("FAL"), true);
+});
+
+Deno.test("assertCompletePage passes on full and unknown totals", () => {
+  assertCompletePage(["a", "b"], 2, "FAL");
+  assertCompletePage(["a"], null, "FAL");
+  assertCompletePage([], 0, "FAL");
+});
 
 Deno.test("planReconcile inserts rows not yet local", () => {
   const plan = planReconcile([baseInput()], []);

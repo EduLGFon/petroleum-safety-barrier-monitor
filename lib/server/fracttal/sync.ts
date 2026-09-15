@@ -193,10 +193,32 @@ export function getDefaultSyncIo(): Promise<SyncIo> {
   return defaultIoPromise;
 }
 
+// assertCompletePage: the mass-delete guard. Deletions are scoped-absent
+// rows, so a truncated remote page (outage, page cap hit) would read as
+// mass deletion. Callers MUST fetch complete pages and call this BEFORE
+// runSync; it throws on truncation and the run aborts with zero writes.
+// A null total (endpoint did not report one) cannot prove truncation and
+// passes - the endpoint contract, not this guard, owns that case.
+export function assertCompletePage(
+  rows: unknown[],
+  total: number | null,
+  scope: string,
+): void {
+  if (total !== null && rows.length < total) {
+    throw new Error(
+      `[sync] truncated page for scope ${scope}: fetched ${rows.length} of ${total}`,
+    );
+  }
+}
+
 // runSync: parse -> map -> reconcile -> (apply unless dry-run), then an
 // audit row in sync_state. Failed runs are recorded and rethrown so the
 // caller (script / later ops notifier) can alert separately from barrier
 // alerts - failures must never go silent.
+//
+// CALLER CONTRACT: fetch the scope's COMPLETE item pages first and enforce
+// assertCompletePage (see fetchScopeSignals, which does both). runSync
+// trusts its source: a truncated source soft-deletes the missing rows.
 export async function runSync(
   source: () => Promise<unknown[]>,
   options: SyncOptions = {},

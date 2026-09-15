@@ -81,30 +81,28 @@ export const defaultSyncIo: SyncIo = {
         tag, typology_id, loc_desc_id, criticality_id, category_id,
         grouping_id, owner_id, comments, action_plan
        from barriers
-       where external_code is not null
+       where external_code is not null and location_id = any($1)
        order by id`,
+      [scopeLocationIds],
     );
-    const inScope = new Set(scopeLocationIds);
-    return rows
-      .filter((r) => inScope.has(r.location_id))
-      .map((r) => ({
-        id: r.id,
-        externalCode: r.external_code,
-        availabilityId: r.availability_id,
-        deletedAt: r.deleted_at,
-        signature: fieldsSignature({
-          tag: r.tag,
-          locationId: r.location_id,
-          typologyId: r.typology_id,
-          locDescId: r.loc_desc_id,
-          criticalityId: r.criticality_id,
-          categoryId: r.category_id,
-          groupingId: r.grouping_id,
-          ownerId: r.owner_id,
-          comments: r.comments,
-          actionPlan: r.action_plan,
-        }),
-      }));
+    return rows.map((r) => ({
+      id: r.id,
+      externalCode: r.external_code,
+      availabilityId: r.availability_id,
+      deletedAt: r.deleted_at,
+      signature: fieldsSignature({
+        tag: r.tag,
+        locationId: r.location_id,
+        typologyId: r.typology_id,
+        locDescId: r.loc_desc_id,
+        criticalityId: r.criticality_id,
+        categoryId: r.category_id,
+        groupingId: r.grouping_id,
+        ownerId: r.owner_id,
+        comments: r.comments,
+        actionPlan: r.action_plan,
+      }),
+    }));
   },
 
   async startRun(scope: string): Promise<number> {
