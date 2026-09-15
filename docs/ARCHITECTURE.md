@@ -131,12 +131,23 @@ Full contract lives in `docs/API.md`. Summary:
 
 ## Persistence
 
+- Fracttal data reference (`docs/FRACTTAL-DATA.md`): field census, join
+  keys, status signal maturity, and the imported catalog, derived from
+  streaming slices of the 480 MB tenant dump.
+- Import pipeline (`scripts/fracttal-import.ts`): streams the dump from
+  disk (char-scan JSON reader, constant memory), rebuilds `locations`,
+  `categories`, and `barriers` from real data, and stamps `lib/map.ts`
+  import defaults. Dry-runs without `--apply`.
 - Postgres (`docs/DATABASE.md`): lookup tables + `barriers` +
   `barrier_status_history`. `compliance_id` is trigger-derived, the only
-  write path is `record_status_change()`. `scripts/migrate.ts` applies
-  `db/schema.sql` + `db/seed_lookups.sql` (idempotent);
-  `scripts/seed.ts` bulk-inserts `getWireBarriers()` output in batches of
-  500 (`--force` truncates first).
+  write path is `record_status_change()`. Location and category ids are
+  NOT frontend contracts - the server serves the dynamic id-keyed
+  vocabularies (`{id, code, count}` and `{id, label}`) to the island, and
+  `lib/resolve.ts` + `lib/api/query.ts` bind those ids at request time.
+  `scripts/migrate.ts` applies `db/schema.sql` + `db/seed_lookups.sql`
+  (idempotent, seed approximates the imported catalog); `scripts/seed.ts`
+  bulk-inserts `getWireBarriers()` output in batches of 500 (`--force`
+  truncates first).
 - Browser `localStorage`: `barrier-dashboard` (location, filters, selection,
   openId; validated per-field on restore, stale page self-heals) and
   `barrier-settings` (theme, accent, density, motion, defaults).
