@@ -151,3 +151,36 @@ Deno.test("resolveBarriers preserves order and stays empty for empty input", () 
   assertEquals(list.map((b) => b.id), [2, 1]);
   assertStrictEquals(resolveBarriers([]).length, 0);
 });
+
+Deno.test("resolveBarrier prefers dynamic labels over seed enums", () => {
+  const b = resolveBarrier(
+    wireBarrier({ locationId: 99, categoryId: 50 }),
+    {
+      locations: { 99: "SM" },
+      categories: { 50: "Válvula XV" },
+    },
+  );
+  assertStrictEquals(b.location, "SM");
+  assertStrictEquals(b.category, "Válvula XV");
+});
+
+Deno.test("resolveBarrier falls back to seed enums for ids without dynamic labels", () => {
+  const b = resolveBarrier(
+    wireBarrier({ locationId: 1, categoryId: 0 }),
+    { locations: { 99: "SM" } },
+  );
+  assertStrictEquals(b.location, "FAL");
+  assertStrictEquals(b.category, "Válvula de Alívio de Pressão");
+});
+
+Deno.test("resolveChartData uses dynamic category labels when provided", () => {
+  const rows = resolveChartData(
+    [{ categoryId: 12, compliant: 1, total: 2 }],
+    { categories: { 12: "Sistema de Detecção de Gás" } },
+  );
+  assertEquals(rows, [{
+    name: "Sistema de Detecção de Gás",
+    Conforme: 1,
+    "Não Conforme": 1,
+  }]);
+});

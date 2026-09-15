@@ -104,7 +104,12 @@ function ServerView(
 ) {
   const [splashDone, setSplashDone] = useState(false);
   const [shown, setShown] = useState(false);
-  const dash = useServerDashboard(baseUrl, defaultLocation);
+  const dash = useServerDashboard(
+    baseUrl,
+    defaultLocation,
+    undefined,
+    vocabularies,
+  );
   const { loading, error, retry, rows } = dash;
 
   // Fade the shell in once the first scope resolves; later refetches keep
@@ -134,7 +139,7 @@ function ServerView(
         total={vocabularies?.locations?.reduce((sum, s) => sum + s.count, 0)}
         dispOpts={vocabularies?.availabilities ?? []}
         confOpts={vocabularies?.compliances ?? []}
-        catOpts={vocabularies?.categories ?? []}
+        catOpts={vocabularies?.categories.map((c) => c.label) ?? []}
         visible={shown}
         loading={loading}
         companyName={companyName}

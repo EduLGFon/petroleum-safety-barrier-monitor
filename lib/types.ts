@@ -101,11 +101,13 @@ export interface CategoryCompliance {
 
 // Server-provided filter vocabularies (display strings + per-station counts)
 // for server-paginated mode, where the client never holds the full dataset.
+// Locations and categories carry their numeric ids so dynamic resolution can
+// map wire ids to these very labels instead of seed enums (see resolve.ts).
 export interface Vocabularies {
-  locations: { code: string; count: number }[];
+  locations: { id: number; code: string; count: number }[];
   availabilities: string[];
   compliances: string[];
-  categories: string[];
+  categories: { id: number; label: string }[];
 }
 
 export type SortableColumn = keyof Pick<

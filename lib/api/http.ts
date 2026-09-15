@@ -10,10 +10,16 @@ import type {
 } from "../wireTypes.ts";
 import { resolveBarriers, resolveChartData, resolveKpi } from "../resolve.ts";
 import { buildQueryString } from "./query.ts";
+import type { ResolverLabels } from "../resolve.ts";
 import type { BarriersApi } from "./types.ts";
 
-// Creates an HTTP BarriersApi bound to the given backend baseUrl.
-export function httpAdapterFactory(baseUrl: string): BarriersApi {
+// Creates an HTTP BarriersApi bound to the given backend baseUrl. labels
+// carries dynamic station/category id->label maps so imported values beyond
+// the seed enums still resolve for display.
+export function httpAdapterFactory(
+  baseUrl: string,
+  labels?: ResolverLabels,
+): BarriersApi {
   // GETs JSON path from baseUrl; throws on non-OK status.
   async function fetchJson<T>(path: string): Promise<T> {
     const res = await fetch(`${baseUrl}${path}`, {
@@ -29,7 +35,7 @@ export function httpAdapterFactory(baseUrl: string): BarriersApi {
       const qs = buildQueryString(query);
       const data = await fetchJson<BarriersResponse>(`/api/barriers?${qs}`);
       return {
-        items: resolveBarriers(data.items),
+        items: resolveBarriers(data.items, labels),
         total: data.total,
         totalPages: data.totalPages,
       };
@@ -38,7 +44,7 @@ export function httpAdapterFactory(baseUrl: string): BarriersApi {
     async getAllBarriers(query) {
       const qs = buildQueryString({ ...query, page: 1, pageSize: 100000 });
       const data = await fetchJson<BarriersResponse>(`/api/barriers?${qs}`);
-      return resolveBarriers(data.items);
+      return resolveBarriers(data.items, labels);
     },
     // HTTP getBarrierById: fetches wire row by id; null only on 404,
     // other failures throw so callers can tell "missing" from "broken".
@@ -50,7 +56,7 @@ export function httpAdapterFactory(baseUrl: string): BarriersApi {
       if (res.status === 404) return null;
       if (!res.ok) throw new Error(`API error ${res.status}: ${path}`);
       const w = await res.json() as WireBarrier;
-      return resolveBarriers([w])[0];
+      return resolveBarriers([w], labels)[0];
     },
     // HTTP getKpi: fetches wire KPI snapshot and resolves to domain.
     async getKpi(query) {
@@ -64,7 +70,7 @@ export function httpAdapterFactory(baseUrl: string): BarriersApi {
       const items = await fetchJson<WireCategoryCompliance[]>(
         `/api/chart?${qs}`,
       );
-      return resolveChartData(items);
+      return resolveChartData(items, labels);
     },
   };
 }

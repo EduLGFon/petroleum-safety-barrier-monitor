@@ -11,7 +11,7 @@ interface Props {
   selected: string;
   allBarriers: Barrier[];
   // Precomputed tabs for server mode (client derives tabs from allBarriers).
-  stations?: { code: string; count: number }[];
+  stations?: { id: number; code: string; count: number }[];
   total?: number;
   onChange: (c: string) => void;
 }

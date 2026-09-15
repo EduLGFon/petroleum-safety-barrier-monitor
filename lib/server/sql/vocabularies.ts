@@ -8,11 +8,11 @@ import { queryRows } from "../db.ts";
 // Distinct display labels plus per-station counts in one parallel batch.
 export async function getVocabularies(): Promise<Vocabularies> {
   const [locRows, dispRows, confRows, catRows] = await Promise.all([
-    queryRows<{ code: string; count: string }>(
-      `select loc.code as code, count(b.id)::text as count
+    queryRows<{ id: number; code: string; count: string }>(
+      `select loc.id as id, loc.code as code, count(b.id)::text as count
        from locations loc
        left join barriers b on b.location_id = loc.id and b.deleted_at is null
-       group by loc.code order by loc.code`,
+       group by loc.id, loc.code order by loc.code`,
     ),
     queryRows<{ label: string }>(
       `select distinct disp.label as label from barriers b
@@ -28,17 +28,21 @@ export async function getVocabularies(): Promise<Vocabularies> {
        where b.deleted_at is null
        order by label`,
     ),
-    queryRows<{ label: string }>(
-      `select distinct cat.label as label from barriers b
+    queryRows<{ id: number; label: string }>(
+      `select distinct cat.id as id, cat.label as label from barriers b
        join categories cat on cat.id = b.category_id
        where b.deleted_at is null
        order by cat.label`,
     ),
   ]);
   return {
-    locations: locRows.map((r) => ({ code: r.code, count: Number(r.count) })),
+    locations: locRows.map((r) => ({
+      id: r.id,
+      code: r.code,
+      count: Number(r.count),
+    })),
     availabilities: dispRows.map((r) => r.label),
     compliances: confRows.map((r) => r.label),
-    categories: catRows.map((r) => r.label),
+    categories: catRows.map((r) => ({ id: r.id, label: r.label })),
   };
 }

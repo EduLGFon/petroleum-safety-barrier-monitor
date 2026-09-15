@@ -6,6 +6,7 @@ import type {
   Barrier,
   CategoryCompliance,
   KpiSnapshot,
+  Vocabularies,
 } from "../../lib/types.ts";
 
 import { useCallback, useEffect, useMemo, useState } from "preact/hooks";
@@ -30,10 +31,13 @@ import { computeKpi } from "../../lib/utils.ts";
 // loading/error/retry. Export covers the current page only (see note below).
 // adapterOverride lets tests inject a fake BarriersApi; callers using the real
 // HTTP path stay untouched (it is just httpAdapterFactory(baseUrl)).
+// vocabularies (server-provided) supply dynamic station/category id maps so
+// imported values beyond the seed enums resolve and filter by id.
 export function useServerDashboard(
   baseUrl: string,
   defaultLocation = "ALL",
   adapterOverride?: BarriersApi,
+  vocabularies?: Vocabularies | null,
 ) {
   const {
     location,
@@ -54,9 +58,35 @@ export function useServerDashboard(
     toggleSelect,
     clearAll,
   } = useSelection();
+  // Dynamic id<->label maps derived once from the server vocabulary; null in
+  // mock mode or until vocabularies arrive, where static enums alone apply.
+  const idMaps = useMemo(
+    () =>
+      vocabularies
+        ? {
+          resolve: {
+            locations: Object.fromEntries(
+              vocabularies.locations.map((l) => [l.id, l.code]),
+            ) as Record<number, string>,
+            categories: Object.fromEntries(
+              vocabularies.categories.map((c) => [c.id, c.label]),
+            ) as Record<number, string>,
+          },
+          query: {
+            locationIds: Object.fromEntries(
+              vocabularies.locations.map((l) => [l.code, l.id]),
+            ) as Record<string, number>,
+            categoryIds: Object.fromEntries(
+              vocabularies.categories.map((c) => [c.label, c.id]),
+            ) as Record<string, number>,
+          },
+        }
+        : null,
+    [vocabularies],
+  );
   const adapter = useMemo(
-    () => adapterOverride ?? httpAdapterFactory(baseUrl),
-    [adapterOverride, baseUrl],
+    () => adapterOverride ?? httpAdapterFactory(baseUrl, idMaps?.resolve),
+    [adapterOverride, baseUrl, idMaps],
   );
 
   const [items, setItems] = useState<Barrier[]>([]);
@@ -103,7 +133,7 @@ export function useServerDashboard(
       pageSize: filters.pageSize,
       sortCol: filters.sortCol,
       sortDir: filters.sortDir,
-    });
+    }, idMaps?.query);
     Promise.all([
       adapter.getBarriers(wq),
       adapter.getKpi({ locationId: wq.locationId }),
@@ -124,7 +154,7 @@ export function useServerDashboard(
     return () => {
       cancelled = true;
     };
-  }, [adapter, hydrated, location, filters, reloadKey]);
+  }, [adapter, hydrated, location, filters, reloadKey, idMaps]);
 
   // Station metadata comes from the seed list when known; stations added
   // later fall back to their own code so details never render undefined.

@@ -17,13 +17,24 @@ export function cleanDateParam(v: string | undefined): string | undefined {
   return /^\d{4}-\d{2}-\d{2}$/.test(date) ? date : undefined;
 }
 
+// Dynamic label->id overrides for stations/categories supplied by the server
+// vocabulary; real imported values beyond the seed enums still encode.
+export interface QueryIdOverrides {
+  locationIds?: Record<string, number>;
+  categoryIds?: Record<string, number>;
+}
+
 /** Converts UI-facing string filters into the numeric wire query the API expects.
  *  Unknown vocabulary values are skipped (with a warning) instead of silently
- *  mapping to a wrong known id - the server will learn the new value first. */
-export function toWireQuery(f: DomainQuery): BarriersQuery {
+ *  mapping to a wrong known id - the server will learn the new value first.
+ *  overrides map dynamic labels to ids when the static enums do not know them. */
+export function toWireQuery(
+  f: DomainQuery,
+  overrides?: QueryIdOverrides,
+): BarriersQuery {
   const q: BarriersQuery = {};
   if (f.location && f.location !== "ALL") {
-    const id = toLocationId(f.location);
+    const id = overrides?.locationIds?.[f.location] ?? toLocationId(f.location);
     if (id === undefined) {
       console.warn(`[toWireQuery] unknown location: ${f.location}`);
     } else q.locationId = id;
@@ -43,7 +54,7 @@ export function toWireQuery(f: DomainQuery): BarriersQuery {
     } else q.complianceId = id;
   }
   if (f.category) {
-    const id = toCategoryId(f.category);
+    const id = overrides?.categoryIds?.[f.category] ?? toCategoryId(f.category);
     if (id === undefined) {
       console.warn(`[toWireQuery] unknown category: ${f.category}`);
     } else q.categoryId = id;

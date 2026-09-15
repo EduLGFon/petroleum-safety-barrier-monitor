@@ -122,6 +122,33 @@ Deno.test("toWireQuery passes through known ids with pageSize/sort intact", () =
   });
 });
 
+Deno.test("toWireQuery uses dynamic id overrides for location and category", () => {
+  const q = toWireQuery(
+    { location: "SM", category: "Válvula XV" },
+    { locationIds: { SM: 21 }, categoryIds: { "Válvula XV": 33 } },
+  );
+  assertEquals(q, { locationId: 21, categoryId: 33 });
+});
+
+Deno.test("toWireQuery falls back to static enums when overrides omit the value", () => {
+  const q = toWireQuery(
+    { location: "FAL", category: "Detector de H₂S" },
+    { locationIds: { SM: 21 }, categoryIds: { "Válvula XV": 33 } },
+  );
+  assertEquals(q, { locationId: 1, categoryId: 9 });
+});
+
+Deno.test("toWireQuery warns on unknown values even with overrides present", () => {
+  const warnings = collectWarnings(() => {
+    const q = toWireQuery(
+      { location: "MARS" },
+      { locationIds: { SM: 21 } },
+    );
+    assertEquals(q, {});
+  });
+  assertStrictEquals(warnings.length, 1);
+});
+
 Deno.test("buildQueryString encodes query/date/sort params", () => {
   const row = buildQueryString({
     locationId: 1,

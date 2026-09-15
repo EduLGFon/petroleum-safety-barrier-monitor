@@ -42,17 +42,29 @@ export function resolveHistoryEntry(
   };
 }
 
-// Maps wire numeric IDs to Barrier strings; compliance is derived from availability, never trusted from wire.
-export function resolveBarrier(w: WireBarrier): Barrier {
+// Dynamic id->label overrides for stations/categories. Static enums only know
+// the seed values; real imported data carries many more, so the server sends
+// its actual vocabulary and resolution prefers those maps when present.
+export interface ResolverLabels {
+  locations?: Record<number, string>;
+  categories?: Record<number, string>;
+}
+
+// Maps numeric wire IDs to Barrier strings; compliance is derived from availability, never trusted from wire. Dynamic labels (when supplied) win over seed enums.
+export function resolveBarrier(
+  w: WireBarrier,
+  labels?: ResolverLabels,
+): Barrier {
   const availability = fromAvailabilityId(w.availabilityId);
   return {
     id: w.id,
     tag: w.tag,
     typology: fromTypologyId(w.typologyId),
-    location: fromLocationId(w.locationId),
+    location: labels?.locations?.[w.locationId] ?? fromLocationId(w.locationId),
     locDesc: fromLocDescId(w.locDescId),
     criticality: fromCriticalityId(w.criticalityId),
-    category: fromCategoryId(w.categoryId),
+    category: labels?.categories?.[w.categoryId] ??
+      fromCategoryId(w.categoryId),
     grouping: fromGroupingId(w.groupingId),
     owner: fromOwnerId(w.ownerId),
     availability,
@@ -67,8 +79,11 @@ export function resolveBarrier(w: WireBarrier): Barrier {
 }
 
 // Maps a wire array to Barrier[] via resolveBarrier; preserves order, empty in → empty out.
-export function resolveBarriers(items: WireBarrier[]): Barrier[] {
-  return items.map(resolveBarrier);
+export function resolveBarriers(
+  items: WireBarrier[],
+  labels?: ResolverLabels,
+): Barrier[] {
+  return items.map((w) => resolveBarrier(w, labels));
 }
 
 /** KPI snapshots are already numeric on the wire - pass-through with type narrowing.
@@ -120,9 +135,11 @@ export function resolveKpi(w: WireKpiSnapshot): KpiSnapshot {
 // truncate past 26 chars like the client derivation; SQL order is preserved.
 export function resolveChartData(
   items: WireCategoryCompliance[],
+  labels?: ResolverLabels,
 ): CategoryCompliance[] {
   return items.map((w) => {
-    const name = fromCategoryId(w.categoryId);
+    const name = labels?.categories?.[w.categoryId] ??
+      fromCategoryId(w.categoryId);
     return {
       name: name.length > 26 ? name.slice(0, 26) + "…" : name,
       Conforme: w.compliant,
