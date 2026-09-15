@@ -11,53 +11,30 @@
 // Run (write to DB):      ... same command with --apply
 // Prerequisite: `deno task db:migrate` (schema + static lookup tables).
 // Read-only unless --apply is passed: the table truncation only happens on apply.
+import {
+  AUTHOR_IMPORT,
+  categoryFor,
+  classifyCorrective,
+  classifyRequest,
+  earliestDate,
+  exclusionReason,
+  IMPORT_NOTE,
+  isBarrierCandidate,
+  isClosedRequestStatus,
+  isoDate,
+  locationTypeOf,
+  mergeEvent,
+  resolveAvailability,
+  stationCodeOf,
+  type StatusEvent,
+  tagFor,
+  typologyIdOf,
+} from "../lib/server/fracttal/barrier-rules.ts";
+
 import { Pool } from "@db/postgres";
 
 // Number of rows per multi-value INSERT (barriers + history).
 const BATCH_SIZE = 500;
-
-// Availability status ids (db/schema.sql + db/seed_lookups.sql + lib/enums.ts).
-const AVAIL_AVAILABLE = 0;
-const AVAIL_OUT_OF_SERVICE = 1;
-const AVAIL_DEGRADED = 4;
-const AVAIL_UNAVAILABLE = 5;
-
-// Typology ids (db/seed_lookups.sql); derived from the parent chain, the
-// conservative default in lib/server/fracttal/map.ts when nothing matches.
-const TYPO_ESTACAO = 0;
-const TYPO_PLANTA = 1;
-const TYPO_DUTO = 2;
-const TYPO_COMPRESSAO = 4;
-const TYPO_MEDICAO = 5;
-const TYPO_DEFAULT = 3; // 'Base Operacional'
-
-// Author row id used for import stamps ('Sincronização Fracttal').
-const AUTHOR_IMPORT = 10;
-
-// Equipment barrier scope - case/accent-insensitive keyword list from
-// docs/FRACTTAL-DATA.md section 3, matched against groups_description only
-// (the asset-type taxonomy). Description is NOT matched: free text pulls in
-// non-barrier types (e.g. a gas pump whose label mentions 'gás'). Every hit
-// is imported as a barrier (catalog is data-driven).
-const BARRIER_KEYWORDS = [
-  "valvula",
-  "extintor",
-  "detec",
-  "alarme",
-  "sirene",
-  "incendio",
-  "bloqueio",
-  "intertravamento",
-  "seguran",
-  "emerg",
-  "psv",
-  "alivio",
-  "hidrante",
-  "gas",
-  "fumaca",
-  "h2s",
-  "corta-?chamas",
-] as const;
 
 const DEFAULT_DIR = "test/fracttal-dump-2026-09-14-04-34-49";
 
@@ -87,59 +64,10 @@ const HISTORY_COLS = [
 
 type InsertRow = Record<string, unknown>;
 
-// Normalizes text for keyword matching: lowercases and folds accents so
-// 'Válvula' matches 'valvula' and 'gás' matches 'gas'.
-function norm(v: string | null | undefined): string {
-  return (v ?? "")
-    .toLowerCase()
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "");
-}
-
-// L2 station code from an equipment parent chain. parent_description is
-// '/'-separated, e.g. '// Seacrest Petróleo/ Área Norte/ SÃO MATEUS - SM/ ...'.
-// Stripping empty segments, index 2 is the field level ('SÃO MATEUS - SM');
-// the trailing ' - CODE' token is the station slug (validated against the full
-// equipment file: this rule reproduces the documented 39 distinct codes).
-function stationCodeOf(parentDescription: string): string {
-  const parts = parentDescription
-    .split("/")
-    .map((p) => p.trim())
-    .filter((p) => p !== "");
-  const seg = parts.length > 2 ? parts[2] : (parts[parts.length - 1] ?? "");
-  const m = seg.match(/\s*-\s*([A-Z0-9][A-Z0-9-]*)\s*$/);
-  return (m ? m[1] : seg).toUpperCase();
-}
-
-// Safety barrier candidate test over the item's taxonomy label only.
-function isBarrierCandidate(groupsDescription: string): boolean {
-  const re = new RegExp(BARRIER_KEYWORDS.join("|"));
-  return re.test(norm(groupsDescription));
-}
-
-// Typology from the parent chain (L3+ text): keyword precedence one-pass.
-function typologyIdOf(parentDescription: string): number {
-  const text = norm(parentDescription);
-  if (/compres/.test(text)) return TYPO_COMPRESSAO;
-  if (/medic|medid/.test(text)) return TYPO_MEDICAO;
-  if (/duto|transfer/.test(text)) return TYPO_DUTO;
-  if (/plant|process/.test(text)) return TYPO_PLANTA;
-  if (/estac|coletor/.test(text)) return TYPO_ESTACAO;
-  return TYPO_DEFAULT;
-}
-
-// First 10 chars of an ISO timestamp as YYYY-MM-DD; null for missing/odd input.
-function isoDate(v: unknown): string | null {
-  if (typeof v !== "string" || v.length < 10) return null;
-  const d = v.slice(0, 10);
-  return /^\d{4}-\d{2}-\d{2}$/.test(d) ? d : null;
-}
-
-// Earliest of two YYYY-MM-DD dates; null stays neutral (other wins).
-function earliestDate(a: string | null, b: string | null): string | null {
-  if (!a) return b;
-  if (!b) return a;
-  return a < b ? a : b;
+// str reads a dump string field. Domain rules (folding, scope, station,
+// typology, dates, events) live in lib/server/fracttal/barrier-rules.ts.
+function str(v: unknown): string {
+  return typeof v === "string" ? v : "";
 }
 
 // Streams a JSON array file one top-level object at a time. Keeps only the
@@ -222,27 +150,28 @@ interface EquipmentRow {
   outOfServiceDate: string | null;
 }
 
-// One corrective signal contributing to a barrier's current availability.
-interface CorrectiveEvent {
-  date: string | null;
-  source: string;
-}
-
-// Aggregated per-barrier state built while scanning WOs/WRs.
+// Aggregated per-barrier state built while scanning WOs/WRs. Work-event
+// slots use the shared StatusEvent shape so both paths merge identically.
 interface BarrierAcc extends EquipmentRow {
   station: string;
   category: string;
-  planned: CorrectiveEvent | null;
-  urgent: CorrectiveEvent | null;
+  planned: StatusEvent | null;
+  urgent: StatusEvent | null;
   stopAssets: boolean;
 }
 
-function str(v: unknown): string {
-  return typeof v === "string" ? v : "";
-}
-
-function boolFlag(v: unknown): boolean {
-  return v === true;
+// extractEvent distills a dump work order/request row to a shared status
+// event: earliest of the candidate date fields plus folio + description.
+function extractEvent(row: Record<string, unknown>): StatusEvent {
+  const folio = str(row.wo_folio);
+  const desc = str(row.description);
+  return {
+    date: earliestDate(
+      isoDate(row.initial_date),
+      earliestDate(isoDate(row.date_maintenance), isoDate(row.creation_date)),
+    ),
+    source: (folio ? `${folio}: ${desc}` : desc).slice(0, 800),
+  };
 }
 
 // Applies one work order to the barrier map; returns the match kind for the report.
@@ -252,49 +181,19 @@ function applyWorkOrder(
 ): "matched" | "unmatched" | "not-corrective" {
   const acc = barriers.get(str(wo.code));
   if (!acc) return "unmatched";
-  const open = wo.done === false;
-  if (!open) return "not-corrective";
-  const type = norm(str(wo.tasks_log_types_description));
-  const failureType = norm(str(wo.types_description));
-  if (
-    type.includes("corretiva planejada") ||
-    failureType.includes("falha potencial")
-  ) {
-    acc.planned = mergeEvent(acc.planned, wo);
+  if (wo.done !== false) return "not-corrective";
+  const slot = classifyCorrective(
+    str(wo.tasks_log_types_description),
+    str(wo.types_description),
+  );
+  if (slot === "planned") {
+    acc.planned = mergeEvent(acc.planned, extractEvent(wo));
+  } else if (slot === "urgent") {
+    acc.urgent = mergeEvent(acc.urgent, extractEvent(wo));
   }
-  if (type.includes("corretiva emergencial")) {
-    acc.urgent = mergeEvent(acc.urgent, wo);
-  }
-  if (boolFlag(wo.stop_assets)) acc.stopAssets = true;
+  if (wo.stop_assets === true) acc.stopAssets = true;
   return "matched";
 }
-
-// Keeps the earliest date and the most informative source for an event slot;
-// if the incoming event has no date but the slot is empty, keep it anyway
-// (status still derives to open; status_since then falls back to today).
-function mergeEvent(
-  current: CorrectiveEvent | null,
-  wo: Record<string, unknown>,
-): CorrectiveEvent {
-  const folio = str(wo.wo_folio);
-  const desc = str(wo.description);
-  const source = (folio ? `${folio}: ${desc}` : desc).slice(0, 800);
-  const incomingDate = earliestDate(
-    isoDate(wo.initial_date),
-    earliestDate(isoDate(wo.date_maintenance), isoDate(wo.creation_date)),
-  );
-  if (!current) {
-    return { date: incomingDate, source };
-  }
-  return {
-    date: current.date ?? incomingDate,
-    source: current.source ? current.source : source,
-  };
-}
-
-// WR statuses that count as closed: solved (4), cancelled (5), solved via WO
-// (6), rejected (12). Everything else is an open request.
-const CLOSED_WR_STATUSES = new Set([4, 5, 6, 12]);
 
 // Applies one work request; closed WRs (solved/cancelled/rejected) are ignored.
 function applyWorkRequest(
@@ -303,20 +202,12 @@ function applyWorkRequest(
 ): "matched" | "unmatched" | "not-corrective" {
   const acc = barriers.get(str(wr.code_item));
   if (!acc) return "unmatched";
-  if (
-    typeof wr.id_status === "number" && CLOSED_WR_STATUSES.has(wr.id_status)
-  ) {
-    return "not-corrective";
-  }
-  const type = norm(str(wr.types_2_description));
-  if (!type.includes("corretiva") && !type.includes("falha")) {
-    return "not-corrective";
-  }
-  if (type.includes("emergencial")) {
-    acc.urgent = mergeEvent(acc.urgent, wr);
-  } else {
-    acc.planned = mergeEvent(acc.planned, wr);
-  }
+  const statusId = typeof wr.id_status === "number" ? wr.id_status : null;
+  if (isClosedRequestStatus(statusId)) return "not-corrective";
+  const slot = classifyRequest(str(wr.types_2_description));
+  if (slot === null) return "not-corrective";
+  if (slot === "urgent") acc.urgent = mergeEvent(acc.urgent, extractEvent(wr));
+  else acc.planned = mergeEvent(acc.planned, extractEvent(wr));
   return "matched";
 }
 
@@ -388,17 +279,24 @@ async function main() {
   const categories = new Set<string>();
   let equipmentSeen = 0;
   let candidates = 0;
+  let excluded = 0;
   for await (const row of streamJsonArray(eqPath)) {
     equipmentSeen += 1;
     const code = str(row.code);
     if (code === "") continue;
     const groupsDescription = str(row.groups_description);
     if (!isBarrierCandidate(groupsDescription)) continue;
+    // Known non-barriers match the scope by mislabel: skip with a report
+    // count, never silently (shared EXCLUDED_EXTERNAL_CODES).
+    if (exclusionReason(code) !== null) {
+      excluded += 1;
+      continue;
+    }
     candidates += 1;
     const description = str(row.description);
     const parentDescription = str(row.parent_description);
     const station = stationCodeOf(parentDescription);
-    const category = groupsDescription.trim() || "(sem categoria)";
+    const category = categoryFor(groupsDescription);
     stations.add(station);
     categories.add(category);
     barriers.set(code, {
@@ -416,7 +314,7 @@ async function main() {
   }
   console.log(
     `Pass A (equipment): ${equipmentSeen} rows, ${candidates} barrier candidates, ` +
-      `${stations.size} stations, ${categories.size} categories`,
+      `${stations.size} stations, ${categories.size} categories, ${excluded} excluded`,
   );
 
   // ── Pass B / C: work orders + work requests ──────────────────────────────
@@ -443,43 +341,28 @@ async function main() {
   );
 
   // ── Derived status per barrier ────────────────────────────────────────────
-  // Precedence (docs/FRACTTAL-DATA.md section 4): open emergency corrective ->
-  // Indisponível (5); open planned corrective -> Degradada (4); asset stopped
-  // or out of service -> Fora de Operação (1); otherwise Disponível (0).
-  interface StatusOut {
-    status: number;
-    since: string | null;
-    note: string;
-  }
-  const statusOf = (acc: BarrierAcc): StatusOut => {
-    const today = new Date().toISOString().slice(0, 10);
-    if (acc.urgent) {
-      return {
-        status: AVAIL_UNAVAILABLE,
-        since: acc.urgent.date ?? today,
-        note: acc.urgent.source ?? "",
-      };
-    }
-    if (acc.planned) {
-      return {
-        status: AVAIL_DEGRADED,
-        since: acc.planned.date ?? today,
-        note: acc.planned.source ?? "",
-      };
-    }
-    if (acc.stopAssets || acc.outOfServiceDate) {
-      return {
-        status: AVAIL_OUT_OF_SERVICE,
-        since: acc.outOfServiceDate ?? today,
-        note: acc.outOfServiceDate ? "Equipamento fora de operação" : "",
-      };
-    }
-    return { status: AVAIL_AVAILABLE, since: today, note: "" };
-  };
+  // Shared precedence (lib/server/fracttal/barrier-rules.ts): open emergency
+  // corrective -> Indisponível (5); open planned corrective -> Degradada (4);
+  // stopped asset or out-of-service date -> Fora de Operação (1); asset
+  // flagged unavailable -> Indisponível (5); otherwise Disponível (0). The
+  // asset flag is passed as available: the dump semantics for that column
+  // are unverified, so the import derives status from work events only.
+  const today = new Date().toISOString().slice(0, 10);
+  const statusOf = (acc: BarrierAcc) =>
+    resolveAvailability(
+      {
+        urgent: acc.urgent,
+        planned: acc.planned,
+        stopAssets: acc.stopAssets,
+        outOfServiceDate: acc.outOfServiceDate,
+        assetAvailable: true,
+      },
+      today,
+    );
 
   const byStatus = new Map<number, number>();
   for (const acc of barriers.values()) {
-    const s = statusOf(acc).status;
+    const s = statusOf(acc).availabilityId;
     byStatus.set(s, (byStatus.get(s) ?? 0) + 1);
   }
   console.log(
@@ -515,11 +398,7 @@ async function main() {
   const locRows = stationList.map((code, i) => ({
     id: i + 1,
     code,
-    type: code.includes("DUTO")
-      ? "Duto de Transferência"
-      : /MOVEL|MÓVEL|TESTE/.test(code)
-      ? "Unidade Móvel"
-      : "Instalação",
+    type: locationTypeOf(code),
   }));
   const locInsert = buildInsert(
     "locations",
@@ -547,7 +426,7 @@ async function main() {
     const rows: InsertRow[] = chunk.map((acc) => {
       const s = statusOf(acc);
       return {
-        tag: acc.description || acc.code,
+        tag: tagFor(acc.description, acc.code),
         typology_id: typologyIdOf(acc.parentDescription),
         location_id: stationIds.get(acc.station) ?? 1,
         loc_desc_id: 0,
@@ -555,10 +434,10 @@ async function main() {
         category_id: categoryIds.get(acc.category) ?? 0,
         grouping_id: 0,
         owner_id: null,
-        availability_id: s.status,
+        availability_id: s.availabilityId,
         comments: s.note,
         action_plan: "",
-        status_since: s.since,
+        status_since: s.statusSince,
         external_code: acc.code,
       };
     });
@@ -573,10 +452,10 @@ async function main() {
       const s = statusOf(chunk[idx]);
       return [{
         barrier_id: row.id,
-        date: s.since,
-        status_id: s.status,
+        date: s.statusSince,
+        status_id: s.availabilityId,
         author_id: AUTHOR_IMPORT,
-        note: "Importado do Fracttal",
+        note: IMPORT_NOTE,
       }];
     });
     const hist = buildInsert(
