@@ -56,6 +56,10 @@ Deno.test("fixture rows land, read back, export totals match", async () => {
   });
 
   await cleanup(scope);
+  // Reconcile retires scoped-absent locals: on a populated DB those are real
+  // barriers sharing the fixture's location, so the test restores every row
+  // its own plan deleted (proves the drill retires zero rows net).
+  let retiredIds: number[] = [];
   try {
     const result = await runSync(
       () =>
@@ -64,6 +68,9 @@ Deno.test("fixture rows land, read back, export totals match", async () => {
           raw(2, "P4T-EQ-002", false),
         ]),
       { scope, dryRun: false, io: defaultSyncIo },
+    );
+    retiredIds = result.plan.entries.flatMap((e) =>
+      e.kind === "delete" ? [e.local.id] : []
     );
     assertStrictEquals(result.plan.counts.inserts, 2);
 
@@ -89,6 +96,12 @@ Deno.test("fixture rows land, read back, export totals match", async () => {
     );
     assertStrictEquals(totalLine?.includes('"2"'), true);
   } finally {
+    if (retiredIds.length > 0) {
+      await queryRows(
+        `update barriers set deleted_at = null where id = any($1)`,
+        [retiredIds],
+      );
+    }
     await cleanup(scope);
   }
 });
