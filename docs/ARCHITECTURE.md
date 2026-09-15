@@ -138,6 +138,12 @@ Full contract lives in `docs/API.md`. Summary:
   disk (char-scan JSON reader, constant memory), rebuilds `locations`,
   `categories`, and `barriers` from real data, and stamps `lib/map.ts`
   import defaults. Dry-runs without `--apply`.
+- Shared mapping rules (`lib/server/fracttal/barrier-rules.ts`): the one
+  converged source for scope keywords, station parse, typology,
+  work-event classification, and 4-state availability used by both the
+  import and the live sync. Precedence: the import owns catalog rows
+  (creates locations/categories on rebuild); the sync never creates
+  them (unknown labels skip and are listed).
 - Postgres (`docs/DATABASE.md`): lookup tables + `barriers` +
   `barrier_status_history`. `compliance_id` is trigger-derived, the only
   write path is `record_status_change()`. Location and category ids are

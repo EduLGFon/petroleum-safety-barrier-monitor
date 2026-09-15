@@ -81,7 +81,9 @@ the join / `external_code` key. Data quality:
 ### Safety barrier keyword filter (groups_description only)
 
 Count of equipment whose `groups_description` taxonomy label hits the
-keyword list (full pass, 18,272 rows): **3,523 rows** (~19%).
+keyword list (full pass, 18,272 rows): **3,523 rows** (~19%), minus 1
+documented exclusion (a pressure transmitter mislabeled `Válvula`, see
+`EXCLUDED_EXTERNAL_CODES`) for **3,522 imported barriers**.
 
 The filter runs on `groups_description` only (the asset-type taxonomy).
 Free-text `description` is NOT matched: it pulls in non-barrier types
@@ -123,7 +125,8 @@ nodes, not barriers.
 ### Recommendation (Step 2 output)
 
 Barrier scope = equipment filtered by `groups_description` keyword match
-(3,523 candidates, ~19% of equipment). Location items stay hierarchy.
+(3,523 candidates, ~19% of equipment, 1 documented exclusion).
+Location items stay hierarchy.
 
 ## 4. Work orders (status signal source)
 
@@ -307,9 +310,10 @@ and rebuilds from the dump in ~37 seconds.
 
 Actual imported catalog from `test/fracttal-dump-2026-09-14-04-34-49/`:
 
-- **barriers**: 3,523 (every `groups_description` keyword hit)
-- **locations**: 36 stations (codes extracted from L2 segment of
-  `parent_description`, ids 1-36 sorted by code, type derived)
+- **barriers**: 3,522 (every `groups_description` keyword hit minus the
+  documented transmitter mislabel exclusion)
+- **locations**: 35 stations (codes extracted from L2 segment of
+  `parent_description`, ids 1-35 sorted by code, type derived)
 - **categories**: 67 labels (from distinct `groups_description` in the
   barrier subset, ids 0-66 sorted alphabetically)
 - **availability_statuses**: unchanged, matches `docs/STATUSES.md`
@@ -317,7 +321,7 @@ Actual imported catalog from `test/fracttal-dump-2026-09-14-04-34-49/`:
   signal is populated
 
 The old fake 6-location/10-category seed rows in `db/seed_lookups.sql`
-have been replaced with the real 36/67 rows so the seed task remains
+have been replaced with the real 35/67 rows so the seed task remains
 approximate but close to reality. The id contract in
 `lib/enums.ts` is now only used for the static lookup tables
 (availability, compliance, groupings, typologies, owners, loc_descs,
@@ -334,19 +338,19 @@ deno run -A --env-file=.env scripts/fracttal-import.ts \
   --dir test/fracttal-dump-2026-09-14-04-34-49 --apply
 ```
 
-| Pass | Input                   | Scanned | Matched | Notes                       |
-| ---- | ----------------------- | ------- | ------- | --------------------------- |
-| A    | `items-2-equipment.json` | 18,272  | 3,523   | `groups_description` only   |
-| B    | `work-orders.json`       | 120,600 | 1,206   | all `CORR - Corretiva Planejada` |
-| C    | `work-requests.json`     | 38,500  | 0       | all in closed statuses      |
+| Pass | Input                    | Scanned | Matched | Notes                                  |
+| ---- | ------------------------ | ------- | ------- | -------------------------------------- |
+| A    | `items-2-equipment.json` | 18,272  | 3,522   | `groups_description` only, 1 exclusion |
+| B    | `work-orders.json`       | 120,600 | 1,206   | all `CORR - Corretiva Planejada`       |
+| C    | `work-requests.json`     | 38,500  | 0       | all in closed statuses                 |
 
-**Derived availability:** Disponível 3,522 / Degradado 1.
+**Derived availability:** Disponível 3,521 / Degradado 1.
 The single degraded barrier (`SSV-BRA01-001`, code `1013959`) carries a
 real WO comment in its `actionPlan` field ("Sanar falha de atuação da
 SSV") and a `statusSince` of `2026-09-11`.
 
 **Station breakdown (top 5):** FAL 1,282 / SM 461 / IBU 262 / FSR 252 /
-CNC 200 (36 total stations).
+CNC 200 (35 total stations).
 
 **Category breakdown (top 5):** Válvula 381 at FAL / Equipamento -
 Emergência 245 at FAL / Válvulas 125 at FAL / Extintor 115 at FAL /

@@ -71,22 +71,30 @@ auditable, with deletions soft.
   update in place; new codes insert; unmapped status values are listed, not
   guessed (see mapping).
 
-## Mapping draft (Fracttal → app enums / wire types)
+## Mapping (Fracttal → app enums / wire types)
+
+Single source of truth: `lib/server/fracttal/barrier-rules.ts` (pure,
+tested). The dump import (`scripts/fracttal-import.ts`) and the live sync
+(`lib/server/fracttal/map.ts`) both call it, so scope, station, typology,
+tags, and availability can never diverge again. Precedence: the import
+owns catalog rows (creates locations/categories on rebuild); the sync
+never creates them (unknown labels skip and are listed in the run report).
 
 The app models barriers with `availability`, `compliance`, and `criticality`.
 Fracttal assets expose `active` and `available` plus operational fields;
-there is **no direct compliance field**, so the draft is provisional and
-reviewed against a real fixture before P3.
+there is **no direct compliance field**, so compliance stays derived
+(never written) on both sides.
 
-| App concept                     | Fracttal source (draft)                                                 | Notes                                                                                                                                 |
-| ------------------------------- | ----------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
-| `externalCode` (new wire field) | `code`                                                                  | Upsert match key                                                                                                                      |
-| `availability`                  | `available` + `initial_date_out_of_service`/`last_final_date_available` | `available:false` → some Indisponível bucket; contingent/degraded buckets need a secondary signal (work orders), **unmapped for now** |
-| `compliance`                    | derived: open/corrective work order on the asset - endpoint TBD         | **Unmapped**: needs the work-order contract + fixture review                                                                          |
-| `criticality`                   | `priorities_description` → map                                          | resolved in P3 against the seed: `'Crítica'`/`'Não Crítica'` exact match, anything else is listed and skipped                         |
-| `category`                      | `groups_1_description`/`groups_2_description`                           | category taxonomy differs per tenant; list, don't force                                                                               |
-| `location`                      | `location_code` / `parent_description`                                  | station grouping                                                                                                                      |
-| `tag` (barcode label)           | `code`                                                                  | display tag                                                                                                                           |
+| App concept                     | Fracttal source (both paths)                                                                                                               | Notes                                                                                                                            |
+| ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------- |
+| `externalCode` (new wire field) | `code`                                                                                                                                     | Upsert match key                                                                                                                 |
+| `availability`                  | `resolveAvailability`: urgent WO/WR event → 5; planned → 4; `stop_assets`/`initial_date_out_of_service` → 1; `available:false` → 5; else 0 | Work events reach the sync via `MapOptions.work` (Phase 1 wires live WO/WR fetching); the import merges dump events the same way |
+| `compliance`                    | derived: open/corrective work order on the asset - endpoint TBD                                                                            | **Unmapped**: needs the work-order contract + fixture review                                                                     |
+| `criticality`                   | `priorities_description` → map, unknown defaults to `Não Crítica` + warning                                                                | listed in the run report (`mappingWarnings`), never a silent guess                                                               |
+| `category`                      | `groups_1_description`/`groups_description` keyword scope                                                                                  | import creates the row; sync skips unmapped labels                                                                               |
+| `location`                      | `location_code` (sync) / L2 station parse of `parent_description` (import)                                                                 | station grouping; sync skips unknown codes                                                                                       |
+| `tag` (barcode label)           | `description` falling back to `code`                                                                                                       | display tag                                                                                                                      |
+| excluded rows                   | `EXCLUDED_EXTERNAL_CODES`                                                                                                                  | known mislabels (e.g. a transmitter tagged `Válvula`) skip with a report count, never silently                                   |
 
 **Unmapped values are listed explicitly in `scripts/fixtures/README.md`**
 and in the capture report (count per unrecognized `groups_*`/`priorities`
@@ -106,9 +114,10 @@ Pipeline: quoted raw rows → parse (`parsePage`, malformed listed) → map
 (`mapAsset`, label→id exact resolution, skip+reason on unmapped) → pure
 reconcile plan → apply (or dry-run report) → `sync_state` audit row.
 
-- `lib/server/fracttal/map.ts` - `availabilityFromAsset` (unavailable →
-  Indisponível id 5, else Disponível id 0) + `IMPORT_DEFAULTS`
-  (`typologyId=3`, `groupingId=0`, `locDescId=0`, `ownerId=null`).
+- `lib/server/fracttal/map.ts` - `mapAsset` (scope filter, exact
+  label→id resolution, criticality default + warning, typology derived
+  from the parent chain, `MapOptions.work`/`today` for events and
+  deterministic runs) + `availabilityFromAsset` (asset-flag-only wrapper).
   Unmapped labels are listed in the run report, never guessed.
 - `lib/server/fracttal/sync.ts` - `planReconcile` (pure) + `runSync`
   (orchestrator). Change detection via a stored `signature` (see module
