@@ -85,16 +85,16 @@ Fracttal assets expose `active` and `available` plus operational fields;
 there is **no direct compliance field**, so compliance stays derived
 (never written) on both sides.
 
-| App concept                     | Fracttal source (both paths)                                                                                                               | Notes                                                                                                                            |
-| ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------- |
-| `externalCode` (new wire field) | `code`                                                                                                                                     | Upsert match key                                                                                                                 |
-| `availability`                  | `resolveAvailability`: urgent WO/WR event → 5; planned → 4; `stop_assets`/`initial_date_out_of_service` → 1; `available:false` → 5; else 0 | Work events reach the sync via `MapOptions.work` (Phase 1 wires live WO/WR fetching); the import merges dump events the same way |
-| `compliance`                    | derived: open/corrective work order on the asset - endpoint TBD                                                                            | **Unmapped**: needs the work-order contract + fixture review                                                                     |
-| `criticality`                   | `priorities_description` → map, unknown defaults to `Não Crítica` + warning                                                                | listed in the run report (`mappingWarnings`), never a silent guess                                                               |
-| `category`                      | `groups_1_description`/`groups_description` keyword scope                                                                                  | import creates the row; sync skips unmapped labels                                                                               |
-| `location`                      | `location_code` (sync) / L2 station parse of `parent_description` (import)                                                                 | station grouping; sync skips unknown codes                                                                                       |
-| `tag` (barcode label)           | `description` falling back to `code`                                                                                                       | display tag                                                                                                                      |
-| excluded rows                   | `EXCLUDED_EXTERNAL_CODES`                                                                                                                  | known mislabels (e.g. a transmitter tagged `Válvula`) skip with a report count, never silently                                   |
+| App concept                     | Fracttal source (both paths)                                                                                                               | Notes                                                                                                                                                                              |
+| ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `externalCode` (new wire field) | `code`                                                                                                                                     | Upsert match key                                                                                                                                                                   |
+| `availability`                  | `resolveAvailability`: urgent WO/WR event → 5; planned → 4; `stop_assets`/`initial_date_out_of_service` → 1; `available:false` → 5; else 0 | Work events come from live `GET /work_orders` + `/work_requests` (one bounded page each per run, merged per code by `buildWorkEvents`); the import merges dump events the same way |
+| `compliance`                    | derived: open/corrective work order on the asset - endpoint TBD                                                                            | **Unmapped**: needs the work-order contract + fixture review                                                                                                                       |
+| `criticality`                   | `priorities_description` → map, unknown defaults to `Não Crítica` + warning                                                                | listed in the run report (`mappingWarnings`), never a silent guess                                                                                                                 |
+| `category`                      | `groups_1_description`/`groups_description` keyword scope                                                                                  | import creates the row; sync skips unmapped labels                                                                                                                                 |
+| `location`                      | `location_code` (sync) / L2 station parse of `parent_description` (import)                                                                 | station grouping; sync skips unknown codes                                                                                                                                         |
+| `tag` (barcode label)           | `description` falling back to `code`                                                                                                       | display tag                                                                                                                                                                        |
+| excluded rows                   | `EXCLUDED_EXTERNAL_CODES`                                                                                                                  | known mislabels (e.g. a transmitter tagged `Válvula`) skip with a report count, never silently                                                                                     |
 
 **Unmapped values are listed explicitly in `scripts/fixtures/README.md`**
 and in the capture report (count per unrecognized `groups_*`/`priorities`
@@ -123,7 +123,16 @@ reconcile plan → apply (or dry-run report) → `sync_state` audit row.
   (orchestrator). Change detection via a stored `signature` (see module
   comment; ORDER IS PART OF THE CONTRACT). Dry-run is the default; nothing
   is written without an explicit flag. Restores reappearing rows, flags
-  `statusChanged` on availability flips.
+  `statusChanged` on availability flips. `SyncOptions.workEvents` carries
+  prebuilt per-code work signals into `mapAsset`; the caller fetches them
+  BEFORE runSync starts, so a work-endpoint failure aborts with zero
+  writes (fail-closed) instead of decaying statuses.
+- `lib/server/fracttal/work.ts` - live work signals: `parseWorkOrder` /
+  `parseWorkRequest` validators, `workOrderSlot` / `workRequestSlot`
+  (same open/closed gates and classifiers as the import), `buildWorkEvents`
+  (per-code merge; malformed rows listed, never thrown), `resolverFor`.
+  `source_updated_at` is the winning work-event date, else the
+  out-of-service date, else null.
 - `lib/server/sql/sync.ts` - the default `SyncIo`: builds label→id context
   from the lookup tables, loads scoped locals, applies the plan (inserts via
   `INSERT ... ON CONFLICT (external_code) DO NOTHING` - the UNIQUE constraint
@@ -171,15 +180,24 @@ reconcile plan → apply (or dry-run report) → `sync_state` audit row.
 Run shapes:
 
 ```
-# fixture dry-run (default; needs DATABASE_URL for local reconcile)
+// fixture dry-run (default; needs DATABASE_URL for local reconcile)
 deno run -A scripts/fracttal-sync.ts --fixture scripts/fixtures/fracttal-assets-sample.json
 # same but writing
 deno run -A scripts/fracttal-sync.ts --fixture <path> --apply
+# fixture plus the work-order status pass
+deno run -A scripts/fracttal-sync.ts --work-fixture scripts/fixtures/fracttal-work-sample.json
 # live, reviewed prod session only, one station, single bounded GET
 deno run -A scripts/fracttal-sync.ts --live --location-code FAL --scope prod:fal --dry-run
 # polling cadence (env-driven; needs FRACTTAL_KEY/SECRET + DATABASE_URL)
 FRACTTAL_SYNC_SCOPES=FAL deno run -A scripts/fracttal-poll.ts
 ```
+
+The live status pass fetches one recent page (100 rows) each of
+`/work_orders` and `/work_requests` per scope run and matches rows to
+barriers by asset code. This keeps actively-changing statuses fresh
+between rebuilds; a full backfill is the import rebuild, not the poll
+loop. Optional `FRACTTAL_WORK_DATE_GTE` forwards a `date[gte]` floor to
+the work-orders fetch.
 
 ## Out of scope here
 
