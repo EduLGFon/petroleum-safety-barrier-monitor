@@ -199,6 +199,50 @@ between rebuilds; a full backfill is the import rebuild, not the poll
 loop. Optional `FRACTTAL_WORK_DATE_GTE` forwards a `date[gte]` floor to
 the work-orders fetch.
 
+## Import vs sync precedence (both live, scoped)
+
+The dump import owns catalog rebuilds; the live sync owns the rows between
+rebuilds. When they disagree, this table wins:
+
+| Concern                   | Import rebuild (`--apply`)                           | Live sync (between rebuilds)                            |
+| ------------------------- | ---------------------------------------------------- | ------------------------------------------------------- |
+| locations/categories rows | creates from the dump taxonomy                       | never creates; unknown labels skip + list in the report |
+| barrier set               | truncates + rebuilds (scope filter + exclusion list) | upserts by `external_code`, soft-deletes scoped-absent  |
+| availability              | full dump WO/WR merge                                | asset flag + bounded recent WO page                     |
+| `tag`/typology            | derived from description / parent chain              | same rules; updates applied on change                   |
+| criticality               | default `Não Crítica`                                | default `Não Crítica` + warning                         |
+| history                   | one import stamp per barrier                         | appends on real change via `record_status_change()`     |
+| audit                     | one `dump-import` row                                | per-scope `running/ok/failed` rows                      |
+
+Rebuild when: a new dump arrives, the taxonomy needs an overhaul, or a
+backfill must reconcile every scope (see below).
+
+## Scope fetch and backfill procedure
+
+One shared assembly (`fetchScopeSignals`) drives every live run: item
+pages paginate to the envelope total (`FRACTTAL_SYNC_MAX_PAGES`, default
+40 x 100 rows), `assertCompletePage` throws on any truncation, and the
+bounded work pass merges after the guard. A truncated scope or a
+work-endpoint failure aborts before `runSync` with zero writes; a
+too-small page cap fails loudly (raise the cap and rerun, never bypass
+the guard).
+
+Rate math: worst case per scope per tick is maxPages item GETs + 2 work
+GETs (FAL needs ~13 today). Keep `FRACTTAL_SYNC_SCOPES` to the stations
+you operate and the 200 req/min/IP ceiling is never close.
+
+Backfill after an outage or before trusting a scope:
+
+1. `deno run -A --env-file=.env scripts/fracttal-sync.ts --live
+   --location-code <STATION> --scope backfill:<STATION> --dry-run
+   --pages 40` (report only; aborts loudly when truncated).
+2. Rerun with `--apply`; confirm `sync_state` shows `ok` with
+   deletes near zero.
+3. Reconcile against the import baseline per station:
+   `select l.code, count(*) from barriers b join locations l on
+   l.id = b.location_id where b.deleted_at is null group by l.code
+   order by 2 desc;`
+
 ## Out of scope here
 
 - Webhook receiver (polling first; webhooks only if Fracttal supports them,
