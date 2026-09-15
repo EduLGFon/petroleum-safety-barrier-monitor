@@ -62,7 +62,7 @@ Deno.test("mapAsset resolves labels case-insensitively and applies defaults", ()
   const mapped = mapAsset(asset(), ctx);
   if (!mapped.ok) throw new Error("expected ok");
   assertStrictEquals(mapped.input.externalCode, "FAL-EQ-001");
-  assertStrictEquals(mapped.input.tag, "FAL-EQ-001");
+  assertStrictEquals(mapped.input.tag, "teste");
   assertStrictEquals(mapped.input.locationId, 1);
   assertStrictEquals(mapped.input.categoryId, 7);
   assertStrictEquals(mapped.input.criticalityId, 1);
@@ -73,6 +73,7 @@ Deno.test("mapAsset resolves labels case-insensitively and applies defaults", ()
   assertStrictEquals(mapped.input.comments, "");
   assertStrictEquals(mapped.input.actionPlan, "");
   assertStrictEquals(mapped.input.sourceUpdatedAt, null);
+  assertStrictEquals(mapped.warnings.length, 0);
 });
 
 Deno.test("mapAsset falls back to groups_description when groups_1 is absent", () => {
@@ -106,14 +107,69 @@ Deno.test("mapAsset skips unknown locations", () => {
 
 Deno.test("mapAsset skips unmapped category labels", () => {
   expectSkip(
-    mapAsset(asset({ groups_1_description: "Typo Isolada" }), ctx),
+    mapAsset(asset({ groups_1_description: "Válvula Inexistente" }), ctx),
     "unmapped category",
   );
 });
 
-Deno.test("mapAsset skips unmapped criticality labels", () => {
-  expectSkip(
-    mapAsset(asset({ priorities_description: "Sem Prioridade" }), ctx),
-    "unmapped criticality",
+Deno.test("mapAsset defaults unknown criticality with a warning", () => {
+  const mapped = mapAsset(
+    asset({ priorities_description: "Sem Prioridade" }),
+    ctx,
   );
+  if (!mapped.ok) throw new Error("expected ok");
+  assertStrictEquals(mapped.input.criticalityId, 0);
+  assertStrictEquals(mapped.warnings.length, 1);
+});
+
+Deno.test("mapAsset derives typology from the parent chain", () => {
+  const mapped = mapAsset(
+    asset({
+      parent_description: "// Seacrest/ Área/ CAMPO - SM/ COMPRESSOR A",
+    }),
+    ctx,
+  );
+  if (!mapped.ok) throw new Error("expected ok");
+  assertStrictEquals(mapped.input.typologyId, 4);
+});
+
+Deno.test("mapAsset maps work events to status plus comments", () => {
+  const mapped = mapAsset(
+    asset(),
+    ctx,
+    {
+      work: { planned: { date: "2026-09-11", source: "OS - 1: fix" } },
+      today: "2026-09-15",
+    },
+  );
+  if (!mapped.ok) throw new Error("expected ok");
+  assertStrictEquals(mapped.input.availabilityId, 4);
+  assertStrictEquals(mapped.input.comments, "OS - 1: fix");
+});
+
+Deno.test("mapAsset maps out-of-service dates to Fora de Operação", () => {
+  const mapped = mapAsset(
+    asset({ initial_date_out_of_service: "2026-08-01T00:00:00" }),
+    ctx,
+    { today: "2026-09-15" },
+  );
+  if (!mapped.ok) throw new Error("expected ok");
+  assertStrictEquals(mapped.input.availabilityId, 1);
+});
+
+Deno.test("mapAsset skips rows outside the barrier scope", () => {
+  expectSkip(
+    mapAsset(
+      asset({
+        groups_1_description: "Bomba",
+        groups_description: "Bomba",
+      }),
+      ctx,
+    ),
+    "not barrier scope",
+  );
+});
+
+Deno.test("mapAsset skips excluded source rows with the reason", () => {
+  expectSkip(mapAsset(asset({ code: "1013971" }), ctx), "excluded asset");
 });

@@ -165,6 +165,7 @@ export interface SyncResult {
   parsed: number;
   malformed: Array<{ index: number; reason: string }>;
   mappingSkips: Array<{ code: string; reason: string }>;
+  mappingWarnings: Array<{ code: string; warning: string }>;
   plan: SyncPlan;
   written: PlanCounts | null;
   runId: number | null;
@@ -211,6 +212,7 @@ export async function runSync(
     parsed: 0,
     malformed: [],
     mappingSkips: [],
+    mappingWarnings: [],
     plan: emptyPlan,
     written: null,
     runId,
@@ -243,15 +245,20 @@ export async function runSync(
     const ctx = await io.buildMapContext();
     const inputs: SyncBarrierInput[] = [];
     const mappingSkips: Array<{ code: string; reason: string }> = [];
+    const mappingWarnings: Array<{ code: string; warning: string }> = [];
     for (const item of parsed.items) {
       const mapped = mapAsset(item, ctx);
       if (mapped.ok) {
         inputs.push(mapped.input);
+        for (const warning of mapped.warnings) {
+          mappingWarnings.push({ code: item.code, warning });
+        }
       } else {
         mappingSkips.push({ code: item.code, reason: mapped.reason });
       }
     }
     baseResult.mappingSkips = mappingSkips;
+    baseResult.mappingWarnings = mappingWarnings;
 
     const scopeLocationIds = [...new Set(inputs.map((i) => i.locationId))];
     const local = await io.loadLocal(scopeLocationIds);

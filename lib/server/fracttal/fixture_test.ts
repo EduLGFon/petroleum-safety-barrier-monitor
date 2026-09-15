@@ -63,7 +63,8 @@ Deno.test("fixture maps to 3 inserts and 2 deliberate skips", async () => {
   assertStrictEquals(plan.counts.deletes, 0);
   assertStrictEquals(plan.counts.skips, 0);
 
-  // FAL-EQ-002 is unavailable -> Indisponível.
-  const unavailable = inputs.find((i) => i.externalCode === "FAL-EQ-002");
-  assertStrictEquals(unavailable?.availabilityId, 5);
+  // FAL-EQ-002 carries an explicit out-of-service date, which outranks the
+  // bare unavailable flag under the shared precedence -> Fora de Operação.
+  const outOfService = inputs.find((i) => i.externalCode === "FAL-EQ-002");
+  assertStrictEquals(outOfService?.availabilityId, 1);
 });

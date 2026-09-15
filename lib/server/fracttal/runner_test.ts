@@ -15,6 +15,7 @@ function okResult(): SyncResult {
     parsed: 1,
     malformed: [],
     mappingSkips: [],
+    mappingWarnings: [],
     plan: {
       entries: [],
       counts: { inserts: 1, updates: 0, deletes: 0, skips: 0 },
