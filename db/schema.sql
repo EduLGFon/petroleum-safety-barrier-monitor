@@ -1,10 +1,16 @@
 -- ═══════════════════════════════════════════════════════════════════════════
 -- SCHEMA - Safety Barrier Monitor
 -- ═══════════════════════════════════════════════════════════════════════════
--- Every lookup table's ids are a hard contract with the frontend's
--- lib/enums.ts resolvers (fromXId/toXId) - a given id must mean the exact
--- same thing on both sides. Rows are seeded by db/seed_lookups.sql with the
--- ids matching lib/enums.ts exactly; do not renumber existing rows.
+-- Every STATIC lookup table's ids (availability_statuses, criticality_levels,
+-- groupings, typologies, owners, loc_descs, authors) are a hard contract with
+-- the frontend's lib/enums.ts resolvers (fromXId/toXId) - a given id must mean
+-- the exact same thing on both sides. Rows are seeded by db/seed_lookups.sql
+-- with the ids matching lib/enums.ts exactly; do not renumber existing rows.
+--
+-- locations and categories are DYNAMIC instead: they mirror the real catalog
+-- imported by scripts/fracttal-import.ts (see db/seed_lookups.sql), and the
+-- server serves those id->label maps as the vocabulary so the UI never depends
+-- on static enums for them.
 --
 -- Run this once against a fresh database:
 --   deno task db:migrate
