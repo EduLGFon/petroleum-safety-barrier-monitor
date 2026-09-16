@@ -52,9 +52,18 @@ export default define.page(function App({ Component }) {
           href="https://fonts.gstatic.com"
           crossOrigin="anonymous"
         />
+        {
+          /* Non-blocking font load: a render-blocking stylesheet from a
+          third party keeps first paint hostage when that host stalls, so
+          the page paints with system fonts first and swaps when ready. */
+        }
         <link
           href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Inter:wght@400;500;600;700&display=swap"
           rel="stylesheet"
+          media="print"
+          onLoad={(e) => {
+            e.currentTarget.media = "all";
+          }}
         />
       </head>
       <body>
