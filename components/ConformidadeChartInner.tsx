@@ -31,6 +31,11 @@ interface Props {
   // True for the aggregated Outras tail-row index (expands, never filters).
   isOutrosRow?: (index: number) => boolean;
   onExpandOutros?: () => void;
+  // Shared x-scale across side-by-side columns so bar lengths stay
+  // comparable; defaults to this column's own max when absent.
+  maxOverride?: number;
+  // Legend renders once (last column); hidden in the other columns.
+  showLegend?: boolean;
 }
 
 // ConformidadeChartInner: stacked Conforme / Não Conforme SVG bars with hover tip and density geometry.
@@ -41,6 +46,8 @@ export default function ConformidadeChartInner(
     activeCategory = "",
     isOutrosRow,
     onExpandOutros,
+    maxOverride,
+    showLegend = true,
   }: Props,
 ) {
   const [hover, setHover] = useState<
@@ -63,7 +70,7 @@ export default function ConformidadeChartInner(
       globalThis.removeEventListener("resize", hide);
     };
   }, []);
-  const max = computeMax(data);
+  const max = maxOverride ?? computeMax(data);
   const height = chartHeight(data.length, ROW_H);
   const width = chartWidth(LABEL_W);
   const ticks = buildTicks(max);
@@ -152,7 +159,7 @@ export default function ConformidadeChartInner(
       )}
       <div
         style={{
-          display: "flex",
+          display: showLegend ? "flex" : "none",
           flexWrap: "wrap",
           gap: "var(--d-gap-lg)",
           fontSize: "var(--d-small)",

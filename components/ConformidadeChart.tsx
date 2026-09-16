@@ -3,11 +3,14 @@
 // chart stays dependency-free (no dynamic import needed in Fresh).
 import type { CategoryCompliance } from "../lib/types.ts";
 import {
+  CHART_COLUMNS,
   CHART_TOP_N,
   type ChartSort,
   type ChartView,
   prepareChart,
+  splitColumns,
 } from "../lib/dashboard/chart.ts";
+import { computeMax } from "./chart/geometry.ts";
 import {
   loadChartPrefs,
   saveChartPrefs,
@@ -50,8 +53,9 @@ const VIEWS: { value: ChartView; label: string; title: string }[] = [
 ];
 
 // ConformidadeChart: glass card frame with view tabs; bars view carries the
-// search + sort toolbar over a Top-N (+Outras) SVG (expanded mode scrolls
-// the full list as before), summary view shows the executive donut.
+// search + sort toolbar over side-by-side Top-N (+Outras) columns sharing
+// one x-scale (expanded mode scrolls the full list as before), summary view
+// shows the executive donut.
 export function ConformidadeChart(
   { data, onSelectCategory, activeCategory = "" }: Props,
 ) {
@@ -74,9 +78,28 @@ export function ConformidadeChart(
       }),
     [data, expanded, searching, query, sort],
   );
-  const scroll = prepared.rows.length > SCROLL_AFTER_ROWS;
+  const scroll = Math.ceil(prepared.rows.length / CHART_COLUMNS) >
+    SCROLL_AFTER_ROWS;
   const isOutrosRow = (i: number) =>
     prepared.hidden > 0 && i === prepared.rows.length - 1;
+  // Side-by-side columns share one x-scale (global max) so bar lengths stay
+  // comparable across columns; the grid collapses to 1 column on narrow
+  // screens. Legend renders once, under the last column.
+  const columns = useMemo(
+    () => splitColumns(prepared.rows, CHART_COLUMNS),
+    [prepared.rows],
+  );
+  const sharedMax = useMemo(() => computeMax(prepared.rows), [prepared.rows]);
+  // Global row offset per column, so the Outras-row predicate (which works
+  // on overall indexes) resolves correctly inside each column slice.
+  const columned = useMemo(() => {
+    let off = 0;
+    return columns.map((rows) => {
+      const start = off;
+      off += rows.length;
+      return { rows, start };
+    });
+  }, [columns]);
   return (
     <div
       className="glass-card"
@@ -274,13 +297,28 @@ export function ConformidadeChart(
                     }
                     : undefined}
                 >
-                  <Chart
-                    data={prepared.rows}
-                    onSelectCategory={onSelectCategory}
-                    activeCategory={activeCategory}
-                    isOutrosRow={isOutrosRow}
-                    onExpandOutros={() => setExpanded(true)}
-                  />
+                  <div
+                    style={{
+                      display: "grid",
+                      gridTemplateColumns:
+                        "repeat(auto-fit, minmax(min(400px, 100%), 1fr))",
+                      gap: "0 24px",
+                      alignItems: "start",
+                    }}
+                  >
+                    {columned.map(({ rows, start }, ci) => (
+                      <Chart
+                        key={ci}
+                        data={rows}
+                        onSelectCategory={onSelectCategory}
+                        activeCategory={activeCategory}
+                        isOutrosRow={(i) => isOutrosRow(i + start)}
+                        onExpandOutros={() => setExpanded(true)}
+                        maxOverride={sharedMax}
+                        showLegend={ci === columned.length - 1}
+                      />
+                    ))}
+                  </div>
                 </div>
               )}
             {!searching && view === "bars" && data.length > CHART_TOP_N && (

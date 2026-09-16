@@ -44,9 +44,11 @@ export type ChartSort = "volume" | "ncRate" | "alpha";
 // + Top NC.
 export type ChartView = "bars" | "summary";
 
-// Default Top-N for the collapsed chart card: 10 rows + Outras fits the
-// card with no internal scroll at any density.
-export const CHART_TOP_N = 10;
+// Default Top-N for the collapsed chart card: 20 rows over 2 side-by-side
+// columns (10 each) fits the card with no internal scroll at any density.
+export const CHART_TOP_N = 20;
+// Columns in the bars view; collapses to 1 on narrow screens via CSS.
+export const CHART_COLUMNS = 2;
 // Minimum row volume to compete in ncRate sort; smaller rows sink below.
 export const CHART_MIN_VOLUME = 5;
 // Rows in the summary view's Top Não Conforme list.
@@ -165,4 +167,18 @@ export function prepareChart(
     hidden: tail.length,
     hiddenTotal: c + nc,
   };
+}
+
+// splitColumns: chunks rows into `cols` balanced columns (first columns take
+// the extra row on odd splits), preserving order. The bars view renders one
+// SVG per column side by side so twice the categories fit without scrolling.
+export function splitColumns<T>(rows: T[], cols = CHART_COLUMNS): T[][] {
+  if (rows.length === 0) return [];
+  if (cols <= 1) return [rows];
+  const per = Math.ceil(rows.length / cols);
+  const out: T[][] = [];
+  for (let i = 0; i < rows.length; i += per) {
+    out.push(rows.slice(i, i + per));
+  }
+  return out;
 }

@@ -4,6 +4,7 @@ import { assertEquals, assertStrictEquals } from "jsr:@std/assert@^1";
 import {
   computeChartData,
   prepareChart,
+  splitColumns,
   summarizeCompliance,
   truncateLabel,
 } from "./chart.ts";
@@ -153,4 +154,17 @@ Deno.test("summarizeCompliance of empty list is 100% with no top", () => {
   assertStrictEquals(s.total, 0);
   assertStrictEquals(s.pctCompliant, 100);
   assertEquals(s.topNC, []);
+});
+
+Deno.test("splitColumns chunks evenly preserving order", () => {
+  assertEquals(splitColumns([1, 2, 3, 4], 2), [[1, 2], [3, 4]]);
+});
+
+Deno.test("splitColumns gives the extra row to the first column", () => {
+  assertEquals(splitColumns([1, 2, 3, 4, 5], 2), [[1, 2, 3], [4, 5]]);
+});
+
+Deno.test("splitColumns handles empty and single-column cases", () => {
+  assertEquals(splitColumns([], 2), []);
+  assertEquals(splitColumns([1, 2], 1), [[1, 2]]);
 });
