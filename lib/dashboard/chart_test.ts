@@ -1,7 +1,12 @@
 // Unit tests for lib/dashboard/chart.ts - per-category Conforme/NC buckets.
 import { assertEquals, assertStrictEquals } from "jsr:@std/assert@^1";
 
-import { computeChartData, prepareChart, truncateLabel } from "./chart.ts";
+import {
+  computeChartData,
+  prepareChart,
+  summarizeCompliance,
+  truncateLabel,
+} from "./chart.ts";
 
 import type { Barrier } from "../types.ts";
 
@@ -124,4 +129,28 @@ Deno.test("prepareChart alpha sort is A–Z", () => {
   const data = [row("C", 1, 0), row("A", 1, 0), row("B", 1, 0)];
   const p = prepareChart(data, { sort: "alpha", limit: 0 });
   assertEquals(p.rows.map((r) => r.name), ["A", "B", "C"]);
+});
+
+Deno.test("summarizeCompliance totals and pct", () => {
+  const s = summarizeCompliance([row("A", 8, 2), row("B", 5, 5)]);
+  assertStrictEquals(s.compliant, 13);
+  assertStrictEquals(s.nonCompliant, 7);
+  assertStrictEquals(s.total, 20);
+  assertStrictEquals(s.pctCompliant, 65);
+});
+
+Deno.test("summarizeCompliance topNC is most-NC-first, clean rows excluded", () => {
+  const s = summarizeCompliance([
+    row("Clean", 10, 0),
+    row("Worst", 1, 9),
+    row("Mid", 5, 5),
+  ], 2);
+  assertEquals(s.topNC.map((r) => r.name), ["Worst", "Mid"]);
+});
+
+Deno.test("summarizeCompliance of empty list is 100% with no top", () => {
+  const s = summarizeCompliance([]);
+  assertStrictEquals(s.total, 0);
+  assertStrictEquals(s.pctCompliant, 100);
+  assertEquals(s.topNC, []);
 });

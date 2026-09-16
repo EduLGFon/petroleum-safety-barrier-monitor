@@ -1,6 +1,6 @@
 // persistence.ts - dashboard localStorage slice; split out so reducer/state stay pure and SSR-safe.
 import type { FilterState } from "../../lib/types.ts";
-import type { ChartSort } from "../../lib/dashboard/chart.ts";
+import type { ChartSort, ChartView } from "../../lib/dashboard/chart.ts";
 
 export const STORE_KEY = "barrier-dashboard";
 
@@ -39,13 +39,19 @@ export const CHART_KEY = "barrier-chart";
 export interface ChartPrefs {
   sort: ChartSort;
   expanded: boolean;
+  view: ChartView;
 }
 
 const CHART_SORTS: ChartSort[] = ["volume", "ncRate", "alpha"];
+const CHART_VIEWS: ChartView[] = ["bars", "summary"];
 
 // Loads chart prefs; SSR-safe, returns defaults on miss/error.
 export function loadChartPrefs(): ChartPrefs {
-  const fallback: ChartPrefs = { sort: "volume", expanded: false };
+  const fallback: ChartPrefs = {
+    sort: "volume",
+    expanded: false,
+    view: "bars",
+  };
   if (typeof window === "undefined") return fallback;
   try {
     const s = localStorage.getItem(CHART_KEY);
@@ -56,6 +62,9 @@ export function loadChartPrefs(): ChartPrefs {
         ? (p.sort as ChartSort)
         : fallback.sort,
       expanded: p.expanded === true,
+      view: CHART_VIEWS.includes(p.view as ChartView)
+        ? (p.view as ChartView)
+        : fallback.view,
     };
   } catch {
     return fallback;

@@ -40,11 +40,59 @@ export function truncateLabel(name: string, max = 26): string {
 // 200-item 40%-NC one); alpha = A–Z (pt-BR).
 export type ChartSort = "volume" | "ncRate" | "alpha";
 
+// ChartView: card tabs. bars = Top-N stacked rows; summary = donut + Top NC.
+// (pareto | treemap reserved for later slices.)
+export type ChartView = "bars" | "summary";
+
 // Default Top-N for the collapsed chart card: 10 rows + Outras fits the
 // card with no internal scroll at any density.
 export const CHART_TOP_N = 10;
 // Minimum row volume to compete in ncRate sort; smaller rows sink below.
 export const CHART_MIN_VOLUME = 5;
+// Rows in the summary view's Top Não Conforme list.
+export const CHART_TOP_NC = 8;
+
+export interface ComplianceSummary {
+  compliant: number;
+  nonCompliant: number;
+  total: number;
+  // 0-100, one decimal.
+  pctCompliant: number;
+  // Top CHART_TOP_NC rows with NC > 0, most NC first.
+  topNC: CategoryCompliance[];
+}
+
+// summarizeCompliance: executive totals + worst-offender list for the
+// summary view. Pure; the donut and list render it verbatim.
+export function summarizeCompliance(
+  data: CategoryCompliance[],
+  limit = CHART_TOP_NC,
+): ComplianceSummary {
+  let compliant = 0;
+  let nonCompliant = 0;
+  for (const d of data) {
+    compliant += d.Conforme;
+    nonCompliant += d["Não Conforme"];
+  }
+  const total = compliant + nonCompliant;
+  const topNC = data
+    .filter((d) => d["Não Conforme"] > 0)
+    .sort((a, b) =>
+      b["Não Conforme"] - a["Não Conforme"] ||
+      (b.Conforme + b["Não Conforme"]) - (a.Conforme + a["Não Conforme"]) ||
+      a.name.localeCompare(b.name, "pt-BR")
+    )
+    .slice(0, Math.max(0, limit));
+  return {
+    compliant,
+    nonCompliant,
+    total,
+    pctCompliant: total === 0
+      ? 100
+      : Math.round((compliant / total) * 1000) / 10,
+    topNC,
+  };
+}
 
 export interface PreparedChart {
   rows: CategoryCompliance[];
