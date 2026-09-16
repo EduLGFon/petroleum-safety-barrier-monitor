@@ -1,0 +1,59 @@
+# Barrier Monitor compose stack - Docker runtime for the integration.
+# This is why it exists: one `compose up` runs the dashboard (app) plus the
+# live Fracttal poll loop (poller) against the configured Postgres, with the
+# same image and the same boot path as local runs. Secrets live in the
+# host-side `.env` (mounted read-only, never baked into the image).
+#
+# Fresh host:
+#   cp .env.example .env        # then set DATABASE_URL + FRACTTAL_* + ADMIN_TOKEN
+#   docker compose build
+#   docker compose run --rm tools deno run -A --env-file=.env scripts/migrate.ts
+#   docker compose up -d        # app + poller
+#   curl -s localhost:8000/api/health
+name: barrier-monitor
+
+services:
+  # Dashboard + API (Fresh production bundle, reads the mounted .env).
+  app:
+    build: .
+    image: barrier-monitor:latest
+    env_file: [.env]
+    volumes:
+      - ./.env:/app/.env:ro
+    ports:
+      - "8000:8000"
+    restart: unless-stopped
+    healthcheck:
+      test: [
+        "CMD",
+        "deno",
+        "eval",
+        "const r = await fetch('http://localhost:8000/api/health'); if (!r.ok) Deno.exit(1);",
+      ]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+
+  # Live Fracttal poll loop (env-driven scopes/cadence, same image).
+  # Needs FRACTTAL_KEY/FRACTTAL_SECRET + FRACTTAL_SYNC_SCOPES in .env;
+  # without credentials it exits(2) and the restart policy retries.
+  poller:
+    image: barrier-monitor:latest
+    command: ["run", "-A", "scripts/fracttal-poll.ts"]
+    env_file: [.env]
+    volumes:
+      - ./.env:/app/.env:ro
+    restart: unless-stopped
+
+  # One-off toolbox (migrate, seed, import, sync, alerts). Never started by
+  # `compose up`; invoked explicitly, e.g.:
+  #   docker compose run --rm tools deno run -A --env-file=.env scripts/migrate.ts
+  #   docker compose run --rm -v /srv/dump:/dump tools \
+  #     deno run -A --env-file=.env scripts/fracttal-import.ts --dir /dump --apply
+  tools:
+    image: barrier-monitor:latest
+    profiles: ["tools"]
+    env_file: [.env]
+    volumes:
+      - ./.env:/app/.env:ro

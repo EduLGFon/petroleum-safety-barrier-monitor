@@ -1,0 +1,10 @@
+node_modules/
+_fresh/
+.git/
+test/
+out/
+build/
+dist/
+.env
+*.dump
+tmp/
