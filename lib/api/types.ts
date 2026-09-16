@@ -16,11 +16,31 @@ export interface BarriersApi {
   ): Promise<Barrier[]>;
   /** Fetch a single barrier by id */
   getBarrierById(id: number): Promise<Barrier | null>;
-  /** Fetch a precomputed KPI snapshot for the given scope */
-  getKpi(query: Pick<BarriersQuery, "locationId">): Promise<KpiSnapshot>;
-  /** Fetch per-category Conforme totals for the chart for the given scope */
+  /** Fetch a precomputed KPI snapshot over the given filters */
+  getKpi(
+    query: Pick<
+      BarriersQuery,
+      | "locationId"
+      | "availabilityId"
+      | "complianceId"
+      | "categoryId"
+      | "query"
+      | "since"
+      | "until"
+    >,
+  ): Promise<KpiSnapshot>;
+  /** Fetch per-category Conforme totals over the given filters */
   getChartData(
-    query: Pick<BarriersQuery, "locationId">,
+    query: Pick<
+      BarriersQuery,
+      | "locationId"
+      | "availabilityId"
+      | "complianceId"
+      | "categoryId"
+      | "query"
+      | "since"
+      | "until"
+    >,
   ): Promise<CategoryCompliance[]>;
 }
 

@@ -1,7 +1,7 @@
-// API: GET /api/kpi - KPI snapshot scoped by location.
-// This is why it exists: Fresh port of the Next route; omitted or 0
-// locationId means all installations (matches ALL=0 in lib/enums.ts).
-// Open GET, throttled, envelope errors.
+// API: GET /api/kpi - KPI snapshot over the current filters.
+// This is why it exists: Fresh port of the Next route; the snapshot honors
+// the same filter subset as the table (location, availability, compliance,
+// category, text, dates) so the header never disagrees with the grid.
 import {
   internal,
   newRequestId,
@@ -14,12 +14,12 @@ import { loadServerConfig } from "../../lib/server/config.ts";
 
 import { getKpi } from "../../lib/server/sql/barriers.ts";
 
-import { parseIntParam } from "./_params.ts";
+import { parseFilterQuery } from "./_params.ts";
 
 import { define } from "../../utils.ts";
 
 export const handler = define.handlers({
-  // GET KPI snapshot for locationId (undefined/0 = all installations).
+  // GET KPI snapshot for the given filters (all omitted = everything).
   async GET(ctx) {
     const requestId = newRequestId();
     const limit = readThrottle.check(routeClientKey(ctx));
@@ -36,10 +36,10 @@ export const handler = define.handlers({
       return internal("GET /api/kpi", err, requestId, "Server misconfigured");
     }
 
-    const locationId = parseIntParam(ctx.url.searchParams.get("locationId"));
+    const filter = parseFilterQuery(ctx.url.searchParams);
 
     try {
-      const snapshot = await getKpi(locationId);
+      const snapshot = await getKpi(filter);
       return Response.json(snapshot);
     } catch (err) {
       return internal(

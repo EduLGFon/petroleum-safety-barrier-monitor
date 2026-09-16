@@ -25,3 +25,26 @@ export function parseQueryParam(v: string | null): string | undefined {
   const trimmed = v.trim().slice(0, 200);
   return trimmed === "" ? undefined : trimmed;
 }
+
+// Reads the shared barrier filter subset (location, availability,
+// compliance, category, text, dates) that list, KPI, chart, and export all
+// honor; paging/sort stay per-route so caps differ honestly.
+export function parseFilterQuery(sp: URLSearchParams): {
+  locationId?: number;
+  availabilityId?: number;
+  complianceId?: number;
+  categoryId?: number;
+  query?: string;
+  since?: string;
+  until?: string;
+} {
+  return {
+    locationId: parseIntParam(sp.get("locationId")),
+    availabilityId: parseIntParam(sp.get("availabilityId")),
+    complianceId: parseIntParam(sp.get("complianceId")),
+    categoryId: parseIntParam(sp.get("categoryId")),
+    query: parseQueryParam(sp.get("query")),
+    since: parseDateParam(sp.get("since")),
+    until: parseDateParam(sp.get("until")),
+  };
+}

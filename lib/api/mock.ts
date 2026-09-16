@@ -109,24 +109,18 @@ export const mockAdapter: BarriersApi = {
     return Promise.resolve(w ? resolveBarriers([w])[0] : null);
   },
 
-  // Mock getKpi: filters by location and computes local KPI snapshot.
+  // Mock getKpi: filters by the full query and computes local KPI snapshot.
   getKpi(query) {
-    const all = getWireBarriers().filter((w) =>
-      query.locationId === undefined || query.locationId === 0 ||
-      w.locationId === query.locationId
-    );
+    const all = getWireBarriers().filter((w) => matchesQuery(w, query));
     return Promise.resolve({
       ...computeKpiLocal(resolveBarriers(all)),
       syncedAt: new Date().toISOString(),
     });
   },
 
-  // Mock getChartData: filters by location and computes local chart rows.
+  // Mock getChartData: filters by the full query and computes local rows.
   getChartData(query) {
-    const all = getWireBarriers().filter((w) =>
-      query.locationId === undefined || query.locationId === 0 ||
-      w.locationId === query.locationId
-    );
+    const all = getWireBarriers().filter((w) => matchesQuery(w, query));
     return Promise.resolve(computeChartData(resolveBarriers(all)));
   },
 };

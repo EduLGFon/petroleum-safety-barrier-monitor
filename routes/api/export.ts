@@ -15,7 +15,7 @@ import {
   streamExportCsv,
 } from "../../lib/server/exportCsv.ts";
 
-import { parseDateParam, parseIntParam, parseQueryParam } from "./_params.ts";
+import { parseFilterQuery } from "./_params.ts";
 
 import { exportThrottle, routeClientKey } from "../../lib/server/throttle.ts";
 
@@ -58,13 +58,7 @@ export const handler = define.handlers({
       return badRequest("format must be csv", requestId);
     }
     const query: BarriersQuery = {
-      locationId: parseIntParam(sp.get("locationId")),
-      availabilityId: parseIntParam(sp.get("availabilityId")),
-      complianceId: parseIntParam(sp.get("complianceId")),
-      categoryId: parseIntParam(sp.get("categoryId")),
-      query: parseQueryParam(sp.get("query")),
-      since: parseDateParam(sp.get("since")),
-      until: parseDateParam(sp.get("until")),
+      ...parseFilterQuery(sp),
       page: 1,
       pageSize: EXPORT_MAX_ROWS,
       sortCol: sp.get("sortCol") ?? undefined,

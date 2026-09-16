@@ -1,7 +1,7 @@
-// API: GET /api/chart - per-category Conforme totals over the filters.
-// This is why it exists: Fresh port for the server-paginated dashboard; the
-// chart honors the same filter subset as the table so it never disagrees
-// with the grid. Open GET, throttled, envelope errors.
+// API: GET /api/vocabularies - filter vocabularies for refresh cadence.
+// This is why it exists: the dashboard SSRs vocabularies once, but the
+// auto-refresh tick refetches them so new stations/categories appear
+// without a full page reload. Open GET like the other dashboard reads.
 import {
   internal,
   newRequestId,
@@ -12,14 +12,12 @@ import { readThrottle, routeClientKey } from "../../lib/server/throttle.ts";
 
 import { loadServerConfig } from "../../lib/server/config.ts";
 
-import { getChartData } from "../../lib/server/sql/chart.ts";
-
-import { parseFilterQuery } from "./_params.ts";
+import { getVocabularies } from "../../lib/server/sql/vocabularies.ts";
 
 import { define } from "../../utils.ts";
 
 export const handler = define.handlers({
-  // GET chart rows for the given filters (all omitted = everything).
+  // GET the current filter vocabularies (id-bearing locations/categories).
   async GET(ctx) {
     const requestId = newRequestId();
     const limit = readThrottle.check(routeClientKey(ctx));
@@ -34,24 +32,21 @@ export const handler = define.handlers({
       loadServerConfig();
     } catch (err) {
       return internal(
-        "GET /api/chart",
+        "GET /api/vocabularies",
         err,
         requestId,
         "Server misconfigured",
       );
     }
 
-    const filter = parseFilterQuery(ctx.url.searchParams);
-
     try {
-      const rows = await getChartData(filter);
-      return Response.json(rows);
+      return Response.json(await getVocabularies());
     } catch (err) {
       return internal(
-        "GET /api/chart",
+        "GET /api/vocabularies",
         err,
         requestId,
-        "Failed to fetch chart data",
+        "Failed to fetch vocabularies",
       );
     }
   },

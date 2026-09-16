@@ -100,15 +100,19 @@ export async function getBarriersByIds(
   return out;
 }
 
-// Computes KPI snapshot counts, optionally scoped to one location.
-// Fixed fields cover the well-known statuses; dynamic by* buckets carry
-// EVERY id present (GROUP BY) so new statuses reconcile instead of vanishing.
-export async function getKpi(locationId?: number): Promise<WireKpiSnapshot> {
-  const scoped = locationId !== undefined && locationId !== 0;
-  const scopeText = scoped
-    ? "where b.deleted_at is null and b.location_id = $1"
-    : "where b.deleted_at is null";
-  const scopeArgs: unknown[] = scoped ? [locationId] : [];
+// Computes KPI snapshot counts over the given filters (location-only callers
+// pass a bare id, which keeps the old call shape working). Fixed fields
+// cover the well-known statuses; dynamic by* buckets carry EVERY id present
+// (GROUP BY) so new statuses reconcile instead of vanishing.
+export async function getKpi(
+  filter?: number | BarriersQuery,
+): Promise<WireKpiSnapshot> {
+  const q: BarriersQuery = typeof filter === "number"
+    ? { locationId: filter }
+    : filter ?? {};
+  const where = buildWhere(q);
+  const from =
+    `from barriers b join locations loc on loc.id = b.location_id ${where.text}`;
   const [rows, dispRows, confRows, critRows] = await Promise.all([
     queryRows<{
       total: string;
@@ -133,23 +137,23 @@ export async function getKpi(locationId?: number): Promise<WireKpiSnapshot> {
         count(*) filter (where b.compliance_id = 0)::text as compliant,
         count(*) filter (where b.compliance_id = 1)::text as non_compliant,
         count(*) filter (where b.compliance_id = 1 and b.criticality_id = 1)::text as critical_non_compliant
-      from barriers b ${scopeText}`,
-      scopeArgs,
+      from barriers b join locations loc on loc.id = b.location_id ${where.text}`,
+      where.args,
     ),
     queryRows<{ id: string; count: string }>(
       `select b.availability_id::text as id, count(*)::text as count
-       from barriers b ${scopeText} group by b.availability_id`,
-      scopeArgs,
+       ${from} group by b.availability_id`,
+      where.args,
     ),
     queryRows<{ id: string; count: string }>(
       `select b.compliance_id::text as id, count(*)::text as count
-       from barriers b ${scopeText} group by b.compliance_id`,
-      scopeArgs,
+       ${from} group by b.compliance_id`,
+      where.args,
     ),
     queryRows<{ id: string; count: string }>(
       `select b.criticality_id::text as id, count(*)::text as count
-       from barriers b ${scopeText} group by b.criticality_id`,
-      scopeArgs,
+       ${from} group by b.criticality_id`,
+      where.args,
     ),
   ]);
 
