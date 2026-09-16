@@ -88,6 +88,7 @@ function ClientView(
         loading={loading}
         companyName={companyName}
         serverMode={false}
+        apiBaseUrl=""
       />
     </>
   );
@@ -150,6 +151,7 @@ function ServerView(
         loading={loading}
         companyName={companyName}
         serverMode
+        apiBaseUrl={baseUrl}
         onServerCsv={exportServerCsv}
       />
     </>

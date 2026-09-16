@@ -48,6 +48,8 @@ interface SectionsProps {
   loading: boolean;
   companyName: string;
   serverMode: boolean;
+  // Origin of the API for the header health probe. Empty = same origin.
+  apiBaseUrl?: string;
   // Server mode only: streams the full filtered set as CSV. Absent in mock
   // mode, where the toolbar exports the client-side rows instead.
   onServerCsv?: () => Promise<void>;
@@ -68,6 +70,7 @@ export function DashboardSections(
     loading,
     companyName,
     serverMode,
+    apiBaseUrl = "",
     onServerCsv,
   }: SectionsProps,
 ) {
@@ -137,6 +140,7 @@ export function DashboardSections(
         <Header
           onOpenSettings={() => setSettingsOpen(true)}
           companyName={companyName}
+          apiBaseUrl={apiBaseUrl}
         />
 
         {/* Location tabs */}
