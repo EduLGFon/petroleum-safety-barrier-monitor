@@ -83,11 +83,14 @@ DashboardView ServerView --> useServerDashboard(baseUrl)
   --> resolveBarriers/resolveKpi/resolveChartData --> render
 ```
 
-Table pages use full filters; KPI/chart scope by `locationId` only
-(`hooks/dashboard/server.ts`). Requests cancel on supersede; first load shows
-the splash, later refetches keep stale rows. `error + rows == 0` renders
-`ServerErrorCard`, otherwise `ServerErrorBanner` with retry. Export and
-detail resolution cover the loaded page only.
+Table pages use full filters; KPI/chart honor the same filter subset
+(minus paging/sort) (`hooks/dashboard/server.ts`). Requests cancel on
+supersede; first load shows the splash, later refetches keep stale rows.
+`error + rows == 0` renders `ServerErrorCard`, otherwise `ServerErrorBanner`
+with retry. A 5-minute cadence (hidden tabs skip) refreshes data plus
+vocabularies via `GET /api/vocabularies`. CSV export streams the full
+filtered set from `GET /api/export` (10k cap); xls/pdf and detail
+resolution cover the loaded page only.
 
 ## Island bridge topology
 
@@ -122,12 +125,12 @@ Full contract lives in `docs/API.md`. Summary:
   derives `compliance` via `isCompliant()`.
 - `BarriersApi` (`lib/api/types.ts`): `getBarriers`, `getAllBarriers`
   (http forces `pageSize: 100000`), `getBarrierById` (`null` only on 404),
-  `getKpi` / `getChartData` (both `locationId`-scoped).
+  `getKpi` / `getChartData` (full filter subset, minus paging/sort).
 - Routes: `GET /api/barriers`, `GET /api/barriers/:id`,
   `PATCH /api/barriers/:id/status` (bonus write path via
   `record_status_change()`), `GET /api/kpi`, `GET /api/chart`,
-  `GET /api/health` (DB-free liveness). No `/api/vocabularies` route;
-  vocabularies are SSR-only.
+  `GET /api/health` (DB-free liveness), `GET /api/vocabularies`
+  (refresh cadence; SSR still seeds the first paint).
 
 ## Persistence
 

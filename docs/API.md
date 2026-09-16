@@ -141,9 +141,12 @@ Full inventory: `barriers`, `barriers/deleted`,
 - `GET /api/barriers/deleted` (+ the same filters) → `BarriersResponse`
   with only deleted rows (soft-delete sync audit). Requires
   `ADMIN_TOKEN`; the `/api/barriers/:id` detail keeps hiding deleted ones.
-- `GET /api/kpi?locationId=1` → `WireKpiSnapshot` (only `locationId`;
-  omitted/`0` = all; remaining params ignored)
-- `GET /api/chart?locationId=1` → `WireCategoryCompliance[]` (same scope)
+- `GET /api/kpi?locationId=1&availabilityId=4&...` → `WireKpiSnapshot`
+  over the same filter subset as the table (location, availability,
+  compliance, category, text, dates; omitted = all)
+- `GET /api/chart?...` (same filter subset) → `WireCategoryCompliance[]`
+- `GET /api/vocabularies` → `Vocabularies` (id-bearing locations +
+  categories for the refresh cadence; SSR still seeds the first paint)
 - `GET /api/health` → `{ ok, time }` (liveness, no DB)
 - `GET /api/recipients` (+ `?activeOnly=1`), `POST /api/recipients`
   `{ email, name? }` (upsert by email, `201`), `PATCH /api/recipients/:id`
@@ -159,7 +162,7 @@ Every failure responds with the `{ error, code, requestId }` envelope + the
 message is fixed per route and the detail goes to the log with the `requestId`).
 
 Explicitly decided openness: **dashboard GETs are open** (`barriers`, `:id`,
-`kpi`, `chart`, `export`) - operational read data; **writes and audit require
+`kpi`, `chart`, `export`, `vocabularies`) - operational read data; **writes and audit require
 `ADMIN_TOKEN`** (`PATCH .../status`, recipients, `GET /api/barriers/deleted`).
 With no token configured, writes respond `401`.
 
@@ -169,18 +172,20 @@ In-memory throttle by remote IP (never `X-Forwarded-For`, which is forgeable):
 throttled (liveness probe). Boot validates `DATABASE_URL` with
 `PUBLIC_API_MODE=http` on the first call (`500` naming the variable).
 
-No `/api/vocabularies` route: in http mode `routes/index.tsx` SSR's
-`getVocabularies()` (`lib/server/sql/vocabularies.ts`) and delivers
-`Vocabularies { locations, availabilities, compliances, categories }`
-as an island prop. In mock mode the client derives the options via
-`useDashboardVocabularies` (`islands/dashboard/vocabularies.ts`).
+`GET /api/vocabularies` refreshes the same payload on the dashboard
+cadence (SSR still seeds the first paint in http mode via
+`routes/index.tsx`; mock mode derives options client-side via
+`useDashboardVocabularies`).
 
 In `PUBLIC_API_MODE=http` the dashboard pages through the server
 (`useServerDashboard` in `hooks/dashboard/server.ts`): pages via
 `getBarriers` (full filters), KPI via `getKpi`, and chart via
-`getChartData` (both `locationId`-only), with cancellation, loading, error
-card/banner, and retry. `getAllBarriers` in http forces `pageSize: 100000`.
-Export covers the loaded page; detail resolves from the current page.
+`getChartData` (same filter subset, minus paging/sort), with cancellation,
+loading, error card/banner, retry, a 5-minute refresh cadence (hidden tabs
+skip), and vocabulary refetch. `getAllBarriers` in http forces
+`pageSize: 100000`. CSV export streams the full filtered set from
+`GET /api/export` (10k cap); xls/pdf stay page-local; detail resolves from
+the current page.
 
 To enable:
 
@@ -250,7 +255,7 @@ toWireQuery({ location: "FAL", availability: "Degradado", page: 1 });
 | `lib/server/db.ts`                   | Lazy server-only Postgres pool (`globalThis.__barrierPool`)                               |
 | `lib/server/sql/barriers.ts`         | `listBarriers`, `getBarrierById`, `getKpi`, `transitionBarrierStatus`                     |
 | `lib/server/sql/chart.ts`            | `getChartData` (`GROUP BY category_id`)                                                   |
-| `lib/server/sql/vocabularies.ts`     | `getVocabularies()` SSR-only (no HTTP route)                                              |
+| `lib/server/sql/vocabularies.ts`     | `getVocabularies()` (SSR seed + `GET /api/vocabularies` refresh)                          |
 | `lib/server/sql/where.ts`            | `buildWhere`, `resolveOrderBy` (whitelist), `escapeLike`                                  |
 | `lib/server/sql/mappers.ts`          | `SELECT_COLUMNS`, `HISTORY_JOIN` (lateral `json_agg`), `toWireBarrier`                    |
 | `routes/api/_params.ts`              | Strict parsers (`parseInt/parseDate/parseQueryParam`); never a route (`_` prefix)         |
