@@ -12,16 +12,21 @@ Stack: Deno-only Fresh 2 + Vite + Preact islands. No ORM, no `package.json`.
 plus `fsRoutes()`. `client.ts` only imports `static/styles.css` for HMR.
 `vite.config.ts` enables `@fresh/plugin-vite`.
 
-| Task         | Command                                           | Env source                                                  |
-| ------------ | ------------------------------------------------- | ----------------------------------------------------------- |
-| `check`      | `deno fmt --check . && deno lint . && deno check` | none                                                        |
-| `test`       | `deno test .`                                     | shell only (pure modules)                                   |
-| `dev`        | `vite`                                            | shell only, no `--env-file`; `export $(cat .env \| xargs)`  |
-| `build`      | `vite build`                                      | shell at build time; request-time env still needed at serve |
-| `preview`    | `deno serve -A _fresh/server.js`                  | shell only, no `--env-file`                                 |
-| `start`      | `deno serve --env-file=.env -A _fresh/server.js`  | `.env`                                                      |
-| `db:migrate` | `deno run -A --env-file=.env scripts/migrate.ts`  | `.env` (`DATABASE_URL`)                                     |
-| `db:seed`    | `deno run -A --env-file=.env scripts/seed.ts`     | `.env` (`DATABASE_URL`)                                     |
+| Task                            | Command                                                  | Env source                                                  |
+| ------------------------------- | -------------------------------------------------------- | ----------------------------------------------------------- |
+| `check`                         | `deno fmt --check . && deno lint . && deno check`        | none                                                        |
+| `test`                          | `deno test .`                                            | shell only (pure modules)                                   |
+| `dev`                           | `vite`                                                   | shell only, no `--env-file`; `export $(cat .env \| xargs)`  |
+| `build`                         | `vite build`                                             | shell at build time; request-time env still needed at serve |
+| `preview`                       | `deno serve -A _fresh/server.js`                         | shell only, no `--env-file`                                 |
+| `start`                         | `deno serve --env-file=.env -A _fresh/server.js`         | `.env`                                                      |
+| `db:migrate`                    | `deno run -A --env-file=.env scripts/migrate.ts`         | `.env` (`DATABASE_URL`)                                     |
+| `db:seed`                       | `deno run -A --env-file=.env scripts/seed.ts`            | `.env` (`DATABASE_URL`)                                     |
+| `fracttal:import`               | `deno run -A --env-file=.env scripts/fracttal-import.ts` | `.env` (`DATABASE_URL`)                                     |
+| `fracttal:sync`                 | `deno run -A --env-file=.env scripts/fracttal-sync.ts`   | `.env` (`DATABASE_URL` + `FRACTTAL_*` live)                 |
+| `fracttal:poll`                 | `deno run -A scripts/fracttal-poll.ts`                   | shell only (`FRACTTAL_*`, like `dev`)                       |
+| `fracttal:capture` / `:extract` | read-only live probes                                    | shell only (`FRACTTAL_*`)                                   |
+| `alerts:check`                  | `deno run -A --env-file=.env scripts/alerts-check.ts`    | `.env` (`DATABASE_URL` + `OPS_*`)                           |
 
 `build` emits `_fresh/server.js` + `_fresh/server/` + `_fresh/client/`.
 `COMPANY_NAME` is read per request, not baked at build time.

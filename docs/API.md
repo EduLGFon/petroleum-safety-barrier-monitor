@@ -291,6 +291,39 @@ See **docs/DATABASE.md** for the full schema and setup walkthrough, and
 
 ## Operations (P5)
 
+### Docker runtime (primary)
+
+```bash
+cp .env.example .env   # set DATABASE_URL + FRACTTAL_* + ADMIN_TOKEN (+ OPS_*)
+docker compose build
+docker compose run --rm tools deno run -A --env-file=.env scripts/migrate.ts
+docker compose up -d                       # app + poller
+curl -s localhost:8000/api/health          # {"ok":true,...}
+docker compose ps                          # both healthy / running
+```
+
+- Config comes from the host `.env` (mounted read-only, never baked into
+  the image - see `.dockerignore`). `deno task fracttal:*` shortcuts mirror
+  the scripts for local runs.
+- Alert digest stays a host cron calling into the stack (every 15 min):
+  `*/15 * * * * cd /opt/barrier-monitor && docker compose run --rm tools
+  deno run -A --env-file=.env scripts/alerts-check.ts --apply
+  >> /var/log/alerts.log 2>&1`(drop`--apply` for a dry-run).
+- Backup stays a host cron (`pg_dump "$DATABASE_URL" -Fc`), verified by
+  restore into an empty DB with identical `barriers` /
+  `barrier_status_history` counts (see below).
+
+Drills (acceptance):
+
+- Kill-poller: `docker kill <poller-container>` → `unless-stopped` restarts
+  it; `docker compose logs poller` shows the cadence resuming, and a missed
+  tick is just a gap (the next tick reconciles; nothing half-written).
+- Rollback to mock: set `PUBLIC_API_MODE=mock` in `.env`, then
+  `docker compose up -d --force-recreate app` (the client returns to the
+  deterministic generator; the DB is untouched).
+
+### Systemd runtime (alternative, no Docker)
+
 Service (`deno task start` reads `.env`):
 
 ```ini

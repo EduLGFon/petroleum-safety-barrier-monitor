@@ -33,6 +33,17 @@ deno task db:seed
 deno task dev   # or: deno task start (reads .env), deno task preview (shell only)
 ```
 
+Docker path (same steps inside the stack - the image carries no secrets,
+the host `.env` is mounted read-only):
+
+```bash
+cp .env.example .env   # set DATABASE_URL (+ FRACTTAL_*, ADMIN_TOKEN)
+docker compose build
+docker compose run --rm tools deno run -A --env-file=.env scripts/migrate.ts
+docker compose run --rm tools deno run -A --env-file=.env scripts/fracttal-import.ts --dir /dump   # dry report; add --apply to write (mount the dump with -v /srv/dump:/dump)
+docker compose up -d
+```
+
 `deno task db:migrate` and `deno task db:seed` are idempotent: running again
 duplicates nothing. To reseed from scratch: `deno task db:seed -- --force`
 (this truncates `barriers`/`barrier_status_history` with
