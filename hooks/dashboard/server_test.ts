@@ -78,6 +78,29 @@ Deno.test("useServerDashboard refetches on scope change", async () => {
   assertStrictEquals(hh.get().kpi.total > 0, true);
 });
 
+Deno.test("useServerDashboard sends full filters to kpi and chart", async () => {
+  const kpiQueries: BarriersQuery[] = [];
+  const spy: BarriersApi = {
+    ...mockAdapter,
+    getKpi(q) {
+      kpiQueries.push(q);
+      return mockAdapter.getKpi(q);
+    },
+  };
+  const hh = await renderHook(useServerDashboard, { args: [BASE, "ALL", spy] });
+  await waitFor(() => hh.get().rows.length > 0);
+  hh.get().setFilter({ availability: "Degradado", since: "2026-01-01" });
+  await waitFor(() =>
+    kpiQueries.some((q) => q.availabilityId === 4 && q.since === "2026-01-01")
+  );
+  const kpi = hh.get().kpi;
+  const expected = await mockAdapter.getKpi({
+    availabilityId: 4,
+    since: "2026-01-01",
+  });
+  assertStrictEquals(kpi.total, expected.total);
+});
+
 Deno.test("useServerDashboard surfaces a fetch failure and clears loading", async () => {
   const fail: BarriersApi = {
     getBarriers: () => Promise.reject(new Error("boom")),

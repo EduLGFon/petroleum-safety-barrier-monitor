@@ -93,7 +93,8 @@ function ClientView(
   );
 }
 
-// ServerView: HTTP-mode dashboard paging from the API per scope change.
+// ServerView: HTTP-mode dashboard paging from the API per scope change,
+// refreshing data + vocabularies on a 5-minute cadence (hidden tabs skip).
 function ServerView(
   { baseUrl, vocabularies, companyName, defaultLocation }: {
     baseUrl: string;
@@ -109,8 +110,13 @@ function ServerView(
     defaultLocation,
     undefined,
     vocabularies,
+    300_000,
   );
-  const { loading, error, retry, rows } = dash;
+  const { loading, error, retry, rows, liveVocabularies, exportServerCsv } =
+    dash;
+  // Live vocabulary wins once the cadence refreshes it; the SSR seed covers
+  // the first paint so tabs never flash empty.
+  const vocab = liveVocabularies ?? vocabularies;
 
   // Fade the shell in once the first scope resolves; later refetches keep
   // showing stale data instead of flashing the splash on every keystroke.
@@ -135,15 +141,16 @@ function ServerView(
       <DashboardSections
         dash={dash}
         barriers={[]}
-        stations={vocabularies?.locations}
-        total={vocabularies?.locations?.reduce((sum, s) => sum + s.count, 0)}
-        dispOpts={vocabularies?.availabilities ?? []}
-        confOpts={vocabularies?.compliances ?? []}
-        catOpts={vocabularies?.categories.map((c) => c.label) ?? []}
+        stations={vocab?.locations}
+        total={vocab?.locations?.reduce((sum, s) => sum + s.count, 0)}
+        dispOpts={vocab?.availabilities ?? []}
+        confOpts={vocab?.compliances ?? []}
+        catOpts={vocab?.categories.map((c) => c.label) ?? []}
         visible={shown}
         loading={loading}
         companyName={companyName}
         serverMode
+        onServerCsv={exportServerCsv}
       />
     </>
   );

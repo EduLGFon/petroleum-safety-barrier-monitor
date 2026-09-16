@@ -28,16 +28,19 @@ import { LOCATIONS } from "../../lib/constants.ts";
 import { computeKpi } from "../../lib/utils.ts";
 
 // Server-driven dashboard store; same 22-key contract as useDashboard plus
-// loading/error/retry. Export covers the current page only (see note below).
+// loading/error/retry. CSV export covers the full filtered set via the
+// server endpoint (xls/pdf stay page-local client exports).
 // adapterOverride lets tests inject a fake BarriersApi; callers using the real
 // HTTP path stay untouched (it is just httpAdapterFactory(baseUrl)).
 // vocabularies (server-provided) supply dynamic station/category id maps so
-// imported values beyond the seed enums resolve and filter by id.
+// imported values beyond the seed enums resolve and filter by id; refreshMs
+// polls data + vocabularies on a cadence (0 disables, skips hidden tabs).
 export function useServerDashboard(
   baseUrl: string,
   defaultLocation = "ALL",
   adapterOverride?: BarriersApi,
   vocabularies?: Vocabularies | null,
+  refreshMs = 0,
 ) {
   const {
     location,
@@ -58,31 +61,38 @@ export function useServerDashboard(
     toggleSelect,
     clearAll,
   } = useSelection();
-  // Dynamic id<->label maps derived once from the server vocabulary; null in
-  // mock mode or until vocabularies arrive, where static enums alone apply.
+  // Dynamic id<->label maps derived from the live vocabulary (SSR seed,
+  // refreshed on cadence); null in mock mode, where static enums apply.
+  const [liveVocab, setLiveVocab] = useState<Vocabularies | null>(
+    vocabularies ?? null,
+  );
+  // Picks up a fresh SSR vocabulary if the prop ever changes (navigation).
+  useEffect(() => {
+    if (vocabularies) setLiveVocab(vocabularies);
+  }, [vocabularies]);
   const idMaps = useMemo(
     () =>
-      vocabularies
+      liveVocab
         ? {
           resolve: {
             locations: Object.fromEntries(
-              vocabularies.locations.map((l) => [l.id, l.code]),
+              liveVocab.locations.map((l) => [l.id, l.code]),
             ) as Record<number, string>,
             categories: Object.fromEntries(
-              vocabularies.categories.map((c) => [c.id, c.label]),
+              liveVocab.categories.map((c) => [c.id, c.label]),
             ) as Record<number, string>,
           },
           query: {
             locationIds: Object.fromEntries(
-              vocabularies.locations.map((l) => [l.code, l.id]),
+              liveVocab.locations.map((l) => [l.code, l.id]),
             ) as Record<string, number>,
             categoryIds: Object.fromEntries(
-              vocabularies.categories.map((c) => [c.label, c.id]),
+              liveVocab.categories.map((c) => [c.label, c.id]),
             ) as Record<string, number>,
           },
         }
         : null,
-    [vocabularies],
+    [liveVocab],
   );
   const adapter = useMemo(
     () => adapterOverride ?? httpAdapterFactory(baseUrl, idMaps?.resolve),
@@ -117,7 +127,8 @@ export function useServerDashboard(
   }, [location, filters, hydrated, selectedIds, openId]);
 
   // Fetch page + KPI + chart on scope change; superseded responses are
-  // dropped via cancellation so fast typing never renders stale data.
+  // dropped via cancellation so fast typing never renders stale data. KPI
+  // and chart honor the same filters as the table (minus paging/sort).
   useEffect(() => {
     if (!hydrated) return;
     let cancelled = false;
@@ -129,15 +140,26 @@ export function useServerDashboard(
       compliance: filters.compliance || undefined,
       category: filters.category || undefined,
       query: filters.query || undefined,
+      since: filters.since || undefined,
+      until: filters.until || undefined,
       page: filters.page,
       pageSize: filters.pageSize,
       sortCol: filters.sortCol,
       sortDir: filters.sortDir,
     }, idMaps?.query);
+    const scope = {
+      locationId: wq.locationId,
+      availabilityId: wq.availabilityId,
+      complianceId: wq.complianceId,
+      categoryId: wq.categoryId,
+      query: wq.query,
+      since: wq.since,
+      until: wq.until,
+    };
     Promise.all([
       adapter.getBarriers(wq),
-      adapter.getKpi({ locationId: wq.locationId }),
-      adapter.getChartData({ locationId: wq.locationId }),
+      adapter.getKpi(scope),
+      adapter.getChartData(scope),
     ]).then(([page, snapshot, chart]) => {
       if (cancelled) return;
       setItems(page.items);
@@ -200,6 +222,70 @@ export function useServerDashboard(
   // Retries the current scope after a fetch failure.
   const retry = useCallback(() => setReloadKey((k) => k + 1), []);
 
+  // Cadence refresh: re-fires data + vocabulary on an interval; hidden tabs
+  // skip the tick (no background churn) and refetch on return via reload.
+  useEffect(() => {
+    if (!refreshMs || refreshMs <= 0 || !hydrated) return;
+    const timer = setInterval(() => {
+      if (typeof document !== "undefined" && document.hidden) return;
+      setReloadKey((k) => k + 1);
+      if (!baseUrl) return;
+      fetch(`${baseUrl}/api/vocabularies`, {
+        headers: { "Accept": "application/json" },
+      }).then((res) => {
+        if (!res.ok) return;
+        return res.json() as Promise<Vocabularies>;
+      }).then((v) => {
+        if (v) setLiveVocab(v);
+      }).catch(() => {
+        // Vocabulary refresh is best-effort; the data reload above stands.
+      });
+    }, refreshMs);
+    return () => clearInterval(timer);
+  }, [refreshMs, hydrated, baseUrl]);
+
+  // Exports the full filtered set as CSV through the server endpoint (the
+  // 10k cap and over-cap message come from the server, surfaced by the
+  // toolbar). xls/pdf stay client-side page exports.
+  const exportServerCsv = useCallback(async () => {
+    if (!baseUrl) throw new Error("Exportação indisponível (sem baseUrl)");
+    const wq = toWireQuery({
+      location,
+      availability: filters.availability || undefined,
+      compliance: filters.compliance || undefined,
+      category: filters.category || undefined,
+      query: filters.query || undefined,
+      since: filters.since || undefined,
+      until: filters.until || undefined,
+      page: 1,
+      pageSize: 10000,
+      sortCol: filters.sortCol,
+      sortDir: filters.sortDir,
+    }, idMaps?.query);
+    const qs = new URLSearchParams({ format: "csv" });
+    for (const [k, v] of Object.entries(wq)) {
+      if (v !== undefined && v !== "") qs.set(k, String(v));
+    }
+    const res = await fetch(`${baseUrl}/api/export?${qs.toString()}`);
+    if (!res.ok) {
+      let detail = `HTTP ${res.status}`;
+      try {
+        const body = await res.json() as { error?: string };
+        if (body.error) detail = body.error;
+      } catch {
+        // Non-JSON error body; keep the status text.
+      }
+      throw new Error(detail);
+    }
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `barreiras-${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }, [baseUrl, location, filters, idMaps]);
+
   return {
     location,
     locationDetails,
@@ -207,8 +293,8 @@ export function useServerDashboard(
     kpi,
     chartData,
     rows: items,
-    // Export covers the loaded page in server mode (full-dataset export
-    // stays a mock-mode capability until a server export endpoint exists).
+    // Export covers the loaded page, except CSV which streams the full
+    // filtered set from the server (see exportServerCsv).
     allFiltered: items,
     filteredTotal: total,
     totalPages: pages,
@@ -228,5 +314,8 @@ export function useServerDashboard(
     loading,
     error,
     retry,
+    exportServerCsv,
+    // Live vocabulary (SSR seed, refreshed on cadence) for tabs and counts.
+    liveVocabularies: liveVocab,
   };
 }

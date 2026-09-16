@@ -48,6 +48,9 @@ interface SectionsProps {
   loading: boolean;
   companyName: string;
   serverMode: boolean;
+  // Server mode only: streams the full filtered set as CSV. Absent in mock
+  // mode, where the toolbar exports the client-side rows instead.
+  onServerCsv?: () => Promise<void>;
 }
 
 // DashboardSections: header, tabs, band, KPI, chart, alert, exports, table,
@@ -65,6 +68,7 @@ export function DashboardSections(
     loading,
     companyName,
     serverMode,
+    onServerCsv,
   }: SectionsProps,
 ) {
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -168,6 +172,7 @@ export function DashboardSections(
             onClearAll={clearAll}
             companyName={companyName}
             serverMode={serverMode}
+            onServerCsv={onServerCsv}
           />
           <FilterBar
             filters={filters}

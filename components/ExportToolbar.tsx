@@ -15,9 +15,10 @@ interface Props {
   onSelectAll: () => void;
   onClearAll: () => void;
   companyName: string;
-  // Server mode pages from the API, so exports cover only the current page;
-  // the toolbar says so up front instead of surprising a user mid-export.
+  // Server mode pages from the API: xls/pdf cover only the current page,
+  // while CSV streams the full filtered set from the server (onServerCsv).
   serverMode?: boolean;
+  onServerCsv?: () => Promise<void>;
 }
 // ExportToolbar: selection bar over selectedIds + allFiltered; derives all/some-selected tri-state and shows format buttons only when a row is selected.
 export function ExportToolbar(
@@ -28,6 +29,7 @@ export function ExportToolbar(
     onClearAll,
     companyName,
     serverMode,
+    onServerCsv,
   }: Props,
 ) {
   const [loading, setLoading] = useState<Fmt | null>(null);
@@ -42,7 +44,9 @@ export function ExportToolbar(
   const allSel = count === allFiltered.length && allFiltered.length > 0,
     someSel = count > 0 && !allSel;
   // doExport: exports matched rows; surfaces failures inline instead of
-  // silently clearing the spinner (previous try/finally had no catch).
+  // silently clearing the spinner (previous try/finally had no catch). In
+  // server mode CSV streams the full filtered set from the server (the
+  // selection only gates the buttons); xls/pdf stay page-local.
   async function doExport(fmt: Fmt) {
     if (!hasAny || loading) return;
     const bs = exportable;
@@ -52,7 +56,10 @@ export function ExportToolbar(
     try {
       if (fmt === "xls") await exportToExcel(bs, name, companyName);
       if (fmt === "pdf") await exportToPDF(bs, name, companyName);
-      if (fmt === "csv") exportToCSV(bs, name);
+      if (fmt === "csv") {
+        if (serverMode && onServerCsv) await onServerCsv();
+        else exportToCSV(bs, name);
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Falha ao exportar");
     } finally {
@@ -161,7 +168,7 @@ export function ExportToolbar(
             color: AURORA.sub,
           }}
         >
-          Exportação abrange somente a página atual
+          CSV abrange o conjunto filtrado; XLS/PDF somente a página atual
         </div>
       )}
       {error && (
