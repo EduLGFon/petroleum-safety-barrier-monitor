@@ -105,7 +105,9 @@ only the known statuses).
 
 `WireCategoryCompliance` carries `{ categoryId, compliant, total }`;
 `resolveChartData` derives `Não Conforme = max(0, total - compliant)`
-(fail-closed, same as `computeChartData`) and truncates names beyond 26 chars.
+(fail-closed, same as `computeChartData`); names stay full (the 26-char
+shortening is presentation-only in `ChartRow`, so chart rows can filter the
+table by exact category).
 
 ## Using the real API (Postgres)
 

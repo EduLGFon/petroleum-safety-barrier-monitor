@@ -17,6 +17,9 @@ interface KpiSectionsProps {
   location: string;
   activeAvailability: string;
   onDispFilter: (v: string) => void;
+  // Chart row click-through: full category name ("" clears the filter).
+  onSelectCategory: (v: string) => void;
+  activeCategory: string;
   ncCount: number;
   isUrgentActive: boolean;
   showUrgent: () => void;
@@ -31,6 +34,8 @@ export function KpiSections(
     location,
     activeAvailability,
     onDispFilter,
+    onSelectCategory,
+    activeCategory,
     ncCount,
     isUrgentActive,
     showUrgent,
@@ -53,7 +58,11 @@ export function KpiSections(
 
       {/* Chart */}
       <div style={{ animation: "slideUp .3s .28s var(--ease-out) both" }}>
-        <ConformidadeChart data={chartData} />
+        <ConformidadeChart
+          data={chartData}
+          onSelectCategory={onSelectCategory}
+          activeCategory={activeCategory}
+        />
       </div>
 
       {/* NC alert - red glass with the signature red glow */}

@@ -3,8 +3,11 @@
 // so new ones appear automatically in the SVG with no code change.
 import type { Barrier, CategoryCompliance } from "../types.ts";
 
-// Groups Conforme / Não Conforme per category in one pass; truncates names >26 chars, sorts biggest-first.
+// Groups Conforme / Não Conforme per category in one pass; sorts biggest-first.
 // Não Conforme means !== "Conforme" (fail-closed, same policy as computeKpi) so chart and KPI never diverge.
+// Names stay FULL here: the 26-char truncation is presentation-only
+// (truncateLabel, applied by ChartRow) so a chart row can filter the table
+// by its exact category (applyFilters matches category exactly).
 export function computeChartData(b: Barrier[]): CategoryCompliance[] {
   // Categories come from the data, not the CATEGORIES seed list: new
   // categories appear automatically, removed ones vanish. Sorted by volume
@@ -20,8 +23,98 @@ export function computeChartData(b: Barrier[]): CategoryCompliance[] {
   return [...buckets.entries()]
     .sort((a, z) => (z[1].c + z[1].nc) - (a[1].c + a[1].nc))
     .map(([name, v]) => ({
-      name: name.length > 26 ? name.slice(0, 26) + "…" : name,
+      name,
       Conforme: v.c,
       "Não Conforme": v.nc,
     }));
+}
+
+// truncateLabel: presentation-only shortening for SVG row labels; the full
+// name stays in data (tooltip <title>, search, table filter).
+export function truncateLabel(name: string, max = 26): string {
+  return name.length > max ? name.slice(0, max) + "…" : name;
+}
+
+// ChartSort: volume = biggest total first; ncRate = highest % Não Conforme
+// first (rows below minVolume sink, so a 1-item 100%-NC row never tops a
+// 200-item 40%-NC one); alpha = A–Z (pt-BR).
+export type ChartSort = "volume" | "ncRate" | "alpha";
+
+// Default Top-N for the collapsed chart card: 10 rows + Outras fits the
+// card with no internal scroll at any density.
+export const CHART_TOP_N = 10;
+// Minimum row volume to compete in ncRate sort; smaller rows sink below.
+export const CHART_MIN_VOLUME = 5;
+
+export interface PreparedChart {
+  rows: CategoryCompliance[];
+  // Pre-limit row count (after query filter), for "Ver todas (N)".
+  total: number;
+  // Rows folded into Outras (0 when expanded or under the limit).
+  hidden: number;
+  // Item total folded into Outras.
+  hiddenTotal: number;
+}
+
+// prepareChart: filter → sort → Top-N with an aggregated Outras tail.
+// Pure and UI-agnostic: the card decides limit/expanded, the SVG renders
+// rows verbatim (the Outras row is the last one iff hidden > 0).
+export function prepareChart(
+  data: CategoryCompliance[],
+  opts: {
+    limit?: number;
+    query?: string;
+    sort?: ChartSort;
+    minVolume?: number;
+  } = {},
+): PreparedChart {
+  const {
+    limit = CHART_TOP_N,
+    query = "",
+    sort = "volume",
+    minVolume = CHART_MIN_VOLUME,
+  } = opts;
+  const q = query.trim().toLowerCase();
+  const filtered = q
+    ? data.filter((d) => d.name.toLowerCase().includes(q))
+    : [...data];
+  const totalOf = (d: CategoryCompliance) => d.Conforme + d["Não Conforme"];
+  const ncRateOf = (d: CategoryCompliance) => {
+    const t = totalOf(d);
+    return t === 0 ? 0 : d["Não Conforme"] / t;
+  };
+  const sorted = filtered.sort((a, b) => {
+    if (sort === "alpha") return a.name.localeCompare(b.name, "pt-BR");
+    if (sort === "ncRate") {
+      const aSmall = totalOf(a) < minVolume ? 1 : 0;
+      const bSmall = totalOf(b) < minVolume ? 1 : 0;
+      if (aSmall !== bSmall) return aSmall - bSmall;
+      return ncRateOf(b) - ncRateOf(a) ||
+        totalOf(b) - totalOf(a) ||
+        a.name.localeCompare(b.name, "pt-BR");
+    }
+    return totalOf(b) - totalOf(a) ||
+      a.name.localeCompare(b.name, "pt-BR");
+  });
+  // limit <= 0 (or >= rows) means expanded: no Outras bucket.
+  if (limit <= 0 || sorted.length <= limit) {
+    return { rows: sorted, total: sorted.length, hidden: 0, hiddenTotal: 0 };
+  }
+  const head = sorted.slice(0, limit);
+  const tail = sorted.slice(limit);
+  let c = 0;
+  let nc = 0;
+  for (const d of tail) {
+    c += d.Conforme;
+    nc += d["Não Conforme"];
+  }
+  return {
+    rows: [
+      ...head,
+      { name: `Outras (${tail.length})`, Conforme: c, "Não Conforme": nc },
+    ],
+    total: sorted.length,
+    hidden: tail.length,
+    hiddenTotal: c + nc,
+  };
 }

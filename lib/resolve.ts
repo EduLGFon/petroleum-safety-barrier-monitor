@@ -132,7 +132,8 @@ export function resolveKpi(w: WireKpiSnapshot): KpiSnapshot {
 
 // Maps wire per-category totals to chart rows; nonCompliant is total minus
 // compliant (fail-closed novel handling, same as computeChartData). Names
-// truncate past 26 chars like the client derivation; SQL order is preserved.
+// stay FULL like the client derivation (truncation is presentation-only in
+// ChartRow); SQL order is preserved.
 export function resolveChartData(
   items: WireCategoryCompliance[],
   labels?: ResolverLabels,
@@ -141,7 +142,7 @@ export function resolveChartData(
     const name = labels?.categories?.[w.categoryId] ??
       fromCategoryId(w.categoryId);
     return {
-      name: name.length > 26 ? name.slice(0, 26) + "…" : name,
+      name,
       Conforme: w.compliant,
       "Não Conforme": Math.max(0, w.total - w.compliant),
     };

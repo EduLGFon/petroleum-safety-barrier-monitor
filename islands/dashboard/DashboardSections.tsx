@@ -161,6 +161,9 @@ export function DashboardSections(
           location={location}
           activeAvailability={filters.availability}
           onDispFilter={(v) => setFilter({ availability: v })}
+          onSelectCategory={(v) =>
+            setFilter({ category: filters.category === v ? "" : v })}
+          activeCategory={filters.category}
           ncCount={ncCount}
           isUrgentActive={isUrgentActive}
           showUrgent={showUrgent}

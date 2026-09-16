@@ -2,6 +2,7 @@
 // Why it exists: isolates row geometry and hover wiring from the SVG frame
 // so the inner chart stays a thin shell over scales, axis and legend.
 import type { CategoryCompliance } from "../../lib/types.ts";
+import { truncateLabel } from "../../lib/dashboard/chart.ts";
 import type { CSSProperties } from "preact";
 import { PLOT_W, px } from "./geometry.ts";
 
@@ -16,11 +17,32 @@ interface Props {
   w: (v: number) => number;
   onHover: (i: number, x: number, y: number) => void;
   onLeave: () => void;
+  // Click-through: selects the category in the table filter (full name).
+  // Absent = display-only row.
+  onSelect?: (name: string) => void;
+  // Active filter state: the selected row stays lit while others dim.
+  active?: boolean;
+  // Aggregated Outras tail row: muted fills, expands instead of filtering.
+  outros?: boolean;
 }
 
 // ChartRow: stacked Conforme / Não Conforme segments plus count and hover target.
 export function ChartRow(
-  { d, index, y, dimmed, labelW, barH, rowH, w, onHover, onLeave }: Props,
+  {
+    d,
+    index,
+    y,
+    dimmed,
+    labelW,
+    barH,
+    rowH,
+    w,
+    onHover,
+    onLeave,
+    onSelect,
+    active = false,
+    outros = false,
+  }: Props,
 ) {
   const total = d.Conforme + d["Não Conforme"];
   // Staggered glide: each row trails the previous one on updates.
@@ -34,15 +56,34 @@ export function ChartRow(
   // barT: shared transition for both segments so they glide together.
   const barT =
     `width .55s var(--ease-out) ${delay}, x .55s var(--ease-out) ${delay}, opacity .3s var(--ease-std)`;
+  // Outros aggregates render muted so they read as a folder, not a category.
+  const fillC = outros ? "#94a3b8" : "#22c55e";
+  const fillN = outros ? "#f87171" : "#ef4444";
+  const clickable = onSelect !== undefined;
   return (
     <g
       className="animate-chart-row"
       onMouseMove={(e) => onHover(index, e.clientX, e.clientY)}
       onMouseLeave={onLeave}
+      onClick={clickable ? () => onSelect(d.name) : undefined}
+      onKeyDown={clickable
+        ? (e) => {
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            onSelect(d.name);
+          }
+        }
+        : undefined}
+      tabIndex={clickable ? 0 : undefined}
+      role={clickable ? "button" : undefined}
+      aria-label={clickable ? d.name : undefined}
       style={{
         opacity: dimmed ? 0.35 : 1,
         transition: "opacity .22s var(--ease-std)",
         animationDelay: `${Math.min(index * 45, 360)}ms`,
+        cursor: clickable ? "pointer" : undefined,
+        outline: active ? "1px solid var(--accent)" : undefined,
+        outlineOffset: -1,
       }}
     >
       <text
@@ -52,10 +93,11 @@ export function ChartRow(
           textAnchor: "end",
           fontSize: "var(--d-small)",
           fill: "var(--text-secondary)",
+          fontStyle: outros ? "italic" : undefined,
         }}
       >
-        {d.name}
-        <title>{d.name}</title>
+        {truncateLabel(d.name)}
+        <title>{outros ? `${d.name} — clique para expandir` : d.name}</title>
       </text>
       <rect
         x={labelW}
@@ -63,7 +105,8 @@ export function ChartRow(
         width={wC}
         height={barH}
         rx={d["Não Conforme"] === 0 ? 4 : 0}
-        fill="#22c55e"
+        fill={fillC}
+        opacity={outros ? 0.55 : 1}
         style={{
           x: px(labelW),
           width: px(wC),
@@ -76,7 +119,8 @@ export function ChartRow(
         width={wN}
         height={barH}
         rx={4}
-        fill="#ef4444"
+        fill={fillN}
+        opacity={outros ? 0.55 : 1}
         style={{
           x: px(labelW + w(d.Conforme)),
           width: px(wN),

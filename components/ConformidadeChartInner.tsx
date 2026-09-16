@@ -24,10 +24,25 @@ import type { CSSProperties } from "preact";
 
 interface Props {
   data: CategoryCompliance[];
+  // Click-through: full category name → table filter. Absent = display-only.
+  onSelectCategory?: (name: string) => void;
+  // Currently filtered category: its row stays lit, others dim.
+  activeCategory?: string;
+  // True for the aggregated Outras tail-row index (expands, never filters).
+  isOutrosRow?: (index: number) => boolean;
+  onExpandOutros?: () => void;
 }
 
 // ConformidadeChartInner: stacked Conforme / Não Conforme SVG bars with hover tip and density geometry.
-export default function ConformidadeChartInner({ data }: Props) {
+export default function ConformidadeChartInner(
+  {
+    data,
+    onSelectCategory,
+    activeCategory = "",
+    isOutrosRow,
+    onExpandOutros,
+  }: Props,
+) {
   const [hover, setHover] = useState<
     { i: number; x: number; y: number } | null
   >(
@@ -109,13 +124,20 @@ export default function ConformidadeChartInner({ data }: Props) {
             d={d}
             index={i}
             y={TOP + i * ROW_H}
-            dimmed={hover !== null && hover.i !== i}
+            dimmed={(hover !== null && hover.i !== i) ||
+              (activeCategory !== "" && d.name !== activeCategory &&
+                !(isOutrosRow?.(i) ?? false))}
             labelW={LABEL_W}
             barH={BAR_H}
             rowH={ROW_H}
             w={w}
             onHover={(ii, x, y) => setHover({ i: ii, x, y })}
             onLeave={() => setHover(null)}
+            onSelect={(isOutrosRow?.(i) ?? false)
+              ? (() => onExpandOutros?.())
+              : onSelectCategory}
+            active={activeCategory !== "" && d.name === activeCategory}
+            outros={isOutrosRow?.(i) ?? false}
           />
         ))}
       </svg>
