@@ -5,6 +5,27 @@
 import type { Vocabularies } from "../../types.ts";
 import { queryRows } from "../db.ts";
 
+// Resolver labels: lean id->label maps from the lookup tables so server-side
+// consumers (CSV export) resolve real imported values instead of seed-enum
+// sentinels. Shape matches ResolverLabels (lib/resolve.ts) structurally.
+export async function getResolverLabels(): Promise<{
+  locations: Record<number, string>;
+  categories: Record<number, string>;
+}> {
+  const [locRows, catRows] = await Promise.all([
+    queryRows<{ id: number; code: string }>(
+      `select id, code from locations`,
+    ),
+    queryRows<{ id: number; label: string }>(
+      `select id, label from categories`,
+    ),
+  ]);
+  return {
+    locations: Object.fromEntries(locRows.map((r) => [r.id, r.code])),
+    categories: Object.fromEntries(catRows.map((r) => [r.id, r.label])),
+  };
+}
+
 // Distinct display labels plus per-station counts in one parallel batch.
 export async function getVocabularies(): Promise<Vocabularies> {
   const [locRows, dispRows, confRows, catRows] = await Promise.all([
