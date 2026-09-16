@@ -21,6 +21,37 @@ interface Props {
   onReset: () => void;
 }
 
+// DateBound: native date input for statusSince bounds; empty clears the bound.
+function DateBound(
+  { value, onChange, title }: {
+    value: string;
+    onChange: (v: string) => void;
+    title: string;
+  },
+) {
+  return (
+    <input
+      type="date"
+      value={value}
+      title={title}
+      aria-label={title}
+      onInput={(e) => onChange(e.currentTarget.value)}
+      style={{
+        padding: "var(--d-sel-pad)",
+        fontSize: "var(--d-body)",
+        ...GLASS_INPUT,
+        border: value
+          ? "1px solid var(--accent)"
+          : `1px solid ${AURORA.segBorder}`,
+        color: value ? AURORA.value : AURORA.label,
+        fontWeight: value ? 700 : 400,
+        maxWidth: "min(200px, 100%)",
+        flex: "0 1 auto",
+      }}
+    />
+  );
+}
+
 // FilterBar: controlled search + three faceted selects over live vocab props (fallbacks for empty data); onFilter patches state, onReset clears.
 export function FilterBar(
   {
@@ -63,7 +94,7 @@ export function FilterBar(
         marginBottom: "var(--d-stack-sm)",
       }}
     >
-      {/* Search */}
+      {/* Search */} {/* Search */}
       <div style={{ flex: 1, minWidth: 220, position: "relative" }}>
         <span
           style={{
@@ -123,6 +154,16 @@ export function FilterBar(
         onChange={(v) => onFilter({ category: v })}
         placeholder={`Categoria (${catOpts.length})`}
         opts={catOpts}
+      />
+      <DateBound
+        value={filters.since}
+        onChange={(v) => onFilter({ since: v })}
+        title="Desde (status desde)"
+      />
+      <DateBound
+        value={filters.until}
+        onChange={(v) => onFilter({ until: v })}
+        title="Até (status desde)"
       />
 
       {hasActiveFilters && (

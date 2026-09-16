@@ -20,6 +20,9 @@ export function applyFilters(b: Barrier[], f: FilterState): Barrier[] {
   }
   if (f.compliance) d = d.filter((x) => x.compliance === f.compliance);
   if (f.category) d = d.filter((x) => x.category === f.category);
+  // ISO dates compare lexicographically; statusSince is YYYY-MM-DD.
+  if (f.since) d = d.filter((x) => x.statusSince >= f.since);
+  if (f.until) d = d.filter((x) => x.statusSince <= f.until);
   return d;
 }
 
@@ -57,6 +60,8 @@ export function defaultFilters(): FilterState {
     availability: "",
     compliance: "",
     category: "",
+    since: "",
+    until: "",
     page: 1,
     pageSize: 25,
     sortCol: "id",
@@ -92,6 +97,16 @@ export function sanitizeFilterPatch(raw: unknown): Partial<FilterState> {
   if (conf !== undefined) patch.compliance = conf;
   const cat = text(r.category);
   if (cat !== undefined) patch.category = cat;
+  // ISO date bounds on statusSince; malformed values drop like the rest.
+  const date = (v: unknown) => {
+    if (typeof v !== "string") return undefined;
+    const d = v.trim().slice(0, 10);
+    return /^\d{4}-\d{2}-\d{2}$/.test(d) ? d : undefined;
+  };
+  const since = date(r.since);
+  if (since !== undefined) patch.since = since;
+  const until = date(r.until);
+  if (until !== undefined) patch.until = until;
   if (Number.isInteger(r.page) && (r.page as number) > 0) {
     patch.page = Math.min(r.page as number, 100000);
   }

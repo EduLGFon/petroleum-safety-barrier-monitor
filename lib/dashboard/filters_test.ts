@@ -62,6 +62,11 @@ Deno.test("sanitizeFilterPatch keeps well-formed values", () => {
   });
 });
 
+Deno.test("sanitizeFilterPatch keeps ISO dates and drops malformed ones", () => {
+  const patch = sanitizeFilterPatch({ since: "2026-01-01", until: "nope" });
+  assertEquals(patch, { since: "2026-01-01" });
+});
+
 Deno.test("sanitizeFilters always returns a complete state", () => {
   const f = sanitizeFilters(null);
   assertEquals(f, defaultFilters());
@@ -74,6 +79,25 @@ Deno.test("applyFilters matches query case-insensitively", () => {
   const rows = [barrier(), barrier({ id: 2, tag: "OT-9-CNC" })];
   const f = { ...defaultFilters(), query: "psv-1" };
   assertStrictEquals(applyFilters(rows, f).length, 1);
+});
+
+Deno.test("applyFilters bounds statusSince by since/until", () => {
+  const rows = [
+    barrier({ id: 1, statusSince: "2026-01-01" }),
+    barrier({ id: 2, statusSince: "2026-06-01" }),
+  ];
+  assertStrictEquals(
+    applyFilters(rows, { ...defaultFilters(), since: "2026-03-01" }).length,
+    1,
+  );
+  assertStrictEquals(
+    applyFilters(rows, { ...defaultFilters(), until: "2026-03-01" }).length,
+    1,
+  );
+  assertStrictEquals(
+    applyFilters(rows, defaultFilters()).length,
+    2,
+  );
 });
 
 Deno.test("applySorting orders ids numerically and copies input", () => {

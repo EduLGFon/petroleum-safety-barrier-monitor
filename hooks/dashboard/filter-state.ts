@@ -60,6 +60,8 @@ export function useFilterState(defaultLocation = "ALL") {
         availability: "",
         compliance: "Não Conforme",
         category: "",
+        since: "",
+        until: "",
         sortCol: "statusSince" as SortableColumn,
         sortDir: "asc",
         page: 1,
@@ -70,7 +72,8 @@ export function useFilterState(defaultLocation = "ALL") {
   const hasActiveFilters = state.location !== "ALL" ||
     !!state.filters.query ||
     !!state.filters.availability || !!state.filters.compliance ||
-    !!state.filters.category;
+    !!state.filters.category || !!state.filters.since ||
+    !!state.filters.until;
 
   return {
     location: state.location,

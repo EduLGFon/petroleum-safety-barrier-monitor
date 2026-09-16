@@ -126,6 +126,8 @@ export interface FilterState {
   availability: string;
   compliance: string;
   category: string;
+  since: string;
+  until: string;
   page: number;
   pageSize: number;
   sortCol: SortableColumn;
