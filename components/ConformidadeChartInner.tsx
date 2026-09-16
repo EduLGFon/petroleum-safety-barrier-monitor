@@ -115,7 +115,7 @@ export default function ConformidadeChartInner(
               y={TOP + data.length * ROW_H + 18}
               style={{
                 textAnchor: "middle",
-                fontSize: "var(--d-small)",
+                fontSize: "var(--d-body)",
                 fill: "var(--text-muted)",
                 x: px(LABEL_W + w(t)),
                 transition: "x .5s var(--ease-out)",
@@ -162,7 +162,7 @@ export default function ConformidadeChartInner(
           display: showLegend ? "flex" : "none",
           flexWrap: "wrap",
           gap: "var(--d-gap-lg)",
-          fontSize: "var(--d-small)",
+          fontSize: "var(--d-body)",
           color: "var(--text-muted)",
           paddingTop: "var(--d-bar-gap)",
         }}

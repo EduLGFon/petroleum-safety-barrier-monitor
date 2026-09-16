@@ -91,7 +91,7 @@ export function ChartRow(
         y={y + 14}
         style={{
           textAnchor: "end",
-          fontSize: "var(--d-small)",
+          fontSize: "var(--d-body)",
           fill: "var(--text-secondary)",
           fontStyle: outros ? "italic" : undefined,
         }}
@@ -142,7 +142,7 @@ export function ChartRow(
           x={labelW + w(total) + 8}
           y={y + 14}
           style={{
-            fontSize: "var(--d-small)",
+            fontSize: "var(--d-body)",
             fill: "var(--text-muted)",
             x: px(labelW + w(total) + 8),
             transition: "x .55s var(--ease-out)",

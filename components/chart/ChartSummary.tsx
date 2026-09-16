@@ -104,7 +104,7 @@ export function ChartSummary(
           style={{
             display: "flex",
             gap: 12,
-            fontSize: 12,
+            fontSize: "var(--d-body)",
             color: AURORA.sub,
           }}
         >
@@ -179,7 +179,7 @@ export function ChartSummary(
                       width: "100%",
                       textAlign: "left",
                       padding: "6px 10px",
-                      fontSize: 12,
+                      fontSize: "var(--d-body)",
                       borderRadius: 8,
                       border: on
                         ? "1px solid transparent"

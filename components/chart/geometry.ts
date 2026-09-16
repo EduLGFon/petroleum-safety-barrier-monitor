@@ -6,7 +6,7 @@ import type { CategoryCompliance } from "../../lib/types.ts";
 export const COUNT_W = 56;
 export const TOP = 6;
 export const AXIS_H = 26;
-export const PLOT_W = 440;
+export const PLOT_W = 380;
 
 /* Floating tooltip geometry - offset from the cursor, margin from edges. */
 export const TIP_OFFSET = 14;
@@ -15,11 +15,12 @@ export const TIP_MARGIN = 8;
 // never painted underneath them, below the loading splash (9999).
 export const TIP_Z = 2000;
 
-/* Bar geometry per density - tighter rows on compact, roomier on spacious. */
+/* Bar geometry per density - compact rows leave room for larger type;
+ * roomier on spacious. Label column keeps its width since type got bigger. */
 export const GEO = {
-  compact: { ROW_H: 21, BAR_H: 14, LABEL_W: 180 },
-  comfortable: { ROW_H: 26, BAR_H: 18, LABEL_W: 200 },
-  spacious: { ROW_H: 31, BAR_H: 22, LABEL_W: 220 },
+  compact: { ROW_H: 18, BAR_H: 12, LABEL_W: 180 },
+  comfortable: { ROW_H: 22, BAR_H: 15, LABEL_W: 200 },
+  spacious: { ROW_H: 26, BAR_H: 18, LABEL_W: 220 },
 } as const;
 
 // DensityKey: valid density names matching the GEO keys.
