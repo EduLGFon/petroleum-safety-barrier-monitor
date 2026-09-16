@@ -144,6 +144,128 @@ export function computePareto(
   };
 }
 
+export interface TreemapTile {
+  name: string;
+  Conforme: number;
+  "Não Conforme": number;
+  total: number;
+  // 0-1 share of Não Conforme within the tile (drives tile color).
+  ncRate: number;
+  // Unit-square geometry (0-1); the view scales to its container.
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+}
+
+interface TileRect {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+}
+
+// worstRow: worst aspect ratio if `row` shared `side`; the squarify
+// decision metric (lower is squarer).
+function worstRow(row: number[], side: number): number {
+  const sum = row.reduce((s, a) => s + a, 0);
+  const max = Math.max(...row);
+  const min = Math.min(...row);
+  return Math.max(
+    (side * side * max) / (sum * sum),
+    (sum * sum) / (side * side * min),
+  );
+}
+
+// squarify: Bruls et al. rectangle packing over the x/y/w/h box. Areas must
+// be positive; returns one rect per area in input order.
+function squarify(
+  areas: number[],
+  x: number,
+  y: number,
+  w: number,
+  h: number,
+): TileRect[] {
+  const out: TileRect[] = new Array(areas.length);
+  let rem = areas.map((a, i) => ({ a, i }));
+  let row: { a: number; i: number }[] = [];
+  let cx = x;
+  let cy = y;
+  let cw = w;
+  let ch = h;
+  // flush: lays the current row along the short side, shrinks the box.
+  const flush = () => {
+    if (row.length === 0) return;
+    const sum = row.reduce((s, e) => s + e.a, 0);
+    if (cw >= ch) {
+      const rh = sum / cw;
+      let ox = cx;
+      for (const e of row) {
+        const rw = e.a / rh;
+        out[e.i] = { x: ox, y: cy, w: rw, h: rh };
+        ox += rw;
+      }
+      cy += rh;
+      ch -= rh;
+    } else {
+      const rw = sum / ch;
+      let oy = cy;
+      for (const e of row) {
+        const rh = e.a / rw;
+        out[e.i] = { x: cx, y: oy, w: rw, h: rh };
+        oy += rh;
+      }
+      cx += rw;
+      cw -= rw;
+    }
+    row = [];
+  };
+  while (rem.length > 0) {
+    const side = Math.min(cw, ch);
+    const cand = [...row, rem[0]];
+    if (
+      row.length === 0 ||
+      worstRow(cand.map((e) => e.a), side) <=
+        worstRow(row.map((e) => e.a), side)
+    ) {
+      row = cand;
+      rem = rem.slice(1);
+    } else {
+      flush();
+    }
+  }
+  flush();
+  return out;
+}
+
+// computeTreemap: all non-empty categories as area-proportional tiles in a
+// unit square, biggest first. Pure; the view scales rects to its container.
+export function computeTreemap(data: CategoryCompliance[]): TreemapTile[] {
+  const items = data
+    .map((d) => ({ d, total: d.Conforme + d["Não Conforme"] }))
+    .filter((e) => e.total > 0)
+    .sort((a, b) =>
+      b.total - a.total || a.d.name.localeCompare(b.d.name, "pt-BR")
+    );
+  const grand = items.reduce((s, e) => s + e.total, 0);
+  if (items.length === 0 || grand === 0) return [];
+  const rects = squarify(
+    items.map((e) => e.total / grand),
+    0,
+    0,
+    1,
+    1,
+  );
+  return items.map((e, i) => ({
+    name: e.d.name,
+    Conforme: e.d.Conforme,
+    "Não Conforme": e.d["Não Conforme"],
+    total: e.total,
+    ncRate: e.d["Não Conforme"] / e.total,
+    ...rects[i],
+  }));
+}
+
 export interface PreparedChart {
   rows: CategoryCompliance[];
   // Pre-limit row count (after query filter), for "Ver todas (N)".

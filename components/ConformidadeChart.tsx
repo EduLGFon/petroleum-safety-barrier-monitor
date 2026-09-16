@@ -13,6 +13,7 @@ import {
   saveChartPrefs,
 } from "../hooks/dashboard/persistence.ts";
 import { ChartSummary } from "./chart/ChartSummary.tsx";
+import { ChartTreemap } from "./chart/ChartTreemap.tsx";
 import { ChartPareto } from "./chart/ChartPareto.tsx";
 import { GLASS_INPUT } from "./filter/FilterSelect.tsx";
 import Chart from "./ConformidadeChartInner.tsx";
@@ -52,6 +53,11 @@ const VIEWS: { value: ChartView; label: string; title: string }[] = [
     value: "pareto",
     label: "Pareto",
     title: "Top categorias + cobertura acumulada",
+  },
+  {
+    value: "treemap",
+    label: "Mapa",
+    title: "Todas as categorias: área = volume, cor = % NC",
   },
 ];
 
@@ -203,6 +209,14 @@ export function ConformidadeChart(
         : view === "pareto"
         ? (
           <ChartPareto
+            data={data}
+            onSelectCategory={onSelectCategory}
+            activeCategory={activeCategory}
+          />
+        )
+        : view === "treemap"
+        ? (
+          <ChartTreemap
             data={data}
             onSelectCategory={onSelectCategory}
             activeCategory={activeCategory}
