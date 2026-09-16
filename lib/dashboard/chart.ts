@@ -40,10 +40,9 @@ export function truncateLabel(name: string, max = 26): string {
 // 200-item 40%-NC one); alpha = A–Z (pt-BR).
 export type ChartSort = "volume" | "ncRate" | "alpha";
 
-// ChartView: card tabs. bars = Top-N stacked rows; summary = donut + Top
-// NC; pareto = Top-15 bars + cumulative-% line; treemap = all categories as
-// area-proportional tiles.
-export type ChartView = "bars" | "summary" | "pareto" | "treemap";
+// ChartView: card tabs. bars = multi-column stacked rows; summary = donut
+// + Top NC.
+export type ChartView = "bars" | "summary";
 
 // Default Top-N for the collapsed chart card: 10 rows + Outras fits the
 // card with no internal scroll at any density.
@@ -52,8 +51,6 @@ export const CHART_TOP_N = 10;
 export const CHART_MIN_VOLUME = 5;
 // Rows in the summary view's Top Não Conforme list.
 export const CHART_TOP_NC = 8;
-// Rows in the Pareto view; 15 fits the card with no internal scroll.
-export const CHART_PARETO_N = 15;
 
 export interface ComplianceSummary {
   compliant: number;
@@ -95,175 +92,6 @@ export function summarizeCompliance(
       : Math.round((compliant / total) * 1000) / 10,
     topNC,
   };
-}
-
-export interface ParetoChart {
-  rows: CategoryCompliance[];
-  // cumulative[i] = share of the GRAND total covered by rows[0..i] (0-1).
-  cumulative: number[];
-  // Grand item total across ALL categories (not just the Top-N).
-  total: number;
-  // % of items the Top-N cover, one decimal.
-  coveredPct: number;
-  // First row index reaching 80% coverage (-1 when never reached).
-  cutoffIndex: number;
-}
-
-// computePareto: biggest-first Top-N plus cumulative coverage against the
-// grand total, so the line answers "which few categories cover most items".
-export function computePareto(
-  data: CategoryCompliance[],
-  limit = CHART_PARETO_N,
-): ParetoChart {
-  const grand = data.reduce(
-    (s, d) => s + d.Conforme + d["Não Conforme"],
-    0,
-  );
-  const rows = [...data]
-    .sort((a, b) =>
-      (b.Conforme + b["Não Conforme"]) - (a.Conforme + a["Não Conforme"]) ||
-      a.name.localeCompare(b.name, "pt-BR")
-    )
-    .slice(0, Math.max(0, limit));
-  const cumulative: number[] = [];
-  let run = 0;
-  for (const d of rows) {
-    run += d.Conforme + d["Não Conforme"];
-    cumulative.push(grand === 0 ? 0 : run / grand);
-  }
-  const cutoffIndex = cumulative.findIndex((c) => c >= 0.8);
-  const covered = cumulative.length === 0
-    ? 0
-    : cumulative[cumulative.length - 1];
-  return {
-    rows,
-    cumulative,
-    total: grand,
-    coveredPct: Math.round(covered * 1000) / 10,
-    cutoffIndex,
-  };
-}
-
-export interface TreemapTile {
-  name: string;
-  Conforme: number;
-  "Não Conforme": number;
-  total: number;
-  // 0-1 share of Não Conforme within the tile (drives tile color).
-  ncRate: number;
-  // Unit-square geometry (0-1); the view scales to its container.
-  x: number;
-  y: number;
-  w: number;
-  h: number;
-}
-
-interface TileRect {
-  x: number;
-  y: number;
-  w: number;
-  h: number;
-}
-
-// worstRow: worst aspect ratio if `row` shared `side`; the squarify
-// decision metric (lower is squarer).
-function worstRow(row: number[], side: number): number {
-  const sum = row.reduce((s, a) => s + a, 0);
-  const max = Math.max(...row);
-  const min = Math.min(...row);
-  return Math.max(
-    (side * side * max) / (sum * sum),
-    (sum * sum) / (side * side * min),
-  );
-}
-
-// squarify: Bruls et al. rectangle packing over the x/y/w/h box. Areas must
-// be positive; returns one rect per area in input order.
-function squarify(
-  areas: number[],
-  x: number,
-  y: number,
-  w: number,
-  h: number,
-): TileRect[] {
-  const out: TileRect[] = new Array(areas.length);
-  let rem = areas.map((a, i) => ({ a, i }));
-  let row: { a: number; i: number }[] = [];
-  let cx = x;
-  let cy = y;
-  let cw = w;
-  let ch = h;
-  // flush: lays the current row along the short side, shrinks the box.
-  const flush = () => {
-    if (row.length === 0) return;
-    const sum = row.reduce((s, e) => s + e.a, 0);
-    if (cw >= ch) {
-      const rh = sum / cw;
-      let ox = cx;
-      for (const e of row) {
-        const rw = e.a / rh;
-        out[e.i] = { x: ox, y: cy, w: rw, h: rh };
-        ox += rw;
-      }
-      cy += rh;
-      ch -= rh;
-    } else {
-      const rw = sum / ch;
-      let oy = cy;
-      for (const e of row) {
-        const rh = e.a / rw;
-        out[e.i] = { x: cx, y: oy, w: rw, h: rh };
-        oy += rh;
-      }
-      cx += rw;
-      cw -= rw;
-    }
-    row = [];
-  };
-  while (rem.length > 0) {
-    const side = Math.min(cw, ch);
-    const cand = [...row, rem[0]];
-    if (
-      row.length === 0 ||
-      worstRow(cand.map((e) => e.a), side) <=
-        worstRow(row.map((e) => e.a), side)
-    ) {
-      row = cand;
-      rem = rem.slice(1);
-    } else {
-      flush();
-    }
-  }
-  flush();
-  return out;
-}
-
-// computeTreemap: all non-empty categories as area-proportional tiles in a
-// unit square, biggest first. Pure; the view scales rects to its container.
-export function computeTreemap(data: CategoryCompliance[]): TreemapTile[] {
-  const items = data
-    .map((d) => ({ d, total: d.Conforme + d["Não Conforme"] }))
-    .filter((e) => e.total > 0)
-    .sort((a, b) =>
-      b.total - a.total || a.d.name.localeCompare(b.d.name, "pt-BR")
-    );
-  const grand = items.reduce((s, e) => s + e.total, 0);
-  if (items.length === 0 || grand === 0) return [];
-  const rects = squarify(
-    items.map((e) => e.total / grand),
-    0,
-    0,
-    1,
-    1,
-  );
-  return items.map((e, i) => ({
-    name: e.d.name,
-    Conforme: e.d.Conforme,
-    "Não Conforme": e.d["Não Conforme"],
-    total: e.total,
-    ncRate: e.d["Não Conforme"] / e.total,
-    ...rects[i],
-  }));
 }
 
 export interface PreparedChart {

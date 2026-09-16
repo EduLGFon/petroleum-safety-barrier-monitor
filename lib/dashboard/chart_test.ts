@@ -3,8 +3,6 @@ import { assertEquals, assertStrictEquals } from "jsr:@std/assert@^1";
 
 import {
   computeChartData,
-  computePareto,
-  computeTreemap,
   prepareChart,
   summarizeCompliance,
   truncateLabel,
@@ -155,65 +153,4 @@ Deno.test("summarizeCompliance of empty list is 100% with no top", () => {
   assertStrictEquals(s.total, 0);
   assertStrictEquals(s.pctCompliant, 100);
   assertEquals(s.topNC, []);
-});
-
-Deno.test("computePareto covers biggest-first with cumulative shares", () => {
-  const p = computePareto([
-    row("A", 50, 0),
-    row("B", 30, 0),
-    row("C", 20, 0),
-  ], 3);
-  assertEquals(p.rows.map((r) => r.name), ["A", "B", "C"]);
-  assertEquals(p.cumulative, [0.5, 0.8, 1]);
-  assertStrictEquals(p.total, 100);
-  assertStrictEquals(p.coveredPct, 100);
-  assertStrictEquals(p.cutoffIndex, 1);
-});
-
-Deno.test("computePareto respects the limit and reports coverage", () => {
-  const p = computePareto([row("A", 80, 0), row("B", 20, 0)], 1);
-  assertStrictEquals(p.rows.length, 1);
-  assertStrictEquals(p.coveredPct, 80);
-  assertStrictEquals(p.cutoffIndex, 0);
-});
-
-Deno.test("computePareto of empty list is empty with cutoff -1", () => {
-  const p = computePareto([]);
-  assertEquals(p.rows, []);
-  assertEquals(p.cumulative, []);
-  assertStrictEquals(p.total, 0);
-  assertStrictEquals(p.cutoffIndex, -1);
-});
-
-Deno.test("computeTreemap areas match shares and stay in bounds", () => {
-  const tiles = computeTreemap([
-    row("A", 50, 0),
-    row("B", 30, 0),
-    row("C", 20, 0),
-  ]);
-  assertStrictEquals(tiles.length, 3);
-  assertStrictEquals(tiles[0].name, "A");
-  let area = 0;
-  for (const t of tiles) {
-    assertEquals(
-      t.x >= 0 && t.y >= 0 && t.x + t.w <= 1 + 1e-9 && t.y + t.h <= 1 + 1e-9,
-      true,
-    );
-    area += t.w * t.h;
-  }
-  // Areas tile the unit square; each tile's area equals its volume share.
-  assertEquals(Math.abs(area - 1) < 1e-9, true);
-  assertEquals(Math.abs(tiles[0].w * tiles[0].h - 0.5) < 1e-9, true);
-  assertStrictEquals(tiles[0].ncRate, 0);
-});
-
-Deno.test("computeTreemap skips empty rows and rates NC share", () => {
-  const tiles = computeTreemap([row("Empty", 0, 0), row("Half", 5, 5)]);
-  assertStrictEquals(tiles.length, 1);
-  assertStrictEquals(tiles[0].name, "Half");
-  assertStrictEquals(tiles[0].ncRate, 0.5);
-});
-
-Deno.test("computeTreemap of empty list is empty", () => {
-  assertEquals(computeTreemap([]), []);
 });
