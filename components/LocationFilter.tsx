@@ -21,7 +21,8 @@ export function LocationFilter(
 ) {
   // Stations from the data first (future stations appear automatically),
   // seed metadata only supplies display names for known codes. Server mode
-  // passes precomputed stations instead of the full barrier list.
+  // passes precomputed stations instead of the full barrier list. Tabs are
+  // ordered by item count (highest first), alphabetical tiebreak.
   const tabs = useMemo(() => {
     const meta = new Map(LOCATIONS.map((l) => [l.code, l]));
     const counts = new Map<string, number>();
@@ -33,6 +34,7 @@ export function LocationFilter(
       }
     }
     const codes = [...counts.keys()].sort((a, b) =>
+      (counts.get(b) ?? 0) - (counts.get(a) ?? 0) ||
       a.localeCompare(b, "pt-BR")
     );
     return codes.map((code) => ({

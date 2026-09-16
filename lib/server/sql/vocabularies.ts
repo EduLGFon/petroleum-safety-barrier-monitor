@@ -33,7 +33,7 @@ export async function getVocabularies(): Promise<Vocabularies> {
       `select loc.id as id, loc.code as code, count(b.id)::text as count
        from locations loc
        left join barriers b on b.location_id = loc.id and b.deleted_at is null
-       group by loc.id, loc.code order by loc.code`,
+       group by loc.id, loc.code order by count(b.id) desc, loc.code`,
     ),
     queryRows<{ label: string }>(
       `select distinct disp.label as label from barriers b
