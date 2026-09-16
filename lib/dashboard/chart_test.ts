@@ -3,6 +3,7 @@ import { assertEquals, assertStrictEquals } from "jsr:@std/assert@^1";
 
 import {
   computeChartData,
+  computePareto,
   prepareChart,
   summarizeCompliance,
   truncateLabel,
@@ -153,4 +154,32 @@ Deno.test("summarizeCompliance of empty list is 100% with no top", () => {
   assertStrictEquals(s.total, 0);
   assertStrictEquals(s.pctCompliant, 100);
   assertEquals(s.topNC, []);
+});
+
+Deno.test("computePareto covers biggest-first with cumulative shares", () => {
+  const p = computePareto([
+    row("A", 50, 0),
+    row("B", 30, 0),
+    row("C", 20, 0),
+  ], 3);
+  assertEquals(p.rows.map((r) => r.name), ["A", "B", "C"]);
+  assertEquals(p.cumulative, [0.5, 0.8, 1]);
+  assertStrictEquals(p.total, 100);
+  assertStrictEquals(p.coveredPct, 100);
+  assertStrictEquals(p.cutoffIndex, 1);
+});
+
+Deno.test("computePareto respects the limit and reports coverage", () => {
+  const p = computePareto([row("A", 80, 0), row("B", 20, 0)], 1);
+  assertStrictEquals(p.rows.length, 1);
+  assertStrictEquals(p.coveredPct, 80);
+  assertStrictEquals(p.cutoffIndex, 0);
+});
+
+Deno.test("computePareto of empty list is empty with cutoff -1", () => {
+  const p = computePareto([]);
+  assertEquals(p.rows, []);
+  assertEquals(p.cumulative, []);
+  assertStrictEquals(p.total, 0);
+  assertStrictEquals(p.cutoffIndex, -1);
 });

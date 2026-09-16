@@ -40,9 +40,10 @@ export function truncateLabel(name: string, max = 26): string {
 // 200-item 40%-NC one); alpha = A–Z (pt-BR).
 export type ChartSort = "volume" | "ncRate" | "alpha";
 
-// ChartView: card tabs. bars = Top-N stacked rows; summary = donut + Top NC.
-// (pareto | treemap reserved for later slices.)
-export type ChartView = "bars" | "summary";
+// ChartView: card tabs. bars = Top-N stacked rows; summary = donut + Top
+// NC; pareto = Top-15 bars + cumulative-% line; treemap = all categories as
+// area-proportional tiles.
+export type ChartView = "bars" | "summary" | "pareto" | "treemap";
 
 // Default Top-N for the collapsed chart card: 10 rows + Outras fits the
 // card with no internal scroll at any density.
@@ -51,6 +52,8 @@ export const CHART_TOP_N = 10;
 export const CHART_MIN_VOLUME = 5;
 // Rows in the summary view's Top Não Conforme list.
 export const CHART_TOP_NC = 8;
+// Rows in the Pareto view; 15 fits the card with no internal scroll.
+export const CHART_PARETO_N = 15;
 
 export interface ComplianceSummary {
   compliant: number;
@@ -91,6 +94,53 @@ export function summarizeCompliance(
       ? 100
       : Math.round((compliant / total) * 1000) / 10,
     topNC,
+  };
+}
+
+export interface ParetoChart {
+  rows: CategoryCompliance[];
+  // cumulative[i] = share of the GRAND total covered by rows[0..i] (0-1).
+  cumulative: number[];
+  // Grand item total across ALL categories (not just the Top-N).
+  total: number;
+  // % of items the Top-N cover, one decimal.
+  coveredPct: number;
+  // First row index reaching 80% coverage (-1 when never reached).
+  cutoffIndex: number;
+}
+
+// computePareto: biggest-first Top-N plus cumulative coverage against the
+// grand total, so the line answers "which few categories cover most items".
+export function computePareto(
+  data: CategoryCompliance[],
+  limit = CHART_PARETO_N,
+): ParetoChart {
+  const grand = data.reduce(
+    (s, d) => s + d.Conforme + d["Não Conforme"],
+    0,
+  );
+  const rows = [...data]
+    .sort((a, b) =>
+      (b.Conforme + b["Não Conforme"]) - (a.Conforme + a["Não Conforme"]) ||
+      a.name.localeCompare(b.name, "pt-BR")
+    )
+    .slice(0, Math.max(0, limit));
+  const cumulative: number[] = [];
+  let run = 0;
+  for (const d of rows) {
+    run += d.Conforme + d["Não Conforme"];
+    cumulative.push(grand === 0 ? 0 : run / grand);
+  }
+  const cutoffIndex = cumulative.findIndex((c) => c >= 0.8);
+  const covered = cumulative.length === 0
+    ? 0
+    : cumulative[cumulative.length - 1];
+  return {
+    rows,
+    cumulative,
+    total: grand,
+    coveredPct: Math.round(covered * 1000) / 10,
+    cutoffIndex,
   };
 }
 

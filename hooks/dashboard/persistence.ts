@@ -43,7 +43,7 @@ export interface ChartPrefs {
 }
 
 const CHART_SORTS: ChartSort[] = ["volume", "ncRate", "alpha"];
-const CHART_VIEWS: ChartView[] = ["bars", "summary"];
+const CHART_VIEWS: ChartView[] = ["bars", "summary", "pareto"];
 
 // Loads chart prefs; SSR-safe, returns defaults on miss/error.
 export function loadChartPrefs(): ChartPrefs {

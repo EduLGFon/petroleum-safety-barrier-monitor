@@ -13,6 +13,7 @@ import {
   saveChartPrefs,
 } from "../hooks/dashboard/persistence.ts";
 import { ChartSummary } from "./chart/ChartSummary.tsx";
+import { ChartPareto } from "./chart/ChartPareto.tsx";
 import { GLASS_INPUT } from "./filter/FilterSelect.tsx";
 import Chart from "./ConformidadeChartInner.tsx";
 import { useEffect, useMemo, useState } from "preact/hooks";
@@ -46,6 +47,11 @@ const VIEWS: { value: ChartView; label: string; title: string }[] = [
     value: "summary",
     label: "Resumo",
     title: "Donut geral + Top Não Conforme",
+  },
+  {
+    value: "pareto",
+    label: "Pareto",
+    title: "Top categorias + cobertura acumulada",
   },
 ];
 
@@ -189,6 +195,14 @@ export function ConformidadeChart(
       {view === "summary"
         ? (
           <ChartSummary
+            data={data}
+            onSelectCategory={onSelectCategory}
+            activeCategory={activeCategory}
+          />
+        )
+        : view === "pareto"
+        ? (
+          <ChartPareto
             data={data}
             onSelectCategory={onSelectCategory}
             activeCategory={activeCategory}
