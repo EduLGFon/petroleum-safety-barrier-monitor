@@ -1,13 +1,30 @@
-// Admin auth - single ADMIN_TOKEN today, shaped to grow into a users table.
+// Request auth - ADMIN_TOKEN Bearer plus cookie sessions with roles.
 // This is why it exists: the PATCH status path writes via
 // record_status_change(), so it must not be callable by anyone with curl.
-// Reads stay open (dashboard decision, documented in docs/API.md); writes
-// and future admin routes go through checkAdminAuth. Fail-closed: no token
-// configured means every write is denied, never silently allowed.
+// Reads stay open (dashboard decision, documented in docs/API.md); writes,
+// user management, recipients and alert rules go through the session-aware
+// resolvers below. Fail-closed: no token and no session means denial.
+import {
+  getSessionTokenFromRequest,
+  hashSessionToken,
+} from "./auth/session.ts";
+
+import { getSessionUser, type SessionUser } from "./sql/sessions.ts";
+
 export type AdminRole = "admin";
+export type RequestRole = "admin" | "user";
 
 export type AdminAuthResult =
   | { ok: true; role: AdminRole }
+  | { ok: false; message: string };
+
+export type RequestAuth =
+  | {
+    ok: true;
+    role: RequestRole;
+    user: SessionUser | null;
+    via: "token" | "session";
+  }
   | { ok: false; message: string };
 
 export type TokenGetter = () => string | undefined;
@@ -42,4 +59,38 @@ export function checkAdminAuth(
     return { ok: false, message: "invalid admin token" };
   }
   return { ok: true, role: "admin" };
+}
+
+// resolveRequestAuth: token first (ops scripts), then cookie session
+// (dashboard logins). Admin routes accept either; user identity rides along
+// for audit when the session path wins.
+export async function resolveRequestAuth(req: Request): Promise<RequestAuth> {
+  const token = checkAdminAuth(req);
+  if (token.ok) {
+    return { ok: true, role: "admin", user: null, via: "token" };
+  }
+  const raw = getSessionTokenFromRequest(req);
+  if (!raw) return { ok: false, message: token.message };
+  try {
+    const user = await getSessionUser(await hashSessionToken(raw));
+    if (!user) return { ok: false, message: "invalid session" };
+    return { ok: true, role: user.role, user, via: "session" };
+  } catch {
+    return { ok: false, message: "invalid session" };
+  }
+}
+
+// requireAdminAuth: guard for writes, user and alert management. Accepts a
+// valid ADMIN_TOKEN or an active admin session; anything else denies.
+export async function requireAdminAuth(req: Request): Promise<RequestAuth> {
+  const auth = await resolveRequestAuth(req);
+  if (!auth.ok) return auth;
+  if (auth.role !== "admin") return { ok: false, message: "admin only" };
+  return auth;
+}
+
+// requireAuthenticated: guard for lookups needed by admin UI. Accepts a
+// valid ADMIN_TOKEN or any active session (admin or user).
+export async function requireAuthenticated(req: Request): Promise<RequestAuth> {
+  return await resolveRequestAuth(req);
 }
