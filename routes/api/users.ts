@@ -1,0 +1,147 @@
+// API: /api/users - user management, admin only after bootstrap.
+// This is why it exists: admins promote others to admin and manage access;
+// the very first user (empty table) may self-register as admin so a fresh
+// database is never locked out. Later creates require an admin session.
+import {
+  badRequest,
+  internal,
+  newRequestId,
+  rateLimited,
+} from "../../lib/server/errors.ts";
+
+import {
+  readThrottle,
+  routeClientKey,
+  writeThrottle,
+} from "../../lib/server/throttle.ts";
+
+import {
+  hashPassword,
+  validateNewPassword,
+} from "../../lib/server/auth/password.ts";
+
+import {
+  createUser,
+  listUsers,
+  normalizeRole,
+} from "../../lib/server/sql/users.ts";
+
+import { loadServerConfig } from "../../lib/server/config.ts";
+
+import { requireAdminAuth } from "../../lib/server/auth.ts";
+
+import { countUsers } from "../../lib/server/sql/users.ts";
+
+import { unauthorized } from "../../lib/server/errors.ts";
+
+import { define } from "../../utils.ts";
+
+async function guardAdmin(
+  ctx: unknown,
+  req: Request,
+  allowBootstrap: boolean,
+): Promise<Response | null> {
+  if (allowBootstrap) {
+    try {
+      if ((await countUsers()) === 0) return null;
+    } catch {
+      // Fall through to the admin guard when the table is unreadable.
+    }
+  }
+  const auth = await requireAdminAuth(req);
+  if (!auth.ok) {
+    return unauthorized(auth.message, newRequestId());
+  }
+  void ctx;
+  return null;
+}
+
+export const handler = define.handlers({
+  // GET - lists users without password hashes.
+  async GET(ctx) {
+    const requestId = newRequestId();
+    const limit = readThrottle.check(routeClientKey(ctx));
+    if (!limit.allowed) {
+      return rateLimited("too many requests", requestId, limit.retryAfterMs);
+    }
+    const denied = await guardAdmin(ctx, ctx.req, false);
+    if (denied) return denied;
+    try {
+      loadServerConfig();
+    } catch (err) {
+      return internal("GET /api/users", err, requestId, "Server misconfigured");
+    }
+    try {
+      return Response.json(await listUsers());
+    } catch (err) {
+      return internal(
+        "GET /api/users",
+        err,
+        requestId,
+        "Failed to fetch users",
+      );
+    }
+  },
+
+  // POST { email, name?, password, role? } - creates a user. The first user
+  // on an empty table becomes admin regardless of the requested role.
+  async POST(ctx) {
+    const requestId = newRequestId();
+    const limit = writeThrottle.check(routeClientKey(ctx));
+    if (!limit.allowed) {
+      return rateLimited("too many requests", requestId, limit.retryAfterMs);
+    }
+    let bootstrap = false;
+    try {
+      bootstrap = (await countUsers()) === 0;
+    } catch (err) {
+      return internal(
+        "POST /api/users",
+        err,
+        requestId,
+        "Server misconfigured",
+      );
+    }
+    if (!bootstrap) {
+      const denied = await guardAdmin(ctx, ctx.req, false);
+      if (denied) return denied;
+    }
+    let body: {
+      email?: unknown;
+      name?: unknown;
+      password?: unknown;
+      role?: unknown;
+    };
+    try {
+      body = await ctx.req.json();
+    } catch {
+      return badRequest("Invalid JSON body", requestId);
+    }
+    try {
+      const password = validateNewPassword(body.password);
+      const role = bootstrap ? "admin" : normalizeRole(body.role ?? "user");
+      const created = await createUser({
+        email: body.email as string,
+        name: (body.name as string | undefined) ?? "",
+        passwordHash: await hashPassword(password),
+        role,
+      });
+      return Response.json(created, { status: 201 });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      if (
+        message.includes("email") || message.includes("name") ||
+        message.includes("password") || message.includes("role") ||
+        message.includes("duplicate") || message.includes("unique")
+      ) {
+        return badRequest(message, requestId);
+      }
+      return internal(
+        "POST /api/users",
+        err,
+        requestId,
+        "Failed to create user",
+      );
+    }
+  },
+});

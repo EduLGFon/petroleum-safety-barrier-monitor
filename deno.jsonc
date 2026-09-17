@@ -20,7 +20,8 @@
     "fracttal:poll": "deno run -A scripts/fracttal-poll.ts",
     "fracttal:capture": "deno run -A scripts/fracttal-capture.ts",
     "fracttal:extract": "deno run -A scripts/fracttal-extract.ts",
-    "alerts:check": "deno run -A --env-file=.env scripts/alerts-check.ts"
+    "alerts:check": "deno run -A --env-file=.env scripts/alerts-check.ts",
+    "admin:create": "deno run -A --env-file=.env scripts/create-admin.ts"
   },
   "imports": {
     "@/": "./",
