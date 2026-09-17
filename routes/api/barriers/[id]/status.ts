@@ -1,7 +1,7 @@
 // API: PATCH /api/barriers/:id/status - status transition write path.
 // This is why it exists: the one sanctioned way to change availability,
-// via record_status_change() (see db/schema.sql). Guarded by ADMIN_TOKEN
-// (fail-closed when unset); reads stay open, writes do not.
+// via record_status_change() (see db/schema.sql). Guarded by admin session
+// or ADMIN_TOKEN (fail-closed when neither is present); reads stay open.
 import {
   badRequest,
   internal,
@@ -10,6 +10,11 @@ import {
   rateLimited,
   unauthorized,
 } from "../../../../lib/server/errors.ts";
+
+import {
+  type AlertMailer,
+  smtpAlertConfigFromEnv,
+} from "../../../../lib/server/alerts/mailer.ts";
 
 import {
   getBarrierById,
@@ -21,9 +26,21 @@ import {
   writeThrottle,
 } from "../../../../lib/server/throttle.ts";
 
+import { maybeSendImmediate } from "../../../../lib/server/alerts/immediate.ts";
+
+import { listAlertRules } from "../../../../lib/server/sql/alert_rules.ts";
+
+import { smtpAlertMailer } from "../../../../lib/server/alerts/mailer.ts";
+
+import { listRecipients } from "../../../../lib/server/sql/recipients.ts";
+
+import { getOrCreateAuthor } from "../../../../lib/server/sql/authors.ts";
+
+import { sqlAlertStore } from "../../../../lib/server/sql/alerts.ts";
+
 import { loadServerConfig } from "../../../../lib/server/config.ts";
 
-import { checkAdminAuth } from "../../../../lib/server/auth.ts";
+import { requireAdminAuth } from "../../../../lib/server/auth.ts";
 
 import { define } from "../../../../utils.ts";
 
@@ -34,8 +51,9 @@ interface StatusBody {
 }
 
 export const handler = define.handlers({
-  // PATCH barrier status via transitionBarrierStatus; admin token first,
-  // then id and body validation.
+  // PATCH barrier status via transitionBarrierStatus. Session admins may
+  // omit authorId (derived from their user name); token callers keep the
+  // explicit authorId contract.
   async PATCH(ctx) {
     const requestId = newRequestId();
     const limit = writeThrottle.check(routeClientKey(ctx));
@@ -46,7 +64,7 @@ export const handler = define.handlers({
         limit.retryAfterMs,
       );
     }
-    const auth = checkAdminAuth(ctx.req);
+    const auth = await requireAdminAuth(ctx.req);
     if (!auth.ok) {
       return unauthorized(auth.message, requestId);
     }
@@ -74,13 +92,32 @@ export const handler = define.handlers({
       return badRequest("Invalid JSON body", requestId);
     }
 
-    const { statusId, authorId, note } = body;
-    if (
-      !Number.isInteger(statusId) || (statusId as number) < 0 ||
-      !Number.isInteger(authorId) || (authorId as number) < 0
-    ) {
+    const { statusId, note } = body;
+    let authorId = body.authorId;
+    if (!Number.isInteger(statusId) || (statusId as number) < 0) {
       return badRequest(
-        "statusId and authorId are required non-negative integers",
+        "statusId is a required non-negative integer",
+        requestId,
+      );
+    }
+    if (authorId === undefined && auth.user !== null) {
+      try {
+        const author = await getOrCreateAuthor(
+          auth.user.name || auth.user.email,
+        );
+        authorId = author.id;
+      } catch (err) {
+        return internal(
+          `PATCH /api/barriers/${ctx.params.id}/status`,
+          err,
+          requestId,
+          "Failed to resolve author",
+        );
+      }
+    }
+    if (!Number.isInteger(authorId) || (authorId as number) < 0) {
+      return badRequest(
+        "authorId is required (or log in so it derives from your user)",
         requestId,
       );
     }
@@ -103,6 +140,44 @@ export const handler = define.handlers({
       );
       if (!updated) {
         return notFound("Barrier not found", requestId);
+      }
+      // Best-effort immediate fan-out (hybrid alerts): the transition
+      // already committed above, so nothing here may fail the response.
+      // Matches enqueue always; immediate rules also send at once when a
+      // relay is configured. Failures only log; the digest cron retries.
+      try {
+        const [rules, recipients] = await Promise.all([
+          listAlertRules(false),
+          listRecipients(true),
+        ]);
+        let mailer: AlertMailer | undefined;
+        try {
+          mailer = smtpAlertMailer(smtpAlertConfigFromEnv());
+        } catch {
+          mailer = undefined; // no relay: enqueue only, cron sends
+        }
+        const fanout = await maybeSendImmediate({
+          store: sqlAlertStore,
+          barrier: updated,
+          statusId: statusId as number,
+          transitionDate: updated.statusSince.slice(0, 10),
+          rules,
+          hasAnyRule: rules.length > 0,
+          mailer,
+          recipients,
+          logger: (line) => console.log(`[status ${requestId}] ${line}`),
+        });
+        if (fanout.matched) {
+          console.log(
+            `[PATCH /api/barriers/${ctx.params.id}/status] requestId=${requestId} ` +
+              `immediate enqueued=${fanout.enqueued} emailed=${fanout.emailed}`,
+          );
+        }
+      } catch (err) {
+        console.error(
+          `[PATCH /api/barriers/${ctx.params.id}/status] requestId=${requestId} immediate fan-out failed`,
+          err,
+        );
       }
       return Response.json(updated);
     } catch (err) {

@@ -24,6 +24,12 @@ export function urgentDigestSubject(count: number, critical: number): string {
   return `[Barreiras] ${what}${crit}`;
 }
 
+// immediateSubject: same counts as the digest, prefixed so inbox triage
+// tells at-once mail apart from the periodic digest.
+export function immediateSubject(count: number, critical: number): string {
+  return `[Imediato] ${urgentDigestSubject(count, critical)}`;
+}
+
 // urgentDigestBody: one line per event, critical first, then the run stamp.
 export function urgentDigestBody(events: DigestEvent[], runAt: string): string {
   const line = (e: DigestEvent): string => {
