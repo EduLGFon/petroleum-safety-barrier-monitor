@@ -119,6 +119,34 @@ alert_recipients
   active                boolean, default true
   created_at
 
+users
+  id                    identity, PK
+  email                 text unique (lowercased)
+  name                  text, default ''
+  password_hash         text (pbkdf2$iterations$salt$hash)
+  role                  admin | user, default user
+  active                boolean, default true
+  created_at / updated_at
+
+sessions
+  id                    identity, PK
+  user_id               → users, on delete cascade
+  token_hash            text unique (SHA-256 of the cookie token)
+  expires_at            timestamptz (12h TTL)
+  created_at
+
+alert_rules
+  id                    identity, PK
+  name                  text unique
+  category_id           → categories, nullable (null = all categories)
+  to_status_id          → availability_statuses, nullable (null = any non-compliant)
+  critical_only         boolean, default false
+  include_recovery      boolean, default false (alerts on returns to Conforme)
+  stale_days            integer, nullable (null = no time trigger)
+  notify_immediate      boolean, default false (true = at once, false = digest)
+  active                boolean, default true (false mutes the rule)
+  created_at / updated_at
+
 barrier_status_history
   id                    identity, PK
   barrier_id            → barriers, on delete cascade
@@ -170,10 +198,10 @@ the corresponding row in the history.
 that function - it is the only place in the application code that should do
 this.
 
-This is already exposed via `PATCH /api/barriers/:id/status`, but the UI does
-not call that endpoint yet - it is the natural path for when the
-"admins can edit contingency" feature is implemented (access roles still do
-not exist in the app).
+This is exposed via `PATCH /api/barriers/:id/status` and the admin-only
+`StatusEditor` island in the barrier modal. Session admins may omit
+`authorId` (derived from their user via `authors`); token callers keep the
+explicit `authorId` contract. Only `admin` roles may write.
 
 ### Provenance + sync (P3)
 
@@ -185,16 +213,33 @@ intact, but `buildWhere`/`scopeText` and the `chart.ts` /
 default; an "admin" view can list deleted ones. `sync_state` records one row
 per run (inserts/updates/deletes/skips counts, `status`, `note`).
 
-### Alerts (P5)
+### Alerts (P5 + rules)
 
-`alert_events` queues urgent transitions: `dedup_key`
-(`barrier:date:status`, UNIQUE - rerun enqueues zero), `sent_at` null until
-sent, `payload` with context (tag, installation, availability,
-criticality, `urgency`, `attempts`, `last_error`, `dead_letter`,
-`delivered[]` per recipient). `alert_recipients` (`email` UNIQUE, `name`,
-`active`) is the digest audience, managed by the admin routes
-`/api/recipients*`. Cycle in `lib/server/alerts/run.ts` + script
-`scripts/alerts-check.ts` (see the Operations section in docs/API.md).
+`alert_events` queues transitions allowed by rules: `dedup_key`
+(`barrier:date:status`, UNIQUE - rerun enqueues zero; stale reminders use
+`stale:rule:barrier:date`), `kind` (`barrier_transition` or `stale`),
+`sent_at` null until sent, `payload` with context (tag, installation,
+availability, criticality, `urgency`, `category`, `immediate`, `attempts`,
+`last_error`, `dead_letter`, `delivered[]` per recipient).
+`alert_recipients` (`email` UNIQUE, `name`, `active`) is the digest
+audience, managed by `/api/recipients*`. `alert_rules` defines triggers:
+per-category enable/disable (no active rule covering a category means that
+category never alerts), landing status, critical-only, recovery opt-in,
+stale days, immediate vs digest. Empty rules fall back to legacy behavior
+(every non-compliant landing alerts via digest). Cycle in
+`lib/server/alerts/run.ts` + `lib/server/alerts/rules.ts` (pure matching) +
+script `scripts/alerts-check.ts` (see the Operations section in docs/API.md).
+
+### Auth (users + sessions)
+
+`users` holds dashboard logins (`role` is `admin` or `user`; only admins
+manage users, recipients, rules, and barrier status). Passwords are
+PBKDF2-SHA256 (`lib/server/auth/password.ts`, no native deps).
+`sessions` holds opaque tokens (only SHA-256 hashes stored, 12h TTL);
+`POST /api/auth/login` sets the HttpOnly cookie, `GET /api/auth/me`
+reveals the role to islands, `POST /api/auth/logout` revokes. Admin routes
+accept a session or `ADMIN_TOKEN`. The first user on an empty table becomes
+admin (or use `scripts/create-admin.ts`).
 
 ## Indexes
 
@@ -258,7 +303,7 @@ splitter that respects dollar-quoted bodies (`$$`), quotes, and comments
 | `routes/api/_params.ts`              | Shared strict parsers (`parseInt/parseDate/parseQueryParam`)                                                                                                                                    |
 | `routes/api/barriers.ts`             | `GET /api/barriers`                                                                                                                                                                             |
 | `routes/api/barriers/[id].ts`        | `GET /api/barriers/:id`                                                                                                                                                                         |
-| `routes/api/barriers/[id]/status.ts` | `PATCH /api/barriers/:id/status` (bonus)                                                                                                                                                        |
+| `routes/api/barriers/[id]/status.ts` | `PATCH /api/barriers/:id/status` (admin write + immediate fan-out)                                                                                                                              |
 | `routes/api/kpi.ts`                  | `GET /api/kpi`                                                                                                                                                                                  |
 | `routes/api/chart.ts`                | `GET /api/chart`                                                                                                                                                                                |
 | `routes/api/health.ts`               | `GET /api/health` (liveness, no DB)                                                                                                                                                             |

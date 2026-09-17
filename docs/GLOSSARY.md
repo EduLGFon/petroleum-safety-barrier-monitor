@@ -37,6 +37,12 @@ listed here exactly, so the codebase does not fork.
 | Comentários                 | `comments`                       |
 | Plano de ação               | `actionPlan` (SQL `action_plan`) |
 | Tipo de instalação          | `type`                           |
+| Usuário                     | `user`                           |
+| Papel                       | `role` (`admin` / `user`)        |
+| Sessão                      | `session`                        |
+| Senha                       | `password` (`password_hash`)     |
+| Regra de alerta             | `alertRule` (`alert_rules`)      |
+| Destinatário                | `recipient` (`alert_recipients`) |
 
 ## Type / property renames
 

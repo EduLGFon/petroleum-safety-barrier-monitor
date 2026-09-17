@@ -132,10 +132,15 @@ Full contract lives in `docs/API.md`. Summary:
   (http forces `pageSize: 100000`), `getBarrierById` (`null` only on 404),
   `getKpi` / `getChartData` (full filter subset, minus paging/sort).
 - Routes: `GET /api/barriers`, `GET /api/barriers/:id`,
-  `PATCH /api/barriers/:id/status` (bonus write path via
-  `record_status_change()`), `GET /api/kpi`, `GET /api/chart`,
+  `PATCH /api/barriers/:id/status` (admin write via `record_status_change()`,
+  author derives from session), `GET /api/kpi`, `GET /api/chart`,
   `GET /api/health` (DB-free liveness), `GET /api/vocabularies`
-  (refresh cadence; SSR still seeds the first paint).
+  (refresh cadence; SSR still seeds the first paint), `POST /api/auth/login`,
+  `POST /api/auth/logout`, `GET /api/auth/me`, `GET/POST /api/users`,
+  `PATCH/DELETE /api/users/:id`, `GET/POST /api/alert-rules`,
+  `PATCH/DELETE /api/alert-rules/:id`, `GET /api/lookups` (admin forms),
+  plus `routes/login.tsx` and `routes/admin.tsx` pages with
+  `LoginForm`/`AdminPanel`/`StatusEditor` islands.
 
 ## Persistence
 
@@ -153,7 +158,9 @@ Full contract lives in `docs/API.md`. Summary:
   (creates locations/categories on rebuild); the sync never creates
   them (unknown labels skip and are listed).
 - Postgres (`docs/DATABASE.md`): lookup tables + `barriers` +
-  `barrier_status_history`. `compliance_id` is trigger-derived, the only
+  `barrier_status_history` + `users`/`sessions` (cookie logins, two roles) +
+  `alert_rules` (per-category triggers) + `alert_events`/`alert_recipients`.
+  `compliance_id` is trigger-derived, the only
   write path is `record_status_change()`. Location and category ids are
   NOT frontend contracts - the server serves the dynamic id-keyed
   vocabularies (`{id, code, count}` and `{id, label}`) to the island, and
