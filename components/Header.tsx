@@ -239,27 +239,67 @@ export function Header(
           />
         </div>
       </div>
-      <button
-        type="button"
-        onClick={onOpenSettings}
-        className="glass-pill lift"
-        title="Configurações"
-        aria-label="Configurações"
-        style={{
-          width: 32,
-          height: 32,
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          background: AURORA.pill,
-          border: `1px solid ${AURORA.pillBorder}`,
-          borderRadius: 99,
-          color: AURORA.pillText,
-          cursor: "pointer",
-        }}
-      >
-        <GearIcon />
-      </button>
+      <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+        <a
+          href="/admin"
+          className="glass-pill lift"
+          title="Administração"
+          style={{
+            display: "flex",
+            alignItems: "center",
+            padding: "0 12px",
+            height: 32,
+            background: AURORA.pill,
+            border: `1px solid ${AURORA.pillBorder}`,
+            borderRadius: 99,
+            color: AURORA.pillText,
+            textDecoration: "none",
+            fontSize: 13,
+          }}
+        >
+          Admin
+        </a>
+        <a
+          href="/login"
+          className="glass-pill lift"
+          title="Acesso"
+          style={{
+            display: "flex",
+            alignItems: "center",
+            padding: "0 12px",
+            height: 32,
+            background: AURORA.pill,
+            border: `1px solid ${AURORA.pillBorder}`,
+            borderRadius: 99,
+            color: AURORA.pillText,
+            textDecoration: "none",
+            fontSize: 13,
+          }}
+        >
+          Acesso
+        </a>
+        <button
+          type="button"
+          onClick={onOpenSettings}
+          className="glass-pill lift"
+          title="Configurações"
+          aria-label="Configurações"
+          style={{
+            width: 32,
+            height: 32,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            background: AURORA.pill,
+            border: `1px solid ${AURORA.pillBorder}`,
+            borderRadius: 99,
+            color: AURORA.pillText,
+            cursor: "pointer",
+          }}
+        >
+          <GearIcon />
+        </button>
+      </div>
     </header>
   );
 }

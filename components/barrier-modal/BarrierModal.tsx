@@ -2,6 +2,7 @@
 // This is why it exists: surfaces full metadata, status badges, NC alert, and
 // chronological statusHistory without leaving the dashboard grid.
 import { useCallback, useEffect, useRef, useState } from "preact/hooks";
+import { StatusEditor } from "../../islands/StatusEditor.tsx";
 import { lockBody, unlockBody } from "../../lib/body-lock.ts";
 import { HistoryIcon, InfoIcon } from "../ui/Icons.tsx";
 import { BarrierDetails } from "./BarrierDetails.tsx";
@@ -201,7 +202,18 @@ function Content(
       {/* Body */}
       <div style={{ overflowY: "auto", flex: 1 }}>
         {tab === "details"
-          ? <BarrierDetails b={b} />
+          ? (
+            <>
+              <BarrierDetails b={b} />
+              <div
+                style={{
+                  padding: "0 var(--d-dialog-body) var(--d-dialog-body)",
+                }}
+              >
+                <StatusEditor barrierId={b.id} />
+              </div>
+            </>
+          )
           : <BarrierHistory b={b} />}
       </div>
     </>
