@@ -240,3 +240,72 @@ create table if not exists alert_recipients (
   active     boolean     not null default true,
   created_at timestamptz not null default now()
 );
+
+-- ─── Users + sessions (auth, two roles: admin and user) ─────────────────────
+-- Users own the dashboard login (email + password, cookie session). Role is
+-- 'admin' (full access: status writes, user and alert management) or 'user'
+-- (read-only dashboard). Only admins may promote others to admin or manage
+-- recipients and alert rules. Passwords store a PBKDF2-SHA256 digest in the
+-- `pbkdf2$iterations$salt_b64$hash_b64` format (see lib/server/auth/).
+create table if not exists users (
+  id            integer generated always as identity primary key,
+  email         text        not null unique,   -- always stored lowercased
+  name          text        not null default '',
+  password_hash text        not null,
+  role          text        not null default 'user' check (role in ('admin', 'user')),
+  active        boolean     not null default true,
+  created_at    timestamptz not null default now(),
+  updated_at    timestamptz not null default now()
+);
+
+create index if not exists idx_users_role on users(role);
+
+drop trigger if exists trg_users_updated_at on users;
+create trigger trg_users_updated_at
+  before update on users
+  for each row execute function set_updated_at();
+
+-- Opaque sessions: the cookie carries a random token, only its SHA-256 hash
+-- is stored here. Expired rows are ignored by lookups and can be swept by a
+-- periodic delete; no background job is required for correctness.
+create table if not exists sessions (
+  id          integer generated always as identity primary key,
+  user_id     integer     not null references users(id) on delete cascade,
+  token_hash  text        not null unique,
+  expires_at  timestamptz not null,
+  created_at  timestamptz not null default now()
+);
+
+create index if not exists idx_sessions_user on sessions(user_id);
+create index if not exists idx_sessions_expires on sessions(expires_at);
+
+-- ─── Alert rules (which events trigger email, per category) ─────────────────
+-- One row defines a trigger: transitions landing on to_status_id (null means
+-- any non-compliant landing) for an optional single category (null means all
+-- categories). Disabling is explicit: active = false, or no active rule
+-- covering a category, means that category never alerts. critical_only limits
+-- the rule to Crítica barriers; include_recovery also alerts on returns to a
+-- compliant status; stale_days adds a time-based trigger (barrier stays
+-- non-compliant for N days); notify_immediate sends at once instead of the
+-- periodic digest (hybrid mode).
+create table if not exists alert_rules (
+  id                integer generated always as identity primary key,
+  name              text        not null unique,
+  category_id       integer     references categories(id) on delete cascade,
+  to_status_id      integer     references availability_statuses(id),
+  critical_only     boolean     not null default false,
+  include_recovery  boolean     not null default false,
+  stale_days        integer     check (stale_days is null or stale_days > 0),
+  notify_immediate  boolean     not null default false,
+  active            boolean     not null default true,
+  created_at        timestamptz not null default now(),
+  updated_at        timestamptz not null default now()
+);
+
+create index if not exists idx_alert_rules_active on alert_rules(active);
+create index if not exists idx_alert_rules_category on alert_rules(category_id);
+
+drop trigger if exists trg_alert_rules_updated_at on alert_rules;
+create trigger trg_alert_rules_updated_at
+  before update on alert_rules
+  for each row execute function set_updated_at();
