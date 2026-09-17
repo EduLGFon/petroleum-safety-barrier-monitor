@@ -1,6 +1,6 @@
 // API: /api/recipients - alert digest audience, admin-only.
 // This is why it exists: the send path reads recipients from the database;
-// only token holders may list or change them (P4 checkAdminAuth on every
+// only admins may list or change them (session or ADMIN_TOKEN on every
 // method, including GET - recipient addresses are admin data).
 import {
   badRequest,
@@ -24,21 +24,21 @@ import {
 
 import { loadServerConfig } from "../../lib/server/config.ts";
 
-import { checkAdminAuth } from "../../lib/server/auth.ts";
+import { requireAdminAuth } from "../../lib/server/auth.ts";
 
 import { define } from "../../utils.ts";
 
-function guard(
+async function guard(
   ctx: unknown,
   req: Request,
   bucket: Throttle,
   requestId: string,
-): Response | null {
+): Promise<Response | null> {
   const limit = bucket.check(routeClientKey(ctx));
   if (!limit.allowed) {
     return rateLimited("too many requests", requestId, limit.retryAfterMs);
   }
-  const auth = checkAdminAuth(req);
+  const auth = await requireAdminAuth(req);
   if (!auth.ok) return unauthorized(auth.message, requestId);
   try {
     loadServerConfig();
@@ -52,7 +52,7 @@ export const handler = define.handlers({
   // GET the recipient list (activeOnly=1 filters).
   async GET(ctx) {
     const requestId = newRequestId();
-    const denied = guard(ctx, ctx.req, readThrottle, requestId);
+    const denied = await guard(ctx, ctx.req, readThrottle, requestId);
     if (denied) return denied;
     try {
       const activeOnly = ctx.url.searchParams.get("activeOnly") === "1";
@@ -70,7 +70,7 @@ export const handler = define.handlers({
   // POST { email, name? } - creates or revives (upsert on email).
   async POST(ctx) {
     const requestId = newRequestId();
-    const denied = guard(ctx, ctx.req, writeThrottle, requestId);
+    const denied = await guard(ctx, ctx.req, writeThrottle, requestId);
     if (denied) return denied;
     let body: { email?: unknown; name?: unknown };
     try {

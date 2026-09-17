@@ -21,12 +21,12 @@ import { loadServerConfig } from "../../../lib/server/config.ts";
 
 import type { BarriersQuery } from "../../../lib/wireTypes.ts";
 
-import { checkAdminAuth } from "../../../lib/server/auth.ts";
+import { requireAdminAuth } from "../../../lib/server/auth.ts";
 
 import { define } from "../../../utils.ts";
 
 export const handler = define.handlers({
-  // GET paged deleted barriers; 401 without a valid ADMIN_TOKEN.
+  // GET paged deleted barriers; 401 without an admin session or token.
   async GET(ctx) {
     const requestId = newRequestId();
     const limit = readThrottle.check(routeClientKey(ctx));
@@ -37,7 +37,7 @@ export const handler = define.handlers({
         limit.retryAfterMs,
       );
     }
-    const auth = checkAdminAuth(ctx.req);
+    const auth = await requireAdminAuth(ctx.req);
     if (!auth.ok) return unauthorized(auth.message, requestId);
     try {
       loadServerConfig();

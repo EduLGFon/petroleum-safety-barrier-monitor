@@ -17,7 +17,7 @@ import { routeClientKey, writeThrottle } from "../../../lib/server/throttle.ts";
 
 import { loadServerConfig } from "../../../lib/server/config.ts";
 
-import { checkAdminAuth } from "../../../lib/server/auth.ts";
+import { requireAdminAuth } from "../../../lib/server/auth.ts";
 
 import { define } from "../../../utils.ts";
 
@@ -29,7 +29,7 @@ export const handler = define.handlers({
     if (!limit.allowed) {
       return rateLimited("too many requests", requestId, limit.retryAfterMs);
     }
-    const auth = checkAdminAuth(ctx.req);
+    const auth = await requireAdminAuth(ctx.req);
     if (!auth.ok) return unauthorized(auth.message, requestId);
     try {
       loadServerConfig();
@@ -75,7 +75,7 @@ export const handler = define.handlers({
     if (!limit.allowed) {
       return rateLimited("too many requests", requestId, limit.retryAfterMs);
     }
-    const auth = checkAdminAuth(ctx.req);
+    const auth = await requireAdminAuth(ctx.req);
     if (!auth.ok) return unauthorized(auth.message, requestId);
     try {
       loadServerConfig();
