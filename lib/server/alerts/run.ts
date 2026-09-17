@@ -22,6 +22,8 @@ import { type AlertMailer, type RetryPolicy, sendWithRetry } from "./mailer.ts";
 
 import { compareUrgency } from "../../dashboard/urgent.ts";
 
+import type { AlertRule } from "../sql/alert_rules.ts";
+
 import type { WireBarrier } from "../../wireTypes.ts";
 
 import { detectUrgentTransitions } from "./detect.ts";
@@ -37,6 +39,12 @@ export interface AlertRecipientRef {
   email: string;
 }
 
+export interface StaleCandidate {
+  id: number;
+  categoryId: number;
+  statusSince: string;
+}
+
 export interface AlertCycleOptions {
   store: AlertStore;
   loadBarriers: (ids: number[]) => Promise<Map<number, WireBarrier>>;
@@ -48,6 +56,9 @@ export interface AlertCycleOptions {
   retry?: Partial<RetryPolicy>;
   now?: () => Date;
   logger?: (line: string) => void;
+  rules?: AlertRule[];
+  hasAnyRule?: boolean;
+  listStale?: (staleDays: number) => Promise<StaleCandidate[]>;
 }
 
 export interface AlertCycleResult {
@@ -62,9 +73,8 @@ export interface AlertCycleResult {
 }
 
 // asBarrier: alert payloads back into the dashboard ordering. statusSince is
-// the transition date (what the digest sorts on) and the event is urgent by
-// construction, so compareUrgency ranks exactly like the "ver urgentes" list
-// does for freshly transitioned barriers.
+// the transition date (what the digest sorts on). Recovery events carry
+// compliance Conforme so they sort after urgent ones, like the dashboard.
 function asBarrier(e: UnsentAlert): Barrier {
   return {
     id: e.id,
@@ -73,11 +83,11 @@ function asBarrier(e: UnsentAlert): Barrier {
     location: e.payload.location,
     locDesc: "",
     criticality: e.payload.criticality as Barrier["criticality"],
-    category: "",
+    category: e.payload.category ?? "",
     grouping: "",
     owner: "",
     availability: e.payload.availability as Barrier["availability"],
-    compliance: "Não Conforme",
+    compliance: e.payload.urgency === "none" ? "Conforme" : "Não Conforme",
     comments: "",
     actionPlan: "",
     statusSince: e.transitionDate,
@@ -96,6 +106,16 @@ function toDigest(e: UnsentAlert): DigestEvent {
   };
 }
 
+// staleDedupKey: distinct namespace so a stale reminder never collides with
+// the transition dedup key for the same barrier and day.
+export function staleDedupKey(
+  ruleId: number,
+  barrierId: number,
+  date: string,
+): string {
+  return `stale:${ruleId}:${barrierId}:${date}`;
+}
+
 // runAlertCycle: one full pass. Reprocess first (clears dead flags so this
 // run picks them up), then watermark -> detect -> enqueue -> one digest per
 // recipient covering only what they haven't received -> mark.
@@ -112,6 +132,9 @@ export async function runAlertCycle(
     retry = {},
     now = () => new Date(),
     logger = () => {},
+    rules = [],
+    hasAnyRule = false,
+    listStale,
   } = options;
   const active = recipients.filter((r) => r.email !== "");
   const activeEmails = active.map((r) => r.email);
@@ -137,6 +160,8 @@ export async function runAlertCycle(
     loadBarriers,
     result.watermark,
     options.onlyBarrierIds,
+    rules,
+    hasAnyRule,
   );
   result.detected = detected.length;
   logger(
@@ -145,15 +170,74 @@ export async function runAlertCycle(
     } detected=${result.detected}`,
   );
 
+  // Stale sweep: one query per distinct stale_days among active rules.
+  // Candidates are filtered by the rule's own category scope before enqueue.
+  const staleEvents: typeof detected = [];
+  if (listStale) {
+    const days = [
+      ...new Set(
+        rules.filter((r) => r.active && r.stale_days !== null)
+          .map((r) => r.stale_days as number),
+      ),
+    ];
+    const today = now().toISOString().slice(0, 10);
+    for (const d of days) {
+      const cands = await listStale(d);
+      const ids = cands.map((c) => c.id);
+      const wires = await loadBarriers(ids);
+      for (const c of cands) {
+        if (
+          options.onlyBarrierIds !== undefined &&
+          !options.onlyBarrierIds.includes(c.id)
+        ) continue;
+        const wire = wires.get(c.id);
+        if (!wire) continue;
+        for (const r of rules) {
+          if (!r.active || r.stale_days !== d) continue;
+          if (r.category_id !== null && r.category_id !== c.categoryId) {
+            continue;
+          }
+          if (r.critical_only && wire.criticalityId !== 1) continue;
+          staleEvents.push({
+            barrierId: c.id,
+            transitionDate: today,
+            statusId: wire.availabilityId,
+            dedupKey: staleDedupKey(r.id, c.id, today),
+            kind: "stale",
+            payload: {
+              tag: wire.tag,
+              location: String(wire.locationId),
+              availability: String(wire.availabilityId),
+              criticality: String(wire.criticalityId),
+              urgency: wire.criticalityId === 1 ? "critical" : "urgent",
+              attempts: 0,
+              lastError: null,
+              deadLetter: false,
+              delivered: [],
+              ruleId: r.id,
+              immediate: r.notify_immediate,
+            },
+            urgency: wire.criticalityId === 1 ? "critical" : "urgent",
+          });
+          break; // one stale event per barrier per run is enough
+        }
+      }
+    }
+    result.detected += staleEvents.length;
+  }
+
   if (dryRun) {
     logger(
-      `[alerts] dry-run: would enqueue ${detected.length}, no writes, no mail`,
+      `[alerts] dry-run: would enqueue ${
+        detected.length + staleEvents.length
+      }, no writes, no mail`,
     );
     return result;
   }
 
-  if (detected.length > 0) {
-    result.enqueued = await store.enqueue(detected);
+  const toEnqueue = [...detected, ...staleEvents];
+  if (toEnqueue.length > 0) {
+    result.enqueued = await store.enqueue(toEnqueue);
     logger(`[alerts] enqueued=${result.enqueued} (dedup skips the rest)`);
   }
 

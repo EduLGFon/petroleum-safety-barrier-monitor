@@ -1,8 +1,8 @@
-// alerts-check: detect urgent barrier transitions, enqueue idempotently,
-// send one digest per active recipient. Dry-run by default (detects and
-// reports, writes nothing, sends nothing); --apply writes and sends.
-// --reprocess clears dead-letter flags so failed events retry; --only-barrier
-// scopes detection to one id (verification support).
+// alerts-check: detect barrier transitions allowed by alert rules,
+// enqueue idempotently, send one digest per active recipient. Dry-run by
+// default (detects and reports, writes nothing, sends nothing); --apply
+// writes and sends. --reprocess clears dead-letter flags so failed events
+// retry; --only-barrier scopes detection to one id (verification support).
 //
 // Env: DATABASE_URL (store), OPS_SMTP_* (relay, same P3 variables as ops
 // mail), FRACTTAL_* not needed. Exit 0 when the run completes (counts in
@@ -20,6 +20,10 @@ import {
   smtpAlertConfigFromEnv,
   smtpAlertMailer,
 } from "../lib/server/alerts/mailer.ts";
+
+import { listStaleBarriers } from "../lib/server/sql/alert_rules.ts";
+
+import { listAlertRules } from "../lib/server/sql/alert_rules.ts";
 
 import { getBarriersByIds } from "../lib/server/sql/barriers.ts";
 
@@ -82,10 +86,12 @@ async function main(): Promise<void> {
   };
 
   let recipients: Array<{ email: string }>;
+  let rules: Awaited<ReturnType<typeof listAlertRules>> = [];
   try {
     recipients = (await listRecipients(true)).map((r) => ({
       email: r.email,
     }));
+    rules = await listAlertRules(false);
   } catch (err) {
     await fail(err instanceof Error ? err.message : String(err));
   }
@@ -106,6 +112,9 @@ async function main(): Promise<void> {
       dryRun,
       reprocess: flags.reprocess,
       logger: (line) => console.log(line),
+      rules: rules!,
+      hasAnyRule: (rules?.length ?? 0) > 0,
+      listStale: (days) => listStaleBarriers(days),
     });
     if (flags.json) console.log(JSON.stringify(result));
     else {

@@ -17,6 +17,7 @@ export interface NewAlertEvent {
   statusId: number;
   dedupKey: string;
   payload: AlertPayload;
+  kind?: string;
 }
 
 export interface AlertPayload {
@@ -32,6 +33,9 @@ export interface AlertPayload {
   // is fully sent once every active recipient is listed here - a rerun
   // after partial delivery sends only the remainder, never duplicates.
   delivered: string[];
+  category?: string;
+  ruleId?: number | null;
+  immediate?: boolean;
 }
 
 export interface UnsentAlert {

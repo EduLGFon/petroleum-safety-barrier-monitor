@@ -1,29 +1,36 @@
 // Urgent transition detection - history rows that entered an urgent state.
 // This is why it exists: the send path must only fire on transitions INTO
 // urgent (a barrier that was already urgent last run is not news), resolved
-// through the same isUrgent predicate the dashboard uses, so the email
-// digest and the NcAlert card never disagree on what counts.
+// through the same isUrgent predicate the dashboard uses, then filtered by
+// admin alert rules (per-category enable/disable, critical-only, recovery).
 import { type AlertStore, dedupKey, type NewAlertEvent } from "./store.ts";
 
 import { isUrgent, urgencyOf } from "../../dashboard/urgent.ts";
+
+import type { AlertRule } from "../sql/alert_rules.ts";
 
 import type { WireBarrier } from "../../wireTypes.ts";
 
 import { resolveBarrier } from "../../resolve.ts";
 
+import { matchRules } from "./rules.ts";
+
 export interface DetectedUrgent extends NewAlertEvent {
-  urgency: "critical" | "urgent";
+  urgency: "critical" | "urgent" | "none";
 }
 
 // detectUrgentTransitions: candidates since the watermark, resolved to
-// domain barriers, keeping only urgent landings. loadBarriers is injected
-// (prod: getBarriersByIds) and takes the whole candidate set at once - one
-// query per run, never N+1 - so tests never touch the database.
+// domain barriers, keeping landings allowed by active rules. Legacy path
+// (no rules configured) keeps the old isUrgent gate; configured rules add
+// per-category enable/disable, critical-only narrowing, and opt-in recovery
+// alerts. loadBarriers batches ids in one query so tests stay DB-free.
 export async function detectUrgentTransitions(
   store: Pick<AlertStore, "recentTransitions">,
   loadBarriers: (ids: number[]) => Promise<Map<number, WireBarrier>>,
   since: string | null,
   onlyBarrierIds?: number[],
+  rules: AlertRule[] = [],
+  hasAnyRule = false,
 ): Promise<DetectedUrgent[]> {
   const candidates = await store.recentTransitions(since, onlyBarrierIds);
   const barriers = await loadBarriers(candidates.map((c) => c.barrierId));
@@ -33,7 +40,19 @@ export async function detectUrgentTransitions(
     if (!wire) continue; // barrier deleted after the transition
     const barrier = resolveBarrier(wire);
     const urgency = urgencyOf(barrier);
-    if (urgency === "none") continue; // landed somewhere calm
+    const compliant = barrier.compliance === "Conforme";
+    const match = matchRules(
+      {
+        categoryId: wire.categoryId,
+        statusId: c.statusId,
+        criticalityId: wire.criticalityId,
+        compliant,
+      },
+      rules,
+      hasAnyRule,
+    );
+    if (!match.matched) continue; // muted category, narrowed or calm
+    if (!hasAnyRule && urgency === "none") continue; // legacy calm skip
     out.push({
       barrierId: c.barrierId,
       transitionDate: c.transitionDate,
@@ -49,6 +68,8 @@ export async function detectUrgentTransitions(
         lastError: null,
         deadLetter: false,
         delivered: [],
+        category: barrier.category,
+        immediate: match.immediate,
       },
       urgency,
     });

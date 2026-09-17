@@ -80,17 +80,18 @@ export const sqlAlertStore: AlertStore = {
         e.statusId,
         e.dedupKey,
         e.payload,
+        e.kind ?? "barrier_transition",
       );
-      const base = args.length - 5;
+      const base = args.length - 6;
       values.push(
         `($${base + 1}, $${base + 2}::date, $${base + 3}, $${base + 4}, $${
           base + 5
-        }::jsonb)`,
+        }::jsonb, $${base + 6})`,
       );
     }
     const rows = await queryRows<{ id: number }>(
       `insert into alert_events
-         (barrier_id, transition_date, status_id, dedup_key, payload)
+         (barrier_id, transition_date, status_id, dedup_key, payload, kind)
        values ${values.join(", ")}
        on conflict (dedup_key) do nothing
        returning id`,
