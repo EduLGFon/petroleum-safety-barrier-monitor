@@ -1,6 +1,7 @@
 // RecipientsTab - who receives alert emails, managed by admins.
 // This is why it exists: the digest audience lives in alert_recipients;
 // this tab wraps its CRUD with PT labels and active toggles.
+import { api } from "./api.ts";
 import { useEffect, useState } from "preact/hooks";
 
 interface Recipient {
@@ -8,21 +9,6 @@ interface Recipient {
   email: string;
   name: string;
   active: boolean;
-}
-
-async function api(path: string, init?: RequestInit): Promise<unknown> {
-  const res = await fetch(path, { credentials: "same-origin", ...init });
-  if (!res.ok) {
-    let message = `Erro ${res.status}`;
-    try {
-      const data = await res.json() as { error?: string };
-      if (data.error) message = data.error;
-    } catch {
-      // Keep the status fallback.
-    }
-    throw new Error(message);
-  }
-  return await res.json();
 }
 
 // RecipientsTab: alert recipient CRUD with active toggles; surfaces fetch errors inline.

@@ -1,6 +1,7 @@
 // UsersTab - admin user list, creation, role and access management.
 // This is why it exists: promoting users to admin and deactivating leavers
 // is a core admin task; this tab wraps /api/users with PT labels.
+import { api } from "./api.ts";
 import { useEffect, useState } from "preact/hooks";
 
 interface PublicUser {
@@ -9,21 +10,6 @@ interface PublicUser {
   name: string;
   role: "admin" | "user";
   active: boolean;
-}
-
-async function api(path: string, init?: RequestInit): Promise<unknown> {
-  const res = await fetch(path, { credentials: "same-origin", ...init });
-  if (!res.ok) {
-    let message = `Erro ${res.status}`;
-    try {
-      const data = await res.json() as { error?: string };
-      if (data.error) message = data.error;
-    } catch {
-      // Keep the status fallback.
-    }
-    throw new Error(message);
-  }
-  return await res.json();
 }
 
 // UsersTab: admin user CRUD table; surfaces fetch errors inline.

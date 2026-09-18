@@ -2,6 +2,7 @@
 // This is why it exists: admins enable or mute alerts by category and tune
 // the trigger (landing status, critical-only, recovery, stale days,
 // immediate vs digest) without code changes.
+import { api } from "./api.ts";
 import { useEffect, useState } from "preact/hooks";
 
 interface AlertRule {
@@ -19,21 +20,6 @@ interface AlertRule {
 interface Lookups {
   availabilities: { id: number; label: string }[];
   categories: { id: number; label: string }[];
-}
-
-async function api(path: string, init?: RequestInit): Promise<unknown> {
-  const res = await fetch(path, { credentials: "same-origin", ...init });
-  if (!res.ok) {
-    let message = `Erro ${res.status}`;
-    try {
-      const data = await res.json() as { error?: string };
-      if (data.error) message = data.error;
-    } catch {
-      // Keep the status fallback.
-    }
-    throw new Error(message);
-  }
-  return await res.json();
 }
 
 // RulesTab: per-category alert rule CRUD; surfaces fetch errors inline.
