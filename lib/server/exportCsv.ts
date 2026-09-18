@@ -54,7 +54,9 @@ export function streamExportCsv(
           }
           let chunk = "";
           for (; idx < end; idx++) {
-            chunk += row(barriers[idx]!).map(csvCell).join(";") + "\r\n";
+            const barrier = barriers[idx];
+            if (!barrier) continue;
+            chunk += row(barrier).map(csvCell).join(";") + "\r\n";
           }
           controller.enqueue(encoder.encode(chunk));
           if (idx >= barriers.length) stage = "summary";

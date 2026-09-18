@@ -110,7 +110,9 @@ export async function createUser(input: {
       normalizeRole(input.role),
     ],
   );
-  return rows[0]!;
+  const created = rows[0];
+  if (!created) throw new Error("createUser returned no row");
+  return created;
 }
 
 // updateUser: partial update for name, role, active, or password hash.

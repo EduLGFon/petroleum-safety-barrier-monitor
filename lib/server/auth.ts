@@ -55,7 +55,8 @@ export function checkAdminAuth(
   }
   const header = req.headers.get("authorization") ?? "";
   const match = /^Bearer (.+)$/.exec(header.trim());
-  if (!match || !constantTimeEqual(match[1]!, configured)) {
+  const presented = match?.[1];
+  if (!presented || !constantTimeEqual(presented, configured)) {
     return { ok: false, message: "invalid admin token" };
   }
   return { ok: true, role: "admin" };

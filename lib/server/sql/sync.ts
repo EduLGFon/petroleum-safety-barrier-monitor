@@ -112,7 +112,9 @@ export const defaultSyncIo: SyncIo = {
        returning id`,
       [scope],
     );
-    return rows[0]!.id;
+    const started = rows[0];
+    if (!started) throw new Error("startRun returned no row");
+    return started.id;
   },
 
   async applyPlan(entries: PlanEntry[]): Promise<PlanCounts> {

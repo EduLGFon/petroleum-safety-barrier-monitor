@@ -255,13 +255,13 @@ export async function runSync(
     status: "ok" | "failed",
     note: string,
   ) => {
-    if (dryRun) return;
+    if (dryRun || runId === null) return;
     const counts: PlanCounts = {
       ...applied,
       skips: baseResult.plan.counts.skips + baseResult.malformed.length +
         baseResult.mappingSkips.length,
     };
-    await io.finishRun(runId!, status, counts, note);
+    await io.finishRun(runId, status, counts, note);
   };
 
   try {

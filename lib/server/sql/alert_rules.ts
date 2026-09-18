@@ -112,7 +112,9 @@ export async function createAlertRule(input: NewAlertRule): Promise<AlertRule> {
       normalizeOptionalBoolean(input.active, "active") ?? true,
     ],
   );
-  return rows[0]!;
+  const created = rows[0];
+  if (!created) throw new Error("createAlertRule returned no row");
+  return created;
 }
 
 // updateAlertRule: partial update; empty patches throw as 400.

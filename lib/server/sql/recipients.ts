@@ -38,7 +38,9 @@ export async function createRecipient(
      returning id, email, name, active, created_at::text`,
     [normalizeEmail(email), normalizeName(name)],
   );
-  return rows[0]!;
+  const created = rows[0];
+  if (!created) throw new Error("createRecipient returned no row");
+  return created;
 }
 
 export async function updateRecipient(

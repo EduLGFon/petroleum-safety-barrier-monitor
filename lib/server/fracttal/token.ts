@@ -79,7 +79,7 @@ export function createTokenCache(
     get() {
       if (pending) return pending;
       const fresh = current && now() < current.expiresAtMs;
-      if (fresh) return Promise.resolve(current!.accessToken);
+      if (fresh && current) return Promise.resolve(current.accessToken);
       // Expiry: use the documented refresh grant when we have a refresh
       // token; the token endpoint's grant handler falls back to
       // client_credentials otherwise.

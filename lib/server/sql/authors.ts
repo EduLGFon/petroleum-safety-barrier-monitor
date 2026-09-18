@@ -37,5 +37,7 @@ export async function getOrCreateAuthor(name: string): Promise<AuthorRow> {
      returning id, name`,
     [clean],
   );
-  return rows[0]!;
+  const author = rows[0];
+  if (!author) throw new Error("getOrCreateAuthor returned no row");
+  return author;
 }
