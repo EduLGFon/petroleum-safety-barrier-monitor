@@ -12,21 +12,22 @@ Stack: Deno-only Fresh 2 + Vite + Preact islands. No ORM, no `package.json`.
 plus `fsRoutes()`. `client.ts` only imports `static/styles.css` for HMR.
 `vite.config.ts` enables `@fresh/plugin-vite`.
 
-| Task                            | Command                                                  | Env source                                                  |
-| ------------------------------- | -------------------------------------------------------- | ----------------------------------------------------------- |
-| `check`                         | `deno fmt --check . && deno lint . && deno check`        | none                                                        |
-| `test`                          | `deno test .`                                            | shell only (pure modules)                                   |
-| `dev`                           | `vite`                                                   | shell only, no `--env-file`; `export $(cat .env \| xargs)`  |
-| `build`                         | `vite build`                                             | shell at build time; request-time env still needed at serve |
-| `preview`                       | `deno serve -A _fresh/server.js`                         | shell only, no `--env-file`                                 |
-| `start`                         | `deno serve --env-file=.env -A _fresh/server.js`         | `.env`                                                      |
-| `db:migrate`                    | `deno run -A --env-file=.env scripts/migrate.ts`         | `.env` (`DATABASE_URL`)                                     |
-| `db:seed`                       | `deno run -A --env-file=.env scripts/seed.ts`            | `.env` (`DATABASE_URL`)                                     |
-| `fracttal:import`               | `deno run -A --env-file=.env scripts/fracttal-import.ts` | `.env` (`DATABASE_URL`)                                     |
-| `fracttal:sync`                 | `deno run -A --env-file=.env scripts/fracttal-sync.ts`   | `.env` (`DATABASE_URL` + `FRACTTAL_*` live)                 |
-| `fracttal:poll`                 | `deno run -A scripts/fracttal-poll.ts`                   | shell only (`FRACTTAL_*`, like `dev`)                       |
-| `fracttal:capture` / `:extract` | read-only live probes                                    | shell only (`FRACTTAL_*`)                                   |
-| `alerts:check`                  | `deno run -A --env-file=.env scripts/alerts-check.ts`    | `.env` (`DATABASE_URL` + `OPS_*`)                           |
+| Task                            | Command                                                                                                                                                                                  | Env source                                                  |
+| ------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------- |
+| `check`                         | `deno fmt --check . && deno lint . && deno check main.ts routes/api/*.ts routes/api/*/*.ts routes/api/*/*/*.ts scripts/*.ts`                                                             | none                                                        |
+| `test`                          | `deno test --allow-read=scripts/fixtures --allow-net=127.0.0.1,localhost --allow-env=OPS_SMTP_HOST,OPS_SMTP_PORT,OPS_SMTP_USER,OPS_SMTP_PASS,OPS_EMAIL_TO,OPS_EMAIL_FROM,DATABASE_URL .` | shell + `DATABASE_URL` (integration gated)                  |
+| `dev`                           | `vite`                                                                                                                                                                                   | shell only, no `--env-file`; `export $(cat .env \| xargs)`  |
+| `build`                         | `vite build`                                                                                                                                                                             | shell at build time; request-time env still needed at serve |
+| `preview`                       | `deno serve -A _fresh/server.js`                                                                                                                                                         | shell only, no `--env-file`                                 |
+| `start`                         | `deno serve --env-file=.env -A _fresh/server.js`                                                                                                                                         | `.env`                                                      |
+| `db:migrate`                    | `deno run -A --env-file=.env scripts/migrate.ts`                                                                                                                                         | `.env` (`DATABASE_URL`)                                     |
+| `db:seed`                       | `deno run -A --env-file=.env scripts/seed.ts`                                                                                                                                            | `.env` (`DATABASE_URL`)                                     |
+| `fracttal:import`               | `deno run -A --env-file=.env scripts/fracttal-import.ts`                                                                                                                                 | `.env` (`DATABASE_URL`)                                     |
+| `fracttal:sync`                 | `deno run -A --env-file=.env scripts/fracttal-sync.ts`                                                                                                                                   | `.env` (`DATABASE_URL` + `FRACTTAL_*` live)                 |
+| `fracttal:poll`                 | `deno run -A scripts/fracttal-poll.ts`                                                                                                                                                   | shell only (`FRACTTAL_*`, like `dev`)                       |
+| `fracttal:capture` / `:extract` | read-only live probes                                                                                                                                                                    | shell only (`FRACTTAL_*`)                                   |
+| `alerts:check`                  | `deno run -A --env-file=.env scripts/alerts-check.ts`                                                                                                                                    | `.env` (`DATABASE_URL` + `OPS_*`)                           |
+| `admin:create`                  | `deno run -A --env-file=.env scripts/create-admin.ts`                                                                                                                                    | `.env` (`DATABASE_URL`)                                     |
 
 `build` emits `_fresh/server.js` + `_fresh/server/` + `_fresh/client/`.
 `COMPANY_NAME` is read per request, not baked at build time.
@@ -133,14 +134,19 @@ Full contract lives in `docs/API.md`. Summary:
   `getKpi` / `getChartData` (full filter subset, minus paging/sort).
 - Routes: `GET /api/barriers`, `GET /api/barriers/:id`,
   `PATCH /api/barriers/:id/status` (admin write via `record_status_change()`,
-  author derives from session), `GET /api/kpi`, `GET /api/chart`,
+  author derives from session), `GET /api/barriers/deleted` (admin),
+  `GET /api/kpi`, `GET /api/chart`, `GET /api/export` (CSV, 10k cap),
   `GET /api/health` (DB-free liveness), `GET /api/vocabularies`
   (refresh cadence; SSR still seeds the first paint), `POST /api/auth/login`,
   `POST /api/auth/logout`, `GET /api/auth/me`, `GET/POST /api/users`,
   `PATCH/DELETE /api/users/:id`, `GET/POST /api/alert-rules`,
-  `PATCH/DELETE /api/alert-rules/:id`, `GET /api/lookups` (admin forms),
+  `PATCH/DELETE /api/alert-rules/:id`, `GET/POST /api/recipients`,
+  `PATCH/DELETE /api/recipients/:id`, `GET /api/lookups` (admin forms),
   plus `routes/login.tsx` and `routes/admin.tsx` pages with
   `LoginForm`/`AdminPanel`/`StatusEditor` islands.
+- Same-origin by design: the dashboard fetches `routes/api/*` from its own
+  origin (`apiBaseUrl` defaults to `url.origin`), so no CORS headers are
+  emitted. Split-origin deploys must proxy `/api/*` through the app origin.
 
 ## Persistence
 
@@ -184,9 +190,11 @@ tasks. `dev` needs shell exports; `start`/`db:*` read `.env`.
 
 - Dynamic data, never fixed catalogs: stations, statuses, categories, and
   counts change without code changes (open unions, SSR/SQL vocabularies,
-  `distinctBy`).
-- Reconcile everywhere: fixed KPI fields + `by*` `GROUP BY` buckets,
-  `resolveKpi` translates numeric-id keys, chart derives NC as
-  `total - compliant` fail-closed, so novel values never vanish.
+  `distinctBy`). Filter selects use live vocabularies; settings accept live
+  vocab props with seed fallback for first paint only.
+- Reconcile everywhere: fixed KPI fields + `other` novel-availability field +
+  `by*` `GROUP BY` buckets, `resolveKpi` translates numeric-id keys, chart
+  derives NC as `total - compliant` fail-closed, so novel values never vanish.
+  Fixed fields + `other` always equal `total`.
 - Layouts survive scale: paginated/server-paged regions, capped export rows
   (`MAX_DOM_ROWS`), debounced search, precomputed sort keys.
