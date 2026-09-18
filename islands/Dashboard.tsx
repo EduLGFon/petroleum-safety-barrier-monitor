@@ -11,6 +11,8 @@ import type { Barrier, Vocabularies } from "../lib/types.ts";
 
 import { ThemeProvider } from "../context/ThemeContext.tsx";
 
+import { ErrorBoundary } from "./ErrorBoundary.tsx";
+
 interface Props {
   initialBarriers: Barrier[];
   companyName: string;
@@ -28,13 +30,15 @@ export function Dashboard(
   return (
     <SettingsProvider>
       <ThemeProvider>
-        <DashboardView
-          initialBarriers={initialBarriers}
-          companyName={companyName}
-          apiMode={apiMode}
-          apiBaseUrl={apiBaseUrl}
-          vocabularies={vocabularies}
-        />
+        <ErrorBoundary>
+          <DashboardView
+            initialBarriers={initialBarriers}
+            companyName={companyName}
+            apiMode={apiMode}
+            apiBaseUrl={apiBaseUrl}
+            vocabularies={vocabularies}
+          />
+        </ErrorBoundary>
       </ThemeProvider>
     </SettingsProvider>
   );
