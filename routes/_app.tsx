@@ -58,13 +58,14 @@ export default define.page(function App({ Component }) {
           the page paints with system fonts first and swaps when ready. */
         }
         <link
+          id="font-css"
           href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Inter:wght@400;500;600;700&display=swap"
           rel="stylesheet"
           media="print"
-          onLoad={(e) => {
-            e.currentTarget.media = "all";
-          }}
         />
+        <script>
+          {`document.getElementById("font-css")?.addEventListener("load",function(){this.media="all"})`}
+        </script>
       </head>
       <body>
         <Component />
