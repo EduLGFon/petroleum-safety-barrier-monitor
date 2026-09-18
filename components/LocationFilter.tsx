@@ -4,9 +4,15 @@
 // and scroll horizontally instead of wrapping into a wall. The active tab
 // runs the signature gradient; idle tabs are quiet glass cells.
 import { LOCATIONS } from "../lib/constants.ts";
+
 import type { Barrier } from "../lib/types.ts";
+
 import { AURORA } from "../lib/aurora.ts";
+
 import { useMemo } from "preact/hooks";
+
+import { fmt } from "../lib/utils.ts";
+
 interface Props {
   selected: string;
   allBarriers: Barrier[];
@@ -132,7 +138,7 @@ function Tab(
           color: active ? "#fff" : AURORA.label,
         }}
       >
-        {count.toLocaleString("pt-BR")}
+        {fmt(count)}
       </span>
     </button>
   );

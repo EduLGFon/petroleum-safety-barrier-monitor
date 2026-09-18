@@ -5,6 +5,7 @@ import {
   AlertTriangleIcon,
   ArrowRightIcon,
 } from "../../components/ui/Icons.tsx";
+import { fmt } from "../../lib/utils.ts";
 
 interface NcAlertProps {
   ncCount: number;
@@ -47,8 +48,7 @@ export function NcAlert(
             color: "var(--alert-nc-text)",
           }}
         >
-          {ncCount.toLocaleString("pt-BR")} barreira{ncCount > 1 ? "s" : ""}
-          {" "}
+          {fmt(ncCount)} barreira{ncCount > 1 ? "s" : ""}{" "}
           não conforme{ncCount > 1 ? "s" : ""}
         </div>
         <div

@@ -3,6 +3,8 @@
 // formatted totals, so exports always match the dashboard KPI cards.
 import { DISP_KNOWN_ORDER } from "../constants.ts";
 
+import { fmt } from "../format.ts";
+
 import type { Barrier } from "../types.ts";
 
 import { computeKpi } from "../utils.ts";
@@ -20,7 +22,7 @@ export interface KpiStats {
 // including fail-closed novel values.
 export function kpiStats(barriers: Barrier[]): KpiStats {
   const k = computeKpi(barriers);
-  const n = (v: number) => v.toLocaleString("pt-BR");
+  const n = fmt;
   return {
     total: n(k.total),
     compliant: n(k.compliant),
@@ -36,7 +38,7 @@ export function kpiStats(barriers: Barrier[]): KpiStats {
 // while the total still reconciles.
 export function summaryRows(barriers: Barrier[]): Array<[string, string]> {
   const k = computeKpi(barriers);
-  const n = (v: number) => v.toLocaleString("pt-BR");
+  const n = fmt;
   const byAvailability = k.byAvailability ?? {};
   const keys = Object.keys(byAvailability).sort((a, b) => {
     const ia = DISP_KNOWN_ORDER.indexOf(a), ib = DISP_KNOWN_ORDER.indexOf(b);

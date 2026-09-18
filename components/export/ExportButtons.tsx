@@ -8,6 +8,7 @@ import {
 } from "../ui/Icons.tsx";
 import type { FunctionComponent } from "preact";
 import { AURORA } from "../../lib/aurora.ts";
+import { fmt } from "../../lib/utils.ts";
 export type Fmt = "xls" | "pdf" | "csv";
 type I = FunctionComponent<
   { size?: number; color?: string; strokeWidth?: number }
@@ -69,7 +70,7 @@ export function ExportButtons(
             whiteSpace: "nowrap",
           }}
         >
-          Exportar {count.toLocaleString("pt-BR")}:
+          Exportar {fmt(count)}:
         </span>
       </div>
       {FMTS.map(({ key, Icon, label, ext, color }) => (

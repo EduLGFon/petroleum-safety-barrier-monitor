@@ -56,7 +56,7 @@ function AnimVal({ n, isPercent }: { n: number; isPercent?: boolean }) {
   }, [n]);
   return (
     <span key={key} className="animate-num">
-      {v.toLocaleString("pt-BR")}
+      {fmt(v)}
       {isPercent ? "%" : ""}
     </span>
   );

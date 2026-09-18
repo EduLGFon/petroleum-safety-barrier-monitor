@@ -9,6 +9,7 @@ import { useEffect, useState } from "preact/hooks";
 import type { FilterState } from "../lib/types.ts";
 import { CATEGORIES } from "../lib/constants.ts";
 import { AURORA } from "../lib/aurora.ts";
+import { fmt } from "../lib/utils.ts";
 
 interface Props {
   filters: FilterState;
@@ -212,8 +213,7 @@ export function FilterBar(
             transition: "color .2s",
           }}
         >
-          {filteredTotal.toLocaleString("pt-BR")}{" "}
-          resultado{filteredTotal !== 1 ? "s" : ""}
+          {fmt(filteredTotal)} resultado{filteredTotal !== 1 ? "s" : ""}
         </span>
       </div>
     </div>

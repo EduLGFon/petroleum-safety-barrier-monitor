@@ -6,10 +6,16 @@ import {
   ChevronsLeftIcon,
   ChevronsRightIcon,
 } from "../ui/Icons.tsx";
+
 import { PAGE_SIZE_OPTS } from "../../lib/constants.ts";
+
 import { bs, buildPages } from "./pagination-utils.ts";
+
 import { AURORA } from "../../lib/aurora.ts";
+
 import { GotoInput } from "./GotoInput.tsx";
+
+import { fmt } from "../../lib/utils.ts";
 
 interface PaginationProps {
   page: number;
@@ -43,8 +49,7 @@ export function Pagination(
       }}
     >
       <span style={{ fontSize: "var(--d-body)", color: "var(--text-muted)" }}>
-        {from.toLocaleString("pt-BR")}-{to.toLocaleString("pt-BR")} de{" "}
-        {total.toLocaleString("pt-BR")}
+        {fmt(from)}-{fmt(to)} de {fmt(total)}
       </span>
       <div
         style={{

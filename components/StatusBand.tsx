@@ -9,6 +9,7 @@ import {
 } from "../lib/constants.ts";
 import { AURORA, AURORA_TYPE } from "../lib/aurora.ts";
 import type { KpiSnapshot } from "../lib/types.ts";
+import { fmt } from "../lib/utils.ts";
 interface Props {
   kpi: KpiSnapshot;
   activeFilter: string;
@@ -99,7 +100,7 @@ export function StatusBand({ kpi, activeFilter, onFilter }: Props) {
                   color: AURORA.value,
                 }}
               >
-                {count.toLocaleString("pt-BR")}
+                {fmt(count)}
               </div>
             </button>
           );

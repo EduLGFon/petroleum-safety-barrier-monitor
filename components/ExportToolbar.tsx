@@ -3,12 +3,21 @@
 // export actions need one home; idle and active states share the same
 // glass bar language as the rest of the identity.
 import { exportToCSV, exportToExcel, exportToPDF } from "../lib/export.ts";
+
 import { ExportButtons, type Fmt } from "./export/ExportButtons.tsx";
+
 import { TriCheck } from "./export/TriCheck.tsx";
+
 import { useMemo, useState } from "preact/hooks";
+
 import type { Barrier } from "../lib/types.ts";
+
 import { CloseIcon } from "./ui/Icons.tsx";
+
 import { AURORA } from "../lib/aurora.ts";
+
+import { fmt } from "../lib/utils.ts";
+
 interface Props {
   selectedIds: Set<number>;
   allFiltered: Barrier[];
@@ -109,11 +118,9 @@ export function ExportToolbar(
           }}
         >
           {allSel
-            ? `${allFiltered.length.toLocaleString("pt-BR")} selecionados`
+            ? `${fmt(allFiltered.length)} selecionados`
             : someSel
-            ? `${count.toLocaleString("pt-BR")} de ${
-              allFiltered.length.toLocaleString("pt-BR")
-            }`
+            ? `${fmt(count)} de ${fmt(allFiltered.length)}`
             : "Selecionar todos"}
         </span>
       </label>

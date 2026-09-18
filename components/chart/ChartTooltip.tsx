@@ -2,8 +2,12 @@
 // Why it exists: keeps viewport-clamped tooltip logic out of the chart frame
 // so the SVG shell stays small and the positioning math is isolated here.
 import { useLayoutEffect, useRef, useState } from "preact/hooks";
+
 import { TIP_MARGIN, TIP_OFFSET, TIP_Z } from "./geometry.ts";
+
 import { createPortal } from "preact/compat";
+
+import { fmt } from "../../lib/utils.ts";
 
 interface Props {
   x: number;
@@ -106,7 +110,7 @@ export function ChartTooltip(
         }}
       >
         <span>Conforme:</span>
-        <span>{compliant.toLocaleString("pt-BR")}</span>
+        <span>{fmt(compliant)}</span>
       </div>
       <div
         style={{
@@ -117,7 +121,7 @@ export function ChartTooltip(
         }}
       >
         <span>Não Conforme:</span>
-        <span>{nonCompliant.toLocaleString("pt-BR")}</span>
+        <span>{fmt(nonCompliant)}</span>
       </div>
     </div>
   );
