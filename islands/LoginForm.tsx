@@ -2,6 +2,7 @@
 // This is why it exists: dashboard users need a PT login screen that sets
 // the HttpOnly session cookie; a fresh database offers one registration
 // form that always creates the first admin.
+import { toPtError } from "../lib/api/error-pt.ts";
 import { useState } from "preact/hooks";
 
 type Mode = "login" | "register";
@@ -49,7 +50,7 @@ export function LoginForm() {
         globalThis.location.href = "/admin";
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
+      setError(toPtError(err instanceof Error ? err.message : String(err)));
     } finally {
       setBusy(false);
     }
