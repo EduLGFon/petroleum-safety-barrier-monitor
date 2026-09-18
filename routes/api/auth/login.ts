@@ -9,17 +9,18 @@ import {
 } from "../../../lib/server/auth/session.ts";
 
 import {
-  getUserByEmail,
-  normalizeEmail,
-  toPublicUser,
-} from "../../../lib/server/sql/users.ts";
-
-import {
   badRequest,
   internal,
   newRequestId,
   rateLimited,
+  unauthorized,
 } from "../../../lib/server/errors.ts";
+
+import {
+  getUserByEmail,
+  normalizeEmail,
+  toPublicUser,
+} from "../../../lib/server/sql/users.ts";
 
 import {
   createSession,
@@ -72,7 +73,7 @@ export const handler = define.handlers({
       const ok = user !== null && user.active &&
         await verifyPassword(body.password, user.password_hash);
       if (!ok || !user) {
-        return badRequest("invalid credentials", requestId);
+        return unauthorized("invalid credentials", requestId);
       }
       const token = createSessionToken();
       const expires = sessionExpiry();
