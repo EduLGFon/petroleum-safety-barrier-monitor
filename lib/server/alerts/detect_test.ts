@@ -43,7 +43,7 @@ Deno.test("detectUrgentTransitions keeps urgent landings with context", async ()
   );
   assertStrictEquals(out.length, 1);
   assertStrictEquals(out[0]!.dedupKey, "1:2026-09-13:5");
-  assertStrictEquals(out[0]!.urgency, "critical"); // criticidadeId 1 = Crítica
+  assertStrictEquals(out[0]!.urgency, "critical"); // criticalityId 1 = critical
   assertStrictEquals(out[0]!.payload.tag, "FAL-EQ-001");
   assertStrictEquals(out[0]!.payload.delivered.length, 0);
 });
@@ -91,6 +91,6 @@ Deno.test("detectUrgentTransitions tiers critical by criticality", async () => {
     null,
   );
   assertStrictEquals(out.length, 1);
-  // criticidadeId 0 is 'Não Crítica' -> urgent, not critical
+  // criticalityId 0 is non-critical -> urgent, not critical
   assertStrictEquals(out[0]!.urgency, "urgent");
 });

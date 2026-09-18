@@ -1,7 +1,7 @@
 // Live work-order signals for status derivation (Phase 1).
-// This is why it exists: Degradado / Indisponivel / Fora de Operacao come
+// This is why it exists: degraded / unavailable / out-of-service states come
 // from corrective work orders and requests, which the item-only sync could
-// not see (the first live sync would have decayed them to Disponivel).
+// not see (the first live sync would have decayed them to available).
 // This module validates live /work_orders + /work_requests rows and folds
 // them into per-code merged signals that runSync feeds to mapAsset. Row
 // semantics mirror the dump import exactly (same classifiers, same event
@@ -20,7 +20,7 @@ import type { FracttalWorkOrder, FracttalWorkRequest } from "./types.ts";
 
 // WorkSlot is one row's contribution: an event per slot plus the stop flag.
 // A row can carry a stop flag with no slot (open preventive WO on a stopped
-// asset still drives Fora de Operacao, matching the import).
+// asset still drives out-of-service, matching the import).
 export interface WorkSlot {
   urgent: StatusEvent | null;
   planned: StatusEvent | null;

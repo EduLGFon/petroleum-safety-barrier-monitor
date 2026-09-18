@@ -14,7 +14,7 @@ export function buildReverse<T extends string>(
   return rev;
 }
 
-// ─── Location (Instalação) ────────────────────────────────────────────────
+// ─── Location ─────────────────────────────────────────────────────────────
 // 0 = ALL is intentionally reserved as the "no filter / all locations" sentinel
 // Pattern for every domain below: toXId maps display string -> wire id
 // (undefined when unknown - callers must skip the filter and warn, never

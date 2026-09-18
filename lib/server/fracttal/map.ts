@@ -21,9 +21,9 @@ import {
   typologyIdOf,
 } from "./barrier-rules.ts";
 
-import type { FracttalAsset } from "./types.ts";
-
 export { AVAILABILITY_AVAILABLE, AVAILABILITY_UNAVAILABLE };
+
+import type { FracttalAsset } from "./types.ts";
 
 // IMPORT_DEFAULTS: fields Fracttal does not carry, given stable documented
 // application defaults (review team decision, not silent guess).
@@ -76,8 +76,8 @@ export interface MapOptions {
 }
 
 // availabilityFromAsset: asset-flag-only derivation (no work events). An
-// asset flagged unavailable maps to Indisponivel, the documented P3 draft
-// for the bare flag; stopped/out-of-service dates map to Fora de Operacao.
+// asset flagged unavailable maps to unavailable, the documented P3 draft
+// for the bare flag; stopped/out-of-service dates map to out-of-service.
 export function availabilityFromAsset(
   a: FracttalAsset,
   today = new Date().toISOString().slice(0, 10),

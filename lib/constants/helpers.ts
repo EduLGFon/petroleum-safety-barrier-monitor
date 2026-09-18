@@ -7,7 +7,7 @@ const COMPLIANT_STATUSES: Availability[] = [
   "Indisponível Contingenciado",
   "Degradado Contingenciado",
 ];
-// True for statuses counted as "Conforme" (Disponível + contingency ones).
+// True for statuses counted as compliant (display "Conforme": available + contingency ones).
 export function isCompliant(s: Availability): boolean {
   return COMPLIANT_STATUSES.includes(s);
 }

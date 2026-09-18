@@ -31,7 +31,7 @@ export function kpiStats(barriers: Barrier[]): KpiStats {
 }
 
 // Builds the [label, value] summary table from one computeKpi pass.
-// Disponibilidade rows come from the dynamic bucket (known first in canonical
+// Availability rows come from the dynamic bucket (known first in canonical
 // order, novel values after by volume), so a new status can never go missing
 // while the total still reconciles.
 export function summaryRows(barriers: Barrier[]): Array<[string, string]> {

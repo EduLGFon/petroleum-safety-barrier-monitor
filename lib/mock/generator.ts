@@ -13,7 +13,7 @@ import { createRng } from "./rng.ts";
 import { buildTag } from "./tags.ts";
 
 // ─── Status distribution (id-keyed) ──────────────────────────────────────
-// 0=Disponível 1=Fora de Op. 2=Indisp.Cont. 3=Degr.Cont. 4=Degradado 5=Indisponível
+// 0=available 1=out-of-service 2=contingency-outage 3=degraded-contingency 4=degraded 5=unavailable
 
 const STATUS_DIST: [number, number][] = [
   [0, 0.52],

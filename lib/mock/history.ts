@@ -16,7 +16,7 @@ function fmtISO(d: Date): string {
 }
 
 // ─── Status distribution (id-keyed) ──────────────────────────────────────
-// 0=Disponível 1=Fora de Op. 2=Indisp.Cont. 3=Degr.Cont. 4=Degradado 5=Indisponível
+// 0=available 1=out-of-service 2=contingency-outage 3=degraded-contingency 4=degraded 5=unavailable
 
 const STATUS_DIST: [number, number][] = [
   [0, 0.52],
@@ -87,7 +87,7 @@ export function generateHistory(
   const allIds = STATUS_DIST.map(([id]) => id);
   const entries: WireStatusHistoryEntry[] = [];
 
-  let prevId = rng.pick([0, 0, 1]); // mostly starts Disponível/Fora de Op.
+  let prevId = rng.pick([0, 0, 1]); // mostly starts available/out-of-service
 
   for (let i = 0; i < numEntries - 1; i++) {
     entries.push({

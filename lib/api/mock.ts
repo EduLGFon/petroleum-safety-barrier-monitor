@@ -14,11 +14,11 @@ import { fromLocationId } from "../enums.ts";
 
 import { getWireBarriers } from "../data.ts";
 
-const COMPLIANT_STATUS_IDS = new Set([0, 1, 2, 3]); // Disponível, Fora de Op., Ind.Cont., Degr.Cont.
+const COMPLIANT_STATUS_IDS = new Set([0, 1, 2, 3]); // available, out-of-service, contingency, degraded-contingency
 
-// Derives compliance id (0 Conforme / 1 Não Conforme) from availability id.
+// Derives compliance id (0 compliant / 1 non-compliant) from availability id.
 function wireComplianceId(dispId: number): number {
-  return COMPLIANT_STATUS_IDS.has(dispId) ? 0 : 1; // 0=Conforme 1=Não Conforme
+  return COMPLIANT_STATUS_IDS.has(dispId) ? 0 : 1; // 0=compliant 1=non-compliant
 }
 
 // Checks a wire barrier against numeric query filters (mock WHERE clause).
