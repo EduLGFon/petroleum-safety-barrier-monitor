@@ -1,13 +1,12 @@
 // Filter bar - Aurora glass search plus faceted selects fed by the data.
 // This is why it exists: vocabularies are dynamic (new statuses, 70+
-// categories), so option lists arrive as props derived from the loaded
-// barriers; the seed constants below are fallback only for empty data.
-import { FALLBACK_CONF, FALLBACK_DISP } from "./filter/filter-fallbacks.ts";
+// categories), so option lists arrive as props derived from live data.
+// Empty props mean still loading or truly empty data: selects show only
+// the placeholder instead of a fixed seed list.
 import { CloseIcon, FilterIcon, SearchIcon } from "./ui/Icons.tsx";
 import { GLASS_INPUT, Sel } from "./filter/FilterSelect.tsx";
 import { useEffect, useState } from "preact/hooks";
 import type { FilterState } from "../lib/types.ts";
-import { CATEGORIES } from "../lib/constants.ts";
 import { AURORA } from "../lib/aurora.ts";
 import { fmt } from "../lib/utils.ts";
 
@@ -80,10 +79,10 @@ export function FilterBar(
     const t = setTimeout(() => onFilter({ query: draft }), 200);
     return () => clearTimeout(t);
   }, [draft, filters.query, onFilter]);
-  // Props carry the live vocabulary; seed lists only fill empty datasets.
-  const dispOpts = availabilities.length ? availabilities : FALLBACK_DISP;
-  const confOpts = compliances.length ? compliances : FALLBACK_CONF;
-  const catOpts = categories.length ? categories : [...CATEGORIES];
+  // Props carry the live vocabulary; empty means loading or no data.
+  const dispOpts = availabilities;
+  const confOpts = compliances;
+  const catOpts = categories;
 
   return (
     <div

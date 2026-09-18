@@ -23,6 +23,8 @@ export const DISP_OPTS = [
   "Degradado",
   "Indisponível",
 ];
+// Seed fallback for first paint only; FiltersSection prefers live vocabularies
+// so new statuses are selectable without a code change.
 export const CONF_OPTS = ["Conforme", "Não Conforme"];
 export const SORT_OPTS = [
   { value: "id", label: "ID" },

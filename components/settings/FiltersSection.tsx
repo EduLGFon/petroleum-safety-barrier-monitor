@@ -10,12 +10,36 @@ interface Props {
   settings: SettingsState;
   setDefaults: (f: Partial<FilterState>) => void;
   setDefaultLoc: (l: string) => void;
+  locations?: { code: string; name: string; type: string }[];
+  availabilities?: string[];
+  compliances?: string[];
+  categories?: string[];
 }
 
 // FiltersSection: startup filter defaults form with restore-defaults action.
+// Live vocab props win over seed lists so new stations/statuses/categories
+// are selectable without a code change; seeds cover first paint only.
 export function FiltersSection(
-  { settings, setDefaults, setDefaultLoc }: Props,
+  {
+    settings,
+    setDefaults,
+    setDefaultLoc,
+    locations,
+    availabilities,
+    compliances,
+    categories,
+  }: Props,
 ) {
+  const locOpts = locations ?? LOCATIONS;
+  const dispOpts = availabilities && availabilities.length > 0
+    ? [...new Set([...availabilities, ...DISP_OPTS])]
+    : DISP_OPTS;
+  const confOpts = compliances && compliances.length > 0
+    ? [...new Set([...compliances, ...CONF_OPTS])]
+    : CONF_OPTS;
+  const catOpts = categories && categories.length > 0
+    ? [...new Set([...categories, ...CATEGORIES])]
+    : [...CATEGORIES];
   return (
     <div
       className="animate-settings-in"
@@ -45,7 +69,7 @@ export function FiltersSection(
           onChange={(e) => setDefaultLoc(e.currentTarget.value)}
           style={selSt}
         >
-          {LOCATIONS.map((l) => (
+          {locOpts.map((l) => (
             <option key={l.code} value={l.code}>
               {l.name}
               {l.code !== "ALL" ? ` - ${l.type}` : ""}
@@ -57,10 +81,10 @@ export function FiltersSection(
         {
           label: "Disponibilidade",
           key: "availability",
-          opts: DISP_OPTS,
+          opts: dispOpts,
         },
-        { label: "Conformidade", key: "compliance", opts: CONF_OPTS },
-        { label: "Categoria", key: "category", opts: [...CATEGORIES] },
+        { label: "Conformidade", key: "compliance", opts: confOpts },
+        { label: "Categoria", key: "category", opts: catOpts },
       ].map(({ label, key, opts }) => (
         <div key={key}>
           <FieldLabel>{label}</FieldLabel>
