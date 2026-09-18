@@ -37,7 +37,7 @@ export function truncateLabel(name: string, max = 26): string {
 
 // ChartSort: volume = biggest total first; ncRate = highest % Não Conforme
 // first (rows below minVolume sink, so a 1-item 100%-NC row never tops a
-// 200-item 40%-NC one); alpha = A–Z (pt-BR).
+// 200-item 40%-NC one); alpha = A-Z (pt-BR).
 export type ChartSort = "volume" | "ncRate" | "alpha";
 
 // ChartView: card tabs. bars = multi-column stacked rows; summary = donut

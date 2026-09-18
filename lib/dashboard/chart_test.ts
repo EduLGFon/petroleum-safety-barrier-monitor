@@ -1,6 +1,4 @@
 // Unit tests for lib/dashboard/chart.ts - per-category Conforme/NC buckets.
-import { assertEquals, assertStrictEquals } from "jsr:@std/assert@^1";
-
 import {
   computeChartData,
   prepareChart,
@@ -8,6 +6,8 @@ import {
   summarizeCompliance,
   truncateLabel,
 } from "./chart.ts";
+
+import { assertEquals, assertStrictEquals } from "jsr:@std/assert@^1";
 
 import type { Barrier } from "../types.ts";
 
@@ -126,7 +126,7 @@ Deno.test("prepareChart ncRate sort puts highest NC% first with volume guard", (
   assertStrictEquals(p.rows[2].name, "TinyWorst");
 });
 
-Deno.test("prepareChart alpha sort is A–Z", () => {
+Deno.test("prepareChart alpha sort is A-Z", () => {
   const data = [row("C", 1, 0), row("A", 1, 0), row("B", 1, 0)];
   const p = prepareChart(data, { sort: "alpha", limit: 0 });
   assertEquals(p.rows.map((r) => r.name), ["A", "B", "C"]);

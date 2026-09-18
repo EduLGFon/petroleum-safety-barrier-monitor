@@ -7,9 +7,14 @@ import {
   summarizeCompliance,
   truncateLabel,
 } from "../../lib/dashboard/chart.ts";
+
 import type { CategoryCompliance } from "../../lib/types.ts";
-import { useMemo } from "preact/hooks";
+
 import { AURORA } from "../../lib/aurora.ts";
+
+import { fmt } from "../../lib/utils.ts";
+
+import { useMemo } from "preact/hooks";
 
 interface Props {
   data: CategoryCompliance[];
@@ -52,9 +57,7 @@ export function ChartSummary(
           height={132}
           viewBox="0 0 132 132"
           role="img"
-          aria-label={`Conformidade geral ${
-            summary.pctCompliant.toLocaleString("pt-BR")
-          }%`}
+          aria-label={`Conformidade geral ${fmt(summary.pctCompliant)}%`}
         >
           <circle
             cx={66}
@@ -88,7 +91,7 @@ export function ChartSummary(
               fill: "var(--text-primary)",
             }}
           >
-            {summary.pctCompliant.toLocaleString("pt-BR")}%
+            {fmt(summary.pctCompliant)}%
           </text>
           <text
             x={66}
@@ -119,7 +122,7 @@ export function ChartSummary(
                 marginRight: 5,
               }}
             />
-            {summary.compliant.toLocaleString("pt-BR")}
+            {fmt(summary.compliant)}
           </span>
           <span>
             <span
@@ -132,7 +135,7 @@ export function ChartSummary(
                 marginRight: 5,
               }}
             />
-            {summary.nonCompliant.toLocaleString("pt-BR")}
+            {fmt(summary.nonCompliant)}
           </span>
         </div>
       </div>
@@ -155,7 +158,7 @@ export function ChartSummary(
             <div
               style={{ fontSize: 13, color: AURORA.sub, padding: "8px 0" }}
             >
-              Nenhuma Não Conformidade — todas as categorias conformes.
+              Nenhuma Não Conformidade - todas as categorias conformes.
             </div>
           )
           : (
@@ -170,7 +173,7 @@ export function ChartSummary(
                     key={d.name}
                     type="button"
                     onClick={() => onSelectCategory?.(d.name)}
-                    title={`${d.name} — filtrar tabela`}
+                    title={`${d.name} - filtrar tabela`}
                     aria-pressed={on}
                     style={{
                       display: "flex",
@@ -212,7 +215,7 @@ export function ChartSummary(
                         color: on ? "#fff" : "#ef4444",
                       }}
                     >
-                      {d["Não Conforme"].toLocaleString("pt-BR")}
+                      {fmt(d["Não Conforme"])}
                     </span>
                     <span
                       aria-hidden="true"

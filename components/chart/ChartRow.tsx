@@ -2,9 +2,14 @@
 // Why it exists: isolates row geometry and hover wiring from the SVG frame
 // so the inner chart stays a thin shell over scales, axis and legend.
 import type { CategoryCompliance } from "../../lib/types.ts";
+
 import { truncateLabel } from "../../lib/dashboard/chart.ts";
+
 import type { CSSProperties } from "preact";
+
 import { PLOT_W, px } from "./geometry.ts";
+
+import { fmt } from "../../lib/utils.ts";
 
 interface Props {
   d: CategoryCompliance;
@@ -97,7 +102,7 @@ export function ChartRow(
         }}
       >
         {truncateLabel(d.name)}
-        <title>{outros ? `${d.name} — clique para expandir` : d.name}</title>
+        <title>{outros ? `${d.name} - clique para expandir` : d.name}</title>
       </text>
       <rect
         x={labelW}
@@ -148,7 +153,7 @@ export function ChartRow(
             transition: "x .55s var(--ease-out)",
           } as CSSProperties}
         >
-          {total.toLocaleString("pt-BR")}
+          {fmt(total)}
         </text>
       )}
     </g>
