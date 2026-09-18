@@ -17,6 +17,7 @@ interface Me {
   email: string;
 }
 
+// AdminPanel: guarded tab shell (users/recipients/rules); fail-closed to access-denied on auth error.
 export function AdminPanel() {
   const [me, setMe] = useState<Me | null>(null);
   const [denied, setDenied] = useState(false);

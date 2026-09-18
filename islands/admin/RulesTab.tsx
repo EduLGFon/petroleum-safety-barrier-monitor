@@ -36,6 +36,7 @@ async function api(path: string, init?: RequestInit): Promise<unknown> {
   return await res.json();
 }
 
+// RulesTab: per-category alert rule CRUD; surfaces fetch errors inline.
 export function RulesTab() {
   const [rules, setRules] = useState<AlertRule[]>([]);
   const [lookups, setLookups] = useState<Lookups | null>(null);

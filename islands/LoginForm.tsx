@@ -27,6 +27,7 @@ async function postJson(url: string, body: unknown): Promise<unknown> {
   return await res.json();
 }
 
+// LoginForm: PT login/register card; shows localized errors and reloads on success.
 export function LoginForm() {
   const [mode, setMode] = useState<Mode>("login");
   const [email, setEmail] = useState("");

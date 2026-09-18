@@ -13,6 +13,7 @@ interface Lookups {
   availabilities: { id: number; label: string }[];
 }
 
+// StatusEditor: admin-only status changer for one barrier; hidden for non-admins/offline.
 export function StatusEditor({ barrierId, onUpdated }: Props) {
   const [isAdmin, setIsAdmin] = useState(false);
   const [options, setOptions] = useState<{ id: number; label: string }[]>([]);

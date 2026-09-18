@@ -10,6 +10,7 @@ import type { Barrier, FilterState } from "../../lib/types.ts";
 import { LOCATIONS } from "../../lib/constants.ts";
 import { useMemo } from "preact/hooks";
 
+// useDashboardDerived: memoized KPI, chart, filtered/sorted/paged rows, and open-barrier details for the dashboard.
 export function useDashboardDerived(
   allBarriers: Barrier[],
   location: string,

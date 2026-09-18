@@ -26,6 +26,7 @@ async function api(path: string, init?: RequestInit): Promise<unknown> {
   return await res.json();
 }
 
+// UsersTab: admin user CRUD table; surfaces fetch errors inline.
 export function UsersTab() {
   const [users, setUsers] = useState<PublicUser[]>([]);
   const [error, setError] = useState("");

@@ -10,6 +10,7 @@ interface P {
   size?: "xs" | "sm" | "md";
   dot?: boolean;
 }
+// Badge: uppercase status pill with optional glow dot; size maps to density tokens.
 export function Badge(
   { label, solid, bg, border, size = "md", dot = true }: P,
 ) {

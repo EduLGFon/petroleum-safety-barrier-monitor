@@ -1,3 +1,6 @@
+/* Global stylesheet - design tokens, layout, and component styles for the dashboard.
+ * Why it exists: single static CSS bundle (no CSS-in-JS runtime) keeps first
+ * paint fast and lets server and islands share one token source. */
 /* ── Reset ─────────────────────────────────────────────────────────────────── */
 *,
 *::before,

@@ -25,6 +25,7 @@ async function api(path: string, init?: RequestInit): Promise<unknown> {
   return await res.json();
 }
 
+// RecipientsTab: alert recipient CRUD with active toggles; surfaces fetch errors inline.
 export function RecipientsTab() {
   const [items, setItems] = useState<Recipient[]>([]);
   const [error, setError] = useState("");
