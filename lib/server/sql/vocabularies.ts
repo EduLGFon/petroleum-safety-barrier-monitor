@@ -11,18 +11,51 @@ import { queryRows } from "../db.ts";
 export async function getResolverLabels(): Promise<{
   locations: Record<number, string>;
   categories: Record<number, string>;
+  typologies: Record<number, string>;
+  groupings: Record<number, string>;
+  owners: Record<number, string>;
+  locDescs: Record<number, string>;
+  authors: Record<number, string>;
 }> {
-  const [locRows, catRows] = await Promise.all([
+  const [
+    locRows,
+    catRows,
+    typRows,
+    grpRows,
+    ownRows,
+    locDescRows,
+    authorRows,
+  ] = await Promise.all([
     queryRows<{ id: number; code: string }>(
       `select id, code from locations`,
     ),
     queryRows<{ id: number; label: string }>(
       `select id, label from categories`,
     ),
+    queryRows<{ id: number; label: string }>(
+      `select id, label from typologies`,
+    ),
+    queryRows<{ id: number; label: string }>(
+      `select id, label from groupings`,
+    ),
+    queryRows<{ id: number; label: string }>(
+      `select id, label from owners`,
+    ),
+    queryRows<{ id: number; label: string }>(
+      `select id, label from loc_descs`,
+    ),
+    queryRows<{ id: number; name: string }>(
+      `select id, name from authors`,
+    ),
   ]);
   return {
     locations: Object.fromEntries(locRows.map((r) => [r.id, r.code])),
     categories: Object.fromEntries(catRows.map((r) => [r.id, r.label])),
+    typologies: Object.fromEntries(typRows.map((r) => [r.id, r.label])),
+    groupings: Object.fromEntries(grpRows.map((r) => [r.id, r.label])),
+    owners: Object.fromEntries(ownRows.map((r) => [r.id, r.label])),
+    locDescs: Object.fromEntries(locDescRows.map((r) => [r.id, r.label])),
+    authors: Object.fromEntries(authorRows.map((r) => [r.id, r.name])),
   };
 }
 

@@ -33,21 +33,27 @@ import type { KpiSnapshot } from "./types.ts";
 // Maps a wire history entry's numeric IDs to display strings; date/note pass through unchanged.
 export function resolveHistoryEntry(
   w: WireStatusHistoryEntry,
+  labels?: ResolverLabels,
 ): StatusHistoryEntry {
   return {
     date: w.date,
     status: fromAvailabilityId(w.statusId),
-    author: fromAuthorId(w.authorId),
+    author: labels?.authors?.[w.authorId] ?? fromAuthorId(w.authorId),
     note: w.note,
   };
 }
 
-// Dynamic id->label overrides for stations/categories. Static enums only know
-// the seed values; real imported data carries many more, so the server sends
-// its actual vocabulary and resolution prefers those maps when present.
+// Dynamic id->label overrides for all taxonomy dimensions. Static enums only
+// know the seed values; real imported data carries many more, so the server
+// sends its actual vocabulary and resolution prefers those maps when present.
 export interface ResolverLabels {
   locations?: Record<number, string>;
   categories?: Record<number, string>;
+  typologies?: Record<number, string>;
+  groupings?: Record<number, string>;
+  owners?: Record<number, string>;
+  locDescs?: Record<number, string>;
+  authors?: Record<number, string>;
 }
 
 // Maps numeric wire IDs to Barrier strings; compliance is derived from availability, never trusted from wire. Dynamic labels (when supplied) win over seed enums.
@@ -59,14 +65,18 @@ export function resolveBarrier(
   return {
     id: w.id,
     tag: w.tag,
-    typology: fromTypologyId(w.typologyId),
+    typology: labels?.typologies?.[w.typologyId] ??
+      fromTypologyId(w.typologyId),
     location: labels?.locations?.[w.locationId] ?? fromLocationId(w.locationId),
-    locDesc: fromLocDescId(w.locDescId),
+    locDesc: labels?.locDescs?.[w.locDescId] ?? fromLocDescId(w.locDescId),
     criticality: fromCriticalityId(w.criticalityId),
     category: labels?.categories?.[w.categoryId] ??
       fromCategoryId(w.categoryId),
-    grouping: fromGroupingId(w.groupingId),
-    owner: fromOwnerId(w.ownerId),
+    grouping: labels?.groupings?.[w.groupingId] ??
+      fromGroupingId(w.groupingId),
+    owner: w.ownerId === -1 && !labels?.owners?.[w.ownerId]
+      ? ""
+      : labels?.owners?.[w.ownerId] ?? fromOwnerId(w.ownerId),
     availability,
     // Compliance is always DERIVED from availability - never trusted
     // from the wire - so the two values can never disagree.
@@ -74,7 +84,7 @@ export function resolveBarrier(
     comments: w.comments,
     actionPlan: w.actionPlan,
     statusSince: w.statusSince,
-    statusHistory: w.statusHistory.map(resolveHistoryEntry),
+    statusHistory: w.statusHistory.map((h) => resolveHistoryEntry(h, labels)),
   };
 }
 
