@@ -2,6 +2,10 @@
 // This is why it exists: authentication needs a validated store behind the
 // /api/auth and /api/users routes, while the routes own throttling and the
 // session-or-token guard. Password hashing lives in lib/server/auth/.
+import { normalizeEmail, normalizeName } from "../validation.ts";
+
+export { normalizeEmail, normalizeName };
+
 import { queryRows } from "../db.ts";
 
 export type UserRole = "admin" | "user";
@@ -36,23 +40,6 @@ export function toPublicUser(row: UserRow): PublicUser {
     active: row.active,
     created_at: row.created_at,
   };
-}
-
-// normalizeEmail: trims, lowercases, caps length. Throws as 400.
-export function normalizeEmail(raw: unknown): string {
-  if (typeof raw !== "string") throw new Error("email must be a string");
-  const email = raw.trim().toLowerCase().slice(0, 254);
-  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-    throw new Error("invalid email address");
-  }
-  return email;
-}
-
-// normalizeName: trims free text; empty stays empty.
-export function normalizeName(raw: unknown): string {
-  if (raw === undefined || raw === null) return "";
-  if (typeof raw !== "string") throw new Error("name must be a string");
-  return raw.trim().slice(0, 200);
 }
 
 // normalizeRole: only the two supported roles; throws as 400 otherwise.

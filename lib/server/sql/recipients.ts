@@ -2,6 +2,10 @@
 // This is why it exists: the send path must read recipients from the
 // database (not env), but only admins may change them - the routes guard
 // with P4 checkAdminAuth while this module stays a thin validated store.
+import { normalizeEmail, normalizeName } from "../validation.ts";
+
+export { normalizeEmail, normalizeName };
+
 import { queryRows } from "../db.ts";
 
 export interface AlertRecipient {
@@ -10,24 +14,6 @@ export interface AlertRecipient {
   name: string;
   active: boolean;
   created_at: string;
-}
-
-// normalizeEmail: trims, lowercases, caps length. Throws on anything that
-// is not plausibly an address - the route turns this into a 400.
-export function normalizeEmail(raw: unknown): string {
-  if (typeof raw !== "string") throw new Error("email must be a string");
-  const email = raw.trim().toLowerCase().slice(0, 254);
-  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-    throw new Error("invalid email address");
-  }
-  return email;
-}
-
-// normalizeName: trims and caps free text; empty stays empty.
-export function normalizeName(raw: unknown): string {
-  if (raw === undefined || raw === null) return "";
-  if (typeof raw !== "string") throw new Error("name must be a string");
-  return raw.trim().slice(0, 200);
 }
 
 export async function listRecipients(
