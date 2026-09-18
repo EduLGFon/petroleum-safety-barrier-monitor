@@ -1,9 +1,9 @@
 // KPI sections - status band, KPI cards, chart, and NC alert.
 // Why: one data-driven block (KPI snapshot + chart rows) shared verbatim by
 // both dashboard modes; keeps DashboardSections to shell composition.
-import { ConformidadeChart } from "../../components/ConformidadeChart.tsx";
-
 import type { CategoryCompliance, KpiSnapshot } from "../../lib/types.ts";
+
+import { ComplianceChart } from "../../components/ComplianceChart.tsx";
 
 import { StatusBand } from "../../components/StatusBand.tsx";
 
@@ -58,7 +58,7 @@ export function KpiSections(
 
       {/* Chart */}
       <div style={{ animation: "slideUp .3s .28s var(--ease-out) both" }}>
-        <ConformidadeChart
+        <ComplianceChart
           data={chartData}
           onSelectCategory={onSelectCategory}
           activeCategory={activeCategory}
