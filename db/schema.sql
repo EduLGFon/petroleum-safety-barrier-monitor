@@ -309,3 +309,16 @@ drop trigger if exists trg_alert_rules_updated_at on alert_rules;
 create trigger trg_alert_rules_updated_at
   before update on alert_rules
   for each row execute function set_updated_at();
+
+-- ─── Throttle buckets (shared rate limits across isolates) ─────────────────
+-- One row per (bucket, key): fixed-window counters shared by all server
+-- isolates. In-memory throttles stay as the fast path and fallback when the
+-- DB is unreachable; the export route prefers this table so multi-isolate
+-- deploys share one budget instead of one per isolate.
+create table if not exists throttle_buckets (
+  bucket    text        not null,
+  key       text        not null,
+  count     integer     not null default 1,
+  reset_at  timestamptz not null,
+  primary key (bucket, key)
+);

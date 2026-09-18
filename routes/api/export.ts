@@ -16,19 +16,21 @@ import {
   streamExportCsv,
 } from "../../lib/server/exportCsv.ts";
 
-import { parseFilterQuery } from "./_params.ts";
-
 import { exportThrottle, routeClientKey } from "../../lib/server/throttle.ts";
 
-import { listBarriers } from "../../lib/server/sql/barriers.ts";
-
 import { getResolverLabels } from "../../lib/server/sql/vocabularies.ts";
+
+import { checkDbThrottle } from "../../lib/server/sql/throttle.ts";
+
+import { listBarriers } from "../../lib/server/sql/barriers.ts";
 
 import { loadServerConfig } from "../../lib/server/config.ts";
 
 import type { BarriersQuery } from "../../lib/wireTypes.ts";
 
 import { resolveBarriers } from "../../lib/resolve.ts";
+
+import { parseFilterQuery } from "./_params.ts";
 
 import { define } from "../../utils.ts";
 
@@ -37,7 +39,16 @@ export const handler = define.handlers({
   // non-csv format or over-cap totals, 429 when the export bucket is spent.
   async GET(ctx) {
     const requestId = newRequestId();
-    const limit = exportThrottle.check(routeClientKey(ctx));
+    // Shared DB budget first so multi-isolate deploys enforce one limit;
+    // falls back to the in-memory bucket when the DB is unreachable.
+    const clientKey = routeClientKey(ctx);
+    let limit = exportThrottle.check(clientKey);
+    try {
+      const shared = await checkDbThrottle("export", clientKey, 10, 60_000);
+      limit = shared;
+    } catch {
+      // Keep the in-memory decision when the shared store is unavailable.
+    }
     if (!limit.allowed) {
       return rateLimited(
         "export rate limit exceeded",
