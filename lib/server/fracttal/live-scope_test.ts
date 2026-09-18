@@ -2,11 +2,11 @@
 // to the envelope total and any truncation throws before runSync, so a
 // partial page can never drive deletions (the outage drill is the
 // truncation test below).
-import { fetchScopeSignals } from "./live-scope.ts";
-
 import type { FracttalListQuery, FracttalWorkQuery } from "./types.ts";
 
 import { assertStrictEquals } from "jsr:@std/assert@^1";
+
+import { fetchScopeSignals } from "./live-scope.ts";
 
 function item(code: string): Record<string, unknown> {
   return { id: 1, code };

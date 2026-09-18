@@ -4,13 +4,6 @@
 // per-call timeout, exponential backoff, and honor of the 200 req/min limit
 // (pause on low `ratelimit-remaining`, wait out `ratelimit-reset` on 406).
 // Never imported by islands - lib/server only.
-import {
-  createTokenCache,
-  type FracttalToken,
-  type TokenCacheOptions,
-  type TokenCredentials,
-} from "./token.ts";
-
 import type {
   FracttalAsset,
   FracttalListQuery,
@@ -18,6 +11,13 @@ import type {
   FracttalReport,
   FracttalWorkQuery,
 } from "./types.ts";
+
+import {
+  createTokenCache,
+  type FracttalToken,
+  type TokenCacheOptions,
+  type TokenCredentials,
+} from "./token.ts";
 
 import { toItemType } from "./itemType.ts";
 

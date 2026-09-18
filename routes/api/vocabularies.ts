@@ -10,9 +10,9 @@ import {
 
 import { readThrottle, routeClientKey } from "../../lib/server/throttle.ts";
 
-import { loadServerConfig } from "../../lib/server/config.ts";
-
 import { getVocabularies } from "../../lib/server/sql/vocabularies.ts";
+
+import { loadServerConfig } from "../../lib/server/config.ts";
 
 import { define } from "../../utils.ts";
 

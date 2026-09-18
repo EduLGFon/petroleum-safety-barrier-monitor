@@ -8,9 +8,13 @@ import type {
   WireCategoryCompliance,
   WireKpiSnapshot,
 } from "../wireTypes.ts";
+
 import { resolveBarriers, resolveChartData, resolveKpi } from "../resolve.ts";
-import { buildQueryString } from "./query.ts";
+
 import type { ResolverLabels } from "../resolve.ts";
+
+import { buildQueryString } from "./query.ts";
+
 import type { BarriersApi } from "./types.ts";
 
 // Creates an HTTP BarriersApi bound to the given backend baseUrl. labels

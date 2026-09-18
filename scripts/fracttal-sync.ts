@@ -21,11 +21,11 @@ import {
 
 import { buildWorkEvents, resolverFor } from "../lib/server/fracttal/work.ts";
 
+import { runSync, type SyncResult } from "../lib/server/fracttal/sync.ts";
+
 import { fetchScopeSignals } from "../lib/server/fracttal/live-scope.ts";
 
 import type { WorkEventsResolver } from "../lib/server/fracttal/work.ts";
-
-import { runSync, type SyncResult } from "../lib/server/fracttal/sync.ts";
 
 import { createFracttalClient } from "../lib/server/fracttal/client.ts";
 
