@@ -1,4 +1,4 @@
-// Conformidade chart inner - stacked horizontal bars as pure SVG.
+// Compliance chart inner - stacked horizontal bars as pure SVG.
 // This is why it exists: dependency-free replacement for recharts with
 // the same data contract (Conforme / Não Conforme per category), axis,
 // gridlines and hover tooltip. All SVG text styling goes through `style`
@@ -15,12 +15,20 @@ import {
   px,
   TOP,
 } from "./chart/geometry.ts";
+
 import { useSettings } from "../context/SettingsContext.tsx";
+
 import type { CategoryCompliance } from "../lib/types.ts";
+
 import { ChartTooltip } from "./chart/ChartTooltip.tsx";
+
 import { useEffect, useState } from "preact/hooks";
+
 import { ChartRow } from "./chart/ChartRow.tsx";
+
 import type { CSSProperties } from "preact";
+
+import { fmt } from "../lib/utils.ts";
 
 interface Props {
   data: CategoryCompliance[];
@@ -38,8 +46,8 @@ interface Props {
   showLegend?: boolean;
 }
 
-// ConformidadeChartInner: stacked Conforme / Não Conforme SVG bars with hover tip and density geometry.
-export default function ConformidadeChartInner(
+// ComplianceChartInner: stacked compliant / non-compliant SVG bars with hover tip and density geometry.
+export default function ComplianceChartInner(
   {
     data,
     onSelectCategory,
@@ -121,7 +129,7 @@ export default function ConformidadeChartInner(
                 transition: "x .5s var(--ease-out)",
               } as CSSProperties}
             >
-              {t.toLocaleString("pt-BR")}
+              {fmt(t)}
             </text>
           </g>
         ))}

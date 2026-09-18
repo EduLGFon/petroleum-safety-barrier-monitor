@@ -1,7 +1,6 @@
 // Compliance chart card - Aurora glass section around the SVG bars.
 // This is why it exists: keeps the card frame stable while the inner
 // chart stays dependency-free (no dynamic import needed in Fresh).
-import type { CategoryCompliance } from "../lib/types.ts";
 import {
   CHART_COLUMNS,
   CHART_TOP_N,
@@ -10,14 +9,21 @@ import {
   prepareChart,
   splitColumns,
 } from "../lib/dashboard/chart.ts";
-import { computeMax } from "./chart/geometry.ts";
+
 import {
   loadChartPrefs,
   saveChartPrefs,
 } from "../hooks/dashboard/persistence.ts";
+
+import type { CategoryCompliance } from "../lib/types.ts";
+
 import { ChartSummary } from "./chart/ChartSummary.tsx";
+
 import { GLASS_INPUT } from "./filter/FilterSelect.tsx";
-import Chart from "./ConformidadeChartInner.tsx";
+
+import { computeMax } from "./chart/geometry.ts";
+
+import Chart from "./ComplianceChartInner.tsx";
 import { useEffect, useMemo, useState } from "preact/hooks";
 import { AURORA } from "../lib/aurora.ts";
 
@@ -40,7 +46,7 @@ const SORTS: { value: ChartSort; label: string; title: string }[] = [
     label: "% NC",
     title: "Maior % Não Conforme primeiro (mín. 5 itens)",
   },
-  { value: "alpha", label: "A–Z", title: "Ordem alfabética" },
+  { value: "alpha", label: "A-Z", title: "Ordem alfabética" },
 ];
 
 const VIEWS: { value: ChartView; label: string; title: string }[] = [
@@ -52,11 +58,11 @@ const VIEWS: { value: ChartView; label: string; title: string }[] = [
   },
 ];
 
-// ConformidadeChart: glass card frame with view tabs; bars view carries the
+// ComplianceChart: glass card frame with view tabs; bars view carries the
 // search + sort toolbar over side-by-side Top-N (+Outras) columns sharing
 // one x-scale (expanded mode scrolls the full list as before), summary view
 // shows the executive donut.
-export function ConformidadeChart(
+export function ComplianceChart(
   { data, onSelectCategory, activeCategory = "" }: Props,
 ) {
   const [sort, setSort] = useState<ChartSort>(() => loadChartPrefs().sort);
