@@ -1,8 +1,9 @@
 // RecipientsTab - who receives alert emails, managed by admins.
 // This is why it exists: the digest audience lives in alert_recipients;
 // this tab wraps its CRUD with PT labels and active toggles.
-import { api } from "./api.ts";
 import { useEffect, useState } from "preact/hooks";
+
+import { api } from "./api.ts";
 
 interface Recipient {
   id: number;

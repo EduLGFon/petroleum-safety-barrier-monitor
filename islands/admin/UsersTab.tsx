@@ -1,8 +1,9 @@
 // UsersTab - admin user list, creation, role and access management.
 // This is why it exists: promoting users to admin and deactivating leavers
 // is a core admin task; this tab wraps /api/users with PT labels.
-import { api } from "./api.ts";
 import { useEffect, useState } from "preact/hooks";
+
+import { api } from "./api.ts";
 
 interface PublicUser {
   id: number;

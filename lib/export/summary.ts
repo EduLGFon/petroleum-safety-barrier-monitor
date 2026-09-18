@@ -3,11 +3,11 @@
 // formatted totals, so exports always match the dashboard KPI cards.
 import { DISP_KNOWN_ORDER } from "../constants.ts";
 
-import { fmt } from "../format.ts";
-
 import type { Barrier } from "../types.ts";
 
 import { computeKpi } from "../utils.ts";
+
+import { fmt } from "../format.ts";
 
 export interface KpiStats {
   total: string;

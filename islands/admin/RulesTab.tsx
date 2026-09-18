@@ -2,8 +2,9 @@
 // This is why it exists: admins enable or mute alerts by category and tune
 // the trigger (landing status, critical-only, recovery, stale days,
 // immediate vs digest) without code changes.
-import { api } from "./api.ts";
 import { useEffect, useState } from "preact/hooks";
+
+import { api } from "./api.ts";
 
 interface AlertRule {
   id: number;
