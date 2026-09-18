@@ -8,6 +8,8 @@ import { CONF_COLORS, DISP_COLORS } from "../constants.ts";
 
 import { daysSince, humanDuration } from "../utils.ts";
 
+import { refusalMessage } from "./limits.ts";
+
 import type { Barrier } from "../types.ts";
 
 import { withBrand } from "../company.ts";
@@ -111,11 +113,7 @@ export function exportToPDF(
 ): void {
   assertBrowser();
   if (barriers.length > MAX_DOM_ROWS) {
-    throw new Error(
-      `PDF comporta até ${MAX_DOM_ROWS.toLocaleString("pt-BR")} registros; ` +
-        `filtrado tem ${barriers.length.toLocaleString("pt-BR")}. ` +
-        `Filtre mais ou exporte CSV.`,
-    );
+    throw new Error(refusalMessage("PDF", barriers.length));
   }
   let node = document.getElementById(REPORT_ID);
   if (!node) {
@@ -130,7 +128,7 @@ export function exportToPDF(
   const cleanup = () => {
     document.body.classList.remove("printing-report");
     document.title = prevTitle;
-    node!.innerHTML = "";
+    if (node) node.innerHTML = "";
   };
   globalThis.addEventListener("afterprint", cleanup, { once: true });
   globalThis.print();

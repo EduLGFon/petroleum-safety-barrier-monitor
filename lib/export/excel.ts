@@ -14,6 +14,8 @@ import { CONF_COLORS, DISP_COLORS } from "../constants.ts";
 
 import { kpiStats, summaryRows } from "./summary.ts";
 
+import { refusalMessage } from "./limits.ts";
+
 import type { Barrier } from "../types.ts";
 
 import { withBrand } from "../company.ts";
@@ -71,11 +73,7 @@ export function exportToExcel(
 ): void {
   assertBrowser();
   if (barriers.length > MAX_DOM_ROWS) {
-    throw new Error(
-      `Excel comporta até ${MAX_DOM_ROWS.toLocaleString("pt-BR")} registros; ` +
-        `filtrado tem ${barriers.length.toLocaleString("pt-BR")}. ` +
-        `Filtre mais ou exporte CSV.`,
-    );
+    throw new Error(refusalMessage("Excel", barriers.length));
   }
   const brand = companyName.toUpperCase() ||
     "MONITOR DE BARREIRAS DE SEGURANÇA";
