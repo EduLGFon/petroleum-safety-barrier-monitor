@@ -58,3 +58,24 @@ Deno.test("computeKpi fails novel compliance closed into NC", () => {
   assertStrictEquals(k.nonCompliant, 1);
   assertStrictEquals(k.byCompliance?.["Parcial"], 1);
 });
+
+// Novel availability lands in other so fixed fields + other === total.
+Deno.test("computeKpi counts novel availability in other", () => {
+  const k = computeKpi([
+    barrier({ availability: "Disponível", compliance: "Conforme" }),
+    barrier({
+      id: 2,
+      availability: "Em Comissionamento",
+      compliance: "Parcial",
+    }),
+  ]);
+  assertStrictEquals(k.total, 2);
+  assertStrictEquals(k.available, 1);
+  assertStrictEquals(k.other, 1);
+  assertStrictEquals(
+    k.available + k.outOfService + k.contingencyOutage +
+      k.degradedContingency + k.degraded + k.unavailable + k.other,
+    k.total,
+  );
+  assertStrictEquals(k.byAvailability?.["Em Comissionamento"], 1);
+});

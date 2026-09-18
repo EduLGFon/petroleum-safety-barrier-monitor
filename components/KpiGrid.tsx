@@ -62,7 +62,7 @@ function AnimVal({ n, isPercent }: { n: number; isPercent?: boolean }) {
   );
 }
 
-// KpiGrid: six glass cards from KpiSnapshot + location label; shares divide by total||1, contingency card sums contingencyOutage + degradedContingency.
+// KpiGrid: glass cards from KpiSnapshot + location label; shares divide by total||1, contingency card sums contingencyOutage + degradedContingency.
 export function KpiGrid({ kpi, location }: Props) {
   const t = kpi.total || 1;
   const loc = location === "ALL" ? "total geral" : `em ${location}`;
@@ -71,6 +71,7 @@ export function KpiGrid({ kpi, location }: Props) {
   const contShare = Math.round(
     (kpi.contingencyOutage + kpi.degradedContingency) / t * 100,
   );
+  const otherShare = Math.round((kpi.other ?? 0) / t * 100);
   const cards: C[] = [
     {
       label: "Total de Barreiras",
@@ -116,6 +117,16 @@ export function KpiGrid({ kpi, location }: Props) {
       alert: kpi.criticalNonCompliant > 0,
       delay: 250,
     },
+    ...((kpi.other ?? 0) > 0
+      ? [{
+        label: "Outros Status",
+        rawNum: kpi.other ?? 0,
+        sub: pct(otherShare) + " do inv.",
+        share: otherShare,
+        alert: true,
+        delay: 300,
+      } as C]
+      : []),
   ];
 
   return (

@@ -18,6 +18,7 @@ export function computeKpi(b: Barrier[]): KpiSnapshot {
     degradedContingency = 0,
     degraded = 0,
     unavailable = 0,
+    other = 0,
     compliant = 0,
     nonCompliant = 0,
     criticalNonCompliant = 0;
@@ -44,6 +45,10 @@ export function computeKpi(b: Barrier[]): KpiSnapshot {
       case "Indisponível":
         unavailable++;
         break;
+      default:
+        // Novel status: counted in other so fixed fields + other === total.
+        other++;
+        break;
     }
     if (x.compliance === "Conforme") compliant++;
     else {
@@ -62,6 +67,7 @@ export function computeKpi(b: Barrier[]): KpiSnapshot {
     degradedContingency,
     degraded,
     unavailable,
+    other,
     compliant,
     nonCompliant,
     criticalNonCompliant,

@@ -122,6 +122,7 @@ export async function getKpi(
       degraded_contingency: string;
       degraded: string;
       unavailable: string;
+      other: string;
       compliant: string;
       non_compliant: string;
       critical_non_compliant: string;
@@ -134,6 +135,7 @@ export async function getKpi(
         count(*) filter (where b.availability_id = 3)::text as degraded_contingency,
         count(*) filter (where b.availability_id = 4)::text as degraded,
         count(*) filter (where b.availability_id = 5)::text as unavailable,
+        count(*) filter (where b.availability_id not in (0, 1, 2, 3, 4, 5))::text as other,
         count(*) filter (where b.compliance_id = 0)::text as compliant,
         count(*) filter (where b.compliance_id = 1)::text as non_compliant,
         count(*) filter (where b.compliance_id = 1 and b.criticality_id = 1)::text as critical_non_compliant
@@ -176,6 +178,7 @@ export async function getKpi(
     degradedContingency: Number(r?.degraded_contingency ?? 0),
     degraded: Number(r?.degraded ?? 0),
     unavailable: Number(r?.unavailable ?? 0),
+    other: Number(r?.other ?? 0),
     compliant,
     nonCompliant: Number(r?.non_compliant ?? 0),
     criticalNonCompliant: Number(r?.critical_non_compliant ?? 0),

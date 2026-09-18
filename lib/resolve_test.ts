@@ -22,6 +22,7 @@ function snapshot(over: Partial<WireKpiSnapshot> = {}): WireKpiSnapshot {
     degradedContingency: 0,
     degraded: 0,
     unavailable: 0,
+    other: 0,
     compliant: 0,
     nonCompliant: 0,
     pctCompliant: 0,

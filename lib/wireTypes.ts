@@ -44,6 +44,7 @@ export interface WireKpiSnapshot {
   degradedContingency: number;
   degraded: number;
   unavailable: number;
+  other: number;
   compliant: number;
   nonCompliant: number;
   pctCompliant: number;
