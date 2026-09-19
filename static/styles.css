@@ -1076,6 +1076,31 @@ html.no-anim *::after {
   }
 }
 
+/* ── Login (Blurred Dashboard production) ────────────────────────────────
+   Shared credential inputs. Colors resolve to --au-* tokens so
+   light/dark/amoled and accent presets re-tint freely. */
+.login-input {
+  width: 100%;
+  box-sizing: border-box;
+  background: var(--au-data);
+  border: 1px solid var(--au-data-border);
+  border-radius: 10px;
+  padding: 11px 13px;
+  color: var(--au-value);
+  font-size: 14px;
+  outline: none;
+  transition:
+    border-color 0.18s var(--ease-std),
+    box-shadow 0.18s var(--ease-std);
+}
+.login-input::placeholder {
+  color: var(--au-sub);
+}
+.login-input:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--glow);
+}
+
 /* ── Print report (exportToPDF) ─────────────────────────────────────────────
    The report node is hidden on screen. While printing, the app is hidden
    and only the report prints, landscape with page numbers. */
