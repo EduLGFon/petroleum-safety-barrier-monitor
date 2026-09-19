@@ -7,6 +7,8 @@ import { type Conn, useConnection } from "../hooks/useConnection.ts";
 
 import { AURORA, AURORA_CONN, AURORA_TYPE } from "../lib/aurora.ts";
 
+import type { AuthUser } from "../lib/types.ts";
+
 import { useSettings } from "../context/SettingsContext.tsx";
 
 interface Props {
@@ -15,6 +17,9 @@ interface Props {
   // Base URL of the API origin. Empty = same origin as the page, so the
   // health probe defaults to the relative "/api/health".
   apiBaseUrl?: string;
+  // Authenticated session identity (crossed from the server route). Shown
+  // as email + role with a logout action; absent = menu hidden.
+  sessionUser?: AuthUser | null;
 }
 
 type ConnState = Conn;
@@ -45,9 +50,24 @@ function GearIcon() {
   );
 }
 
+// logoutToLogin: revokes the session cookie, then lands on /login.
+// Failures still navigate (a dead session must never trap the user).
+async function logoutToLogin(): Promise<void> {
+  try {
+    await fetch("/api/auth/logout", {
+      method: "POST",
+      credentials: "same-origin",
+    });
+  } catch {
+    // Cookie may already be dead; navigation clears it anyway.
+  }
+  globalThis.location.href = "/login";
+}
+
 // Header: title + live connection dot on the left, settings gear on the right.
 export function Header(
-  { onOpenSettings, companyName = "", apiBaseUrl = "" }: Props,
+  { onOpenSettings, companyName = "", apiBaseUrl = "", sessionUser = null }:
+    Props,
 ) {
   const healthUrl = apiBaseUrl
     ? `${apiBaseUrl.replace(/\/$/, "")}/api/health`
@@ -125,6 +145,67 @@ export function Header(
         </div>
       </div>
       <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+        {sessionUser && (
+          <span
+            className="glass-pill"
+            title={sessionUser.email}
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 8,
+              padding: "0 6px 0 12px",
+              height: 32,
+              background: AURORA.pill,
+              border: `1px solid ${AURORA.pillBorder}`,
+              borderRadius: 99,
+              color: AURORA.pillText,
+              fontSize: 12,
+              maxWidth: 260,
+            }}
+          >
+            <span
+              style={{
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+                whiteSpace: "nowrap",
+              }}
+            >
+              {sessionUser.email}
+            </span>
+            <span
+              style={{
+                fontSize: 10,
+                fontWeight: 700,
+                letterSpacing: ".08em",
+                textTransform: "uppercase",
+                background: AURORA.grad,
+                color: "#fff",
+                borderRadius: 99,
+                padding: "2px 8px",
+                flexShrink: 0,
+              }}
+            >
+              {sessionUser.role === "admin" ? "Admin" : "Usuário"}
+            </span>
+            <button
+              type="button"
+              onClick={() => void logoutToLogin()}
+              title="Sair"
+              style={{
+                border: 0,
+                background: "transparent",
+                color: AURORA.pillText,
+                fontSize: 12,
+                fontWeight: 600,
+                cursor: "pointer",
+                padding: "4px 6px",
+                flexShrink: 0,
+              }}
+            >
+              Sair
+            </button>
+          </span>
+        )}
         <a
           href="/admin"
           className="glass-pill lift"

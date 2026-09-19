@@ -9,7 +9,7 @@ import { LoadingScreen } from "../../components/LoadingScreen.tsx";
 
 import { useSettings } from "../../context/SettingsContext.tsx";
 
-import type { Barrier, Vocabularies } from "../../lib/types.ts";
+import type { AuthUser, Barrier, Vocabularies } from "../../lib/types.ts";
 
 import { useCallback, useEffect, useState } from "preact/hooks";
 
@@ -25,12 +25,20 @@ interface Props {
   apiMode: "mock" | "http";
   apiBaseUrl: string;
   vocabularies: Vocabularies | null;
+  sessionUser: AuthUser | null;
 }
 
 // DashboardView: picks the data mode; splash, settings, and sections live
 // in the mode views below so hooks never run conditionally.
 export function DashboardView(
-  { initialBarriers, companyName, apiMode, apiBaseUrl, vocabularies }: Props,
+  {
+    initialBarriers,
+    companyName,
+    apiMode,
+    apiBaseUrl,
+    vocabularies,
+    sessionUser,
+  }: Props,
 ) {
   const { settings } = useSettings();
   if (apiMode === "http") {
@@ -40,6 +48,7 @@ export function DashboardView(
         vocabularies={vocabularies}
         companyName={companyName}
         defaultLocation={settings.defaultLocation}
+        sessionUser={sessionUser}
       />
     );
   }
@@ -48,16 +57,18 @@ export function DashboardView(
       barriers={initialBarriers}
       companyName={companyName}
       defaultLocation={settings.defaultLocation}
+      sessionUser={sessionUser}
     />
   );
 }
 
 // ClientView: mock-mode dashboard over the SSR'd barrier list.
 function ClientView(
-  { barriers, companyName, defaultLocation }: {
+  { barriers, companyName, defaultLocation, sessionUser }: {
     barriers: Barrier[];
     companyName: string;
     defaultLocation: string;
+    sessionUser: AuthUser | null;
   },
 ) {
   const [loading, setLoading] = useState(true);
@@ -88,6 +99,7 @@ function ClientView(
         loading={loading}
         companyName={companyName}
         serverMode={false}
+        sessionUser={sessionUser}
         apiBaseUrl=""
       />
     </>
@@ -97,11 +109,12 @@ function ClientView(
 // ServerView: HTTP-mode dashboard paging from the API per scope change,
 // refreshing data + vocabularies on a 5-minute cadence (hidden tabs skip).
 function ServerView(
-  { baseUrl, vocabularies, companyName, defaultLocation }: {
+  { baseUrl, vocabularies, companyName, defaultLocation, sessionUser }: {
     baseUrl: string;
     vocabularies: Vocabularies | null;
     companyName: string;
     defaultLocation: string;
+    sessionUser: AuthUser | null;
   },
 ) {
   const [splashDone, setSplashDone] = useState(false);
@@ -151,6 +164,7 @@ function ServerView(
         loading={loading}
         companyName={companyName}
         serverMode
+        sessionUser={sessionUser}
         apiBaseUrl={baseUrl}
         onServerCsv={exportServerCsv}
       />

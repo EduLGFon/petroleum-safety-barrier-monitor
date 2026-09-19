@@ -17,11 +17,11 @@ import { FilterBar } from "../../components/FilterBar.tsx";
 
 import { sanitizeFilterPatch } from "../../lib/utils.ts";
 
+import type { AuthUser, Barrier } from "../../lib/types.ts";
+
 import { Header } from "../../components/Header.tsx";
 
 import { useEffect, useState } from "preact/hooks";
-
-import type { Barrier } from "../../lib/types.ts";
 
 import { KpiSections } from "./KpiSections.tsx";
 
@@ -48,6 +48,9 @@ interface SectionsProps {
   loading: boolean;
   companyName: string;
   serverMode: boolean;
+  // Authenticated session identity for the Header user menu. Null when the
+  // island renders without SSR identity (never in production page flow).
+  sessionUser?: AuthUser | null;
   // Origin of the API for the header health probe. Empty = same origin.
   apiBaseUrl?: string;
   // Server mode only: streams the full filtered set as CSV. Absent in mock
@@ -70,6 +73,7 @@ export function DashboardSections(
     loading,
     companyName,
     serverMode,
+    sessionUser = null,
     apiBaseUrl = "",
     onServerCsv,
   }: SectionsProps,
@@ -141,6 +145,7 @@ export function DashboardSections(
           onOpenSettings={() => setSettingsOpen(true)}
           companyName={companyName}
           apiBaseUrl={apiBaseUrl}
+          sessionUser={sessionUser}
         />
 
         {/* Location tabs */}

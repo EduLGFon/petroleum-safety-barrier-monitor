@@ -1,11 +1,22 @@
-// Admin route - renders the management console island.
-// This is why it exists: user, recipient, and alert-rule management needs a
-// dedicated page outside the dashboard grid; the island itself guards the
-// admin role via /api/auth/me.
+// Admin route - camouflaged management console.
+// This is why it exists: the console's very existence is hidden from
+// strangers (anonymous visitors get a bare 404, same as a missing page).
+// Dead cookies redirect to /login with ?next=/admin; authenticated users
+// render the island, which keeps its own role check for non-admins.
+import { requirePageSession, toLogin } from "../lib/server/page-auth.ts";
+
+import { camouflage } from "../lib/server/page-auth.ts";
+
 import { AdminPanel } from "../islands/AdminPanel.tsx";
+
 import { define } from "../utils.ts";
 
-export default define.page(function Admin() {
+export default define.page(async function Admin(
+  { url, req }: { url: URL; req: Request },
+) {
+  const session = await requirePageSession(req);
+  if (session.state === "anonymous") return camouflage();
+  if (session.state === "expired") return toLogin(url);
   return (
     <main
       style={{

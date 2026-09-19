@@ -2,11 +2,16 @@
 // This is why it exists: Fresh port of the Next route; the snapshot honors
 // the same filter subset as the table (location, availability, compliance,
 // category, text, dates) so the header never disagrees with the grid.
+// Authenticated GET (session or ADMIN_TOKEN); anonymous gets 404.
 import {
   internal,
   newRequestId,
+  notFound,
   rateLimited,
+  unauthorized,
 } from "../../lib/server/errors.ts";
+
+import { requireDataAuth } from "../../lib/server/auth.ts";
 
 import { readThrottle, routeClientKey } from "../../lib/server/throttle.ts";
 
@@ -34,6 +39,12 @@ export const handler = define.handlers({
       loadServerConfig();
     } catch (err) {
       return internal("GET /api/kpi", err, requestId, "Server misconfigured");
+    }
+    const dataAuth = await requireDataAuth(ctx.req);
+    if (!dataAuth.ok) {
+      return dataAuth.anonymous
+        ? notFound("not found", requestId)
+        : unauthorized(dataAuth.message, requestId);
     }
 
     const filter = parseFilterQuery(ctx.url.searchParams);

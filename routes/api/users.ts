@@ -6,6 +6,7 @@ import {
   badRequest,
   internal,
   newRequestId,
+  notFound,
   rateLimited,
 } from "../../lib/server/errors.ts";
 
@@ -28,7 +29,7 @@ import {
 
 import { loadServerConfig } from "../../lib/server/config.ts";
 
-import { requireAdminAuth } from "../../lib/server/auth.ts";
+import { hasCredentials, requireAdminAuth } from "../../lib/server/auth.ts";
 
 import { countUsers } from "../../lib/server/sql/users.ts";
 
@@ -50,6 +51,9 @@ async function guardAdmin(
   }
   const auth = await requireAdminAuth(req);
   if (!auth.ok) {
+    // Anonymous callers cannot probe user management; the empty-table
+    // bootstrap above already returned for a fresh database.
+    if (!hasCredentials(req)) return notFound("not found", newRequestId());
     return unauthorized(auth.message, newRequestId());
   }
   void ctx;

@@ -1,13 +1,17 @@
 // API: GET /api/barriers/:id - single wire barrier or 404.
 // This is why it exists: Fresh port of the Next route with identical
-// id validation. Open GET, throttled, envelope errors.
+// id validation. Authenticated GET (session or ADMIN_TOKEN); anonymous
+// callers cannot probe row existence. Throttled, envelope errors.
 import {
   badRequest,
   internal,
   newRequestId,
   notFound,
   rateLimited,
+  unauthorized,
 } from "../../../lib/server/errors.ts";
+
+import { requireDataAuth } from "../../../lib/server/auth.ts";
 
 import { readThrottle, routeClientKey } from "../../../lib/server/throttle.ts";
 
@@ -38,6 +42,14 @@ export const handler = define.handlers({
         requestId,
         "Server misconfigured",
       );
+    }
+    const dataAuth = await requireDataAuth(ctx.req);
+    if (!dataAuth.ok) {
+      // Row-miss and camouflage share the 404 shape on purpose, so
+      // anonymous callers cannot probe which ids exist.
+      return dataAuth.anonymous
+        ? notFound("not found", requestId)
+        : unauthorized(dataAuth.message, requestId);
     }
 
     const barrierId = Number(ctx.params.id);

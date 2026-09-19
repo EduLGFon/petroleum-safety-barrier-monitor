@@ -1,12 +1,16 @@
 // API: GET /api/vocabularies - filter vocabularies for refresh cadence.
 // This is why it exists: the dashboard SSRs vocabularies once, but the
 // auto-refresh tick refetches them so new stations/categories appear
-// without a full page reload. Open GET like the other dashboard reads.
+// without a full page reload. Authenticated GET (labels leak stations).
 import {
   internal,
   newRequestId,
+  notFound,
   rateLimited,
+  unauthorized,
 } from "../../lib/server/errors.ts";
+
+import { requireDataAuth } from "../../lib/server/auth.ts";
 
 import { readThrottle, routeClientKey } from "../../lib/server/throttle.ts";
 
@@ -37,6 +41,12 @@ export const handler = define.handlers({
         requestId,
         "Server misconfigured",
       );
+    }
+    const dataAuth = await requireDataAuth(ctx.req);
+    if (!dataAuth.ok) {
+      return dataAuth.anonymous
+        ? notFound("not found", requestId)
+        : unauthorized(dataAuth.message, requestId);
     }
 
     try {

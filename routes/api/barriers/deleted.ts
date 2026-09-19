@@ -8,7 +8,6 @@ import {
   internal,
   newRequestId,
   rateLimited,
-  unauthorized,
 } from "../../../lib/server/errors.ts";
 
 import { readThrottle, routeClientKey } from "../../../lib/server/throttle.ts";
@@ -21,7 +20,10 @@ import { loadServerConfig } from "../../../lib/server/config.ts";
 
 import type { BarriersQuery } from "../../../lib/wireTypes.ts";
 
-import { requireAdminAuth } from "../../../lib/server/auth.ts";
+import {
+  denyByCredentials,
+  requireAdminAuth,
+} from "../../../lib/server/auth.ts";
 
 import { define } from "../../../utils.ts";
 
@@ -38,7 +40,7 @@ export const handler = define.handlers({
       );
     }
     const auth = await requireAdminAuth(ctx.req);
-    if (!auth.ok) return unauthorized(auth.message, requestId);
+    if (!auth.ok) return denyByCredentials(ctx.req, auth.message, requestId);
     try {
       loadServerConfig();
     } catch (err) {

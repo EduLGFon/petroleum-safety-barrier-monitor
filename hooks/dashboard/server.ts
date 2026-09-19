@@ -15,6 +15,8 @@ import { restoreSelection, useSelection } from "./selection.ts";
 
 import { httpAdapterFactory } from "../../lib/api/http.ts";
 
+import { isAuthExpired } from "../../lib/api/http.ts";
+
 import type { BarriersApi } from "../../lib/api/types.ts";
 
 import { loadDash, saveDash } from "./persistence.ts";
@@ -27,6 +29,17 @@ import { LOCATIONS } from "../../lib/constants.ts";
 
 import { computeKpi } from "../../lib/utils.ts";
 
+// toLoginWithReturn: sends an expired session back to /login preserving
+// the current page, so the user lands where they were after signing in.
+function toLoginWithReturn(): void {
+  try {
+    const here = globalThis.location.pathname + globalThis.location.search;
+    globalThis.location.href = `/login?next=${encodeURIComponent(here)}`;
+  } catch {
+    // Non-browser (tests): nothing to redirect.
+  }
+}
+
 // Server-driven dashboard store; same 22-key contract as useDashboard plus
 // loading/error/retry. CSV export covers the full filtered set via the
 // server endpoint (xls/pdf stay page-local client exports).
@@ -35,6 +48,8 @@ import { computeKpi } from "../../lib/utils.ts";
 // vocabularies (server-provided) supply dynamic station/category id maps so
 // imported values beyond the seed enums resolve and filter by id; refreshMs
 // polls data + vocabularies on a cadence (0 disables, skips hidden tabs).
+// Auth expiry (AuthExpiredError from the HTTP adapter) redirects to
+// /login?next= so a dead session never strands the user on errors.
 export function useServerDashboard(
   baseUrl: string,
   defaultLocation = "ALL",
@@ -170,6 +185,12 @@ export function useServerDashboard(
       setLoading(false);
     }).catch((err) => {
       if (cancelled) return;
+      // Dead session mid-use: back to login with a return ticket instead
+      // of stranding the dashboard on an error banner.
+      if (isAuthExpired(err)) {
+        toLoginWithReturn();
+        return;
+      }
       setError(err instanceof Error ? err.message : "Falha ao carregar dados");
       setLoading(false);
     });
@@ -232,7 +253,12 @@ export function useServerDashboard(
       if (!baseUrl) return;
       fetch(`${baseUrl}/api/vocabularies`, {
         headers: { "Accept": "application/json" },
+        credentials: "same-origin",
       }).then((res) => {
+        if (res.status === 401 || res.status === 404) {
+          toLoginWithReturn();
+          return;
+        }
         if (!res.ok) return;
         return res.json() as Promise<Vocabularies>;
       }).then((v) => {
@@ -266,7 +292,14 @@ export function useServerDashboard(
     for (const [k, v] of Object.entries(wq)) {
       if (v !== undefined && v !== "") qs.set(k, String(v));
     }
-    const res = await fetch(`${baseUrl}/api/export?${qs.toString()}`);
+    const res = await fetch(`${baseUrl}/api/export?${qs.toString()}`, {
+      credentials: "same-origin",
+    });
+    if (res.status === 401 || res.status === 404) {
+      // Extraction on a dead session: re-login first, then retry export.
+      toLoginWithReturn();
+      throw new Error("Sessão expirada - entre novamente para exportar");
+    }
     if (!res.ok) {
       let detail = `HTTP ${res.status}`;
       try {

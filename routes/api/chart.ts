@@ -1,12 +1,16 @@
 // API: GET /api/chart - per-category Conforme totals over the filters.
 // This is why it exists: Fresh port for the server-paginated dashboard; the
 // chart honors the same filter subset as the table so it never disagrees
-// with the grid. Open GET, throttled, envelope errors.
+// with the grid. Authenticated GET (session or ADMIN_TOKEN); throttled.
 import {
   internal,
   newRequestId,
+  notFound,
   rateLimited,
+  unauthorized,
 } from "../../lib/server/errors.ts";
+
+import { requireDataAuth } from "../../lib/server/auth.ts";
 
 import { readThrottle, routeClientKey } from "../../lib/server/throttle.ts";
 
@@ -39,6 +43,12 @@ export const handler = define.handlers({
         requestId,
         "Server misconfigured",
       );
+    }
+    const dataAuth = await requireDataAuth(ctx.req);
+    if (!dataAuth.ok) {
+      return dataAuth.anonymous
+        ? notFound("not found", requestId)
+        : unauthorized(dataAuth.message, requestId);
     }
 
     const filter = parseFilterQuery(ctx.url.searchParams);

@@ -7,7 +7,7 @@ import { SettingsProvider } from "../context/SettingsContext.tsx";
 
 import { DashboardView } from "./dashboard/DashboardView.tsx";
 
-import type { Barrier, Vocabularies } from "../lib/types.ts";
+import type { AuthUser, Barrier, Vocabularies } from "../lib/types.ts";
 
 import { ThemeProvider } from "../context/ThemeContext.tsx";
 
@@ -19,11 +19,19 @@ interface Props {
   apiMode: "mock" | "http";
   apiBaseUrl: string;
   vocabularies: Vocabularies | null;
+  sessionUser: AuthUser | null;
 }
 
 // Dashboard: island root; wraps DashboardView in Settings + Theme providers since server route context does not reach hydrated islands.
 export function Dashboard(
-  { initialBarriers, companyName, apiMode, apiBaseUrl, vocabularies }: Props,
+  {
+    initialBarriers,
+    companyName,
+    apiMode,
+    apiBaseUrl,
+    vocabularies,
+    sessionUser,
+  }: Props,
 ) {
   // Providers must wrap the island content itself: context from a server
   // route does not reach island code when it hydrates in the browser.
@@ -37,6 +45,7 @@ export function Dashboard(
             apiMode={apiMode}
             apiBaseUrl={apiBaseUrl}
             vocabularies={vocabularies}
+            sessionUser={sessionUser}
           />
         </ErrorBoundary>
       </ThemeProvider>

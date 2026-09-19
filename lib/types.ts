@@ -134,3 +134,12 @@ export interface FilterState {
   sortCol: SortableColumn;
   sortDir: "asc" | "desc";
 }
+
+// Authenticated session identity crossed from server routes into islands
+// (Header menu). Client-safe subset: no hashes, no expiry internals.
+export interface AuthUser {
+  id: number;
+  email: string;
+  name: string;
+  role: "admin" | "user";
+}

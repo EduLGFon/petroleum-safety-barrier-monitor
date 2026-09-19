@@ -1,15 +1,19 @@
 // API: GET /api/export?format=csv - server CSV of the current query.
 // This is why it exists: the dashboard's CSV download streams the whole
 // filtered set (capped) with byte-same rows via lib/server/exportCsv.ts,
-// resolving real station/category labels from the lookup tables. Open like
-// the other dashboard GETs (decision documented in docs/API.md); throttled
-// tighter (DB-heavy).
+// resolving real station/category labels from the lookup tables.
+// Authenticated like the other dashboard GETs (extraction needs a session
+// or ADMIN_TOKEN); anonymous gets 404 camouflage. Throttled tighter.
 import {
   badRequest,
   internal,
   newRequestId,
+  notFound,
   rateLimited,
+  unauthorized,
 } from "../../lib/server/errors.ts";
+
+import { requireDataAuth } from "../../lib/server/auth.ts";
 
 import {
   EXPORT_MAX_ROWS,
@@ -65,6 +69,12 @@ export const handler = define.handlers({
         requestId,
         "Server misconfigured",
       );
+    }
+    const dataAuth = await requireDataAuth(ctx.req);
+    if (!dataAuth.ok) {
+      return dataAuth.anonymous
+        ? notFound("not found", requestId)
+        : unauthorized(dataAuth.message, requestId);
     }
 
     const sp = ctx.url.searchParams;

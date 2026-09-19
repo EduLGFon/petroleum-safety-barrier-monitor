@@ -188,12 +188,15 @@ Every failure responds with the `{ error, code, requestId }` envelope + the
 `RATE_LIMITED` / `INTERNAL`; `500` never leaks a stack or column - the public
 message is fixed per route and the detail goes to the log with the `requestId`).
 
-Explicitly decided openness: **dashboard GETs are open** (`barriers`, `:id`,
-`kpi`, `chart`, `export`, `vocabularies`) - operational read data; **writes and admin data require
+Login => Dashboard: **dashboard GETs require auth** (`barriers`, `:id`,
+`kpi`, `chart`, `export`, `vocabularies`) - session cookie or `ADMIN_TOKEN`.
+Anonymous callers get `404` camouflage (`NOT_FOUND`, same shape as a missing
+route); dead credentials get `401`. **Writes and admin data require
 admin** (session cookie or `ADMIN_TOKEN`): `PATCH .../status`, recipients,
 users, alert-rules, `GET /api/barriers/deleted`, `GET /api/lookups`.
-With no credentials, those respond `401` (`403` never leaks existence;
-`admin only` when a non-admin session calls).
+`403` never leaks existence; `admin only` when a non-admin session calls.
+Pages: `/login` is the only public route - `/` redirects logged-out
+sessions to `/login?next=`, anonymous visitors get `404` on `/admin`.
 
 In-memory throttle by remote IP (never `X-Forwarded-For`, which is forgeable):
 120 req/min on reads, 30 req/min on writes, 10 req/min on export
@@ -288,13 +291,13 @@ toWireQuery({ location: "FAL", availability: "Degradado", page: 1 });
 | `lib/server/sql/where.ts`            | `buildWhere`, `resolveOrderBy` (whitelist), `escapeLike`                                                      |
 | `lib/server/sql/mappers.ts`          | `SELECT_COLUMNS`, `HISTORY_JOIN` (lateral `json_agg`), `toWireBarrier`                                        |
 | `routes/api/_params.ts`              | Strict parsers (`parseInt/parseDate/parseQueryParam`); never a route (`_` prefix)                             |
-| `routes/api/barriers.ts`             | `GET /api/barriers` (open, read throttle)                                                                     |
+| `routes/api/barriers.ts`             | `GET /api/barriers` (session/token, read throttle)                                                            |
 | `routes/api/barriers/deleted.ts`     | `GET /api/barriers/deleted` (deleted only, requires `ADMIN_TOKEN`)                                            |
-| `routes/api/barriers/[id].ts`        | `GET /api/barriers/:id` (open, read throttle)                                                                 |
+| `routes/api/barriers/[id].ts`        | `GET /api/barriers/:id` (session/token, read throttle)                                                        |
 | `routes/api/barriers/[id]/status.ts` | `PATCH /api/barriers/:id/status` (requires admin, write throttle; author derives from session)                |
-| `routes/api/export.ts`               | `GET /api/export?format=csv` (open, export throttle, 10k cap, stream)                                         |
-| `routes/api/kpi.ts`                  | `GET /api/kpi` (open, read throttle)                                                                          |
-| `routes/api/chart.ts`                | `GET /api/chart` (open, read throttle)                                                                        |
+| `routes/api/export.ts`               | `GET /api/export?format=csv` (session/token, export throttle, 10k cap, stream)                                |
+| `routes/api/kpi.ts`                  | `GET /api/kpi` (session/token, read throttle)                                                                 |
+| `routes/api/chart.ts`                | `GET /api/chart` (session/token, read throttle)                                                               |
 | `routes/api/health.ts`               | `GET /api/health` (liveness, no DB, no throttle)                                                              |
 | `routes/api/recipients.ts`           | `GET/POST /api/recipients` (admin, upsert by email)                                                           |
 | `routes/api/recipients/[id].ts`      | `PATCH/DELETE /api/recipients/:id` (admin)                                                                    |

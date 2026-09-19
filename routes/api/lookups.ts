@@ -3,15 +3,14 @@
 // ids (not display labels) for availabilities, categories, and authors. The
 // public vocabularies endpoint only carries labels, so this authenticated
 // endpoint serves the exact rows those writes reference.
-import {
-  newRequestId,
-  rateLimited,
-  unauthorized,
-} from "../../lib/server/errors.ts";
+import { newRequestId, rateLimited } from "../../lib/server/errors.ts";
 
 import { readThrottle, routeClientKey } from "../../lib/server/throttle.ts";
 
-import { requireAuthenticated } from "../../lib/server/auth.ts";
+import {
+  denyByCredentials,
+  requireAuthenticated,
+} from "../../lib/server/auth.ts";
 
 import { listAuthors } from "../../lib/server/sql/authors.ts";
 
@@ -30,7 +29,7 @@ export const handler = define.handlers({
       return rateLimited("too many requests", requestId, limit.retryAfterMs);
     }
     const auth = await requireAuthenticated(ctx.req);
-    if (!auth.ok) return unauthorized(auth.message, requestId);
+    if (!auth.ok) return denyByCredentials(ctx.req, auth.message, requestId);
     try {
       const [availabilities, categories, authors] = await Promise.all([
         queryRows<{ id: number; label: string }>(

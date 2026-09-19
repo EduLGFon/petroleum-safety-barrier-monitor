@@ -1,14 +1,13 @@
 // API: PATCH /api/barriers/:id/status - status transition write path.
 // This is why it exists: the one sanctioned way to change availability,
 // via record_status_change() (see db/schema.sql). Guarded by admin session
-// or ADMIN_TOKEN (fail-closed when neither is present); reads stay open.
+// or ADMIN_TOKEN (fail-closed when neither is present); reads require login.
 import {
   badRequest,
   internal,
   newRequestId,
   notFound,
   rateLimited,
-  unauthorized,
 } from "../../../../lib/server/errors.ts";
 
 import {
@@ -40,7 +39,10 @@ import { sqlAlertStore } from "../../../../lib/server/sql/alerts.ts";
 
 import { loadServerConfig } from "../../../../lib/server/config.ts";
 
-import { requireAdminAuth } from "../../../../lib/server/auth.ts";
+import {
+  denyByCredentials,
+  requireAdminAuth,
+} from "../../../../lib/server/auth.ts";
 
 import { define } from "../../../../utils.ts";
 
@@ -65,9 +67,7 @@ export const handler = define.handlers({
       );
     }
     const auth = await requireAdminAuth(ctx.req);
-    if (!auth.ok) {
-      return unauthorized(auth.message, requestId);
-    }
+    if (!auth.ok) return denyByCredentials(ctx.req, auth.message, requestId);
     try {
       loadServerConfig();
     } catch (err) {

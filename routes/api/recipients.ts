@@ -7,7 +7,6 @@ import {
   internal,
   newRequestId,
   rateLimited,
-  unauthorized,
 } from "../../lib/server/errors.ts";
 
 import {
@@ -24,7 +23,7 @@ import {
 
 import { loadServerConfig } from "../../lib/server/config.ts";
 
-import { requireAdminAuth } from "../../lib/server/auth.ts";
+import { denyByCredentials, requireAdminAuth } from "../../lib/server/auth.ts";
 
 import { define } from "../../utils.ts";
 
@@ -39,7 +38,7 @@ async function guard(
     return rateLimited("too many requests", requestId, limit.retryAfterMs);
   }
   const auth = await requireAdminAuth(req);
-  if (!auth.ok) return unauthorized(auth.message, requestId);
+  if (!auth.ok) return denyByCredentials(req, auth.message, requestId);
   try {
     loadServerConfig();
   } catch (err) {

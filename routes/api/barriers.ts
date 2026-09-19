@@ -1,12 +1,17 @@
 // API: GET /api/barriers - paged wire barrier list.
 // This is why it exists: Fresh port of the Next route with the same
 // BarriersQuery contract (see lib/wireTypes.ts) for the http adapter.
-// Open GET (dashboard decision in docs/API.md), throttled, envelope errors.
+// Authenticated GET (session or ADMIN_TOKEN); anonymous gets 404
+// camouflage, invalid credentials get 401. Throttled, envelope errors.
 import {
   internal,
   newRequestId,
+  notFound,
   rateLimited,
+  unauthorized,
 } from "../../lib/server/errors.ts";
+
+import { requireDataAuth } from "../../lib/server/auth.ts";
 
 import { parseDateParam, parseIntParam, parseQueryParam } from "./_params.ts";
 
@@ -41,6 +46,12 @@ export const handler = define.handlers({
         requestId,
         "Server misconfigured",
       );
+    }
+    const dataAuth = await requireDataAuth(ctx.req);
+    if (!dataAuth.ok) {
+      return dataAuth.anonymous
+        ? notFound("not found", requestId)
+        : unauthorized(dataAuth.message, requestId);
     }
 
     const sp = ctx.url.searchParams;
