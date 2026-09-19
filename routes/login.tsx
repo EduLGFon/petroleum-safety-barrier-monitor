@@ -1,8 +1,7 @@
 // Login route - the only public page (immersive credential screen).
 // This is why it exists: session login lives outside the Dashboard island
 // so logged-out users never download the monitor bundle just to sign in.
-// Already-authenticated visitors bounce straight to their return target
-// (non-admins asking for /admin land on the dashboard instead).
+// Already-authenticated visitors bounce straight to their return target.
 import { requirePageSession, safeNext } from "../lib/server/page-auth.ts";
 
 import { LoginShell } from "../components/login/LoginShell.tsx";
@@ -18,8 +17,7 @@ export default define.page(async function Login(
 ) {
   const session = await requirePageSession(req);
   if (session.state === "authenticated") {
-    let next = safeNext(url.searchParams.get("next"));
-    if (next.startsWith("/admin") && session.user.role !== "admin") next = "/";
+    const next = safeNext(url.searchParams.get("next"));
     return Response.redirect(new URL(next, url), 302);
   }
   const companyName = getCompanyName();

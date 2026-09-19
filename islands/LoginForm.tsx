@@ -71,7 +71,7 @@ export function LoginForm({ companyName = "" }: { companyName?: string }) {
         globalThis.location.href = safeNext(params.get("next"));
       } else {
         await postJson("/api/users", { email, name, password });
-        globalThis.location.href = "/admin";
+        globalThis.location.href = "/";
       }
     } catch (err) {
       setError(toPtError(err instanceof Error ? err.message : String(err)));

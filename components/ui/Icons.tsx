@@ -10,3 +10,5 @@ export * from "./icons/domain.tsx";
 export * from "./icons/files.tsx";
 
 export * from "./icons/theme.tsx";
+
+export * from "./icons/admin.tsx";

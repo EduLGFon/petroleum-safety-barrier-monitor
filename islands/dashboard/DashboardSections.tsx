@@ -223,6 +223,7 @@ export function DashboardSections(
         settingsOpen={settingsOpen}
         onCloseSettings={() => setSettingsOpen(false)}
         companyName={companyName}
+        sessionUser={sessionUser}
       />
     </>
   );

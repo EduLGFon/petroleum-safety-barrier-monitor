@@ -1,6 +1,7 @@
-// SettingsPanel - slide-over dialog for appearance and default filters.
+// SettingsPanel - slide-over dialog for appearance, filters, and admin.
 // This is why it exists: centralizes theme / accent / density / reduce-motion
-// plus startup filter defaults from SettingsContext.
+// plus startup filter defaults from SettingsContext, with an admin-only tab
+// (users, recipients, alert rules) for administrators.
 import {
   type AccentColor,
   type Density,
@@ -11,24 +12,29 @@ import { PanelFooter, PanelHeader } from "./settings/PanelChrome.tsx";
 
 import { AppearanceSection } from "./settings/AppearanceSection.tsx";
 
+import { AdminSection } from "./settings/AdminSection.tsx";
+
 import { FiltersSection } from "./settings/FiltersSection.tsx";
 
 import { lockBody, unlockBody } from "../lib/body-lock.ts";
 
 import { useEffect, useRef, useState } from "preact/hooks";
 
-import { FilterIcon, SunIcon } from "./ui/Icons.tsx";
+import { FilterIcon, ShieldIcon, SunIcon } from "./ui/Icons.tsx";
 
-import type { Theme } from "../lib/types.ts";
+import type { AuthUser, Theme } from "../lib/types.ts";
 
 interface Props {
   open: boolean;
   onClose: () => void;
   companyName: string;
+  sessionUser?: AuthUser | null;
 }
 
-// SettingsPanel: slide-over dialog hosting appearance and filters sections.
-export function SettingsPanel({ open, onClose, companyName }: Props) {
+// SettingsPanel: slide-over dialog hosting appearance, filters, and admin sections.
+export function SettingsPanel(
+  { open, onClose, companyName, sessionUser = null }: Props,
+) {
   const {
     settings,
     setTheme,
@@ -38,7 +44,8 @@ export function SettingsPanel({ open, onClose, companyName }: Props) {
     setDefaultLoc,
     setReduceMotion,
   } = useSettings();
-  const [section, setSection] = useState<"appearance" | "filters">(
+  const [section, setSection] = useState<
+    "appearance" | "filters" | "admin">(
     "appearance",
   );
   const [activeTheme, setActiveTheme] = useState<Theme | null>(null);
@@ -147,7 +154,7 @@ export function SettingsPanel({ open, onClose, companyName }: Props) {
           top: 0,
           right: 0,
           height: "100dvh",
-          width: "var(--d-panel-w)",
+          width: section === "admin" ? "min(560px, 96vw)" : "var(--d-panel-w)",
           maxWidth: "96vw",
           background: "var(--bg-surface)",
           borderLeft: "1px solid var(--border)",
@@ -174,11 +181,16 @@ export function SettingsPanel({ open, onClose, companyName }: Props) {
             flexShrink: 0,
           }}
         >
-          {[{ key: "appearance", label: "Aparência", Icon: SunIcon }, {
-            key: "filters",
-            label: "Filtros",
-            Icon: FilterIcon,
-          }].map((
+          {[
+            { key: "appearance", label: "Aparência", Icon: SunIcon },
+            {
+              key: "filters",
+              label: "Filtros",
+              Icon: FilterIcon,
+            },
+            ...(sessionUser?.role === "admin"
+              ? [{ key: "admin", label: "Admin", Icon: ShieldIcon }]
+          ].map((
             { key, label, Icon },
           ) => (
             <button
@@ -237,6 +249,11 @@ export function SettingsPanel({ open, onClose, companyName }: Props) {
             setDefaultLoc={setDefaultLoc}
           />
         )}
+
+
+        {/* ── ADMIN ── */}
+        {section === "admin" && sessionUser?.role === "admin" && (
+          <AdminSection sessionUser={sessionUser} />
 
         {/* Footer */}
         <PanelFooter companyName={companyName} />

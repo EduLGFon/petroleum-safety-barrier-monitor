@@ -142,11 +142,13 @@ Full contract lives in `docs/API.md`. Summary:
   `PATCH/DELETE /api/users/:id`, `GET/POST /api/alert-rules`,
   `PATCH/DELETE /api/alert-rules/:id`, `GET/POST /api/recipients`,
   `PATCH/DELETE /api/recipients/:id`, `GET /api/lookups` (admin forms),
-  plus `routes/login.tsx` (only public page) and `routes/admin.tsx` pages with
-  `LoginForm`/`AdminPanel`/`StatusEditor` islands.
+  plus `routes/login.tsx` (only public page) and the `LoginForm`/
+  `StatusEditor` islands. Admin management (users, recipients, alert rules)
+  lives in the settings sidepanel (`components/settings/AdminSection.tsx`),
+  gated by `sessionUser.role`; there is no separate admin route.
 - Access: Login => Dashboard. Data reads need a session or `ADMIN_TOKEN`
   (anonymous `404`, dead credentials `401`); `/` redirects logged-out
-  visitors to `/login?next=`, `/admin` returns `404` to anonymous visitors.
+  visitors to `/login?next=`.
 - Same-origin by design: the dashboard fetches `routes/api/*` from its own
   origin (`apiBaseUrl` defaults to `url.origin`), so no CORS headers are
   emitted. Split-origin deploys must proxy `/api/*` through the app origin.

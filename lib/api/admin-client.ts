@@ -1,11 +1,14 @@
-// Admin API helper - shared fetch + error envelope parser for admin tabs.
-// This is why it exists: Users, Rules, and Recipients tabs each had a copy
-// of the same fetch wrapper; one helper keeps auth errors consistent and
-// maps English wire errors to pt-BR UI strings at the boundary.
-import { toPtError } from "../../lib/api/error-pt.ts";
+// Admin API client - same-origin JSON fetch for the settings admin tab.
+// This is why it exists: Users, Recipients, and Rules managers share one
+// fetch wrapper so auth errors stay consistent and English wire errors map
+// to pt-BR UI strings at the boundary.
+import { toPtError } from "./error-pt.ts";
 
 // api: same-origin JSON fetch; throws a localized Error on non-OK status.
-export async function api(path: string, init?: RequestInit): Promise<unknown> {
+export async function adminApi(
+  path: string,
+  init?: RequestInit,
+): Promise<unknown> {
   const res = await fetch(path, { credentials: "same-origin", ...init });
   if (!res.ok) {
     let message = `Erro ${res.status}`;

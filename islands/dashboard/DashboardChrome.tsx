@@ -5,7 +5,7 @@ import { SettingsPanel } from "../../components/SettingsPanel.tsx";
 
 import { BarrierModal } from "../../components/BarrierModal.tsx";
 
-import type { Barrier } from "../../lib/types.ts";
+import type { AuthUser, Barrier } from "../../lib/types.ts";
 
 import { withBrand } from "../../lib/company.ts";
 
@@ -34,6 +34,7 @@ interface OverlaysProps {
   settingsOpen: boolean;
   onCloseSettings: () => void;
   companyName: string;
+  sessionUser?: AuthUser | null;
 }
 
 // DashboardOverlays: detail modal plus settings drawer above the page.
@@ -44,6 +45,7 @@ export function DashboardOverlays(
     settingsOpen,
     onCloseSettings,
     companyName,
+    sessionUser = null,
   }: OverlaysProps,
 ) {
   return (
@@ -53,6 +55,7 @@ export function DashboardOverlays(
         open={settingsOpen}
         onClose={onCloseSettings}
         companyName={companyName}
+        sessionUser={sessionUser}
       />
     </>
   );

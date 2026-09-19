@@ -196,7 +196,9 @@ admin** (session cookie or `ADMIN_TOKEN`): `PATCH .../status`, recipients,
 users, alert-rules, `GET /api/barriers/deleted`, `GET /api/lookups`.
 `403` never leaks existence; `admin only` when a non-admin session calls.
 Pages: `/login` is the only public route - `/` redirects logged-out
-sessions to `/login?next=`, anonymous visitors get `404` on `/admin`.
+sessions to `/login?next=`. Admin management lives in the settings
+sidepanel Admin tab (admin role only); the admin APIs below stay
+server-enforced regardless of what the drawer shows.
 
 In-memory throttle by remote IP (never `X-Forwarded-For`, which is forgeable):
 120 req/min on reads, 30 req/min on writes, 10 req/min on export

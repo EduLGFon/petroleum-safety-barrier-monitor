@@ -206,44 +206,6 @@ export function Header(
             </button>
           </span>
         )}
-        <a
-          href="/admin"
-          className="glass-pill lift"
-          title="Administração"
-          style={{
-            display: "flex",
-            alignItems: "center",
-            padding: "0 12px",
-            height: 32,
-            background: AURORA.pill,
-            border: `1px solid ${AURORA.pillBorder}`,
-            borderRadius: 99,
-            color: AURORA.pillText,
-            textDecoration: "none",
-            fontSize: 13,
-          }}
-        >
-          Admin
-        </a>
-        <a
-          href="/login"
-          className="glass-pill lift"
-          title="Acesso"
-          style={{
-            display: "flex",
-            alignItems: "center",
-            padding: "0 12px",
-            height: 32,
-            background: AURORA.pill,
-            border: `1px solid ${AURORA.pillBorder}`,
-            borderRadius: 99,
-            color: AURORA.pillText,
-            textDecoration: "none",
-            fontSize: 13,
-          }}
-        >
-          Acesso
-        </a>
         <button
           type="button"
           onClick={onOpenSettings}
