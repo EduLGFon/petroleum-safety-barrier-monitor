@@ -138,14 +138,17 @@ Full contract lives in `docs/API.md`. Summary:
   `GET /api/kpi`, `GET /api/chart`, `GET /api/export` (CSV, 10k cap),
   `GET /api/health` (DB-free liveness), `GET /api/vocabularies`
   (refresh cadence; SSR still seeds the first paint), `POST /api/auth/login`,
-  `POST /api/auth/logout`, `GET /api/auth/me`, `GET/POST /api/users`,
+  `POST /api/auth/logout`, `GET /api/auth/me`, `POST /api/auth/password`
+  (own change, session-only), `GET/POST /api/users`,
   `PATCH/DELETE /api/users/:id`, `GET/POST /api/alert-rules`,
   `PATCH/DELETE /api/alert-rules/:id`, `GET/POST /api/recipients`,
   `PATCH/DELETE /api/recipients/:id`, `GET /api/lookups` (admin forms),
   plus `routes/login.tsx` (only public page) and the `LoginForm`/
   `StatusEditor` islands. Admin management (users, recipients, alert rules)
   lives in the settings sidepanel (`components/settings/AdminSection.tsx`),
-  gated by `sessionUser.role`; there is no separate admin route.
+  gated by `sessionUser.role`; there is no separate admin route. Every
+  authenticated user also gets a Conta tab (`AccountSection.tsx`) with a
+  self-service password change (`POST /api/auth/password`, session-only).
 - Access: Login => Dashboard. Data reads need a session or `ADMIN_TOKEN`
   (anonymous `404`, dead credentials `401`); `/` redirects logged-out
   visitors to `/login?next=`.

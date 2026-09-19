@@ -1,7 +1,8 @@
-// SettingsPanel - slide-over dialog for appearance, filters, and admin.
+// SettingsPanel - slide-over dialog for appearance, filters, account, admin.
 // This is why it exists: centralizes theme / accent / density / reduce-motion
-// plus startup filter defaults from SettingsContext, with an admin-only tab
-// (users, recipients, alert rules) for administrators.
+// plus startup filter defaults from SettingsContext, with a Conta tab (own
+// profile plus self-service password change) for every authenticated user and
+// an admin-only tab (users, recipients, alert rules) for administrators.
 import {
   type AccentColor,
   type Density,
@@ -12,6 +13,8 @@ import { PanelFooter, PanelHeader } from "./settings/PanelChrome.tsx";
 
 import { AppearanceSection } from "./settings/AppearanceSection.tsx";
 
+import { AccountSection } from "./settings/AccountSection.tsx";
+
 import { AdminSection } from "./settings/AdminSection.tsx";
 
 import { FiltersSection } from "./settings/FiltersSection.tsx";
@@ -20,7 +23,7 @@ import { lockBody, unlockBody } from "../lib/body-lock.ts";
 
 import { useEffect, useRef, useState } from "preact/hooks";
 
-import { FilterIcon, ShieldIcon, SunIcon } from "./ui/Icons.tsx";
+import { FilterIcon, ShieldIcon, SunIcon, UserIcon } from "./ui/Icons.tsx";
 
 import type { AuthUser, Theme } from "../lib/types.ts";
 
@@ -45,7 +48,8 @@ export function SettingsPanel(
     setReduceMotion,
   } = useSettings();
   const [section, setSection] = useState<
-    "appearance" | "filters" | "admin">(
+    "appearance" | "filters" | "account" | "admin"
+  >(
     "appearance",
   );
   const [activeTheme, setActiveTheme] = useState<Theme | null>(null);
@@ -188,8 +192,12 @@ export function SettingsPanel(
               label: "Filtros",
               Icon: FilterIcon,
             },
+            ...(sessionUser
+              ? [{ key: "account", label: "Conta", Icon: UserIcon }]
+              : []),
             ...(sessionUser?.role === "admin"
               ? [{ key: "admin", label: "Admin", Icon: ShieldIcon }]
+              : []),
           ].map((
             { key, label, Icon },
           ) => (
@@ -250,10 +258,15 @@ export function SettingsPanel(
           />
         )}
 
+        {/* ── ACCOUNT ── */}
+        {section === "account" && sessionUser && (
+          <AccountSection sessionUser={sessionUser} />
+        )}
 
         {/* ── ADMIN ── */}
         {section === "admin" && sessionUser?.role === "admin" && (
           <AdminSection sessionUser={sessionUser} />
+        )}
 
         {/* Footer */}
         <PanelFooter companyName={companyName} />

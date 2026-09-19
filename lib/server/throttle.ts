@@ -58,6 +58,13 @@ export function createThrottle(options: ThrottleOptions): Throttle {
 export const readThrottle = createThrottle({ limit: 120, windowMs: 60_000 });
 export const writeThrottle = createThrottle({ limit: 30, windowMs: 60_000 });
 export const exportThrottle = createThrottle({ limit: 10, windowMs: 60_000 });
+// passwordThrottle: self-service password changes carry a current-password
+// oracle (wrong guesses probe the real password), so they get the tightest
+// write bucket even though the caller is already authenticated.
+export const passwordThrottle = createThrottle({
+  limit: 10,
+  windowMs: 60_000,
+});
 
 // routeClientKey: extracts the client identity from a Fresh route context
 // without importing Fresh types (unknown in, string out). Falls back to

@@ -237,7 +237,9 @@ manage users, recipients, rules, and barrier status). Passwords are
 PBKDF2-SHA256 (`lib/server/auth/password.ts`, no native deps).
 `sessions` holds opaque tokens (only SHA-256 hashes stored, 12h TTL);
 `POST /api/auth/login` sets the HttpOnly cookie, `GET /api/auth/me`
-reveals the role to islands, `POST /api/auth/logout` revokes. Admin routes
+reveals the role to islands, `POST /api/auth/logout` revokes,
+`POST /api/auth/password` changes the caller's own password (session-only,
+revokes every session). Admin routes
 accept a session or `ADMIN_TOKEN`. The first user on an empty table becomes
 admin (or use `scripts/create-admin.ts`).
 

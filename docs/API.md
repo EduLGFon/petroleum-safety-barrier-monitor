@@ -165,7 +165,12 @@ Full inventory: `barriers`, `barriers/deleted`,
 - `POST /api/auth/login` `{ email, password }` → public user + HttpOnly
   session cookie (`401` generic on bad credentials); `GET /api/auth/me` →
   current session user (`401` without one); `POST /api/auth/logout` →
-  `{ ok: true }` + cleared cookie.
+  `{ ok: true }` + cleared cookie; `POST /api/auth/password`
+  `{ currentPassword, newPassword }` → `{ ok: true }` + cleared cookie -
+  self-service change for any active session (admin or user; `ADMIN_TOKEN`
+  rejected, identity comes from the session alone so no user can address
+  another's password). Requires the current password, enforces the 12–256
+  policy, rejects reuse, revokes every session (re-login everywhere).
 - `GET /api/users`, `POST /api/users` `{ email, name?, password (12+),
   role? }` (`201`; first user on an empty table becomes admin without
   auth), `PATCH /api/users/:id` `{ name?, role?, active?, password? }`,
@@ -306,6 +311,7 @@ toWireQuery({ location: "FAL", availability: "Degradado", page: 1 });
 | `routes/api/auth/login.ts`           | `POST /api/auth/login` (credentials → session cookie)                                                         |
 | `routes/api/auth/logout.ts`          | `POST /api/auth/logout` (revoke + clear cookie)                                                               |
 | `routes/api/auth/me.ts`              | `GET /api/auth/me` (session user for islands)                                                                 |
+| `routes/api/auth/password.ts`        | `POST /api/auth/password` (own password change, session-only)                                                 |
 | `routes/api/users.ts`                | `GET/POST /api/users` (admin; bootstrap first admin)                                                          |
 | `routes/api/users/[id].ts`           | `PATCH/DELETE /api/users/:id` (admin, last-admin guard)                                                       |
 | `routes/api/alert-rules.ts`          | `GET/POST /api/alert-rules` (admin, per-category triggers)                                                    |
