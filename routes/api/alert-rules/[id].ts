@@ -13,16 +13,16 @@ import {
   updateAlertRule,
 } from "../../../lib/server/sql/alert_rules.ts";
 
-import { routeClientKey, writeThrottle } from "../../../lib/server/throttle.ts";
-
-import { rateLimited } from "../../../lib/server/errors.ts";
-
-import { loadServerConfig } from "../../../lib/server/config.ts";
-
 import {
   denyByCredentials,
   requireAdminAuth,
 } from "../../../lib/server/auth.ts";
+
+import { routeClientKey, writeThrottle } from "../../../lib/server/throttle.ts";
+
+import { loadServerConfig } from "../../../lib/server/config.ts";
+
+import { rateLimited } from "../../../lib/server/errors.ts";
 
 import { define } from "../../../utils.ts";
 

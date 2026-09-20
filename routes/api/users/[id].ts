@@ -14,20 +14,20 @@ import {
   validateNewPassword,
 } from "../../../lib/server/auth/password.ts";
 
+import {
+  denyByCredentials,
+  requireAdminAuth,
+} from "../../../lib/server/auth.ts";
+
 import { routeClientKey, writeThrottle } from "../../../lib/server/throttle.ts";
 
 import { deleteSessionsForUser } from "../../../lib/server/sql/sessions.ts";
 
 import { deleteUser, updateUser } from "../../../lib/server/sql/users.ts";
 
-import { rateLimited } from "../../../lib/server/errors.ts";
-
 import { loadServerConfig } from "../../../lib/server/config.ts";
 
-import {
-  denyByCredentials,
-  requireAdminAuth,
-} from "../../../lib/server/auth.ts";
+import { rateLimited } from "../../../lib/server/errors.ts";
 
 import { define } from "../../../utils.ts";
 

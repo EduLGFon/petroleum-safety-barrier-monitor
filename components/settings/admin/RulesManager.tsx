@@ -1,8 +1,6 @@
 // RulesManager - per-category alert triggers with premium rows.
 // This is why it exists: admins enable or mute alerts by category and tune
 // the trigger without code changes; this manager wraps /api/alert-rules.
-import { adminApi } from "../../../lib/api/admin-client.ts";
-import { useEffect, useState } from "preact/hooks";
 import {
   AdminCard,
   AdminHero,
@@ -18,6 +16,10 @@ import {
   SkeletonRows,
   StatusBadge,
 } from "./AdminPrimitives.tsx";
+
+import { adminApi } from "../../../lib/api/admin-client.ts";
+
+import { useEffect, useState } from "preact/hooks";
 
 interface AlertRule {
   id: number;

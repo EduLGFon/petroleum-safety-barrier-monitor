@@ -2,9 +2,6 @@
 // This is why it exists: every authenticated user needs a way to change
 // their own password; admins keep the separate reset path in AdminSection.
 // Identity never leaves the session cookie: the request carries no id.
-import { adminApi } from "../../lib/api/admin-client.ts";
-import type { AuthUser } from "../../lib/types.ts";
-import { useState } from "preact/hooks";
 import {
   AdminCard,
   Avatar,
@@ -13,6 +10,12 @@ import {
   primaryBtn,
   StatusBadge,
 } from "./admin/AdminPrimitives.tsx";
+
+import { adminApi } from "../../lib/api/admin-client.ts";
+
+import type { AuthUser } from "../../lib/types.ts";
+
+import { useState } from "preact/hooks";
 
 // AccountSection: read-only profile card plus password form for the owner.
 export function AccountSection(

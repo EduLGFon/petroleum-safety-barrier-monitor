@@ -10,13 +10,13 @@ import {
   unauthorized,
 } from "../../lib/server/errors.ts";
 
-import { requireDataAuth } from "../../lib/server/auth.ts";
-
 import { readThrottle, routeClientKey } from "../../lib/server/throttle.ts";
 
 import { getVocabularies } from "../../lib/server/sql/vocabularies.ts";
 
 import { loadServerConfig } from "../../lib/server/config.ts";
+
+import { requireDataAuth } from "../../lib/server/auth.ts";
 
 import { define } from "../../utils.ts";
 

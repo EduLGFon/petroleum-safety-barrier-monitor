@@ -1,8 +1,6 @@
 // RecipientsManager - alert email audience with active toggles.
 // This is why it exists: the digest audience lives in alert_recipients;
 // this manager wraps its CRUD with PT labels and premium rows.
-import { adminApi } from "../../../lib/api/admin-client.ts";
-import { useEffect, useState } from "preact/hooks";
 import {
   AdminCard,
   AdminHero,
@@ -18,6 +16,10 @@ import {
   SkeletonRows,
   StatusBadge,
 } from "./AdminPrimitives.tsx";
+
+import { adminApi } from "../../../lib/api/admin-client.ts";
+
+import { useEffect, useState } from "preact/hooks";
 
 interface Recipient {
   id: number;

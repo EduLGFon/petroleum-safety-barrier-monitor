@@ -1,8 +1,6 @@
 // UsersManager - admin user list, creation, and role/access actions.
 // This is why it exists: promoting users and deactivating leavers is a core
 // admin task; this manager wraps /api/users with PT labels and premium rows.
-import { adminApi } from "../../../lib/api/admin-client.ts";
-import { useEffect, useState } from "preact/hooks";
 import {
   AdminCard,
   AdminHero,
@@ -18,6 +16,10 @@ import {
   SkeletonRows,
   StatusBadge,
 } from "./AdminPrimitives.tsx";
+
+import { adminApi } from "../../../lib/api/admin-client.ts";
+
+import { useEffect, useState } from "preact/hooks";
 
 interface PublicUser {
   id: number;

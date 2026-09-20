@@ -10,6 +10,11 @@ import {
   rateLimited,
 } from "../../../lib/server/errors.ts";
 
+import {
+  denyByCredentials,
+  requireAdminAuth,
+} from "../../../lib/server/auth.ts";
+
 import { readThrottle, routeClientKey } from "../../../lib/server/throttle.ts";
 
 import { parseDateParam, parseIntParam, parseQueryParam } from "../_params.ts";
@@ -19,11 +24,6 @@ import { listBarriers } from "../../../lib/server/sql/barriers.ts";
 import { loadServerConfig } from "../../../lib/server/config.ts";
 
 import type { BarriersQuery } from "../../../lib/wireTypes.ts";
-
-import {
-  denyByCredentials,
-  requireAdminAuth,
-} from "../../../lib/server/auth.ts";
 
 import { define } from "../../../utils.ts";
 

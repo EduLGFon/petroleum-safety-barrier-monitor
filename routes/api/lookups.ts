@@ -3,14 +3,14 @@
 // ids (not display labels) for availabilities, categories, and authors. The
 // public vocabularies endpoint only carries labels, so this authenticated
 // endpoint serves the exact rows those writes reference.
-import { newRequestId, rateLimited } from "../../lib/server/errors.ts";
-
-import { readThrottle, routeClientKey } from "../../lib/server/throttle.ts";
-
 import {
   denyByCredentials,
   requireAuthenticated,
 } from "../../lib/server/auth.ts";
+
+import { readThrottle, routeClientKey } from "../../lib/server/throttle.ts";
+
+import { newRequestId, rateLimited } from "../../lib/server/errors.ts";
 
 import { listAuthors } from "../../lib/server/sql/authors.ts";
 

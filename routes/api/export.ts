@@ -13,8 +13,6 @@ import {
   unauthorized,
 } from "../../lib/server/errors.ts";
 
-import { requireDataAuth } from "../../lib/server/auth.ts";
-
 import {
   EXPORT_MAX_ROWS,
   streamExportCsv,
@@ -31,6 +29,8 @@ import { listBarriers } from "../../lib/server/sql/barriers.ts";
 import { loadServerConfig } from "../../lib/server/config.ts";
 
 import type { BarriersQuery } from "../../lib/wireTypes.ts";
+
+import { requireDataAuth } from "../../lib/server/auth.ts";
 
 import { resolveBarriers } from "../../lib/resolve.ts";
 

@@ -10,13 +10,13 @@ import {
   unauthorized,
 } from "../../lib/server/errors.ts";
 
-import { requireDataAuth } from "../../lib/server/auth.ts";
-
 import { readThrottle, routeClientKey } from "../../lib/server/throttle.ts";
 
 import { loadServerConfig } from "../../lib/server/config.ts";
 
 import { getChartData } from "../../lib/server/sql/chart.ts";
+
+import { requireDataAuth } from "../../lib/server/auth.ts";
 
 import { parseFilterQuery } from "./_params.ts";
 

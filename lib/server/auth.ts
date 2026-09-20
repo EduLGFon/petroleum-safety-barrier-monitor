@@ -9,9 +9,9 @@ import {
   hashSessionToken,
 } from "./auth/session.ts";
 
-import { apiError } from "./errors.ts";
-
 import { getSessionUser, type SessionUser } from "./sql/sessions.ts";
+
+import { apiError } from "./errors.ts";
 
 export type AdminRole = "admin";
 export type RequestRole = "admin" | "user";

@@ -13,11 +13,11 @@ import { useSettings } from "../../context/SettingsContext.tsx";
 
 import type { useDashboard } from "../../hooks/useDashboard.ts";
 
+import type { AuthUser, Barrier } from "../../lib/types.ts";
+
 import { FilterBar } from "../../components/FilterBar.tsx";
 
 import { sanitizeFilterPatch } from "../../lib/utils.ts";
-
-import type { AuthUser, Barrier } from "../../lib/types.ts";
 
 import { Header } from "../../components/Header.tsx";
 

@@ -1,6 +1,8 @@
 // DashboardView - mode switch between client and server data views.
 // Why: mock mode aggregates the SSR'd list in the browser; HTTP mode pages
 // from the API. Both render the shared DashboardSections tree.
+import type { AuthUser, Barrier, Vocabularies } from "../../lib/types.ts";
+
 import { ServerErrorBanner, ServerErrorCard } from "./ServerError.tsx";
 
 import { useServerDashboard } from "../../hooks/dashboard/server.ts";
@@ -8,8 +10,6 @@ import { useServerDashboard } from "../../hooks/dashboard/server.ts";
 import { LoadingScreen } from "../../components/LoadingScreen.tsx";
 
 import { useSettings } from "../../context/SettingsContext.tsx";
-
-import type { AuthUser, Barrier, Vocabularies } from "../../lib/types.ts";
 
 import { useCallback, useEffect, useState } from "preact/hooks";
 

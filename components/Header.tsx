@@ -7,9 +7,9 @@ import { type Conn, useConnection } from "../hooks/useConnection.ts";
 
 import { AURORA, AURORA_CONN, AURORA_TYPE } from "../lib/aurora.ts";
 
-import type { AuthUser } from "../lib/types.ts";
-
 import { useSettings } from "../context/SettingsContext.tsx";
+
+import type { AuthUser } from "../lib/types.ts";
 
 interface Props {
   onOpenSettings: () => void;

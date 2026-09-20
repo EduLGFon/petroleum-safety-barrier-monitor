@@ -12,14 +12,14 @@ import {
   updateRecipient,
 } from "../../../lib/server/sql/recipients.ts";
 
-import { routeClientKey, writeThrottle } from "../../../lib/server/throttle.ts";
-
-import { loadServerConfig } from "../../../lib/server/config.ts";
-
 import {
   denyByCredentials,
   requireAdminAuth,
 } from "../../../lib/server/auth.ts";
+
+import { routeClientKey, writeThrottle } from "../../../lib/server/throttle.ts";
+
+import { loadServerConfig } from "../../../lib/server/config.ts";
 
 import { define } from "../../../utils.ts";
 

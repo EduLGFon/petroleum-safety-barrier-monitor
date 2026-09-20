@@ -11,13 +11,13 @@ import {
   unauthorized,
 } from "../../../lib/server/errors.ts";
 
-import { requireDataAuth } from "../../../lib/server/auth.ts";
-
 import { readThrottle, routeClientKey } from "../../../lib/server/throttle.ts";
 
 import { getBarrierById } from "../../../lib/server/sql/barriers.ts";
 
 import { loadServerConfig } from "../../../lib/server/config.ts";
+
+import { requireDataAuth } from "../../../lib/server/auth.ts";
 
 import { define } from "../../../utils.ts";
 

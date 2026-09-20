@@ -3,11 +3,15 @@
 // SSR ships data), so every page resolves the cookie session server-side:
 // anonymous visitors get 404 camouflage everywhere except /login, holders
 // of dead cookies get a login redirect that returns them via ?next=.
-import { hasCredentials } from "./auth.ts";
-import type { AuthUser } from "../types.ts";
-import { getSessionUser } from "./sql/sessions.ts";
-import { hashSessionToken } from "./auth/session.ts";
 import { getSessionTokenFromRequest } from "./auth/session.ts";
+
+import { hashSessionToken } from "./auth/session.ts";
+
+import { getSessionUser } from "./sql/sessions.ts";
+
+import type { AuthUser } from "../types.ts";
+
+import { hasCredentials } from "./auth.ts";
 
 export type PageSession =
   | { state: "authenticated"; user: AuthUser }

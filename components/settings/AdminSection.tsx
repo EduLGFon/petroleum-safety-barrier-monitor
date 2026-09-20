@@ -1,13 +1,19 @@
 // AdminSection - admin-only tab content inside the settings sidepanel.
 // This is why it exists: the old /admin console moves into the drawer so
 // admins manage users, recipients, and rules without leaving the monitor.
-import type { AuthUser } from "../../lib/types.ts";
-import { BellIcon, MailIcon, UsersIcon } from "../ui/Icons.tsx";
 import { RecipientsManager } from "./admin/RecipientsManager.tsx";
+
+import { BellIcon, MailIcon, UsersIcon } from "../ui/Icons.tsx";
+
 import { RulesManager } from "./admin/RulesManager.tsx";
+
 import { UsersManager } from "./admin/UsersManager.tsx";
-import { useState } from "preact/hooks";
+
+import type { AuthUser } from "../../lib/types.ts";
+
 import type { ComponentType } from "preact";
+
+import { useState } from "preact/hooks";
 
 type Sub = "users" | "recipients" | "rules";
 

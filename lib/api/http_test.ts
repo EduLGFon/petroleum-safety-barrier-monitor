@@ -2,13 +2,15 @@
 // This is why they exist: the dashboard redirects to /login on
 // AuthExpiredError, so the 401/404 mapping (and the row-level 404=null
 // contract) must stay exact without a database or server.
-import { AuthExpiredError, httpAdapterFactory } from "./http.ts";
-import { isAuthExpired } from "./http.ts";
 import {
   assert,
   assertInstanceOf,
   assertStrictEquals,
 } from "jsr:@std/assert@^1";
+
+import { AuthExpiredError, httpAdapterFactory } from "./http.ts";
+
+import { isAuthExpired } from "./http.ts";
 
 function stubFetch(status: number, body: unknown = {}): () => void {
   const prev = globalThis.fetch;

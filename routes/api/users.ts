@@ -27,9 +27,9 @@ import {
   normalizeRole,
 } from "../../lib/server/sql/users.ts";
 
-import { loadServerConfig } from "../../lib/server/config.ts";
-
 import { hasCredentials, requireAdminAuth } from "../../lib/server/auth.ts";
+
+import { loadServerConfig } from "../../lib/server/config.ts";
 
 import { countUsers } from "../../lib/server/sql/users.ts";
 

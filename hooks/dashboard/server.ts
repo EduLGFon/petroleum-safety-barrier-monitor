@@ -15,9 +15,9 @@ import { restoreSelection, useSelection } from "./selection.ts";
 
 import { httpAdapterFactory } from "../../lib/api/http.ts";
 
-import { isAuthExpired } from "../../lib/api/http.ts";
-
 import type { BarriersApi } from "../../lib/api/types.ts";
+
+import { isAuthExpired } from "../../lib/api/http.ts";
 
 import { loadDash, saveDash } from "./persistence.ts";
 

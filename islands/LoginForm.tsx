@@ -3,11 +3,16 @@
 // over a blurred dashboard preview, with PT copy, show/hide password,
 // localized errors and first-admin bootstrap.
 import { BlurredBackdrop } from "../components/login/BlurredBackdrop.tsx";
+
 import { BrandHeader } from "../components/login/BrandHeader.tsx";
+
 import { TrustFooter } from "../components/login/TrustFooter.tsx";
+
 import { toPtError } from "../lib/api/error-pt.ts";
-import { useState } from "preact/hooks";
+
 import { AURORA } from "../lib/aurora.ts";
+
+import { useState } from "preact/hooks";
 
 type Mode = "login" | "register";
 

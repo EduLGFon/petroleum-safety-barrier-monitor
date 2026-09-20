@@ -30,9 +30,9 @@ import {
 
 import { deleteSessionsForUser } from "../../../lib/server/sql/sessions.ts";
 
-import { buildExpiredCookie } from "../../../lib/server/auth/session.ts";
-
 import { getUserById, updateUser } from "../../../lib/server/sql/users.ts";
+
+import { buildExpiredCookie } from "../../../lib/server/auth/session.ts";
 
 import { loadServerConfig } from "../../../lib/server/config.ts";
 

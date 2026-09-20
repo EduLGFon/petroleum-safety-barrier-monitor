@@ -21,6 +21,11 @@ import {
 } from "../../../../lib/server/sql/barriers.ts";
 
 import {
+  denyByCredentials,
+  requireAdminAuth,
+} from "../../../../lib/server/auth.ts";
+
+import {
   routeClientKey,
   writeThrottle,
 } from "../../../../lib/server/throttle.ts";
@@ -38,11 +43,6 @@ import { getOrCreateAuthor } from "../../../../lib/server/sql/authors.ts";
 import { sqlAlertStore } from "../../../../lib/server/sql/alerts.ts";
 
 import { loadServerConfig } from "../../../../lib/server/config.ts";
-
-import {
-  denyByCredentials,
-  requireAdminAuth,
-} from "../../../../lib/server/auth.ts";
 
 import { define } from "../../../../utils.ts";
 

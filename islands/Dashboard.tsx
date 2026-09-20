@@ -3,11 +3,11 @@
 // in components/ so the client ships JS for this subtree alone. Server-only
 // config (mode, base URL, vocabularies) crosses the island boundary as props
 // because islands cannot read Deno env in the browser.
+import type { AuthUser, Barrier, Vocabularies } from "../lib/types.ts";
+
 import { SettingsProvider } from "../context/SettingsContext.tsx";
 
 import { DashboardView } from "./dashboard/DashboardView.tsx";
-
-import type { AuthUser, Barrier, Vocabularies } from "../lib/types.ts";
 
 import { ThemeProvider } from "../context/ThemeContext.tsx";
 
