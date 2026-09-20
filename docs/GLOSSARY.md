@@ -38,6 +38,7 @@ listed here exactly, so the codebase does not fork.
 | Plano de ação               | `actionPlan` (SQL `action_plan`) |
 | Tipo de instalação          | `type`                           |
 | Usuário                     | `user`                           |
+| Conta (perfil + senha)      | `account`                        |
 | Papel                       | `role` (`admin` / `user`)        |
 | Sessão                      | `session`                        |
 | Senha                       | `password` (`password_hash`)     |

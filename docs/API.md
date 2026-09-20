@@ -206,9 +206,12 @@ sidepanel Admin tab (admin role only); the admin APIs below stay
 server-enforced regardless of what the drawer shows.
 
 In-memory throttle by remote IP (never `X-Forwarded-For`, which is forgeable):
-120 req/min on reads, 30 req/min on writes, 10 req/min on export
+120 req/min on reads, 30 req/min on writes, 10 req/min on export and on
+self-service password changes
 (`429 { error, code: RATE_LIMITED }` + `Retry-After`). `/api/health` is not
-throttled (liveness probe). Boot validates `DATABASE_URL` with
+throttled (liveness probe). The export additionally shares its budget across
+isolates via the `throttle_buckets` table (`lib/server/sql/throttle.ts`,
+memory fallback). Boot validates `DATABASE_URL` with
 `PUBLIC_API_MODE=http` on the first call (`500` naming the variable).
 
 `GET /api/vocabularies` refreshes the same payload on the dashboard
@@ -321,6 +324,7 @@ toWireQuery({ location: "FAL", availability: "Degradado", page: 1 });
 | `lib/server/errors.ts`               | Envelope `{ error, code, requestId }` + `x-request-id`                                                        |
 | `lib/server/auth.ts`                 | `checkAdminAuth` (Bearer) + `resolveRequestAuth`/`requireAdminAuth`/`requireAuthenticated` (session or token) |
 | `lib/server/throttle.ts`             | `createThrottle` (fixed window, no deps) + per-route buckets                                                  |
+| `lib/server/sql/throttle.ts`         | Postgres `throttle_buckets` budget shared across isolates (memory fallback)                                   |
 | `lib/server/exportCsv.ts`            | `streamExportCsv` (BOM + `row()` + `summaryRows()`, chunks of 500)                                            |
 | `lib/server/sql/recipients.ts`       | CRUD `alert_recipients` (pure validation + thin store)                                                        |
 | `lib/server/sql/users.ts`            | CRUD `users` (roles, last-admin guard, no hashes in JSON)                                                     |
