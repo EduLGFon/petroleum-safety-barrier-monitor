@@ -158,7 +158,11 @@ Full inventory: `barriers`, `barriers/deleted`,
   categories for the refresh cadence; SSR still seeds the first paint)
 - `GET /api/sync-status` → `SyncStatus` (`state` syncing/idle/stale/unknown,
   `runningSince`, last finished run with counts + note, tracked barrier
-  total) for the dashboard indicator; same 5-minute cadence as vocabularies
+  total) for the dashboard indicator; polls every minute (15s fast lane
+  while a run is in flight)
+- `GET /api/sync-changes?limit=8` (1..20) → `{ changes: SyncChange[] }`
+  (newest barriers touched by sync runs: tag, station, kind, status) for
+  the indicator card's "what changed" section; same cadence as sync-status
 - `GET /api/health` → `{ ok, time }` (liveness, no DB)
 - `GET /api/recipients` (+ `?activeOnly=1`), `POST /api/recipients`
   `{ email, name? }` (upsert by email, `201`), `PATCH /api/recipients/:id`

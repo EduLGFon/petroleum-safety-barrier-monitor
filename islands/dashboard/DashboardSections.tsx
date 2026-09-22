@@ -3,7 +3,12 @@
 // data hook feeding `dash` differs. Settings defaults gate lives here too.
 import { DashboardFooter, DashboardOverlays } from "./DashboardChrome.tsx";
 
-import type { AuthUser, Barrier, SyncStatus } from "../../lib/types.ts";
+import type {
+  AuthUser,
+  Barrier,
+  SyncChange,
+  SyncStatus,
+} from "../../lib/types.ts";
 
 import { LocationFilter } from "../../components/LocationFilter.tsx";
 
@@ -48,8 +53,11 @@ interface SectionsProps {
   loading: boolean;
   companyName: string;
   serverMode: boolean;
-  // Live sync status for the indicator pill (HTTP mode only; null hides it).
+  // Live sync status for the header health indicator (HTTP mode only).
   syncStatus?: SyncStatus | null;
+  // Barriers touched by recent sync runs for the card's "what changed"
+  // section (HTTP mode only; null hides the section).
+  syncChanges?: SyncChange[] | null;
   // Authenticated session identity for the Header user menu. Null when the
   // island renders without SSR identity (never in production page flow).
   sessionUser?: AuthUser | null;
@@ -77,6 +85,7 @@ export function DashboardSections(
     serverMode,
     sessionUser = null,
     syncStatus = null,
+    syncChanges = null,
     apiBaseUrl = "",
     onServerCsv,
   }: SectionsProps,
@@ -150,6 +159,7 @@ export function DashboardSections(
           apiBaseUrl={apiBaseUrl}
           sessionUser={sessionUser}
           syncStatus={syncStatus ?? null}
+          syncChanges={syncChanges ?? null}
         />
 
         {/* Location tabs */}
