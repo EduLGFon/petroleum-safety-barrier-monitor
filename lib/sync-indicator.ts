@@ -139,15 +139,37 @@ export function formatInstant(iso: string | null): InstantParts | null {
   };
 }
 
-// formatDuration: run length in pt-BR short form ("45s", "3 min").
+// formatDuration: precise pt-BR run length down to the millisecond
+// ("450 ms", "8 s 320 ms", "2 min 14 s", "1 h 3 min"). Malformed or
+// negative input renders "-" instead of NaN downstream.
 export function formatDuration(startedAt: string, finishedAt: string): string {
   const ms = new Date(finishedAt).getTime() - new Date(startedAt).getTime();
   if (!Number.isFinite(ms) || ms < 0) return "-";
-  const s = Math.round(ms / 1000);
-  if (s < 60) return `${s}s`;
-  const m = Math.floor(s / 60);
-  if (m < 60) return `${m} min`;
-  return `${Math.floor(m / 60)} h ${m % 60} min`;
+  if (ms < 1000) return `${Math.round(ms)} ms`;
+  const wholeSecs = Math.floor(ms / 1000);
+  const remMs = Math.round(ms - wholeSecs * 1000);
+  if (wholeSecs < 60) {
+    return remMs > 0 ? `${wholeSecs} s ${remMs} ms` : `${wholeSecs} s`;
+  }
+  const mins = Math.floor(wholeSecs / 60);
+  if (mins < 60) return `${mins} min ${wholeSecs % 60} s`;
+  return `${Math.floor(mins / 60)} h ${mins % 60} min`;
+}
+
+// SCOPE_LABELS: technical sync scopes mapped to plain pt-BR origin names.
+const SCOPE_LABELS: Record<string, string> = {
+  "all": "Todas as instalações",
+  "fracttal-live:all": "Fracttal - todas as instalações",
+  "dump-import": "Importação de arquivo",
+};
+
+// friendlyScope: human origin name for a raw sync scope. Unknown scopes
+// are prettified (separators become spaces) instead of leaking raw codes.
+export function friendlyScope(scope: string): string {
+  const hit = SCOPE_LABELS[scope.trim().toLowerCase()];
+  if (hit !== undefined) return hit;
+  const pretty = scope.replace(/[_:;-]+/g, " ").replace(/\s+/g, " ").trim();
+  return pretty === "" ? scope : pretty;
 }
 
 // healthLabel: short pt-BR subtitle prefix per merged kind.

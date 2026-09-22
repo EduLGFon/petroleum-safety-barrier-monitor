@@ -1,7 +1,13 @@
 // Unit tests for the merged sync indicator model (pure mapper).
 // This is why they exist: dot precedence and local instant formatting
 // must stay deterministic across timezones without a browser.
-import { formatInstant, toDeltas, toHealthKind } from "./sync-indicator.ts";
+import {
+  formatDuration,
+  formatInstant,
+  friendlyScope,
+  toDeltas,
+  toHealthKind,
+} from "./sync-indicator.ts";
 
 import { assertStrictEquals } from "jsr:@std/assert@^1";
 
@@ -64,4 +70,35 @@ Deno.test("formatInstant renders pt-BR date and time parts", () => {
   assertStrictEquals(parts?.date.includes("/"), true);
   assertStrictEquals(parts?.time.includes(":"), true);
   assertStrictEquals(formatInstant(null), null);
+});
+
+Deno.test("formatDuration resolves down to milliseconds", () => {
+  assertStrictEquals(
+    formatDuration("2026-09-22T10:00:00.000Z", "2026-09-22T10:00:00.450Z"),
+    "450 ms",
+  );
+  assertStrictEquals(
+    formatDuration("2026-09-22T10:00:00.000Z", "2026-09-22T10:00:08.320Z"),
+    "8 s 320 ms",
+  );
+  assertStrictEquals(
+    formatDuration("2026-09-22T10:00:00.000Z", "2026-09-22T10:02:14.000Z"),
+    "2 min 14 s",
+  );
+  assertStrictEquals(
+    formatDuration("not-a-date", "2026-09-22T10:00:00.000Z"),
+    "-",
+  );
+});
+
+Deno.test("friendlyScope names known scopes and prettifies the rest", () => {
+  assertStrictEquals(
+    friendlyScope("fracttal-live:all"),
+    "Fracttal - todas as instalações",
+  );
+  assertStrictEquals(friendlyScope("dump-import"), "Importação de arquivo");
+  assertStrictEquals(
+    friendlyScope("nightly_custom-scope"),
+    "nightly custom scope",
+  );
 });
