@@ -43,3 +43,22 @@ export function fmt(n: number): string {
 export function pct(n: number): string {
   return `${n}%`;
 }
+// Relative "x ago" in pt-BR from an ISO timestamp ("há 5 min") for live
+// freshness labels. Future or malformed input renders "agora mesmo"; the
+// optional now makes it deterministic in tests. Never throws.
+export function timeAgoPt(iso: string, nowMs: number = Date.now()): string {
+  const then = new Date(iso).getTime();
+  if (!Number.isFinite(then)) return "agora mesmo";
+  const secs = Math.max(0, Math.floor((nowMs - then) / 1000));
+  if (secs < 60) return "agora mesmo";
+  const mins = Math.floor(secs / 60);
+  if (mins < 60) return `há ${mins} min`;
+  const hours = Math.floor(mins / 60);
+  if (hours < 24) return `há ${hours} h`;
+  const days = Math.floor(hours / 24);
+  if (days < 30) return `há ${days} ${days === 1 ? "dia" : "dias"}`;
+  const months = Math.floor(days / 30);
+  if (months < 12) return `há ${months} ${months === 1 ? "mês" : "meses"}`;
+  const years = Math.floor(months / 12);
+  return `há ${years} ${years === 1 ? "ano" : "anos"}`;
+}

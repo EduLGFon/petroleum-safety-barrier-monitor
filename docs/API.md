@@ -156,6 +156,9 @@ Full inventory: `barriers`, `barriers/deleted`,
 - `GET /api/chart?...` (same filter subset) → `WireCategoryCompliance[]`
 - `GET /api/vocabularies` → `Vocabularies` (id-bearing locations +
   categories for the refresh cadence; SSR still seeds the first paint)
+- `GET /api/sync-status` → `SyncStatus` (`state` syncing/idle/stale/unknown,
+  `runningSince`, last finished run with counts + note, tracked barrier
+  total) for the dashboard indicator; same 5-minute cadence as vocabularies
 - `GET /api/health` → `{ ok, time }` (liveness, no DB)
 - `GET /api/recipients` (+ `?activeOnly=1`), `POST /api/recipients`
   `{ email, name? }` (upsert by email, `201`), `PATCH /api/recipients/:id`
@@ -308,6 +311,7 @@ toWireQuery({ location: "FAL", availability: "Degradado", page: 1 });
 | `routes/api/export.ts`               | `GET /api/export?format=csv` (session/token, export throttle, 10k cap, stream)                                |
 | `routes/api/kpi.ts`                  | `GET /api/kpi` (session/token, read throttle)                                                                 |
 | `routes/api/chart.ts`                | `GET /api/chart` (session/token, read throttle)                                                               |
+| `routes/api/sync-status.ts`          | `GET /api/sync-status` (session/token, read throttle; dashboard indicator)                                    |
 | `routes/api/health.ts`               | `GET /api/health` (liveness, no DB, no throttle)                                                              |
 | `routes/api/recipients.ts`           | `GET/POST /api/recipients` (admin, upsert by email)                                                           |
 | `routes/api/recipients/[id].ts`      | `PATCH/DELETE /api/recipients/:id` (admin)                                                                    |

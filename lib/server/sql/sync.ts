@@ -13,9 +13,17 @@ import {
 
 import type { MapContext } from "../fracttal/map.ts";
 
+import type { SyncStatus } from "../../types.ts";
+
 import { queryRows } from "../db.ts";
 
 export const SYNC_AUTHOR_ID = 10; // authors.id, see db/seed_lookups.sql
+
+// Freshness windows for the status indicator, in minutes. A `running` row
+// newer than SYNC_FRESH_MINUTES means a sync is in flight; one older than
+// SYNC_STALE_MINUTES means the poller likely crashed mid-run.
+export const SYNC_FRESH_MINUTES = 10;
+export const SYNC_STALE_MINUTES = 15;
 
 // syncScopeRunning: poll lock - true while a run for the scope is still
 // 'running'. A crashed run would block polls forever, so the lock is stale
@@ -270,4 +278,96 @@ async function insertBarrier(input: {
     ],
   );
   return rows[0]?.id ?? null;
+}
+
+// SyncStatusRow: the raw sync_state shape the status indicator reads.
+export interface SyncStatusRow {
+  id: number;
+  scope: string;
+  status: string;
+  inserts: number;
+  updates: number;
+  deletes: number;
+  skips: number;
+  note: string;
+  started_at: string;
+  finished_at: string;
+}
+
+// toSyncStatus: pure state decision over the three reads below. A fresh
+// `running` row means in flight; a stale one (no fresh row) means the
+// poller likely died mid-run; otherwise the latest finished row decides,
+// and an empty table reports unknown. Unexpected statuses fail closed.
+export function toSyncStatus(args: {
+  latest: SyncStatusRow | null;
+  running: { scope: string; started_at: string } | null;
+  staleRunning: boolean;
+  barriers: number;
+}): SyncStatus {
+  const totals = { barriers: args.barriers };
+  const lastRun = args.latest === null ? null : {
+    scope: args.latest.scope,
+    status: (args.latest.status === "ok" ? "ok" : "failed") as
+      | "ok"
+      | "failed",
+    startedAt: args.latest.started_at,
+    finishedAt: args.latest.finished_at,
+    inserts: args.latest.inserts,
+    updates: args.latest.updates,
+    deletes: args.latest.deletes,
+    skips: args.latest.skips,
+    note: args.latest.note,
+  };
+  if (args.running !== null) {
+    return {
+      state: "syncing",
+      runningSince: args.running.started_at,
+      lastRun,
+      totals,
+    };
+  }
+  if (args.staleRunning) {
+    return { state: "stale", runningSince: null, lastRun, totals };
+  }
+  if (lastRun === null) {
+    return { state: "unknown", runningSince: null, lastRun, totals };
+  }
+  return { state: "idle", runningSince: null, lastRun, totals };
+}
+
+// getSyncStatus: dashboard indicator data - latest finished run, fresh
+// running row, stale-run flag, and the tracked barrier total. Read-only;
+// the route serves it to any authenticated dashboard user.
+export async function getSyncStatus(): Promise<SyncStatus> {
+  const [finished, running, stale, counted] = await Promise.all([
+    queryRows<SyncStatusRow>(
+      `select id, scope, status, inserts, updates, deletes, skips, note,
+        started_at, finished_at
+       from sync_state where status != 'running'
+       order by id desc limit 1`,
+    ),
+    queryRows<{ scope: string; started_at: string }>(
+      `select scope, started_at from sync_state
+       where status = 'running'
+         and started_at >= now() - make_interval(mins => $1)
+       order by id desc limit 1`,
+      [SYNC_FRESH_MINUTES],
+    ),
+    queryRows<{ one: number }>(
+      `select 1 as one from sync_state
+       where status = 'running'
+         and started_at < now() - make_interval(mins => $1)
+       limit 1`,
+      [SYNC_STALE_MINUTES],
+    ),
+    queryRows<{ n: number }>(
+      `select count(*)::int as n from barriers where deleted_at is null`,
+    ),
+  ]);
+  return toSyncStatus({
+    latest: finished[0] ?? null,
+    running: running[0] ?? null,
+    staleRunning: stale.length > 0,
+    barriers: counted[0]?.n ?? 0,
+  });
 }

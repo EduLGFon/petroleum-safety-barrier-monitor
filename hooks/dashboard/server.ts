@@ -31,7 +31,8 @@ import { computeKpi } from "../../lib/utils.ts";
 
 // toLoginWithReturn: sends an expired session back to /login preserving
 // the current page, so the user lands where they were after signing in.
-function toLoginWithReturn(): void {
+// Exported for the sync-status hook, which shares the same session fate.
+export function toLoginWithReturn(): void {
   try {
     const here = globalThis.location.pathname + globalThis.location.search;
     globalThis.location.href = `/login?next=${encodeURIComponent(here)}`;

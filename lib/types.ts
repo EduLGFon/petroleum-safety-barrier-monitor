@@ -111,6 +111,26 @@ export interface Vocabularies {
   categories: { id: number; label: string }[];
 }
 
+// Sync pipeline status for the dashboard indicator (served by
+// GET /api/sync-status from sync_state; lastRun is null on a fresh
+// database, and "unknown" covers that case).
+export interface SyncStatus {
+  state: "syncing" | "idle" | "stale" | "unknown";
+  runningSince: string | null;
+  lastRun: {
+    scope: string;
+    status: "ok" | "failed";
+    startedAt: string;
+    finishedAt: string;
+    inserts: number;
+    updates: number;
+    deletes: number;
+    skips: number;
+    note: string;
+  } | null;
+  totals: { barriers: number };
+}
+
 export type SortableColumn = keyof Pick<
   Barrier,
   | "id"

@@ -3,6 +3,10 @@
 // data hook feeding `dash` differs. Settings defaults gate lives here too.
 import { DashboardFooter, DashboardOverlays } from "./DashboardChrome.tsx";
 
+import type { AuthUser, Barrier, SyncStatus } from "../../lib/types.ts";
+
+import { SyncStatusPill } from "../../components/SyncStatusPill.tsx";
+
 import { LocationFilter } from "../../components/LocationFilter.tsx";
 
 import { ExportToolbar } from "../../components/ExportToolbar.tsx";
@@ -12,8 +16,6 @@ import { BarriersTable } from "../../components/BarriersTable.tsx";
 import { useSettings } from "../../context/SettingsContext.tsx";
 
 import type { useDashboard } from "../../hooks/useDashboard.ts";
-
-import type { AuthUser, Barrier } from "../../lib/types.ts";
 
 import { FilterBar } from "../../components/FilterBar.tsx";
 
@@ -48,6 +50,8 @@ interface SectionsProps {
   loading: boolean;
   companyName: string;
   serverMode: boolean;
+  // Live sync status for the indicator pill (HTTP mode only; null hides it).
+  syncStatus?: SyncStatus | null;
   // Authenticated session identity for the Header user menu. Null when the
   // island renders without SSR identity (never in production page flow).
   sessionUser?: AuthUser | null;
@@ -74,6 +78,7 @@ export function DashboardSections(
     companyName,
     serverMode,
     sessionUser = null,
+    syncStatus = null,
     apiBaseUrl = "",
     onServerCsv,
   }: SectionsProps,
@@ -147,6 +152,19 @@ export function DashboardSections(
           apiBaseUrl={apiBaseUrl}
           sessionUser={sessionUser}
         />
+
+        {/* Sync status pill (HTTP mode only; null renders nothing) */}
+        {syncStatus !== null && (
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "flex-end",
+              marginBottom: "var(--d-section)",
+            }}
+          >
+            <SyncStatusPill status={syncStatus} />
+          </div>
+        )}
 
         {/* Location tabs */}
         <div style={{ animation: "slideUp .3s .04s var(--ease-out) both" }}>

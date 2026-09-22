@@ -7,6 +7,8 @@ import { ServerErrorBanner, ServerErrorCard } from "./ServerError.tsx";
 
 import { useServerDashboard } from "../../hooks/dashboard/server.ts";
 
+import { useSyncStatus } from "../../hooks/dashboard/sync-status.ts";
+
 import { LoadingScreen } from "../../components/LoadingScreen.tsx";
 
 import { useSettings } from "../../context/SettingsContext.tsx";
@@ -131,6 +133,9 @@ function ServerView(
   // Live vocabulary wins once the cadence refreshes it; the SSR seed covers
   // the first paint so tabs never flash empty.
   const vocab = liveVocabularies ?? vocabularies;
+  // Sync indicator rides the same 5-minute cadence (HTTP mode only; mock
+  // mode has no sync to report).
+  const syncStatus = useSyncStatus(baseUrl, 300_000, true);
 
   // Fade the shell in once the first scope resolves; later refetches keep
   // showing stale data instead of flashing the splash on every keystroke.
@@ -165,6 +170,7 @@ function ServerView(
         companyName={companyName}
         serverMode
         sessionUser={sessionUser}
+        syncStatus={syncStatus}
         apiBaseUrl={baseUrl}
         onServerCsv={exportServerCsv}
       />

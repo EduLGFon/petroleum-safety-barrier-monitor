@@ -11,6 +11,13 @@ export {
   sanitizeFilters,
 } from "./dashboard/filters.ts";
 export { applyFilters, applySorting, paginate } from "./dashboard/filters.ts";
-export { daysSince, fmt, fmtDate, humanDuration, pct } from "./format.ts";
+export {
+  daysSince,
+  fmt,
+  fmtDate,
+  humanDuration,
+  pct,
+  timeAgoPt,
+} from "./format.ts";
 export { computeChartData } from "./dashboard/chart.ts";
 export { computeKpi } from "./dashboard/kpi.ts";

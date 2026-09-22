@@ -138,7 +138,8 @@ Full contract lives in `docs/API.md`. Summary:
   author derives from session), `GET /api/barriers/deleted` (admin),
   `GET /api/kpi`, `GET /api/chart`, `GET /api/export` (CSV, 10k cap),
   `GET /api/health` (DB-free liveness), `GET /api/vocabularies`
-  (refresh cadence; SSR still seeds the first paint), `POST /api/auth/login`,
+  (refresh cadence; SSR still seeds the first paint), `GET /api/sync-status`
+  (dashboard sync indicator, same cadence), `POST /api/auth/login`,
   `POST /api/auth/logout`, `GET /api/auth/me`, `POST /api/auth/password`
   (own change, session-only), `GET/POST /api/users`,
   `PATCH/DELETE /api/users/:id`, `GET/POST /api/alert-rules`,
