@@ -179,10 +179,11 @@ Full inventory: `barriers`, `barriers/deleted`,
   another's password). Requires the current password, enforces the 12–256
   policy, rejects reuse, revokes every session (re-login everywhere).
 - `GET /api/users`, `POST /api/users` `{ email, name?, password (12+),
-  role? }` (`201`; first user on an empty table becomes admin without
-  auth), `PATCH /api/users/:id` `{ name?, role?, active?, password? }`,
-  `DELETE /api/users/:id` → `{ ok: true }` - all but bootstrap require
-  admin; the last active admin cannot be demoted, deactivated, or deleted.
+  role? }` (`201`) - both require admin; the first account is provisioned
+  via CLI (`scripts/create-admin.ts`), never via this route. `PATCH
+  /api/users/:id` `{ name?, role?, active?, password? }`, `DELETE
+  /api/users/:id` → `{ ok: true }` - the last active admin cannot be
+  demoted, deactivated, or deleted.
 - `GET /api/alert-rules` (+ `?activeOnly=1`), `POST /api/alert-rules`
   `{ name, categoryId?, toStatusId?, criticalOnly?, includeRecovery?,
   staleDays?, notifyImmediate?, active? }` (`201`),
@@ -323,7 +324,7 @@ toWireQuery({ location: "FAL", availability: "Degradado", page: 1 });
 | `routes/api/auth/logout.ts`          | `POST /api/auth/logout` (revoke + clear cookie)                                                               |
 | `routes/api/auth/me.ts`              | `GET /api/auth/me` (session user for islands)                                                                 |
 | `routes/api/auth/password.ts`        | `POST /api/auth/password` (own password change, session-only)                                                 |
-| `routes/api/users.ts`                | `GET/POST /api/users` (admin; bootstrap first admin)                                                          |
+| `routes/api/users.ts`                | `GET/POST /api/users` (admin only; first account via CLI)                                                     |
 | `routes/api/users/[id].ts`           | `PATCH/DELETE /api/users/:id` (admin, last-admin guard)                                                       |
 | `routes/api/alert-rules.ts`          | `GET/POST /api/alert-rules` (admin, per-category triggers)                                                    |
 | `routes/api/alert-rules/[id].ts`     | `PATCH/DELETE /api/alert-rules/:id` (admin)                                                                   |

@@ -32,11 +32,13 @@ export { AVAILABILITY_AVAILABLE, AVAILABILITY_UNAVAILABLE };
 import type { FracttalAsset } from "./types.ts";
 
 // IMPORT_DEFAULTS: fields Fracttal does not carry, given stable documented
-// application defaults (review team decision, not silent guess).
+// application defaults (review team decision, not silent guess). locDescId
+// is storage-only (NOT NULL FK): Fracttal carries no location text and the
+// UI/exports never display it, so id 0 is a placeholder, not a real place.
 export const IMPORT_DEFAULTS = {
   typologyId: 3, // 'Base Operacional'
   groupingId: 0, // 'Sistemas de Alívio'
-  locDescId: 0, // 'Próx. ao Separador de Teste'
+  locDescId: 0, // storage-only placeholder, never displayed
   ownerId: null as number | null,
 };
 

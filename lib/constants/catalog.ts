@@ -1,4 +1,7 @@
 // Display catalog seed lists for categories, owners, notes and plans - split from lib/constants.ts to keep files small; why: centralizes mock/DB seed labels while UI stays dynamic.
+// Note: LOC_DESCS below is storage-only legacy (Fracttal carries no location
+// text; the UI and exports never display locDesc). Kept so existing
+// loc_desc_id FK rows and the mock generator resolve.
 export const CATEGORIES = [
   "Válvula de Alívio de Pressão",
   "Alarmes de Emergência e Sirene",

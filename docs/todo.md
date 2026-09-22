@@ -4,7 +4,6 @@
 - stylished and integrated admin settings
 - stylished mail alert settings
 - wrong contingecy days (sem contingencia ha x dias)
-- wrong location (¨Próx. ao Separador de Teste¨)
 - improve filters (replace and add more)
 - update barrier data after changing status
 

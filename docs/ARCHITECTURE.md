@@ -142,7 +142,8 @@ Full contract lives in `docs/API.md`. Summary:
   - `GET /api/sync-changes` (header health indicator, 1-minute cadence with
     a 15s fast lane while a run is in flight), `POST /api/auth/login`,
     `POST /api/auth/logout`, `GET /api/auth/me`, `POST /api/auth/password`
-    (own change, session-only), `GET/POST /api/users`,
+    (own change, session-only), `GET/POST /api/users` (admin only; first
+    account via `scripts/create-admin.ts`, never self-registered),
     `PATCH/DELETE /api/users/:id`, `GET/POST /api/alert-rules`,
     `PATCH/DELETE /api/alert-rules/:id`, `GET/POST /api/recipients`,
     `PATCH/DELETE /api/recipients/:id`, `GET /api/lookups` (admin forms),
@@ -192,17 +193,20 @@ Full contract lives in `docs/API.md`. Summary:
 
 ## Config
 
-See `.env.example`. `COMPANY_NAME` brands titles/headers/exports (empty =
-unbranded). `PUBLIC_API_MODE` (`mock`/`http`) + `PUBLIC_API_BASE_URL`
-select the adapter. `DATABASE_URL` feeds `lib/server/db.ts` and both `db:*`
-tasks. `dev` needs shell exports; `start`/`db:*` read `.env`.
+See `.env.example`. `COMPANY_NAME` brands the top header, login card header,
+splash card, and exports (empty = unbranded). The dashboard footer carries
+the author signature, the settings panel and loading splash have no brand
+copy, and the login footer is an unbranded session marker.
+`PUBLIC_API_MODE` (`mock`/`http`) + `PUBLIC_API_BASE_URL` select the
+adapter. `DATABASE_URL` feeds `lib/server/db.ts` and both `db:*` tasks.
+`dev` needs shell exports; `start`/`db:*` read `.env`.
 
 ## Design principles
 
 - Dynamic data, never fixed catalogs: stations, statuses, categories, and
   counts change without code changes (open unions, SSR/SQL vocabularies,
-  `distinctBy`). Filter selects use live vocabularies; settings accept live
-  vocab props with seed fallback for first paint only.
+  `distinctBy`). Filter selects and settings default filters use live
+  vocabularies only; no seed fallback is offered.
 - Reconcile everywhere: fixed KPI fields + `other` novel-availability field +
   `by*` `GROUP BY` buckets, `resolveKpi` translates numeric-id keys, chart
   derives NC as `total - compliant` fail-closed, so novel values never vanish.
