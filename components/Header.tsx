@@ -1,15 +1,27 @@
 // Aurora Executive Dark header.
 // This is why it exists: eyebrow + an extra-thin title on the left with
-// a live connection dot (emerald = connected, amber = reconnecting,
-// red = disconnected), gear button on the right. No cards, no pills, no
-// extra chrome: the header sits directly on the mesh canvas.
+// a merged connection + sync bulb, a one-row sync subtitle (local instant
+// plus colored delta chips), and a hover card with full run details.
+// Gear button on the right. The header sits directly on the mesh canvas.
+import {
+  formatInstant,
+  healthLabel,
+  toHealthKind,
+} from "../lib/sync-indicator.ts";
+
 import { type Conn, useConnection } from "../hooks/useConnection.ts";
 
-import { AURORA, AURORA_CONN, AURORA_TYPE } from "../lib/aurora.ts";
+import { AURORA, AURORA_TYPE } from "../lib/aurora.ts";
 
-import { useSettings } from "../context/SettingsContext.tsx";
+import type { AuthUser, SyncStatus } from "../lib/types.ts";
 
-import type { AuthUser } from "../lib/types.ts";
+import { SyncHoverCard } from "./header/SyncHoverCard.tsx";
+
+import { HealthDot } from "./header/HealthDot.tsx";
+
+import { SyncLine } from "./header/SyncLine.tsx";
+
+import { useState } from "preact/hooks";
 
 interface Props {
   onOpenSettings: () => void;
@@ -20,6 +32,9 @@ interface Props {
   // Authenticated session identity (crossed from the server route). Shown
   // as email + role with a logout action; absent = menu hidden.
   sessionUser?: AuthUser | null;
+  // Live sync status for the merged indicator (HTTP mode only). Null hides
+  // the subtitle line and hover card; the dot falls back to connection only.
+  syncStatus?: SyncStatus | null;
 }
 
 type ConnState = Conn;
@@ -64,25 +79,32 @@ async function logoutToLogin(): Promise<void> {
   globalThis.location.href = "/login";
 }
 
-// Header: title + live connection dot on the left, settings gear on the right.
+// Header: title + merged health dot plus sync subtitle on the left,
+// settings gear on the right. Hovering or focusing the title block opens
+// the full sync audit card (touch toggles it with a tap).
 export function Header(
-  { onOpenSettings, companyName = "", apiBaseUrl = "", sessionUser = null }:
-    Props,
+  {
+    onOpenSettings,
+    companyName = "",
+    apiBaseUrl = "",
+    sessionUser = null,
+    syncStatus = null,
+  }: Props,
 ) {
   const healthUrl = apiBaseUrl
     ? `${apiBaseUrl.replace(/\/$/, "")}/api/health`
     : "/api/health";
   const conn = useConnection(healthUrl);
-  const { settings } = useSettings();
-  const isUp = conn === "connected";
-  // Connected: the palette's main color. Offline: red - or gray when the
-  // palette itself is red, so the two states never look alike.
-  const color = isUp
-    ? AURORA_CONN.connected
-    : settings.accentColor === "red"
-    ? AURORA_CONN.offlineOnRed
-    : AURORA_CONN.offline;
-  const glow = isUp ? AURORA_CONN.connectedGlow : color;
+  const [syncOpen, setSyncOpen] = useState(false);
+  const kind = toHealthKind(syncStatus, conn);
+  const instantIso = syncStatus?.runningSince ??
+    syncStatus?.lastRun?.finishedAt ?? null;
+  const instant = formatInstant(instantIso);
+  const dotLabel = syncStatus === null
+    ? CONN_LABEL[conn]
+    : `${CONN_LABEL[conn]} - ${healthLabel(kind)}${
+      instant ? ` ${instant.dateTime}` : ""
+    }`;
   return (
     <header
       style={{
@@ -95,7 +117,15 @@ export function Header(
         animation: "cardAppear .35s var(--ease-out) both",
       }}
     >
-      <div>
+      <div
+        onMouseEnter={() => setSyncOpen(true)}
+        onMouseLeave={() => setSyncOpen(false)}
+        onFocus={() => setSyncOpen(true)}
+        onBlur={() => setSyncOpen(false)}
+        onClick={() => setSyncOpen((v) => !v)}
+        tabIndex={syncStatus === null ? undefined : 0}
+        style={{ position: "relative", outline: "none" }}
+      >
         {companyName && (
           <div
             style={{
@@ -122,27 +152,16 @@ export function Header(
           }}
         >
           Monitor de Barreiras
-          <span
-            title={CONN_LABEL[conn]}
-            aria-label={CONN_LABEL[conn]}
-            style={{
-              width: 12,
-              height: 12,
-              borderRadius: 99,
-              flexShrink: 0,
-              // Solid bulb in the live color + three-layer halo.
-              // Lit states breathe/flicker, the dead state holds still.
-              background: color,
-              boxShadow:
-                `0 0 3px ${color}, 0 0 10px ${glow}, 0 0 22px color-mix(in srgb, ${color} 35%, transparent)`,
-              animation: conn === "connected"
-                ? "bulbBreathe 3.5s ease-in-out infinite"
-                : conn === "reconnecting"
-                ? "bulbFlicker 1.6s linear infinite"
-                : "none",
-            }}
+          <HealthDot
+            conn={conn}
+            kind={syncStatus === null && conn === "connected" ? "synced" : kind}
+            label={dotLabel}
           />
         </div>
+        <SyncLine sync={syncStatus} conn={conn} />
+        {syncOpen && syncStatus !== null && (
+          <SyncHoverCard sync={syncStatus} conn={conn} />
+        )}
       </div>
       <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
         {sessionUser && (

@@ -5,8 +5,6 @@ import { DashboardFooter, DashboardOverlays } from "./DashboardChrome.tsx";
 
 import type { AuthUser, Barrier, SyncStatus } from "../../lib/types.ts";
 
-import { SyncStatusPill } from "../../components/SyncStatusPill.tsx";
-
 import { LocationFilter } from "../../components/LocationFilter.tsx";
 
 import { ExportToolbar } from "../../components/ExportToolbar.tsx";
@@ -145,26 +143,14 @@ export function DashboardSections(
             "opacity .5s var(--ease-out), transform .5s var(--ease-out)",
         }}
       >
-        {/* Header */}
+        {/* Header with merged connection + sync indicator */}
         <Header
           onOpenSettings={() => setSettingsOpen(true)}
           companyName={companyName}
           apiBaseUrl={apiBaseUrl}
           sessionUser={sessionUser}
+          syncStatus={syncStatus ?? null}
         />
-
-        {/* Sync status pill (HTTP mode only; null renders nothing) */}
-        {syncStatus !== null && (
-          <div
-            style={{
-              display: "flex",
-              justifyContent: "flex-end",
-              marginBottom: "var(--d-section)",
-            }}
-          >
-            <SyncStatusPill status={syncStatus} />
-          </div>
-        )}
 
         {/* Location tabs */}
         <div style={{ animation: "slideUp .3s .04s var(--ease-out) both" }}>
