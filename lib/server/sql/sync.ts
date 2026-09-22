@@ -13,7 +13,7 @@ import {
 
 import type { MapContext } from "../fracttal/map.ts";
 
-import type { SyncStatus } from "../../types.ts";
+import type { SyncChange, SyncStatus } from "../../types.ts";
 
 import { queryRows } from "../db.ts";
 
@@ -370,4 +370,73 @@ export async function getSyncStatus(): Promise<SyncStatus> {
     staleRunning: stale.length > 0,
     barriers: counted[0]?.n ?? 0,
   });
+}
+
+// HistoryTouch: raw join shape for the recent-changes list below.
+interface HistoryTouch {
+  barrier_id: number;
+  tag: string;
+  location: string;
+  status: string;
+  note: string;
+  changed_at: string;
+}
+
+// getSyncRecentChanges: newest barriers touched by the sync author (history
+// rows stamped by applyPlan) plus recent soft deletes, merged by timestamp.
+// Read-only; powers the card's "what changed" section so raw counts are
+// never the whole story. Limit is clamped to 1..20.
+export async function getSyncRecentChanges(limit = 8): Promise<SyncChange[]> {
+  const take = Math.max(1, Math.min(20, Math.floor(limit) || 8));
+  const [touched, removed] = await Promise.all([
+    queryRows<HistoryTouch>(
+      `select b.id as barrier_id, b.tag,
+        coalesce(l.name, l.code, '') as location,
+        coalesce(s.label, '') as status, h.note,
+        h.created_at as changed_at
+       from barrier_status_history h
+       join barriers b on b.id = h.barrier_id
+       left join locations l on l.id = b.location_id
+       left join availability_statuses s on s.id = h.status_id
+       where h.author_id = $1
+       order by h.created_at desc limit $2`,
+      [SYNC_AUTHOR_ID, take],
+    ),
+    queryRows<
+      Pick<HistoryTouch, "barrier_id" | "tag" | "location" | "changed_at">
+    >(
+      `select b.id as barrier_id, b.tag,
+        coalesce(l.name, l.code, '') as location,
+        b.deleted_at as changed_at
+       from barriers b
+       left join locations l on l.id = b.location_id
+       where b.deleted_at is not null
+       order by b.deleted_at desc limit $1`,
+      [take],
+    ),
+  ]);
+  const merged: SyncChange[] = [
+    ...touched.map((r) => ({
+      barrierId: r.barrier_id,
+      tag: r.tag,
+      location: r.location,
+      kind: (r.note === "Importado do Fracttal" ? "new" : "updated") as
+        | "new"
+        | "updated",
+      status: r.status,
+      changedAt: r.changed_at,
+    })),
+    ...removed.map((r) => ({
+      barrierId: r.barrier_id,
+      tag: r.tag,
+      location: r.location,
+      kind: "removed" as const,
+      status: "Removida",
+      changedAt: r.changed_at,
+    })),
+  ];
+  merged.sort((a, b) =>
+    new Date(b.changedAt).getTime() - new Date(a.changedAt).getTime()
+  );
+  return merged.slice(0, take);
 }

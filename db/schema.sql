@@ -153,6 +153,9 @@ create table if not exists barrier_status_history (
 );
 
 create index if not exists idx_history_barrier on barrier_status_history(barrier_id, date);
+-- Sync card's "what changed" list filters by the sync author and orders by
+-- recency; this index keeps that read cheap as history grows.
+create index if not exists idx_history_sync_author on barrier_status_history(author_id, created_at desc);
 
 -- ─── updated_at maintenance ─────────────────────────────────────────────────
 

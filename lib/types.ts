@@ -131,6 +131,18 @@ export interface SyncStatus {
   totals: { barriers: number };
 }
 
+// One barrier touched by a sync run, for the "what changed" card section
+// (served by GET /api/sync-changes from barrier_status_history by the sync
+// author plus recent soft deletes; kind "new" marks first-time imports).
+export interface SyncChange {
+  barrierId: number;
+  tag: string;
+  location: string;
+  kind: "new" | "updated" | "removed";
+  status: string;
+  changedAt: string;
+}
+
 export type SortableColumn = keyof Pick<
   Barrier,
   | "id"
