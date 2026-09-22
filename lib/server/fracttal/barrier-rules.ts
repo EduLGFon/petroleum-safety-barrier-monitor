@@ -151,12 +151,24 @@ export function classifyRequest(
   return type.includes("emergencial") ? "urgent" : "planned";
 }
 
+// Work-order open statuses (reference: Query tasks in WOs, ot_status as
+// text: 1 in process, 2 review). 3 completed and 4 cancelled carry no
+// signal (the same closed gate as done !== false). Used for the open-only
+// status pass (FRACTTAL_WORK_OPEN_ONLY); the default windowed pass ignores
+// this set.
+export const OPEN_WORK_ORDER_STATUSES: readonly string[] = ["1", "2"];
+
 // Request statuses that count as closed: solved (4), cancelled (5), solved
-// via work order (6), rejected (12). Everything else is an open request.
+// via work order (6), rejected (12) - all observed in the dump - plus 11
+// removed from pending tasks (reference: Query status changes from
+// requests; terminal by label). Everything else is an open request; status
+// 9 (WO cancelled) deliberately stays open: the underlying need may persist,
+// and for safety barriers a sticky signal beats a silent decay.
 export const CLOSED_REQUEST_STATUSES: ReadonlySet<number> = new Set([
   4,
   5,
   6,
+  11,
   12,
 ]);
 

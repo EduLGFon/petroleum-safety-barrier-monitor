@@ -20,6 +20,7 @@ import {
   isoDate,
   locationTypeOf,
   mergeEvent,
+  OPEN_WORK_ORDER_STATUSES,
   resolveAvailability,
   stationCodeOf,
   tagFor,
@@ -130,9 +131,17 @@ Deno.test("isClosedRequestStatus matches the terminal set", () => {
   assertStrictEquals(isClosedRequestStatus(4), true);
   assertStrictEquals(isClosedRequestStatus(5), true);
   assertStrictEquals(isClosedRequestStatus(6), true);
+  // 11 removed from pending tasks (reference: Query status changes from
+  // requests) is terminal; 9 (WO cancelled) stays open on purpose.
+  assertStrictEquals(isClosedRequestStatus(11), true);
   assertStrictEquals(isClosedRequestStatus(12), true);
+  assertStrictEquals(isClosedRequestStatus(9), false);
   assertStrictEquals(isClosedRequestStatus(1), false);
   assertStrictEquals(isClosedRequestStatus(null), false);
+});
+
+Deno.test("OPEN_WORK_ORDER_STATUSES covers in-process and review", () => {
+  assertStrictEquals(OPEN_WORK_ORDER_STATUSES.join(","), "1,2");
 });
 
 Deno.test("mergeEvent keeps the earliest date and first source", () => {

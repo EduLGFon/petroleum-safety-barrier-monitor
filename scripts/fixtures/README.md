@@ -2,7 +2,10 @@
 
 Replays, never prod: every sync/alert test and dry-run reads these files.
 A reviewed prod capture (docs/FRACTTAL.md "Capture procedure") replaces the
-sample below; until then the synthetic rows stand in.
+sample below; until then the synthetic rows stand in. Rows are live-shaped:
+category in `groups_description`, polo in `groups_1_description` (ignored),
+and FAL-EQ-001 carries a parent chain (primary station path) while the rest
+resolve via `location_code` (fallback path).
 
 ## fracttal-assets-sample.json (synthetic, `meta.synthetic: true`)
 

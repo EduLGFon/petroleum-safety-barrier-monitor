@@ -34,9 +34,10 @@ Deno.test("fixture rows land, read back, export totals match", async () => {
     return;
   }
   const scope = `p4test:${Date.now()}`;
-  // Real lookup labels so the raw rows map instead of skip.
+  // Real lookup labels so the raw rows map instead of skip (live-shaped:
+  // category in groups_description, polo ignored in groups_1).
   const locs = await queryRows<{ code: string }>(
-    "select code from locations limit 1",
+    "select code from locations order by code limit 2",
   );
   const cats = await queryRows<{ label: string }>(
     "select label from categories limit 1",
@@ -50,7 +51,8 @@ Deno.test("fixture rows land, read back, export totals match", async () => {
     code,
     id_type_item: 2,
     location_code: locs[0]!.code,
-    groups_1_description: cats[0]!.label,
+    groups_description: cats[0]!.label,
+    groups_1_description: "Polo Cricaré",
     priorities_description: crits[0]!.label,
     available,
   });

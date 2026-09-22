@@ -220,7 +220,8 @@ function rawRow(over: Record<string, unknown> = {}): unknown {
     description: "teste",
     location_code: "FAL",
     items_types_description: "Equipment",
-    groups_1_description: "Sistema de Combate a Incêndio",
+    groups_1_description: "Polo Cricaré",
+    groups_description: "Sistema de Combate a Incêndio",
     priorities_description: "Crítico",
     ...over,
   };

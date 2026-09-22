@@ -30,8 +30,8 @@ function asset(over: Partial<FracttalAsset> = {}): FracttalAsset {
     location_code: "fal",
     id_parent: null,
     items_types_description: "Equipment",
-    groups_description: null,
-    groups_1_description: "Sistema de Combate a Incêndio",
+    groups_description: "Sistema de Combate a Incêndio",
+    groups_1_description: "Polo Cricaré",
     groups_2_description: null,
     priorities_description: "Crítico",
     parent_description: null,
@@ -76,16 +76,26 @@ Deno.test("mapAsset resolves labels case-insensitively and applies defaults", ()
   assertStrictEquals(mapped.warnings.length, 0);
 });
 
-Deno.test("mapAsset falls back to groups_description when groups_1 is absent", () => {
+Deno.test("mapAsset reads category from groups_description, not the polo label", () => {
   const mapped = mapAsset(
-    asset({
-      groups_1_description: null,
-      groups_description: "Sistema de Combate a Incêndio",
-    }),
+    asset({ groups_1_description: "Polo Norte Capixaba" }),
     ctx,
   );
   if (!mapped.ok) throw new Error("expected ok");
   assertStrictEquals(mapped.input.categoryId, 7);
+});
+
+Deno.test("mapAsset prefers the parent-derived station over location_code", () => {
+  const mapped = mapAsset(
+    asset({
+      parent_description:
+        "// Seacrest Petróleo/ Área Norte/ FAZENDA ALEGRE - FAL/ POÇOS",
+      location_code: "SSV-BRA01-001",
+    }),
+    ctx,
+  );
+  if (!mapped.ok) throw new Error("expected ok");
+  assertStrictEquals(mapped.input.locationId, 1);
 });
 
 const expectSkip = (mapped: MappedRow, fragment: string) => {
@@ -98,16 +108,16 @@ Deno.test("mapAsset skips empty external_code", () => {
   expectSkip(mapAsset(asset({ code: "  " }), ctx), "empty external_code");
 });
 
-Deno.test("mapAsset skips unknown locations", () => {
+Deno.test("mapAsset skips unknown stations", () => {
   expectSkip(
     mapAsset(asset({ location_code: "ZZZ" }), ctx),
-    "unknown location",
+    "unknown station",
   );
 });
 
 Deno.test("mapAsset skips unmapped category labels", () => {
   expectSkip(
-    mapAsset(asset({ groups_1_description: "Válvula Inexistente" }), ctx),
+    mapAsset(asset({ groups_description: "Válvula Inexistente" }), ctx),
     "unmapped category",
   );
 });
@@ -176,12 +186,11 @@ Deno.test("mapAsset stamps sourceUpdatedAt from the winning event", () => {
 });
 
 Deno.test("mapAsset skips rows outside the barrier scope", () => {
+  // Scope reports first even with an unknown station (import order), so
+  // non-barriers never inflate the station-triage list.
   expectSkip(
     mapAsset(
-      asset({
-        groups_1_description: "Bomba",
-        groups_description: "Bomba",
-      }),
+      asset({ groups_description: "Bomba", location_code: "ZZZ" }),
       ctx,
     ),
     "not barrier scope",

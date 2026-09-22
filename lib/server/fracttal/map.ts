@@ -4,9 +4,14 @@
 // station, typology, availability precedence) live in ./barrier-rules.ts so
 // the dump import and the live sync can never diverge again; this module
 // only resolves labels against the context and SKIPS (with a reason)
-// anything unmapped - never guesses a plausible id. The sync never creates
-// catalog rows: the import owns locations/categories, unknown labels here
-// skip and are listed in the run report.
+// anything unmapped - never guesses a plausible id. Field choices mirror
+// the import exactly (scripts/fracttal-import.ts pass A): scope and
+// category read groups_description (groups_1_description is the polo/area
+// upstream, never the category), and the station is the L2 parse of
+// parent_description with the raw location_code as fallback (live
+// location_code values are group/asset tags, never station codes). The sync
+// never creates catalog rows: the import owns locations/categories, unknown
+// labels here skip and are listed in the run report.
 import {
   AVAILABILITY_AVAILABLE,
   AVAILABILITY_UNAVAILABLE,
@@ -16,6 +21,7 @@ import {
   isBarrierCandidate,
   isoDate,
   resolveAvailability,
+  stationCodeOf,
   type StatusEvent,
   tagFor,
   typologyIdOf,
@@ -110,25 +116,30 @@ export function mapAsset(
     return { ok: false, reason: `excluded asset (${excluded})` };
   }
 
-  const locationCode = (asset.location_code ?? "").trim().toUpperCase();
-  const locationId = locationCode !== ""
-    ? ctx.locationIds[locationCode]
-    : undefined;
-  if (locationId === undefined) {
-    return {
-      ok: false,
-      reason: `unknown location '${locationCode || "<none>"}'`,
-    };
-  }
-
-  // Scope and category share the preferred taxonomy label (most specific
-  // first), mirroring the import's keyword scope on the same label family.
-  const categoryLabel = categoryFor(
-    asset.groups_1_description ?? asset.groups_description,
-  );
+  // Scope and category read groups_description only, mirroring the import's
+  // keyword scope on the same label family (the import checks scope before
+  // station too, so skip reasons agree). groups_1_description is the polo
+  // and is never consulted: preferring it scoped every live row out.
+  const categoryLabel = categoryFor(asset.groups_description);
   if (!isBarrierCandidate(categoryLabel)) {
     return { ok: false, reason: `not barrier scope ('${categoryLabel}')` };
   }
+
+  const stationLabel = stationCodeOf(asset.parent_description);
+  const locationCode = (asset.location_code ?? "").trim().toUpperCase();
+  // Parent parse wins whenever it resolves (the import assigns stations the
+  // same way, so local and remote rows agree); the raw code covers rows
+  // without a parent chain. Either miss skips and is listed.
+  const locationId =
+    (stationLabel !== "" ? ctx.locationIds[stationLabel] : undefined) ??
+      (locationCode !== "" ? ctx.locationIds[locationCode] : undefined);
+  if (locationId === undefined) {
+    return {
+      ok: false,
+      reason: `unknown station '${stationLabel || locationCode || "<none>"}'`,
+    };
+  }
+
   const categoryId = ctx.categoryIds[categoryLabel];
   if (categoryId === undefined) {
     return { ok: false, reason: `unmapped category '${categoryLabel}'` };
