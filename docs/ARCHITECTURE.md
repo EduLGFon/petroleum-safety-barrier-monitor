@@ -178,7 +178,7 @@ Full contract lives in `docs/API.md`. Summary:
   `compliance_id` is trigger-derived, the only
   write path is `record_status_change()`. Location and category ids are
   NOT frontend contracts - the server serves the dynamic id-keyed
-  vocabularies (`{id, code, count}` and `{id, label}`) to the island, and
+  vocabularies (`{id, code, name, count}` and `{id, label}`) to the island, and
   `lib/resolve.ts` + `lib/api/query.ts` bind those ids at request time.
   `scripts/migrate.ts` applies `db/schema.sql` + `db/seed_lookups.sql`
   (idempotent, seed approximates the imported catalog); `scripts/seed.ts`

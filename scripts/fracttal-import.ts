@@ -26,6 +26,7 @@ import {
   mergeEvent,
   resolveAvailability,
   stationCodeOf,
+  stationNameOf,
   type StatusEvent,
   tagFor,
   typologyIdOf,
@@ -275,7 +276,10 @@ async function main() {
   // Builds the barrier set, the station set and the category set. Only the
   // barrier-scope rows are kept; everything else is reported and dropped.
   const barriers = new Map<string, BarrierAcc>();
-  const stations = new Set<string>();
+  // stations maps code -> display name (first canonical segment wins;
+  // override segments yield null and never overwrite - the catalog row
+  // borrows the canonical name, falling back to the code at read time).
+  const stations = new Map<string, string | null>();
   const categories = new Set<string>();
   let equipmentSeen = 0;
   let candidates = 0;
@@ -297,7 +301,10 @@ async function main() {
     const parentDescription = str(row.parent_description);
     const station = stationCodeOf(parentDescription);
     const category = categoryFor(groupsDescription);
-    stations.add(station);
+    const stationName = stationNameOf(parentDescription);
+    if (!stations.has(station) || stations.get(station) == null) {
+      stations.set(station, stationName);
+    }
     categories.add(category);
     barriers.set(code, {
       code,
@@ -386,7 +393,7 @@ async function main() {
   );
   await exec("truncate table locations, categories restart identity cascade");
 
-  const stationList = [...stations].sort();
+  const stationList = [...stations.keys()].sort();
   const stationIds = new Map(
     stationList.map((code, i) => [code, i + 1]), // 0 = 'ALL' is UI-only, never a row
   );
@@ -399,10 +406,11 @@ async function main() {
     id: i + 1,
     code,
     type: locationTypeOf(code),
+    name: stations.get(code) ?? null,
   }));
   const locInsert = buildInsert(
     "locations",
-    ["id", "code", "type"] as const,
+    ["id", "code", "type", "name"] as const,
     locRows,
   );
   await exec(locInsert.text, locInsert.args);

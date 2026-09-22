@@ -23,7 +23,9 @@ import {
   OPEN_WORK_ORDER_STATUSES,
   resolveAvailability,
   stationCodeOf,
+  stationNameOf,
   tagFor,
+  toDisplayName,
   TYPOLOGY_COMPRESSION,
   TYPOLOGY_MEASUREMENT,
   TYPOLOGY_OPERATIONS_BASE,
@@ -65,6 +67,48 @@ Deno.test("stationCodeOf takes the trailing L2 code token", () => {
   );
   assertStrictEquals(stationCodeOf("lone segment"), "LONE SEGMENT");
   assertStrictEquals(stationCodeOf(null), "");
+  // The São Mateus base carries a state suffix, not a station code.
+  assertStrictEquals(
+    stationCodeOf(
+      "// Seacrest Petróleo/ Área Norte/ Base Seacrest - São Mateus-ES/ X",
+    ),
+    "SM",
+  );
+});
+
+Deno.test("stationNameOf derives the display name from the L2 prefix", () => {
+  assertStrictEquals(
+    stationNameOf("// Seacrest Petróleo/ Área Norte/ FAZENDA ALEGRE - FAL/ X"),
+    "Fazenda Alegre",
+  );
+  assertStrictEquals(
+    stationNameOf("// Seacrest Petróleo/ Área Norte/ SÃO MATEUS - SM/ X"),
+    "São Mateus",
+  );
+  assertStrictEquals(
+    stationNameOf("// Seacrest Petróleo/ Área/ CÓRREGO DOURADO - CD/ X"),
+    "Córrego Dourado",
+  );
+  // Override segments borrow the canonical name instead of setting one.
+  assertStrictEquals(
+    stationNameOf(
+      "// Seacrest Petróleo/ Área Norte/ Base Seacrest - São Mateus-ES/ X",
+    ),
+    null,
+  );
+  // Segments without a dash-code tail display as their own code.
+  assertStrictEquals(
+    stationNameOf("// Seacrest/ Área/ CJ DUTOS TERRESTRES - ÁREA SUL/ X"),
+    null,
+  );
+  assertStrictEquals(stationNameOf("lone segment"), null);
+  assertStrictEquals(stationNameOf(null), null);
+});
+
+Deno.test("toDisplayName keeps pt-BR particles lowercase", () => {
+  assertStrictEquals(toDisplayName("LAGOA SURUACA"), "Lagoa Suruaca");
+  assertStrictEquals(toDisplayName("RIO SÃO MATEUS"), "Rio São Mateus");
+  assertStrictEquals(toDisplayName("CÓRREGO DAS PEDRAS"), "Córrego das Pedras");
 });
 
 Deno.test("typologyIdOf follows keyword precedence", () => {

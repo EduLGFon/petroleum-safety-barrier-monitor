@@ -64,7 +64,9 @@ the middle of the way.
 ## Schema
 
 ```
-locations              id, code, type
+locations              id, code, type, name (display name for hover tooltips;
+                       null falls back to code; owned by the import, never
+                       written by the sync)
 availability_statuses  id, label, is_compliant
 criticality_levels     id, label
 categories             id, label

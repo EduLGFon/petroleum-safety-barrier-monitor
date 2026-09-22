@@ -17,23 +17,30 @@ interface Props {
   selected: string;
   allBarriers: Barrier[];
   // Precomputed tabs for server mode (client derives tabs from allBarriers).
-  stations?: { id: number; code: string; count: number }[];
+  stations?: { id: number; code: string; name: string; count: number }[];
   total?: number;
   onChange: (c: string) => void;
 }
-// LocationFilter: station tabs derived from data plus Todas; scrolls horizontally.
+// LocationFilter: station tabs derived from data plus Todas; scrolls
+// horizontally. Visible labels stay short codes; the full display name
+// (server-provided) shows on hover. Mock mode has no names, so the seed
+// installation type stays the tooltip there.
 export function LocationFilter(
   { selected, allBarriers, stations, total, onChange }: Props,
 ) {
   // Stations from the data first (future stations appear automatically),
-  // seed metadata only supplies display names for known codes. Server mode
-  // passes precomputed stations instead of the full barrier list. Tabs are
-  // ordered by item count (highest first), alphabetical tiebreak.
+  // seed metadata only supplies display fallback for known codes. Server
+  // mode passes precomputed stations instead of the full barrier list. Tabs
+  // are ordered by item count (highest first), alphabetical tiebreak.
   const tabs = useMemo(() => {
     const meta = new Map(LOCATIONS.map((l) => [l.code, l]));
     const counts = new Map<string, number>();
+    const names = new Map<string, string>();
     if (stations) {
-      for (const s of stations) counts.set(s.code, s.count);
+      for (const s of stations) {
+        counts.set(s.code, s.count);
+        names.set(s.code, s.name);
+      }
     } else {
       for (const b of allBarriers) {
         counts.set(b.location, (counts.get(b.location) ?? 0) + 1);
@@ -43,12 +50,13 @@ export function LocationFilter(
       (counts.get(b) ?? 0) - (counts.get(a) ?? 0) ||
       a.localeCompare(b, "pt-BR")
     );
-    return codes.map((code) => ({
-      code,
-      name: meta.get(code)?.name ?? code,
-      type: meta.get(code)?.type ?? "Instalação",
-      count: counts.get(code) ?? 0,
-    }));
+    return codes.map((code) => {
+      const serverName = names.get(code);
+      const tip = serverName && serverName !== code
+        ? serverName
+        : (meta.get(code)?.type ?? "Instalação");
+      return { code, tip, count: counts.get(code) ?? 0 };
+    });
   }, [allBarriers, stations]);
   return (
     <nav
@@ -64,8 +72,8 @@ export function LocationFilter(
       }}
     >
       <Tab
-        name="Todas"
-        type="Todas as Instalações"
+        label="Todas"
+        tip="Todas as Instalações"
         count={total ?? allBarriers.length}
         active={selected === "ALL"}
         index={0}
@@ -74,8 +82,8 @@ export function LocationFilter(
       {tabs.map((t, i) => (
         <Tab
           key={t.code}
-          name={t.name}
-          type={t.type}
+          label={t.code}
+          tip={t.tip}
           count={t.count}
           active={selected === t.code}
           index={i + 1}
@@ -87,10 +95,12 @@ export function LocationFilter(
 }
 
 // Tab: single glass pill tab with count badge and staggered entrance.
+// The visible label stays the short station code; tip carries the full
+// display name (or the installation type fallback) for hover.
 function Tab(
-  { name, type, count, active, index, onClick }: {
-    name: string;
-    type: string;
+  { label, tip, count, active, index, onClick }: {
+    label: string;
+    tip: string;
     count: number;
     active: boolean;
     index: number;
@@ -102,7 +112,7 @@ function Tab(
       type="button"
       onClick={onClick}
       aria-pressed={active}
-      title={type}
+      title={tip}
       style={{
         display: "flex",
         alignItems: "center",
@@ -126,7 +136,7 @@ function Tab(
         }ms var(--ease-out) both`,
       }}
     >
-      {name}
+      {label}
       <span
         className="tnum"
         style={{

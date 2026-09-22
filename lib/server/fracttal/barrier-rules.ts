@@ -70,6 +70,17 @@ export function isBarrierCandidate(
   );
 }
 
+// STATION_OVERRIDES corrects L2 segments whose trailing " - CODE" token is
+// not a station (same precedent as EXCLUDED_EXTERNAL_CODES: documented,
+// evidence-backed, never guessed). Verified live 2026-09-20: "Base Seacrest
+// - São Mateus-ES" is the company base in the city of São Mateus (state of
+// Espírito Santo), so it maps to SM - the "-ES" is the state suffix, not a
+// station code. Keys are folded (case/accent-insensitive) full L2 segments;
+// values are catalog station codes.
+export const STATION_OVERRIDES: Readonly<Record<string, string>> = {
+  "base seacrest - sao mateus-es": "SM",
+};
+
 // stationCodeOf extracts the L2 station slug from an equipment parent chain
 // ("// Seacrest Petroleo/ Area Norte/ SAO MATEUS - SM/ ...") by taking the
 // trailing " - CODE" token. Validated against the full equipment file: this
@@ -77,11 +88,62 @@ export function isBarrierCandidate(
 export function stationCodeOf(
   parentDescription: string | null | undefined,
 ): string {
-  const parts = (parentDescription ?? "").split("/").map((p) => p.trim())
-    .filter((p) => p !== "");
-  const seg = parts.length > 2 ? parts[2] : (parts[parts.length - 1] ?? "");
+  const seg = l2Segment(parentDescription);
+  const override = STATION_OVERRIDES[foldText(seg)];
+  if (override !== undefined) return override;
   const match = seg.match(/\s*-\s*([A-Z0-9][A-Z0-9-]*)\s*$/);
   return (match ? match[1] : seg).toUpperCase();
+}
+
+// l2Segment pulls the field-level (third) segment out of an equipment
+// parent chain; shared by the code and name derivations so they can never
+// disagree on which segment they read.
+function l2Segment(parentDescription: string | null | undefined): string {
+  const parts = (parentDescription ?? "").split("/").map((p) => p.trim())
+    .filter((p) => p !== "");
+  return parts.length > 2 ? parts[2]! : (parts[parts.length - 1] ?? "");
+}
+
+// NAME_PARTICLES stays lowercase in display names (pt-BR convention).
+const NAME_PARTICLES: ReadonlySet<string> = new Set([
+  "de",
+  "da",
+  "do",
+  "das",
+  "dos",
+  "e",
+  "em",
+  "no",
+  "na",
+]);
+
+// toDisplayName title-cases a raw taxonomy segment ("SÃO MATEUS" becomes
+// "São Mateus"). Deterministic fallback naming only: the operator's official
+// list supersedes it wherever provided.
+export function toDisplayName(raw: string): string {
+  return raw.toLowerCase().split(/\s+/).map((word, i) =>
+    i > 0 && NAME_PARTICLES.has(word)
+      ? word
+      : word.charAt(0).toUpperCase() + word.slice(1)
+  ).join(" ");
+}
+
+// stationNameOf derives the display name from the L2 segment: the text
+// before " - CODE", title-cased ("FAZENDA ALEGRE - FAL" gives
+// "Fazenda Alegre"). Null when there is no dash-code tail (the code itself
+// is already the display text then) and for override segments (they borrow
+// their station's canonical name and must never set it).
+export function stationNameOf(
+  parentDescription: string | null | undefined,
+): string | null {
+  const seg = l2Segment(parentDescription);
+  if (seg === "" || STATION_OVERRIDES[foldText(seg)] !== undefined) {
+    return null;
+  }
+  const prefix = (seg.match(/^(.*?)\s*-\s*[A-Z0-9][A-Z0-9-]*\s*$/)?.[1] ?? "")
+    .trim();
+  if (prefix === "") return null;
+  return toDisplayName(prefix);
 }
 
 // typologyIdOf derives typology from the parent chain by keyword precedence.

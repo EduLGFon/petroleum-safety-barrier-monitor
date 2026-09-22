@@ -10,43 +10,46 @@
 -- 0 = 'ALL' stays a UI-only sentinel that is never a row). Rebuilding them
 -- from the live dump supersedes any hand-edits here.
 
-insert into locations (id, code, type) values
-  (1, 'BIG', 'Instalação'),
-  (2, 'CAB', 'Instalação'),
-  (3, 'CCN', 'Instalação'),
-  (4, 'CCNS', 'Instalação'),
-  (5, 'CD', 'Instalação'),
-  (6, 'CG', 'Instalação'),
-  (7, 'CJ DUTOS TERRESTRES - ÁREA CENTRO', 'Duto de Transferência'),
-  (8, 'CJ DUTOS TERRESTRES - ÁREA NORTE', 'Duto de Transferência'),
-  (9, 'CJ DUTOS TERRESTRES - ÁREA SUL', 'Duto de Transferência'),
-  (10, 'CJ UNIDADE DE TESTE MÓVEL', 'Unidade Móvel'),
-  (11, 'CNC', 'Instalação'),
-  (12, 'CP', 'Instalação'),
-  (13, 'ES', 'Instalação'),
-  (14, 'FAL', 'Instalação'),
-  (15, 'FC', 'Instalação'),
-  (16, 'FQ', 'Instalação'),
-  (17, 'FSJ', 'Instalação'),
-  (18, 'FSL', 'Instalação'),
-  (19, 'FSR', 'Instalação'),
-  (20, 'GU', 'Instalação'),
-  (21, 'IBU', 'Instalação'),
-  (22, 'JCT', 'Instalação'),
-  (23, 'LB', 'Instalação'),
-  (24, 'LS', 'Instalação'),
-  (25, 'MA', 'Instalação'),
-  (26, 'RI', 'Instalação'),
-  (27, 'RP', 'Instalação'),
-  (28, 'RPO', 'Instalação'),
-  (29, 'RPS', 'Instalação'),
-  (30, 'RSM', 'Instalação'),
-  (31, 'SEI', 'Instalação'),
-  (32, 'SM', 'Instalação'),
-  (33, 'SML', 'Instalação'),
-  (34, 'TAB', 'Instalação'),
-  (35, 'UGV''S MÓVEIS - UGVM''S', 'Instalação')
-on conflict (id) do update set code = excluded.code, type = excluded.type;
+insert into locations (id, code, type, name) values
+  (1, 'BIG', 'Instalação', 'Biguá'),
+  (2, 'CAB', 'Instalação', 'Cacimbas'),
+  (3, 'CCN', 'Instalação', 'Córrego Cedro Norte'),
+  (4, 'CCNS', 'Instalação', 'Corrego Cedro Norte Sul'),
+  (5, 'CD', 'Instalação', 'Córrego Dourado'),
+  (6, 'CG', 'Instalação', 'Campo Grande'),
+  (7, 'CJ DUTOS TERRESTRES - ÁREA CENTRO', 'Duto de Transferência', null),
+  (8, 'CJ DUTOS TERRESTRES - ÁREA NORTE', 'Duto de Transferência', null),
+  (9, 'CJ DUTOS TERRESTRES - ÁREA SUL', 'Duto de Transferência', null),
+  (10, 'CJ UNIDADE DE TESTE MÓVEL', 'Unidade Móvel', null),
+  (11, 'CNC', 'Instalação', 'Cancã'),
+  (12, 'CP', 'Instalação', 'Córrego das Pedras'),
+  (13, 'ES', 'Instalação', 'Base Seacrest - São Mateus'),
+  (14, 'FAL', 'Instalação', 'Fazenda Alegre'),
+  (15, 'FC', 'Instalação', 'Fazenda Cedro'),
+  (16, 'FQ', 'Instalação', 'Fazenda Queimadas'),
+  (17, 'FSJ', 'Instalação', 'Fazenda São Jorge'),
+  (18, 'FSL', 'Instalação', 'Fazenda Santa Luzia'),
+  (19, 'FSR', 'Instalação', 'Fazenda São Rafael'),
+  (20, 'GU', 'Instalação', 'Guriri'),
+  (21, 'IBU', 'Instalação', 'Inhambu'),
+  (22, 'JCT', 'Instalação', 'Jacutinga'),
+  (23, 'LB', 'Instalação', 'Lagoa Bonita'),
+  (24, 'LS', 'Instalação', 'Lagoa Suruaca'),
+  (25, 'MA', 'Instalação', 'Mariricu'),
+  (26, 'RI', 'Instalação', 'Rio Itaúnas'),
+  (27, 'RP', 'Instalação', 'Rio Preto'),
+  (28, 'RPO', 'Instalação', 'Rio Preto Oeste'),
+  (29, 'RPS', 'Instalação', 'Rio Preto Sul'),
+  (30, 'RSM', 'Instalação', 'Rio São Mateus'),
+  (31, 'SEI', 'Instalação', 'Seriema'),
+  (32, 'SM', 'Instalação', 'São Mateus'),
+  (33, 'SML', 'Instalação', 'São Mateus Leste'),
+  (34, 'TAB', 'Instalação', 'Tabuiaá'),
+  (35, 'UGV''S MÓVEIS - UGVM''S', 'Instalação', null)
+on conflict (id) do update set
+  code = excluded.code,
+  type = excluded.type,
+  name = excluded.name;
 
 -- 'ALL' (id 0) is a UI filter sentinel, not a real installation: remove the
 -- legacy row when nothing references it so no barrier can point at it.
@@ -135,7 +138,8 @@ insert into categories (id, label) values
   (63, 'Válvulas segurança'),
   (64, 'Válvulas- PSV'),
   (65, 'Válvulassegurança'),
-  (66, 'Válvúla')
+  (66, 'Válvúla'),
+  (67, 'Válvula BIN')
 on conflict (id) do update set label = excluded.label;
 
 insert into groupings (id, label) values

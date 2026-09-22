@@ -105,7 +105,7 @@ export interface CategoryCompliance {
 // Locations and categories carry their numeric ids so dynamic resolution can
 // map wire ids to these very labels instead of seed enums (see resolve.ts).
 export interface Vocabularies {
-  locations: { id: number; code: string; count: number }[];
+  locations: { id: number; code: string; name: string; count: number }[];
   availabilities: string[];
   compliances: string[];
   categories: { id: number; label: string }[];

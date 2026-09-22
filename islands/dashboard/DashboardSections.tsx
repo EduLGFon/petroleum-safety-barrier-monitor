@@ -39,7 +39,7 @@ interface SectionsProps {
   // Client mode: full list (tabs + counts derive from it). Server mode: the
   // loaded page plus precomputed stations/total from SSR vocabularies.
   barriers: Barrier[];
-  stations?: { id: number; code: string; count: number }[];
+  stations?: { id: number; code: string; name: string; count: number }[];
   total?: number;
   dispOpts: string[];
   confOpts: string[];

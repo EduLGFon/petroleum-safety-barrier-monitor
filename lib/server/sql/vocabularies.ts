@@ -60,13 +60,17 @@ export async function getResolverLabels(): Promise<{
 }
 
 // Distinct display labels plus per-station counts in one parallel batch.
+// Station names ride along for hover tooltips (null falls back to code);
+// codes stay the filter keys everywhere.
 export async function getVocabularies(): Promise<Vocabularies> {
   const [locRows, dispRows, confRows, catRows] = await Promise.all([
-    queryRows<{ id: number; code: string; count: string }>(
-      `select loc.id as id, loc.code as code, count(b.id)::text as count
+    queryRows<{ id: number; code: string; name: string; count: string }>(
+      `select loc.id as id, loc.code as code,
+        coalesce(loc.name, loc.code) as name, count(b.id)::text as count
        from locations loc
        left join barriers b on b.location_id = loc.id and b.deleted_at is null
-       group by loc.id, loc.code order by count(b.id) desc, loc.code`,
+       group by loc.id, loc.code, loc.name
+       order by count(b.id) desc, loc.code`,
     ),
     queryRows<{ label: string }>(
       `select distinct disp.label as label from barriers b
@@ -93,6 +97,7 @@ export async function getVocabularies(): Promise<Vocabularies> {
     locations: locRows.map((r) => ({
       id: r.id,
       code: r.code,
+      name: r.name,
       count: Number(r.count),
     })),
     availabilities: dispRows.map((r) => r.label),

@@ -21,8 +21,13 @@
 create table if not exists locations (
   id    integer primary key,
   code  text not null unique,          -- 'FAL','CNC','CNS','FAP','RJO','SPL' ('ALL' is UI-only, never a row)
-  type  text not null                   -- installation type, display only
+  type  text not null,                 -- installation type, display only
+  name  text                           -- full display name (hover tooltip); null falls back to code
 );
+
+-- Later-added columns ride along idempotently so existing databases gain
+-- them on the next migrate without a version table.
+alter table locations add column if not exists name text;
 
 create table if not exists availability_statuses (
   id           integer primary key,
