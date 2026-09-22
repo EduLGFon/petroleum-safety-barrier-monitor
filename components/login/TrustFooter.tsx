@@ -1,10 +1,10 @@
 // Trust footer - session reassurance line under the login form.
-// This is why it exists: one shared strip (company plus protected
-// session) so the login never drifts from the brand promise.
+// This is why it exists: one shared strip so the login shows a consistent
+// protected-session marker with no brand copy.
 import { AURORA, AURORA_TYPE } from "../../lib/aurora.ts";
 
-// TrustFooter: live-dot plus company and protected-session marker.
-export function TrustFooter({ companyName = "" }: { companyName?: string }) {
+// TrustFooter: padlock plus protected-session marker, no company name.
+export function TrustFooter() {
   return (
     <div
       style={{
@@ -28,7 +28,7 @@ export function TrustFooter({ companyName = "" }: { companyName?: string }) {
           boxShadow: "0 0 8px #34d399",
         }}
       />
-      {companyName ? `${companyName} · ` : ""}Sessão protegida
+      🔒 Sessão protegida
     </div>
   );
 }

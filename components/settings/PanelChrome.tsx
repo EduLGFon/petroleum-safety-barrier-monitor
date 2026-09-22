@@ -1,13 +1,11 @@
-// Settings panel chrome - dialog header and footer.
-// Why: isolates the branded header/close button and version footer so the
-// SettingsPanel shell keeps only backdrop, tabs, and section switching.
-import { withBrand } from "../../lib/company.ts";
+// Settings panel chrome - dialog header.
+// Why: isolates the title block and close button so the SettingsPanel shell
+// keeps only backdrop, tabs, and section switching. No brand copy lives
+// here by design.
 import { CloseIcon } from "../ui/Icons.tsx";
 
-// PanelHeader: branded title block with glow accent and close button.
-export function PanelHeader(
-  { companyName, onClose }: { companyName: string; onClose: () => void },
-) {
+// PanelHeader: plain title block with glow accent and close button.
+export function PanelHeader({ onClose }: { onClose: () => void }) {
   return (
     <div
       style={{
@@ -37,18 +35,6 @@ export function PanelHeader(
       <div>
         <div
           style={{
-            fontSize: "var(--d-micro)",
-            fontWeight: 800,
-            letterSpacing: "0.16em",
-            textTransform: "uppercase",
-            color: "var(--accent)",
-            marginBottom: "var(--d-gap-2xs)",
-          }}
-        >
-          {companyName || "Configurações"}
-        </div>
-        <div
-          style={{
             fontSize: "var(--d-panel-title)",
             fontWeight: 800,
             color: "var(--text-primary)",
@@ -76,27 +62,6 @@ export function PanelHeader(
       >
         <CloseIcon size={14} color="var(--text-muted)" strokeWidth={2.5} />
       </button>
-    </div>
-  );
-}
-
-// PanelFooter: branded version line pinned to the dialog bottom.
-export function PanelFooter({ companyName }: { companyName: string }) {
-  return (
-    <div
-      style={{
-        marginTop: "auto",
-        padding: "var(--d-foot-pad)",
-        borderTop: "1px solid var(--border)",
-        background: "var(--bg-elevated)",
-        fontSize: "var(--d-caption)",
-        color: "var(--text-muted)",
-        textAlign: "center",
-        letterSpacing: "0.05em",
-        flexShrink: 0,
-      }}
-    >
-      {withBrand(companyName, "Monitor de Barreiras")} · v0.4
     </div>
   );
 }

@@ -1,4 +1,4 @@
-// Dashboard chrome - footer brand line and overlay dialogs.
+// Dashboard chrome - footer signature line and overlay dialogs.
 // Why: keeps DashboardView to section composition; footer and modal wiring
 // render once and change rarely.
 import { SettingsPanel } from "../../components/SettingsPanel.tsx";
@@ -7,10 +7,8 @@ import { BarrierModal } from "../../components/BarrierModal.tsx";
 
 import type { AuthUser, Barrier } from "../../lib/types.ts";
 
-import { withBrand } from "../../lib/company.ts";
-
-// DashboardFooter: centered brand line closing the page.
-export function DashboardFooter({ companyName }: { companyName: string }) {
+// DashboardFooter: centered author signature closing the page.
+export function DashboardFooter() {
   return (
     <div
       className="tnum"
@@ -23,7 +21,7 @@ export function DashboardFooter({ companyName }: { companyName: string }) {
         animation: "fadeInFast .4s .5s both",
       }}
     >
-      {withBrand(companyName, "Monitor de Barreiras de Segurança")}
+      Desenvolvido por Energy Júnior - 2026
     </div>
   );
 }
@@ -33,7 +31,6 @@ interface OverlaysProps {
   onCloseBarrier: () => void;
   settingsOpen: boolean;
   onCloseSettings: () => void;
-  companyName: string;
   sessionUser?: AuthUser | null;
   // Live vocabularies forwarded to the settings filters section.
   locations?: { code: string; name: string; type: string }[];
@@ -49,7 +46,6 @@ export function DashboardOverlays(
     onCloseBarrier,
     settingsOpen,
     onCloseSettings,
-    companyName,
     sessionUser = null,
     locations,
     availabilities,
@@ -63,7 +59,6 @@ export function DashboardOverlays(
       <SettingsPanel
         open={settingsOpen}
         onClose={onCloseSettings}
-        companyName={companyName}
         sessionUser={sessionUser}
         locations={locations}
         availabilities={availabilities}

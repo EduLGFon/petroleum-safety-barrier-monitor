@@ -42,23 +42,6 @@ export function LoadingScreen({ onDone, companyName }: Props) {
         msg={msg}
         companyName={companyName}
       />
-
-      {/* Footer */}
-      <div
-        style={{
-          position: "absolute",
-          bottom: 24,
-          fontSize: "var(--d-micro)",
-          color: AURORA.sub,
-          letterSpacing: "0.12em",
-          textTransform: "uppercase",
-          animation: "fadeInFast .8s .4s both",
-        }}
-      >
-        {companyName
-          ? `${companyName} · Segurança Operacional`
-          : "Segurança Operacional"}
-      </div>
     </div>
   );
 }

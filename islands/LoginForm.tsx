@@ -277,7 +277,7 @@ export function LoginForm({ companyName = "" }: { companyName?: string }) {
             </button>
           </form>
           <div style={{ marginTop: 18 }}>
-            <TrustFooter companyName={companyName} />
+            <TrustFooter />
           </div>
         </div>
       </div>

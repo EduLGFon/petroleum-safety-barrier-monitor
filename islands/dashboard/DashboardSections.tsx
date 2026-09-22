@@ -246,7 +246,7 @@ export function DashboardSections(
           />
         </div>
 
-        <DashboardFooter companyName={companyName} />
+        <DashboardFooter />
       </div>
 
       <DashboardOverlays
@@ -254,7 +254,6 @@ export function DashboardSections(
         onCloseBarrier={() => setOpenId(null)}
         settingsOpen={settingsOpen}
         onCloseSettings={() => setSettingsOpen(false)}
-        companyName={companyName}
         sessionUser={sessionUser}
         locations={settingLocations}
         availabilities={dispOpts}

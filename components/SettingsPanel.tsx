@@ -11,7 +11,7 @@ import {
 
 import { FilterIcon, ShieldIcon, SunIcon, UserIcon } from "./ui/Icons.tsx";
 
-import { PanelFooter, PanelHeader } from "./settings/PanelChrome.tsx";
+import { PanelHeader } from "./settings/PanelChrome.tsx";
 
 import { AppearanceSection } from "./settings/AppearanceSection.tsx";
 
@@ -30,7 +30,6 @@ import type { AuthUser, Theme } from "../lib/types.ts";
 interface Props {
   open: boolean;
   onClose: () => void;
-  companyName: string;
   sessionUser?: AuthUser | null;
   // Live vocabularies for the filters section; absent means "unknown yet"
   // and the section offers only "Todas" instead of stale seeds.
@@ -45,7 +44,6 @@ export function SettingsPanel(
   {
     open,
     onClose,
-    companyName,
     sessionUser = null,
     locations,
     availabilities,
@@ -189,7 +187,7 @@ export function SettingsPanel(
         }}
       >
         {/* Header */}
-        <PanelHeader companyName={companyName} onClose={onClose} />
+        <PanelHeader onClose={onClose} />
 
         {/* Tabs */}
         <div
@@ -286,9 +284,6 @@ export function SettingsPanel(
         {section === "admin" && sessionUser?.role === "admin" && (
           <AdminSection sessionUser={sessionUser} />
         )}
-
-        {/* Footer */}
-        <PanelFooter companyName={companyName} />
       </aside>
     </>
   );
