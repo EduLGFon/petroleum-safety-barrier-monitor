@@ -115,6 +115,11 @@ export function Header(
         flexWrap: "wrap",
         marginBottom: "var(--d-section)",
         animation: "cardAppear .35s var(--ease-out) both",
+        // Lifted above the dashboard sections below (slideUp entrances and
+        // glass surfaces paint over the hover card otherwise). Stays below
+        // the chart tooltip (2000) and all overlays (990+).
+        position: "relative",
+        zIndex: 30,
       }}
     >
       <div
