@@ -84,9 +84,12 @@ export interface FracttalWorkRequest {
 }
 
 // FracttalWorkQuery mirrors the documented query params for the work
-// endpoints; limit is clamped to the API ceiling (100) by the client.
+// endpoints that the sync actually uses (reference: Query tasks in WOs,
+// Consulta de Solicitud): paging plus the ot_status filter. since/until
+// are intentionally absent: a live probe (2026-09-20) showed since has no
+// effect on totals, so windowing is newest-N-pages only.
 export interface FracttalWorkQuery {
   start?: number;
   limit?: number;
-  dateGte?: string;
+  otStatus?: string;
 }

@@ -59,8 +59,11 @@ export const defaultSyncIo: SyncIo = {
     return ctx;
   },
 
-  async loadLocal(scopeLocationIds: number[]): Promise<LocalBarrier[]> {
-    if (scopeLocationIds.length === 0) return [];
+  async loadLocal(
+    scopeLocationIds: number[],
+    remoteCodes: string[],
+  ): Promise<LocalBarrier[]> {
+    if (scopeLocationIds.length === 0 && remoteCodes.length === 0) return [];
     const rows = await queryRows<{
       id: number;
       external_code: string;
@@ -78,12 +81,13 @@ export const defaultSyncIo: SyncIo = {
       action_plan: string;
     }>(
       `select id, external_code, location_id, availability_id, deleted_at,
-        tag, typology_id, loc_desc_id, criticality_id, category_id,
-        grouping_id, owner_id, comments, action_plan
-       from barriers
-       where external_code is not null and location_id = any($1)
-       order by id`,
-      [scopeLocationIds],
+         tag, typology_id, loc_desc_id, criticality_id, category_id,
+         grouping_id, owner_id, comments, action_plan
+        from barriers
+        where external_code is not null
+          and (location_id = any($1) or external_code = any($2))
+        order by id`,
+      [scopeLocationIds, remoteCodes],
     );
     return rows.map((r) => ({
       id: r.id,
@@ -156,17 +160,20 @@ export const defaultSyncIo: SyncIo = {
         }
         continue;
       }
-      // update / restore: same field write; restore clears deleted_at.
+      // update / restore: same field write (location included, so station
+      // moves persist); restore clears deleted_at.
       await queryRows(
         `update barriers set
-           tag = $2, typology_id = $3, loc_desc_id = $4, criticality_id = $5,
-           category_id = $6, grouping_id = $7, owner_id = $8,
-           comments = $9, action_plan = $10, source_updated_at = $11,
-           deleted_at = case when $12 then null else deleted_at end
+           tag = $2, location_id = $3, typology_id = $4, loc_desc_id = $5,
+           criticality_id = $6, category_id = $7, grouping_id = $8,
+           owner_id = $9, comments = $10, action_plan = $11,
+           source_updated_at = $12,
+           deleted_at = case when $13 then null else deleted_at end
          where id = $1`,
         [
           entry.local.id,
           input.tag,
+          input.locationId,
           input.typologyId,
           input.locDescId,
           input.criticalityId,

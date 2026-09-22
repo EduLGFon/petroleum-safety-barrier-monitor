@@ -26,6 +26,10 @@ export const DEFAULT_TIMEOUT_MS = 15_000;
 export const DEFAULT_MAX_RETRIES = 3;
 export const DEFAULT_RATE_WAIT_MS = 60_000;
 export const DEFAULT_TOKEN_URL = "https://one.fracttal.com/oauth/token";
+// DEFAULT_RATE_PER_MIN caps sustained throughput at 75% of the documented
+// 200 req/min/IP ceiling: margin for token refreshes, retries, manual
+// scripts, and NAT-shared egress IPs. Bursts may spend a minute's worth.
+export const DEFAULT_RATE_PER_MIN = 150;
 
 export interface FracttalClientOptions {
   baseUrl: string;
@@ -35,6 +39,10 @@ export interface FracttalClientOptions {
   maxRetries?: number;
   // maxRateWaitMs caps how long a 406/429 pause may last (tests shrink it).
   maxRateWaitMs?: number;
+  // ratePerMin/rateBurst size the token bucket shared by every GET this
+  // client issues (tests shrink both to observe spacing quickly).
+  ratePerMin?: number;
+  rateBurst?: number;
   now?: () => number;
   fetchImpl?: typeof fetch;
 }
@@ -44,6 +52,7 @@ export interface FracttalClient {
   listRawItems(
     query: FracttalListQuery,
   ): Promise<{ rows: unknown[]; total: number }>;
+  fetchRawItem(code: string): Promise<{ row: unknown }>;
   collectAssets(
     query: FracttalListQuery,
     maxPages?: number,
@@ -61,6 +70,17 @@ interface Envelope {
   message?: unknown;
   data: unknown;
   total?: unknown;
+}
+
+// rateLimitReset: seconds until the rate window resets. The rate-limit docs
+// contradict themselves across languages (Spanish ratelimit-* vs English
+// Request-Call-Limit-*), so both spellings are accepted; anything unknown
+// means the documented 60s wait.
+function rateLimitReset(headers: Headers): number {
+  const raw = headers.get("ratelimit-reset") ??
+    headers.get("Request-Call-Limit-Reset");
+  const seconds = Number(raw);
+  return Number.isFinite(seconds) && seconds > 0 ? seconds : 60;
 }
 
 // parseEnvelope: normalizes the wide documented envelope; a malformed body
@@ -164,11 +184,13 @@ export function buildListQuery(q: FracttalListQuery): URLSearchParams {
   return params;
 }
 
-// buildWorkQuery: same paging plus the optional date[gte] floor the dump
-// capture used. No invented filters: scoping beyond this is client-side.
+// buildWorkQuery: same paging plus the ot_status filter (reference: Query
+// tasks in WOs). No since/until window: a live probe showed since has no
+// effect, so the status pass is newest-N-pages (or the open-status sweep).
+// No invented filters: scoping beyond this is client-side.
 export function buildWorkQuery(q: FracttalWorkQuery): URLSearchParams {
   const params = new URLSearchParams();
-  if (q.dateGte !== undefined) params.set("date[gte]", q.dateGte);
+  if (q.otStatus !== undefined) params.set("ot_status", q.otStatus);
   const start = Math.max(0, Math.floor(q.start ?? 0));
   const limit = Math.min(
     MAX_PAGE_SIZE,
@@ -189,6 +211,8 @@ export function createFracttalClient(
     timeoutMs = DEFAULT_TIMEOUT_MS,
     maxRetries = DEFAULT_MAX_RETRIES,
     maxRateWaitMs = DEFAULT_RATE_WAIT_MS,
+    ratePerMin = DEFAULT_RATE_PER_MIN,
+    rateBurst = ratePerMin,
     now = Date.now,
     fetchImpl = fetch,
   }: FracttalClientOptions,
@@ -216,11 +240,40 @@ export function createFracttalClient(
   const waitPause = (ms: number) =>
     new Promise<void>((r) => setTimeout(r, Math.min(ms, maxRateWaitMs)));
 
+  // Token bucket: the single pacing mechanism for every GET this client
+  // issues. Sequential callers barely notice it (API latency dominates);
+  // parallel page fetches share it, so adding concurrency can never exceed
+  // the ceiling no matter how many fetchers run. Retries consume tokens too
+  // (they are requests). The 406/429 path below stays the server-side net.
+  const bucketSize = Math.max(1, Math.floor(ratePerMin));
+  const bucketBurst = Math.max(1, Math.floor(rateBurst));
+  let bucketTokens = bucketBurst;
+  let bucketRefillAt = now();
+  const takeToken = async (): Promise<void> => {
+    for (;;) {
+      const t = now();
+      bucketTokens = Math.min(
+        bucketBurst,
+        bucketTokens + ((t - bucketRefillAt) / 60000) * bucketSize,
+      );
+      bucketRefillAt = t;
+      if (bucketTokens >= 1) {
+        bucketTokens -= 1;
+        return;
+      }
+      const waitMs = ((1 - bucketTokens) / bucketSize) * 60000;
+      await new Promise<void>((r) =>
+        setTimeout(r, Math.min(waitMs, maxRateWaitMs))
+      );
+    }
+  };
+
   // getJson: one authenticated GET with timeout, one 401 refresh retry,
   // 406/429 rate-limit wait, 5xx backoff, and strict body parsing.
   async function getJson(path: string): Promise<unknown> {
     let refreshed = false;
     for (let attempt = 0; attempt <= maxRetries; attempt++) {
+      await takeToken();
       const ctrl = new AbortController();
       const timer = setTimeout(() => ctrl.abort(), timeoutMs);
       let res: Response;
@@ -252,7 +305,7 @@ export function createFracttalClient(
         continue;
       }
       const status = res.status;
-      const reset = Number(res.headers.get("ratelimit-reset")) || 60;
+      const reset = rateLimitReset(res.headers);
       if (status === 406 || status === 429) {
         if (attempt < maxRetries) {
           await waitPause(reset * 1000);
@@ -316,6 +369,17 @@ export function createFracttalClient(
     };
   }
 
+  // fetchRawItem: one asset by code (reference: Query an Asset,
+  // GET /items/{code}). Targeted verification without a scope sweep; the
+  // sync pipeline parses the row downstream. A missing asset resolves to a
+  // null row, never a throw (absence is data, not an outage).
+  async function fetchRawItem(code: string): Promise<{ row: unknown }> {
+    const body = await getJson(`/items/${encodeURIComponent(code)}`);
+    const envelope = parseEnvelope(body);
+    const rows = Array.isArray(envelope.data) ? envelope.data : [];
+    return { row: rows[0] ?? null };
+  }
+
   async function listRawWorkOrders(
     query: FracttalWorkQuery,
   ): Promise<{ rows: unknown[]; total: number }> {
@@ -372,6 +436,7 @@ export function createFracttalClient(
   return {
     listAssets,
     listRawItems,
+    fetchRawItem,
     collectAssets,
     listRawWorkOrders,
     listRawWorkRequests,

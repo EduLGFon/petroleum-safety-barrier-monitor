@@ -51,10 +51,18 @@ export interface SyncPlan {
 
 export interface SyncIo {
   buildMapContext(): Promise<MapContext>;
-  // loadLocal: local barriers that could match this sync, scoped to the
-  // location set the remote rows resolved to (deletion is per-scope, so a
-  // one-station sync can never retire another station's barriers).
-  loadLocal(scopeLocationIds: number[]): Promise<LocalBarrier[]>;
+  // loadLocal: local barriers that could match this sync: the stations the
+  // remote rows resolved to (deletion stays per-scope, so a sweep of one
+  // station can never retire another's barriers) PLUS any row whose
+  // external_code appears upstream. The code arm is what makes station moves
+  // reconcile as updates: without it a moved asset misses by scope, its old
+  // row soft-deletes while the "insert" dies on the UNIQUE constraint, and
+  // the barrier vanishes. Code-matched rows are always touched upstream, so
+  // they can never be deleted by the plan.
+  loadLocal(
+    scopeLocationIds: number[],
+    remoteCodes: string[],
+  ): Promise<LocalBarrier[]>;
   startRun(scope: string): Promise<number>;
   applyPlan(entries: PlanEntry[]): Promise<PlanCounts>;
   finishRun(
@@ -172,6 +180,28 @@ export interface SyncResult {
   written: PlanCounts | null;
   runId: number | null;
   status: "ok" | "failed";
+}
+
+// buildRunNote: compact durable summary for the sync_state audit row. Skip
+// and warning lists are unbounded in memory but the audit row keeps counts
+// plus the first few skip reasons, so ops can diagnose a scope from SQL
+// alone (console is the only failure channel while no email is configured).
+export function buildRunNote(args: {
+  parsed: number;
+  malformed: number;
+  mappingSkips: Array<{ code: string; reason: string }>;
+  mappingWarnings: number;
+  counts: PlanCounts;
+}): string {
+  const head = `parsed=${args.parsed} malformed=${args.malformed} ` +
+    `mapSkips=${args.mappingSkips.length} warnings=${args.mappingWarnings} ` +
+    `plan i:${args.counts.inserts} u:${args.counts.updates} ` +
+    `d:${args.counts.deletes} s:${args.counts.skips}`;
+  const top = args.mappingSkips.slice(0, 5)
+    .map((s) => `${s.code} (${s.reason})`)
+    .join("; ");
+  const note = top === "" ? head : `${head} | top skips: ${top}`;
+  return note.length > 500 ? `${note.slice(0, 497)}...` : note;
 }
 
 export interface SyncOptions {
@@ -294,7 +324,8 @@ export async function runSync(
     baseResult.mappingWarnings = mappingWarnings;
 
     const scopeLocationIds = [...new Set(inputs.map((i) => i.locationId))];
-    const local = await io.loadLocal(scopeLocationIds);
+    const remoteCodes = [...new Set(inputs.map((i) => i.externalCode))];
+    const local = await io.loadLocal(scopeLocationIds, remoteCodes);
 
     const plan = planReconcile(inputs, local);
     baseResult.plan = plan;
@@ -304,7 +335,17 @@ export async function runSync(
     const executable = plan.entries.filter((e) => e.kind !== "skip");
     const written = await io.applyPlan(executable);
     baseResult.written = written;
-    await finish(written, "ok", "");
+    await finish(
+      written,
+      "ok",
+      buildRunNote({
+        parsed: baseResult.parsed,
+        malformed: baseResult.malformed.length,
+        mappingSkips: baseResult.mappingSkips,
+        mappingWarnings: baseResult.mappingWarnings.length,
+        counts: plan.counts,
+      }),
+    );
     return baseResult;
   } catch (err) {
     const note = err instanceof Error ? err.message : String(err);

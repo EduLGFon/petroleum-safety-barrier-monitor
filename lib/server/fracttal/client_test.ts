@@ -293,12 +293,14 @@ Deno.test("collectAssets surfaces malformed rows in the report", async () => {
   assertEquals(report.collected, 1);
 });
 
-Deno.test("buildWorkQuery serializes paging plus the date floor", () => {
-  const q = buildWorkQuery({ start: -2, limit: 500, dateGte: "2024-01-01" });
-  assertStrictEquals(q.get("date[gte]"), "2024-01-01");
+Deno.test("buildWorkQuery serializes paging plus the ot_status filter", () => {
+  const q = buildWorkQuery({ start: -2, limit: 500, otStatus: "1" });
+  assertStrictEquals(q.get("ot_status"), "1");
+  assertStrictEquals(q.get("since"), null);
+  assertStrictEquals(q.get("date[gte]"), null);
   assertStrictEquals(q.get("start"), "0");
   assertStrictEquals(q.get("limit"), "100");
-  assertStrictEquals(buildWorkQuery({}).get("date[gte]"), null);
+  assertStrictEquals(buildWorkQuery({}).get("ot_status"), null);
 });
 
 Deno.test("listRawWorkOrders and listRawWorkRequests hit their paths", async () => {
@@ -341,4 +343,87 @@ Deno.test("upstream 5xx throws after retries are exhausted", async () => {
     fetchImpl,
   });
   await expectRejects(client.listAssets({}), "503");
+});
+
+Deno.test("token bucket spaces sustained requests within the rate", async () => {
+  const { fetchImpl } = fakeFetch({
+    "/items": { body: { success: true, data: [], total: 0 } },
+  });
+  const client = createFracttalClient({
+    baseUrl: DATA_URL,
+    credentials: { key: "k", secret: "s" },
+    // 1200/min = one token per 50ms; burst 1 forces two refills below.
+    ratePerMin: 1200,
+    rateBurst: 1,
+    maxRateWaitMs: 60_000,
+    fetchImpl,
+  });
+  const t0 = Date.now();
+  await client.listRawItems({ limit: 100 });
+  await client.listRawItems({ limit: 100 });
+  await client.listRawItems({ limit: 100 });
+  const elapsed = Date.now() - t0;
+  // Two 50ms refills; assert well under the nominal 100ms so loaded CI
+  // cannot flake it.
+  assertStrictEquals(elapsed >= 50, true, `elapsed=${elapsed}ms`);
+});
+
+Deno.test("token bucket leaves a fresh burst unthrottled", async () => {
+  const { fetchImpl, calls } = fakeFetch({
+    "/items": { body: { success: true, data: [], total: 0 } },
+  });
+  const client = createFracttalClient({
+    baseUrl: DATA_URL,
+    credentials: { key: "k", secret: "s" },
+    ratePerMin: 150,
+    fetchImpl,
+  });
+  const t0 = Date.now();
+  await client.listRawItems({ limit: 100 });
+  await client.listRawItems({ limit: 100 });
+  const elapsed = Date.now() - t0;
+  assertStrictEquals(calls.filter((c) => c.url.includes("/items")).length, 2);
+  assertStrictEquals(elapsed < 2000, true, `elapsed=${elapsed}ms`);
+});
+
+Deno.test("over-limit accepts the English rate-header spelling", async () => {
+  const { fetchImpl } = fakeFetch({
+    "/items": {
+      body: { success: false, message: "Maximum number of request exceeded" },
+      status: 406,
+      headers: { "Request-Call-Limit-Reset": "60" },
+    },
+  });
+  const client = createFracttalClient({
+    baseUrl: DATA_URL,
+    credentials: { key: "k", secret: "s" },
+    maxRetries: 0,
+    fetchImpl,
+  });
+  // maxRetries 0 skips the wait and throws at once: the English header must
+  // still route to the rate-limited error, not the generic HTTP one.
+  await expectRejects(client.listRawItems({}), "rate limited (HTTP 406)");
+});
+
+Deno.test("fetchRawItem hits GET /items/{code} and tolerates absence", async () => {
+  const { fetchImpl, calls } = fakeFetch({
+    "/items/EQ-001": { body: { success: true, data: [asset()], total: 1 } },
+    "/items/NOPE": { body: { success: true, data: [] } },
+  });
+  const client = createFracttalClient({
+    baseUrl: DATA_URL,
+    credentials: { key: "k", secret: "s" },
+    fetchImpl,
+  });
+  const found = await client.fetchRawItem("EQ-001");
+  assertEquals(
+    (found.row as Record<string, unknown>)?.code,
+    "EQ-001",
+  );
+  const missing = await client.fetchRawItem("NOPE");
+  assertStrictEquals(missing.row, null);
+  assertStrictEquals(
+    calls.some((c) => c.url.includes("/items/EQ-001")),
+    true,
+  );
 });

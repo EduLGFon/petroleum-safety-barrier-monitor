@@ -6,10 +6,12 @@
 //     capture replaces it (visible meta.synthetic flag); --work-fixture adds
 //     the work-order status pass (defaults to scripts/fixtures/
 //     fracttal-work-sample.json when present, asset signals only otherwise);
-//   - live mode reuses the read-only client: one location, paginated to the
-//     envelope total (--pages, max 40), plus one bounded page each of work
-//     orders/requests for statuses; a truncated scope aborts before runSync
-//     (zero writes) - a too-small --pages fails loudly, raise and rerun;
+//   - live mode reuses the read-only client: the full equipment sweep,
+//     paginated to the envelope total (--pages, max 400), plus the newest
+//     --work-pages of work orders/requests for statuses (pages fetch
+//     concurrently, throughput capped by --rate-per-min); a truncated sweep
+//     aborts before runSync (zero writes) - a too-small --pages fails
+//     loudly, raise and rerun;
 //   - never sends emails - audit rows go to sync_state, nothing else mails.
 // The exit code is 1 on thrown errors; mapping/unmapped skips are warnings.
 import {
@@ -19,11 +21,16 @@ import {
   smtpEmailNotifier,
 } from "../lib/server/fracttal/notify.ts";
 
+import {
+  fetchItemSignals,
+  fetchWorkSignals,
+} from "../lib/server/fracttal/live-scope.ts";
+
+import { OPEN_WORK_ORDER_STATUSES } from "../lib/server/fracttal/barrier-rules.ts";
+
 import { buildWorkEvents, resolverFor } from "../lib/server/fracttal/work.ts";
 
 import { runSync, type SyncResult } from "../lib/server/fracttal/sync.ts";
-
-import { fetchScopeSignals } from "../lib/server/fracttal/live-scope.ts";
 
 import type { WorkEventsResolver } from "../lib/server/fracttal/work.ts";
 
@@ -44,9 +51,12 @@ interface SyncFlags {
   workFixturePath?: string;
   live: boolean;
   scope?: string;
-  locationCode?: string;
   itemType: ItemTypeValue;
   pages: number;
+  workPages: number;
+  workOpenOnly: boolean;
+  ratePerMin: number;
+  fetchConcurrency: number;
   baseUrl: string;
   apply: boolean;
   json: boolean;
@@ -57,7 +67,11 @@ function parseFlags(argv: string[]): SyncFlags {
     fixturePath: DEFAULT_FIXTURE,
     live: false,
     itemType: 2,
-    pages: 1,
+    pages: 200,
+    workPages: 5,
+    workOpenOnly: true,
+    ratePerMin: 150,
+    fetchConcurrency: 4,
     baseUrl: Deno.env.get("FRACTTAL_BASE_URL") ?? DEFAULT_BASE_URL,
     apply: false,
     json: false,
@@ -68,11 +82,18 @@ function parseFlags(argv: string[]): SyncFlags {
     else if (arg === "--work-fixture") base.workFixturePath = argv[++i];
     else if (arg === "--live") base.live = true;
     else if (arg === "--scope") base.scope = argv[++i];
-    else if (arg === "--location-code") base.locationCode = argv[++i];
     else if (arg === "--item-type") {
       base.itemType = Number(argv[++i]) as ItemTypeValue;
     } else if (arg === "--pages") {
-      base.pages = Math.min(40, Math.max(1, Number(argv[++i]) || 1));
+      base.pages = Math.min(400, Math.max(1, Number(argv[++i]) || 200));
+    } else if (arg === "--work-pages") {
+      base.workPages = Math.min(40, Math.max(1, Number(argv[++i]) || 5));
+    } else if (arg === "--work-open-only") base.workOpenOnly = true;
+    else if (arg === "--work-windowed") base.workOpenOnly = false;
+    else if (arg === "--rate-per-min") {
+      base.ratePerMin = Math.max(1, Number(argv[++i]) || 150);
+    } else if (arg === "--fetch-concurrency") {
+      base.fetchConcurrency = Math.max(1, Number(argv[++i]) || 4);
     } else if (arg === "--base-url") base.baseUrl = argv[++i];
     else if (arg === "--apply") base.apply = true;
     else if (arg === "--json") base.json = true;
@@ -133,36 +154,52 @@ async function sourceFor(
     undefined,
     { baseUrl: flags.baseUrl, itemType: flags.itemType },
   );
-  if (!flags.locationCode) {
-    throw new Error("--location-code <station> required in --live mode");
-  }
   const client = createFracttalClient({
     baseUrl,
     credentials: { key, secret },
+    ratePerMin: flags.ratePerMin,
   });
-  const dateGte = Deno.env.get("FRACTTAL_WORK_DATE_GTE") ?? undefined;
-  // One shared assembly: complete item pages (guarded, fail-closed) plus
-  // the bounded work-order status pass. A truncated scope aborts here with
-  // zero writes - raise --pages (max 40) and rerun.
-  const fetched = await fetchScopeSignals(client, {
-    locationCode: flags.locationCode,
-    itemType: itemType as ItemTypeValue,
-    maxPages: flags.pages,
-    dateGte,
+  const openStatuses = flags.workOpenOnly
+    ? [...OPEN_WORK_ORDER_STATUSES]
+    : undefined;
+  // Work fetches eagerly so a work-endpoint failure aborts before any
+  // runSync (zero writes, fail-closed); items stay lazy in the source
+  // closure so the running audit row covers fetch+apply.
+  const work = await fetchWorkSignals(client, {
+    maxPages: flags.workPages,
+    openStatuses,
+    openMaxPages: flags.pages,
+    concurrency: flags.fetchConcurrency,
   });
+  if (work.ordersTruncated) {
+    console.warn(
+      `[fracttal-sync] open work sweep truncated (orders=${work.workOrders})`,
+    );
+  }
   console.log(
-    `[fracttal-sync] live fetch: ${fetched.itemRows.length} rows (of ${fetched.itemTotal}, ` +
-      `${fetched.pagesFetched} pages) at location_code=${flags.locationCode}; ` +
-      `work orders ${fetched.workOrders}, requests ${fetched.workRequests}, ` +
-      `work malformed ${fetched.workMalformed}`,
+    `[fracttal-sync] live work: ${work.workOrders} orders, ` +
+      `${work.workRequests} requests, malformed ${work.workMalformed}`,
   );
   return {
-    source: () => Promise.resolve(fetched.itemRows),
-    scope: flags.scope ?? `fracttal-live:${flags.locationCode}`,
-    workEvents: fetched.workEvents,
+    source: async () => {
+      // A truncated sweep aborts inside runSync with zero writes - raise
+      // --pages (max 400) and rerun.
+      const items = await fetchItemSignals(client, {
+        itemType: itemType as ItemTypeValue,
+        maxPages: flags.pages,
+        concurrency: flags.fetchConcurrency,
+      });
+      console.log(
+        `[fracttal-sync] live fetch: ${items.itemRows.length} rows (of ${items.itemTotal}, ` +
+          `${items.pagesFetched} pages)`,
+      );
+      return items.itemRows;
+    },
+    scope: flags.scope ?? "fracttal-live:all",
+    workEvents: work.workEvents,
     workNote: `live: ${
-      fetched.workOrders + fetched.workRequests
-    } work rows, ${fetched.workMalformed} malformed`,
+      work.workOrders + work.workRequests
+    } work rows, ${work.workMalformed} malformed`,
   };
 }
 
@@ -197,6 +234,15 @@ async function main(): Promise<void> {
 
   const { plan } = result;
   const counts = result.written ?? plan.counts;
+  // availabilityTally: what the plan WOULD set per availability status
+  // (inserts + updates + restores carry inputs; skips and deletes do not).
+  // Dry-run diffs between work-pass modes compare this line.
+  const availabilityTally: Record<number, number> = {};
+  for (const entry of plan.entries) {
+    if (entry.kind === "skip" || entry.kind === "delete") continue;
+    const id = entry.input.availabilityId;
+    availabilityTally[id] = (availabilityTally[id] ?? 0) + 1;
+  }
   const summary = {
     scope: result.scope,
     status: result.status,
@@ -208,6 +254,7 @@ async function main(): Promise<void> {
     mappingWarnings: result.mappingWarnings.length,
     work: workNote,
     plan: plan.counts,
+    availability: availabilityTally,
     written: result.written,
     runId: result.runId,
   };
@@ -221,6 +268,7 @@ async function main(): Promise<void> {
         `warnings=${result.mappingWarnings.length} ` +
         `plan { i:${plan.counts.inserts} u:${plan.counts.updates} ` +
         `d:${plan.counts.deletes} s:${plan.counts.skips} } ` +
+        `availability ${JSON.stringify(availabilityTally)} ` +
         (result.written
           ? `written { i:${counts.inserts} u:${counts.updates} ` +
             `d:${counts.deletes} s:${counts.skips} }`

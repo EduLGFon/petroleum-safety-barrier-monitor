@@ -107,3 +107,95 @@ Deno.test("fixture rows land, read back, export totals match", async () => {
     await cleanup(scope);
   }
 });
+
+Deno.test("station moves reconcile as updates, not delete+insert", async () => {
+  if (!Deno.env.get("DATABASE_URL")) {
+    console.log("skip: DATABASE_URL unset - needs a real Postgres");
+    return;
+  }
+  const scope = `p4test-move:${Date.now()}`;
+  const locs = await queryRows<{ code: string }>(
+    "select code from locations order by code limit 2",
+  );
+  const cats = await queryRows<{ label: string }>(
+    "select label from categories limit 1",
+  );
+  const crits = await queryRows<{ label: string }>(
+    "select label from criticality_levels limit 1",
+  );
+  if (locs.length < 2 || cats.length === 0) {
+    console.log("skip: need two stations and one category");
+    return;
+  }
+  const rawAt = (code: string, loc: string) => ({
+    id: 920000,
+    code,
+    id_type_item: 2,
+    location_code: loc,
+    groups_description: cats[0]!.label,
+    groups_1_description: "Polo Cricaré",
+    priorities_description: crits[0]!.label,
+    available: true,
+  });
+
+  await cleanup(scope);
+  // Reconcile retires scoped-absent locals on both runs; every retired row
+  // is restored below so the drill retires zero rows net.
+  const retiredIds: number[] = [];
+  const retire = (entries: Array<{ kind: string; local?: { id: number } }>) => {
+    for (const e of entries) {
+      if (e.kind === "delete" && e.local) retiredIds.push(e.local.id);
+    }
+  };
+  try {
+    const first = await runSync(
+      () => Promise.resolve([rawAt("P4T-MOVE-001", locs[0]!.code)]),
+      { scope, dryRun: false, io: defaultSyncIo },
+    );
+    retire(first.plan.entries);
+    assertStrictEquals(first.plan.counts.inserts, 1);
+
+    // Same asset, other station: the code arm of loadLocal must match it so
+    // the plan updates instead of deleting the old row and stillbirthing
+    // the "insert" on the UNIQUE constraint.
+    const second = await runSync(
+      () => Promise.resolve([rawAt("P4T-MOVE-001", locs[1]!.code)]),
+      { scope, dryRun: false, io: defaultSyncIo },
+    );
+    retire(second.plan.entries);
+    const moved = second.plan.entries.filter((e) =>
+      e.kind === "update" && e.input.externalCode === "P4T-MOVE-001"
+    );
+    const reborn = second.plan.entries.filter((e) =>
+      e.kind === "insert" && e.input.externalCode === "P4T-MOVE-001"
+    );
+    const killed = second.plan.entries.filter((e) =>
+      e.kind === "delete" && e.local.externalCode === "P4T-MOVE-001"
+    );
+    assertStrictEquals(moved.length, 1);
+    assertStrictEquals(reborn.length, 0);
+    assertStrictEquals(killed.length, 0);
+
+    const row = await queryRows<
+      { location_id: number; deleted_at: string | null }
+    >(
+      `select location_id, deleted_at from barriers where external_code = $1`,
+      ["P4T-MOVE-001"],
+    );
+    assertStrictEquals(row.length, 1);
+    const locB = await queryRows<{ id: number }>(
+      `select id from locations where code = $1`,
+      [locs[1]!.code],
+    );
+    assertStrictEquals(row[0]!.location_id, locB[0]!.id);
+    assertStrictEquals(row[0]!.deleted_at, null);
+  } finally {
+    if (retiredIds.length > 0) {
+      await queryRows(
+        `update barriers set deleted_at = null where id = any($1)`,
+        [retiredIds],
+      );
+    }
+    await cleanup(scope);
+  }
+});
