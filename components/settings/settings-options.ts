@@ -11,9 +11,9 @@ export const THEMES: {
   >;
   label: string;
 }[] = [
-  { value: "light", Icon: SunIcon, label: "Aurora Claro" },
-  { value: "dark", Icon: MoonIcon, label: "Aurora Escura" },
-  { value: "amoled", Icon: MonitorIcon, label: "Aurora Black" },
+  { value: "light", Icon: SunIcon, label: "Claro" },
+  { value: "dark", Icon: MoonIcon, label: "Escuro" },
+  { value: "amoled", Icon: MonitorIcon, label: "Black" },
 ];
 export const DISP_OPTS = [
   "Disponível",

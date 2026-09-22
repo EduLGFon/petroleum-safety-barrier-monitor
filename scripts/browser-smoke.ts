@@ -528,7 +528,7 @@ if (MODE !== "mock") {
     const panel = await evalJs(`(() => {
     const start = document.documentElement.dataset.theme;
     const p = document.querySelector('aside[role="dialog"][aria-label="Configurações"]');
-    const label = start === 'dark' ? 'Aurora Claro' : 'Aurora Escura';
+    const label = start === 'dark' ? 'Claro' : 'Escuro';
     const btn = p && [...p.querySelectorAll('button')]
       .find((b) => b.textContent.includes(label));
     if (btn) btn.click();
