@@ -1,7 +1,7 @@
-// API: /api/users - user management, admin only after bootstrap.
-// This is why it exists: admins promote others to admin and manage access;
-// the very first user (empty table) may self-register as admin so a fresh
-// database is never locked out. Later creates require an admin session.
+// API: /api/users - user management, admin only.
+// This is why it exists: admins manage access and promote others to admin.
+// The first account is provisioned via CLI (scripts/create-admin.ts); this
+// route never self-registers, even on an empty table.
 import {
   badRequest,
   internal,
@@ -31,8 +31,6 @@ import { hasCredentials, requireAdminAuth } from "../../lib/server/auth.ts";
 
 import { loadServerConfig } from "../../lib/server/config.ts";
 
-import { countUsers } from "../../lib/server/sql/users.ts";
-
 import { unauthorized } from "../../lib/server/errors.ts";
 
 import { define } from "../../utils.ts";
@@ -40,19 +38,10 @@ import { define } from "../../utils.ts";
 async function guardAdmin(
   ctx: unknown,
   req: Request,
-  allowBootstrap: boolean,
 ): Promise<Response | null> {
-  if (allowBootstrap) {
-    try {
-      if ((await countUsers()) === 0) return null;
-    } catch {
-      // Fall through to the admin guard when the table is unreadable.
-    }
-  }
   const auth = await requireAdminAuth(req);
   if (!auth.ok) {
-    // Anonymous callers cannot probe user management; the empty-table
-    // bootstrap above already returned for a fresh database.
+    // Anonymous callers cannot probe user management.
     if (!hasCredentials(req)) return notFound("not found", newRequestId());
     return unauthorized(auth.message, newRequestId());
   }
@@ -68,7 +57,7 @@ export const handler = define.handlers({
     if (!limit.allowed) {
       return rateLimited("too many requests", requestId, limit.retryAfterMs);
     }
-    const denied = await guardAdmin(ctx, ctx.req, false);
+    const denied = await guardAdmin(ctx, ctx.req);
     if (denied) return denied;
     try {
       loadServerConfig();
@@ -87,29 +76,16 @@ export const handler = define.handlers({
     }
   },
 
-  // POST { email, name?, password, role? } - creates a user. The first user
-  // on an empty table becomes admin regardless of the requested role.
+  // POST { email, name?, password, role? } - creates a user, admin session
+  // required. First accounts come from scripts/create-admin.ts, never here.
   async POST(ctx) {
     const requestId = newRequestId();
     const limit = writeThrottle.check(routeClientKey(ctx));
     if (!limit.allowed) {
       return rateLimited("too many requests", requestId, limit.retryAfterMs);
     }
-    let bootstrap = false;
-    try {
-      bootstrap = (await countUsers()) === 0;
-    } catch (err) {
-      return internal(
-        "POST /api/users",
-        err,
-        requestId,
-        "Server misconfigured",
-      );
-    }
-    if (!bootstrap) {
-      const denied = await guardAdmin(ctx, ctx.req, false);
-      if (denied) return denied;
-    }
+    const denied = await guardAdmin(ctx, ctx.req);
+    if (denied) return denied;
     let body: {
       email?: unknown;
       name?: unknown;
@@ -123,7 +99,7 @@ export const handler = define.handlers({
     }
     try {
       const password = validateNewPassword(body.password);
-      const role = bootstrap ? "admin" : normalizeRole(body.role ?? "user");
+      const role = normalizeRole(body.role ?? "user");
       const created = await createUser({
         email: body.email as string,
         name: (body.name as string | undefined) ?? "",

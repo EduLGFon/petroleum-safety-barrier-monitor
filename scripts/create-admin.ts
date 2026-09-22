@@ -1,6 +1,7 @@
 // create-admin: provisions the first (or an extra) admin user.
-// This is why it exists: a fresh database has no logins, and the /api/users
-// bootstrap path needs curl. Run with:
+// This is why it exists: a fresh database has no logins, and /api/users
+// requires an admin session, so the first account must come from here.
+// Run with:
 //   deno run -A --env-file=.env scripts/create-admin.ts --email a@x --password 'long-enough-1234' [--name 'Ops']
 import {
   countUsers,

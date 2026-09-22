@@ -1,7 +1,8 @@
 // LoginForm - immersive Blurred Dashboard credential screen.
 // This is why it exists: production login floats a glass credential card
-// over a blurred dashboard preview, with PT copy, show/hide password,
-// localized errors and first-admin bootstrap.
+// over a blurred dashboard preview, with PT copy, show/hide password and
+// localized errors. The first account is provisioned via CLI
+// (scripts/create-admin.ts); this screen never self-registers.
 import { BlurredBackdrop } from "../components/login/BlurredBackdrop.tsx";
 
 import { BrandHeader } from "../components/login/BrandHeader.tsx";
@@ -13,8 +14,6 @@ import { toPtError } from "../lib/api/error-pt.ts";
 import { AURORA } from "../lib/aurora.ts";
 
 import { useState } from "preact/hooks";
-
-type Mode = "login" | "register";
 
 // postJson: fetch helper that sends cookies and parses error envelopes.
 async function postJson(url: string, body: unknown): Promise<unknown> {
@@ -57,9 +56,7 @@ function safeNext(raw: string | null): string {
 
 // LoginForm: blurred preview behind, glass card over it; reloads on success.
 export function LoginForm({ companyName = "" }: { companyName?: string }) {
-  const [mode, setMode] = useState<Mode>("login");
   const [email, setEmail] = useState("");
-  const [name, setName] = useState("");
   const [password, setPassword] = useState("");
   const [showPw, setShowPw] = useState(false);
   const [error, setError] = useState("");
@@ -70,14 +67,9 @@ export function LoginForm({ companyName = "" }: { companyName?: string }) {
     setError("");
     setBusy(true);
     try {
-      if (mode === "login") {
-        await postJson("/api/auth/login", { email, password });
-        const params = new URLSearchParams(globalThis.location.search);
-        globalThis.location.href = safeNext(params.get("next"));
-      } else {
-        await postJson("/api/users", { email, name, password });
-        globalThis.location.href = "/";
-      }
+      await postJson("/api/auth/login", { email, password });
+      const params = new URLSearchParams(globalThis.location.search);
+      globalThis.location.href = safeNext(params.get("next"));
     } catch (err) {
       setError(toPtError(err instanceof Error ? err.message : String(err)));
     } finally {
@@ -122,12 +114,8 @@ export function LoginForm({ companyName = "" }: { companyName?: string }) {
           <BrandHeader
             companyName={companyName}
             markSize={52}
-            title={mode === "login"
-              ? "Monitor de Barreiras"
-              : "Criar primeiro acesso"}
-            subtitle={mode === "login"
-              ? "Entre com suas credenciais corporativas"
-              : "Banco vazio: esta conta será administradora"}
+            title="Monitor de Barreiras"
+            subtitle="Entre com suas credenciais corporativas"
           />
           <div
             style={{
@@ -150,36 +138,19 @@ export function LoginForm({ companyName = "" }: { companyName?: string }) {
                 autoComplete="email"
               />
             </label>
-            {mode === "register" && (
-              <label style={labelStyle} className="animate-fade-in">
-                Nome
-                <input
-                  className="login-input"
-                  type="text"
-                  value={name}
-                  placeholder="Nome completo"
-                  onInput={(e) =>
-                    setName(e.currentTarget.value)}
-                  autoComplete="name"
-                />
-              </label>
-            )}
             <label style={labelStyle}>
               <span>
-                Senha {mode === "register" ? "(mínimo 12 caracteres)" : ""}
+                Senha
               </span>
               <span style={{ position: "relative", display: "block" }}>
                 <input
                   className="login-input"
                   type={showPw ? "text" : "password"}
                   required
-                  minLength={mode === "register" ? 12 : undefined}
                   value={password}
                   placeholder="••••••••••••"
                   onInput={(e) => setPassword(e.currentTarget.value)}
-                  autoComplete={mode === "login"
-                    ? "current-password"
-                    : "new-password"}
+                  autoComplete="current-password"
                   style={{ paddingRight: 64 }}
                 />
                 <button
@@ -255,25 +226,7 @@ export function LoginForm({ companyName = "" }: { companyName?: string }) {
                   }}
                 />
               )}
-              {busy ? "Aguarde…" : mode === "login" ? "Entrar" : "Criar admin"}
-            </button>
-            <button
-              type="button"
-              disabled={busy}
-              onClick={() => {
-                setMode(mode === "login" ? "register" : "login");
-                setError("");
-              }}
-              style={{
-                border: 0,
-                background: "transparent",
-                color: "var(--au-label)",
-                fontSize: 13,
-                cursor: "pointer",
-                padding: 4,
-              }}
-            >
-              {mode === "login" ? "Criar primeiro acesso" : "Voltar ao login"}
+              {busy ? "Aguarde…" : "Entrar"}
             </button>
           </form>
           <div style={{ marginTop: 18 }}>
