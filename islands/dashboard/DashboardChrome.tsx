@@ -35,6 +35,11 @@ interface OverlaysProps {
   onCloseSettings: () => void;
   companyName: string;
   sessionUser?: AuthUser | null;
+  // Live vocabularies forwarded to the settings filters section.
+  locations?: { code: string; name: string; type: string }[];
+  availabilities?: string[];
+  compliances?: string[];
+  categories?: string[];
 }
 
 // DashboardOverlays: detail modal plus settings drawer above the page.
@@ -46,6 +51,10 @@ export function DashboardOverlays(
     onCloseSettings,
     companyName,
     sessionUser = null,
+    locations,
+    availabilities,
+    compliances,
+    categories,
   }: OverlaysProps,
 ) {
   return (
@@ -56,6 +65,10 @@ export function DashboardOverlays(
         onClose={onCloseSettings}
         companyName={companyName}
         sessionUser={sessionUser}
+        locations={locations}
+        availabilities={availabilities}
+        compliances={compliances}
+        categories={categories}
       />
     </>
   );

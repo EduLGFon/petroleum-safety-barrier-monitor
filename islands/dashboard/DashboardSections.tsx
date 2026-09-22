@@ -26,7 +26,7 @@ import { sanitizeFilterPatch } from "../../lib/utils.ts";
 
 import { Header } from "../../components/Header.tsx";
 
-import { useEffect, useState } from "preact/hooks";
+import { useEffect, useMemo, useState } from "preact/hooks";
 
 import { KpiSections } from "./KpiSections.tsx";
 
@@ -128,6 +128,24 @@ export function DashboardSections(
       setFilter(patch);
     }
   }, [hydrated, defaultsApplied, loading, settings.defaultFilters, setFilter]);
+
+  // Settings filter vocabularies are fully dynamic: server mode reuses the
+  // SSR/live stations, client mode derives distinct stations from the loaded
+  // list. No seed station list is used here, so new installations appear
+  // without a code change.
+  const settingLocations = useMemo(() => {
+    if (stations && stations.length > 0) {
+      return stations.map((s) => ({
+        code: s.code,
+        name: s.name || s.code,
+        type: "",
+      }));
+    }
+    const codes = [...new Set(barriers.map((b) => b.location))].sort((a, b) =>
+      a.localeCompare(b, "pt-BR")
+    );
+    return codes.map((code) => ({ code, name: code, type: "" }));
+  }, [stations, barriers]);
 
   // Unified NC count: every non-Conforme barrier (fail-closed, novel statuses
   // included) drives the alert, matching KpiGrid and the chart.
@@ -238,6 +256,10 @@ export function DashboardSections(
         onCloseSettings={() => setSettingsOpen(false)}
         companyName={companyName}
         sessionUser={sessionUser}
+        locations={settingLocations}
+        availabilities={dispOpts}
+        compliances={confOpts}
+        categories={catOpts}
       />
     </>
   );

@@ -1,15 +1,17 @@
 // FiltersSection.tsx - default location, filters, and sort form with reset.
 // Why: isolates startup filter defaults so the shell only switches sections.
-import { CONF_OPTS, DISP_OPTS, selSt, SORT_OPTS } from "./settings-options.ts";
+import { selSt, SORT_OPTS } from "./settings-options.ts";
 import type { SettingsState } from "../../context/SettingsContext.tsx";
 import { FieldLabel, SectTitle } from "./SectionPrimitives.tsx";
-import { CATEGORIES, LOCATIONS } from "../../lib/constants.ts";
 import type { FilterState } from "../../lib/types.ts";
 
 interface Props {
   settings: SettingsState;
   setDefaults: (f: Partial<FilterState>) => void;
   setDefaultLoc: (l: string) => void;
+  // Live vocabularies from the dashboard (server SSR or client dataset).
+  // Empty or absent means "no known values yet": the selects offer only
+  // "Todas" instead of stale seed lists.
   locations?: { code: string; name: string; type: string }[];
   availabilities?: string[];
   compliances?: string[];
@@ -17,8 +19,10 @@ interface Props {
 }
 
 // FiltersSection: startup filter defaults form with restore-defaults action.
-// Live vocab props win over seed lists so new stations/statuses/categories
-// are selectable without a code change; seeds cover first paint only.
+// Every option list is dynamic: only values present in the live data are
+// selectable, so new stations/statuses/categories work with no code change.
+// Stored defaults not present in the live lists coerce to "Todas"/"ALL" for
+// display and are overwritten on the next user change.
 export function FiltersSection(
   {
     settings,
@@ -30,16 +34,33 @@ export function FiltersSection(
     categories,
   }: Props,
 ) {
-  const locOpts = locations ?? LOCATIONS;
-  const dispOpts = availabilities && availabilities.length > 0
-    ? [...new Set([...availabilities, ...DISP_OPTS])]
-    : DISP_OPTS;
-  const confOpts = compliances && compliances.length > 0
-    ? [...new Set([...compliances, ...CONF_OPTS])]
-    : CONF_OPTS;
-  const catOpts = categories && categories.length > 0
-    ? [...new Set([...categories, ...CATEGORIES])]
-    : [...CATEGORIES];
+  const liveLocs = locations ?? [];
+  const locOpts = [
+    { code: "ALL", name: "Todas", type: "" },
+    ...liveLocs.filter((l) => l.code !== "ALL"),
+  ];
+  const locKnown = new Set(locOpts.map((l) => l.code));
+  const effLoc = locKnown.has(settings.defaultLocation)
+    ? settings.defaultLocation
+    : "ALL";
+  const dispOpts = availabilities ?? [];
+  const confOpts = compliances ?? [];
+  const catOpts = categories ?? [];
+  const effAvail = dispOpts.includes(
+      (settings.defaultFilters as Record<string, string>).availability ?? "",
+    )
+    ? (settings.defaultFilters as Record<string, string>).availability as string
+    : "";
+  const effConf = confOpts.includes(
+      (settings.defaultFilters as Record<string, string>).compliance ?? "",
+    )
+    ? (settings.defaultFilters as Record<string, string>).compliance as string
+    : "";
+  const effCat = catOpts.includes(
+      (settings.defaultFilters as Record<string, string>).category ?? "",
+    )
+    ? (settings.defaultFilters as Record<string, string>).category as string
+    : "";
   return (
     <div
       className="animate-settings-in"
@@ -65,14 +86,14 @@ export function FiltersSection(
       <div>
         <FieldLabel>Instalação (localização)</FieldLabel>
         <select
-          value={settings.defaultLocation}
+          value={effLoc}
           onChange={(e) => setDefaultLoc(e.currentTarget.value)}
           style={selSt}
         >
           {locOpts.map((l) => (
             <option key={l.code} value={l.code}>
               {l.name}
-              {l.code !== "ALL" ? ` - ${l.type}` : ""}
+              {l.code !== "ALL" && l.type ? ` - ${l.type}` : ""}
             </option>
           ))}
         </select>
@@ -82,16 +103,20 @@ export function FiltersSection(
           label: "Disponibilidade",
           key: "availability",
           opts: dispOpts,
+          eff: effAvail,
         },
-        { label: "Conformidade", key: "compliance", opts: confOpts },
-        { label: "Categoria", key: "category", opts: catOpts },
-      ].map(({ label, key, opts }) => (
+        {
+          label: "Conformidade",
+          key: "compliance",
+          opts: confOpts,
+          eff: effConf,
+        },
+        { label: "Categoria", key: "category", opts: catOpts, eff: effCat },
+      ].map(({ label, key, opts, eff }) => (
         <div key={key}>
           <FieldLabel>{label}</FieldLabel>
           <select
-            value={(settings.defaultFilters as Record<string, string>)[
-              key
-            ] ?? ""}
+            value={eff}
             onChange={(e) =>
               setDefaults({
                 ...settings.defaultFilters,

@@ -15,17 +15,9 @@ export const THEMES: {
   { value: "dark", Icon: MoonIcon, label: "Escuro" },
   { value: "amoled", Icon: MonitorIcon, label: "Black" },
 ];
-export const DISP_OPTS = [
-  "Disponível",
-  "Fora de Operação",
-  "Indisponível Contingenciado",
-  "Degradado Contingenciado",
-  "Degradado",
-  "Indisponível",
-];
-// Seed fallback for first paint only; FiltersSection prefers live vocabularies
-// so new statuses are selectable without a code change.
-export const CONF_OPTS = ["Conforme", "Não Conforme"];
+// Live vocabularies arrive via props from the dashboard (SSR/live in HTTP
+// mode, dataset-derived in mock mode); no seed fallback lives here so stale
+// stations or statuses can never be offered.
 export const SORT_OPTS = [
   { value: "id", label: "ID" },
   { value: "tag", label: "TAG" },

@@ -32,11 +32,26 @@ interface Props {
   onClose: () => void;
   companyName: string;
   sessionUser?: AuthUser | null;
+  // Live vocabularies for the filters section; absent means "unknown yet"
+  // and the section offers only "Todas" instead of stale seeds.
+  locations?: { code: string; name: string; type: string }[];
+  availabilities?: string[];
+  compliances?: string[];
+  categories?: string[];
 }
 
 // SettingsPanel: slide-over dialog hosting appearance, filters, and admin sections.
 export function SettingsPanel(
-  { open, onClose, companyName, sessionUser = null }: Props,
+  {
+    open,
+    onClose,
+    companyName,
+    sessionUser = null,
+    locations,
+    availabilities,
+    compliances,
+    categories,
+  }: Props,
 ) {
   const {
     settings,
@@ -255,6 +270,10 @@ export function SettingsPanel(
             settings={settings}
             setDefaults={setDefaults}
             setDefaultLoc={setDefaultLoc}
+            locations={locations}
+            availabilities={availabilities}
+            compliances={compliances}
+            categories={categories}
           />
         )}
 
