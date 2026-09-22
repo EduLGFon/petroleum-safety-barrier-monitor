@@ -27,7 +27,6 @@ const HEADERS = [
   "TAG",
   "Inst.",
   "Tipologia",
-  "Localização",
   "Categoria",
   "Agrupamento",
   "Criticidade",
@@ -44,7 +43,7 @@ const PT_PER_CHAR = 5.5;
 const CELL_PAD_PT = 12;
 // Columns that may hold long free text wrap at this width instead of
 // stretching the table.
-const WRAP_COLS = new Set([4, 12, 13]);
+const WRAP_COLS = new Set([11, 12]);
 const MAX_WRAP_CHARS = 55;
 const MIN_COL_PT = 40;
 const MAX_COL_PT = 320;
@@ -108,7 +107,7 @@ export function exportToExcel(
       `${stats.compliant} · ${stats.pct}`,
       "#ECFDF5",
       "#15803D",
-      4,
+      3,
     ) +
     kpiCell("Não conformes", stats.nonCompliant, "#FEF2F2", "#B91C1C", 3) +
     kpiCell("Críticas NC", stats.critical, "#FFF7ED", "#C2410C", 3) +
@@ -131,20 +130,20 @@ export function exportToExcel(
           escHtml(v)
         }</td>`;
       }
-      if (ci === 9) {
+      if (ci === 8) {
         return `<td style="${base}text-align:center;">${pill(v, disp)}</td>`;
       }
-      if (ci === 11) {
+      if (ci === 10) {
         return `<td style="${base}text-align:center;">${pill(v, conf)}</td>`;
       }
-      if (ci === 7) {
+      if (ci === 6) {
         const c = isCrit ? "#F97316" : "#64748B";
         const extra = isCrit ? `background:${c}1F;font-weight:bold;` : "";
         return `<td style="${base}text-align:center;color:${c};${extra}">${
           escHtml(v)
         }</td>`;
       }
-      if (ci === 10 && v) {
+      if (ci === 9 && v) {
         return `<td style="${base}font-style:italic;color:#EA580C;">${
           escHtml(v)
         }</td>`;
@@ -165,22 +164,22 @@ export function exportToExcel(
     }">${escHtml(v)}</td></tr>`;
   }).join("");
   const productRow = companyName
-    ? `<tr><td colspan="14" style="background:#0A1628;color:#93C5FD;font-size:10pt;letter-spacing:.14em;padding:0 12px 4px 12px;">MONITOR DE BARREIRAS DE SEGURANÇA</td></tr>`
+    ? `<tr><td colspan="13" style="background:#0A1628;color:#93C5FD;font-size:10pt;letter-spacing:.14em;padding:0 12px 4px 12px;">MONITOR DE BARREIRAS DE SEGURANÇA</td></tr>`
     : "";
   const html =
     `<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel"><head><meta charset="UTF-8"></head><body>` +
     `<table border="0" cellpadding="0" cellspacing="0" style="border-collapse:collapse;table-layout:auto;font-family:Calibri,Arial,sans-serif;"><colgroup>${cols}</colgroup>` +
-    `<tr><td colspan="14" style="background:#0A1628;color:#fff;font-size:16pt;font-weight:bold;padding:12px 12px 2px 12px;white-space:normal;vertical-align:middle;">${
+    `<tr><td colspan="13" style="background:#0A1628;color:#fff;font-size:16pt;font-weight:bold;padding:12px 12px 2px 12px;white-space:normal;vertical-align:middle;">${
       escHtml(brand)
     }</td></tr>` +
     productRow +
-    `<tr><td colspan="14" style="background:#0E2036;color:#94A3B8;font-size:9pt;font-style:italic;padding:5px 12px;white-space:normal;vertical-align:middle;">${
+    `<tr><td colspan="13" style="background:#0E2036;color:#94A3B8;font-size:9pt;font-style:italic;padding:5px 12px;white-space:normal;vertical-align:middle;">${
       escHtml(subtitle)
     }</td></tr>` +
-    `<tr><td colspan="14" style="background:#3B82F6;font-size:2pt;padding:0;">&nbsp;</td></tr>` +
+    `<tr><td colspan="13" style="background:#3B82F6;font-size:2pt;padding:0;">&nbsp;</td></tr>` +
     kpiStrip +
     `<tr>${head}</tr>${body}` +
-    `<tr><td colspan="14" style="color:#94A3B8;font-size:8pt;font-style:italic;padding:6px 4px;">${
+    `<tr><td colspan="13" style="color:#94A3B8;font-size:8pt;font-style:italic;padding:6px 4px;">${
       escHtml(
         withBrand(companyName, "Gerado pelo Monitor de Barreiras de Segurança"),
       )

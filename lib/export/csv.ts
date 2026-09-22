@@ -13,14 +13,13 @@ export function csvCell(v: unknown): string {
   return `"${String(v ?? "").replace(/"/g, '""')}"`;
 }
 
-// The 14 export columns, single-sourced: the browser CSV and the server
+// The 13 export columns, single-sourced: the browser CSV and the server
 // /api/export route both build from this, so the files always agree.
 export const CSV_HEADERS = [
   "ID",
   "TAG",
   "Instalação",
   "Tipologia",
-  "Localização",
   "Categoria",
   "Agrupamento",
   "Criticidade",

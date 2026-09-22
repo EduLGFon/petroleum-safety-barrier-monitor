@@ -4,8 +4,10 @@
 import { daysSince, fmtDate, humanDuration } from "../utils.ts";
 import type { Barrier } from "../types.ts";
 
-// Maps a Barrier to a 14-column export row; NC duration blank unless statusSince present, empty owner falls back.
+// Maps a Barrier to a 13-column export row; NC duration blank unless statusSince present, empty owner falls back.
 // Non-Conforme means !== "Conforme" (fail-closed, same as computeKpi).
+// Note: locDesc is storage-only (Fracttal carries no location text) and is
+// intentionally excluded from exports so mock labels never leak into files.
 export function row(b: Barrier): string[] {
   const nc = b.compliance !== "Conforme";
   const when = nc && b.statusSince
@@ -18,7 +20,6 @@ export function row(b: Barrier): string[] {
     b.tag,
     b.location,
     b.typology,
-    b.locDesc,
     b.category,
     b.grouping,
     b.criticality,

@@ -4,13 +4,13 @@
 import type { Barrier, FilterState, SortableColumn } from "../types.ts";
 import { PAGE_SIZE_OPTS } from "../constants.ts";
 
-// Applies case-insensitive query (tag/loc/location/category) plus exact filters; empty strings mean no filter.
+// Applies case-insensitive query (tag/location/category) plus exact filters; empty strings mean no filter.
 export function applyFilters(b: Barrier[], f: FilterState): Barrier[] {
   let d = b;
   if (f.query) {
     const q = f.query.toLowerCase();
     d = d.filter((x) =>
-      x.tag.toLowerCase().includes(q) || x.locDesc.toLowerCase().includes(q) ||
+      x.tag.toLowerCase().includes(q) ||
       x.location.toLowerCase().includes(q) ||
       x.category.toLowerCase().includes(q)
     );

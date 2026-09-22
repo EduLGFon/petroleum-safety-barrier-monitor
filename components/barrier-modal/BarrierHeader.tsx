@@ -1,11 +1,6 @@
 // BarrierHeader - header/badges/NC alert part for the barrier dialog.
 // Why: isolates title/badges/NC alert so the shell Content stays small.
-import {
-  AlertTriangleIcon,
-  CloseIcon,
-  MapPinIcon,
-  TagIcon,
-} from "../ui/Icons.tsx";
+import { AlertTriangleIcon, CloseIcon, TagIcon } from "../ui/Icons.tsx";
 import { CONF_COLORS, CRIT_COLORS, DISP_COLORS } from "../../lib/constants.ts";
 import { daysSince, fmtDate, humanDuration } from "../../lib/utils.ts";
 import type { Barrier } from "../../lib/types.ts";
@@ -101,24 +96,6 @@ export function BarrierHeader(
               }}
             >
               {b.tag}
-            </div>
-            <div
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: "var(--d-mini-gap)",
-                marginTop: "var(--d-mini-gap)",
-              }}
-            >
-              <MapPinIcon size={11} color="var(--text-muted)" strokeWidth={2} />
-              <span
-                style={{
-                  fontSize: "var(--d-body)",
-                  color: "var(--text-muted)",
-                }}
-              >
-                {b.locDesc}
-              </span>
             </div>
           </div>
           <button

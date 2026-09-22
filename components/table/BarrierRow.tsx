@@ -108,9 +108,6 @@ export function BarrierRow(
         >
           {b.tag}
         </div>
-        <div style={{ fontSize: 12, color: AURORA.loc, marginTop: 2 }}>
-          {b.locDesc}
-        </div>
         {/* "sem contingenciamento" duration label for NC items */}
         {isNC && b.statusSince && (
           <div

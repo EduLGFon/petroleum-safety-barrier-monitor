@@ -1,6 +1,6 @@
 // Server CSV export - same rows and summary as the client exports.
 // This is why it exists: GET /api/export must produce byte-identical content
-// to the dashboard's CSV download, so both go through row() (14-column
+// to the dashboard's CSV download, so both go through row() (13-column
 // mapping), csvCell (quoting) and summaryRows (RESUMO block). Only the
 // transport differs: here a ReadableStream instead of a browser Blob.
 import { CSV_HEADERS, csvCell } from "../export/csv.ts";

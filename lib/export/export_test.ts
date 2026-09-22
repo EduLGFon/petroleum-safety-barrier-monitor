@@ -32,19 +32,19 @@ function mk(over: Partial<Barrier> = {}): Barrier {
   };
 }
 
-Deno.test("row maps a bare barrier to 14 columns", () => {
+Deno.test("row maps a bare barrier to 13 columns", () => {
   const r = row(mk());
-  assertStrictEquals(r.length, 14);
+  assertStrictEquals(r.length, 13);
   assertStrictEquals(r[0], "1");
   assertStrictEquals(r[1], "PSV-001");
   assertStrictEquals(r[2], "FAL");
-  assertStrictEquals(r[9], "Disponível");
-  assertStrictEquals(r[11], "Conforme");
+  assertStrictEquals(r[8], "Disponível");
+  assertStrictEquals(r[10], "Conforme");
 });
 
 Deno.test("row renders empty who-equals for Conforme rows despite statusSince", () => {
   const r = row(mk({ statusSince: "2020-01-01" }));
-  assertStrictEquals(r[10], "");
+  assertStrictEquals(r[9], "");
 });
 
 Deno.test("row renders NC duration + desde only when statusSince exists", () => {
@@ -54,7 +54,7 @@ Deno.test("row renders NC duration + desde only when statusSince exists", () => 
     statusSince: "2020-01-01",
   });
   const r = row(nc);
-  assertEquals(r[10], "6 anos (desde 01/01/2020)");
+  assertEquals(r[9], "6 anos (desde 01/01/2020)");
 
   const bare = row(
     mk({
@@ -63,14 +63,14 @@ Deno.test("row renders NC duration + desde only when statusSince exists", () => 
       availability: "Indisponível",
     }),
   );
-  assertStrictEquals(bare[10], "");
+  assertStrictEquals(bare[9], "");
 });
 
 Deno.test("row treats any non-Conforme as NC and falls back empty dono", () => {
   const novel = row(mk({ compliance: "Em análise" })); // fail-closed
-  assertStrictEquals(novel[11], "Em análise");
+  assertStrictEquals(novel[10], "Em análise");
   const none = row(mk({ owner: "" }));
-  assertStrictEquals(none[8], "Não informado");
+  assertStrictEquals(none[7], "Não informado");
 });
 
 Deno.test("kpiStats yields zeros for empty input", () => {
