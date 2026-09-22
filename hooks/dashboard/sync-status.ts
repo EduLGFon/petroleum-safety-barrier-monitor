@@ -2,7 +2,10 @@
 // This is why it exists: the pill needs the same cadence discipline as the
 // vocabulary refresh (hidden tabs skip, dead sessions redirect, failures
 // are best-effort) without tangling the data hook. Null while loading or
-// when disabled; the pill renders nothing for null.
+// when disabled; the pill renders nothing for null. While a run is in
+// flight the hook switches to the fast activeMs lane so the flip back to
+// synced lands seconds after the run, not one idle tick later. Returning
+// to the tab or window refetches immediately for the same reason.
 import type { SyncStatus } from "../../lib/types.ts";
 
 import { useEffect, useState } from "preact/hooks";
@@ -11,13 +14,17 @@ import { toLoginWithReturn } from "./server.ts";
 
 export function useSyncStatus(
   baseUrl: string,
-  refreshMs: number,
+  idleMs: number,
+  activeMs: number,
   enabled: boolean,
 ): SyncStatus | null {
   const [status, setStatus] = useState<SyncStatus | null>(null);
+  const active = status?.state === "syncing";
 
   useEffect(() => {
-    if (!enabled || !refreshMs || refreshMs <= 0 || !baseUrl) return;
+    if (!enabled || !baseUrl) return;
+    const cadence = active ? activeMs : idleMs;
+    if (!cadence || cadence <= 0) return;
     let cancelled = false;
     const load = (): void => {
       fetch(`${baseUrl}/api/sync-status`, {
@@ -37,15 +44,26 @@ export function useSyncStatus(
       });
     };
     load();
+    const onVisible = (): void => {
+      if (typeof document !== "undefined" && !document.hidden) load();
+    };
     const timer = setInterval(() => {
       if (typeof document !== "undefined" && document.hidden) return;
       load();
-    }, refreshMs);
+    }, cadence);
+    if (typeof document !== "undefined") {
+      document.addEventListener("visibilitychange", onVisible);
+    }
+    globalThis.addEventListener("focus", onVisible);
     return () => {
       cancelled = true;
       clearInterval(timer);
+      if (typeof document !== "undefined") {
+        document.removeEventListener("visibilitychange", onVisible);
+      }
+      globalThis.removeEventListener("focus", onVisible);
     };
-  }, [baseUrl, refreshMs, enabled]);
+  }, [baseUrl, idleMs, activeMs, enabled, active]);
 
   return status;
 }
