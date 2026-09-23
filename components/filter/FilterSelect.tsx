@@ -5,8 +5,8 @@
 // trap stacking contexts) can never paint over the options.
 import { useEffect, useRef, useState } from "preact/hooks";
 import type { ComponentChildren } from "preact";
+import { createPortal } from "preact/compat";
 import { AURORA } from "../../lib/aurora.ts";
-import { render } from "preact";
 
 // Shared glass style for search input and selects.
 export const GLASS_INPUT = {
@@ -24,37 +24,35 @@ function widest(opts: string[]): number {
   return n;
 }
 
-// MenuPortal: fixed-position menu rendered into document.body on open and
-// removed on close. Escapes every ancestor stacking context and overflow
-// clip between the input and the page; follows the input on scroll/resize.
+// MenuPortal: fixed-position menu portalled to document.body on open.
+// Declarative createPortal keeps the menu in the same Preact tree (no manual
+// render() root to tear down), so repositioning on scroll/resize never
+// destroys the menu node mid-scroll and can never throw into the boundary.
+// The wrapper div carries the fixed geometry; the opaque blurred <ul> inside
+// paints over rows/cards on every theme.
 function MenuPortal({ left, top, width, children }: {
   left: number;
   top: number;
   width: string;
   children: ComponentChildren;
 }) {
-  const host = useRef<HTMLDivElement | null>(null);
-  if (host.current === null && typeof document !== "undefined") {
-    host.current = document.createElement("div");
-  }
-  useEffect(() => {
-    const el = host.current;
-    if (!el) return;
-    el.style.position = "fixed";
-    el.style.left = `${left}px`;
-    el.style.top = `${top}px`;
-    el.style.width = width;
-    el.style.zIndex = "900";
-    document.body.appendChild(el);
-    return () => {
-      render(null, el);
-      el.remove();
-    };
-  }, [left, top, width]);
-  useEffect(() => {
-    if (host.current) render(<>{children}</>, host.current);
-  });
-  return null;
+  // SSR: no document to portal into; the caller gates on anchor.min > 0,
+  // which only happens client-side after measuring the input rect.
+  if (typeof document === "undefined") return null;
+  return createPortal(
+    <div
+      style={{
+        position: "fixed",
+        left: `${left}px`,
+        top: `${top}px`,
+        width,
+        zIndex: 900,
+      }}
+    >
+      {children}
+    </div>,
+    document.body,
+  );
 }
 
 // Combo: controlled combobox bound to an exact option value. Collapsed it is
@@ -79,19 +77,39 @@ export function Combo(
   useEffect(() => {
     if (!open) setDraft(value);
   }, [value, open]);
-  // Track the input rect while open so the menu follows scroll/resize.
+  // Track the input rect while open so the menu follows page scroll/resize.
+  // No capture: window scroll (bubble) fires for document scrolls only, so
+  // scrolling the option list itself never re-renders the menu mid-gesture.
+  // rAF-throttled plus an equality guard, so flinging the page issues at
+  // most one state update per frame and identical rects skip render storms.
   useEffect(() => {
     if (!open) return;
+    let raf = 0;
     const place = () => {
-      const r = input.current?.getBoundingClientRect();
-      if (r) setAnchor({ left: r.left, top: r.bottom + 4, min: r.width });
+      cancelAnimationFrame(raf);
+      raf = requestAnimationFrame(() => {
+        const r = input.current?.getBoundingClientRect();
+        if (!r) return;
+        const next = {
+          left: Math.round(r.left),
+          top: Math.round(r.bottom + 4),
+          min: Math.round(r.width),
+        };
+        setAnchor((prev) =>
+          prev.left === next.left && prev.top === next.top &&
+            prev.min === next.min
+            ? prev
+            : next
+        );
+      });
     };
     place();
-    window.addEventListener("scroll", place, true);
-    window.addEventListener("resize", place);
+    globalThis.addEventListener("scroll", place, { passive: true });
+    globalThis.addEventListener("resize", place);
     return () => {
-      window.removeEventListener("scroll", place, true);
-      window.removeEventListener("resize", place);
+      cancelAnimationFrame(raf);
+      globalThis.removeEventListener("scroll", place);
+      globalThis.removeEventListener("resize", place);
     };
   }, [open]);
   const q = draft.trim().toLowerCase();
@@ -182,7 +200,12 @@ export function Combo(
               listStyle: "none",
               maxHeight: 240,
               overflowY: "auto",
-              background: "var(--bg-elevated)",
+              // Opaque + blurred: solid dialog surface blurs whatever scrolls
+              // underneath instead of the near-transparent elevated wash that
+              // let rows bleed through the text.
+              background: AURORA.dialog,
+              backdropFilter: "blur(16px) saturate(1.25)",
+              WebkitBackdropFilter: "blur(16px) saturate(1.25)",
               border: `1px solid ${AURORA.segBorder}`,
               borderRadius: 10,
               boxShadow: "0 12px 32px rgba(0,0,0,.35)",
