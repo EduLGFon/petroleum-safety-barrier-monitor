@@ -4,7 +4,7 @@
 // Empty props mean still loading or truly empty data: selects show only
 // the placeholder instead of a fixed seed list.
 import { CloseIcon, FilterIcon, SearchIcon } from "./ui/Icons.tsx";
-import { GLASS_INPUT, Sel } from "./filter/FilterSelect.tsx";
+import { Combo, GLASS_INPUT } from "./filter/FilterSelect.tsx";
 import { useEffect, useState } from "preact/hooks";
 import type { FilterState } from "../lib/types.ts";
 import { AURORA } from "../lib/aurora.ts";
@@ -97,8 +97,17 @@ export function FilterBar(
         marginBottom: "var(--d-stack-sm)",
       }}
     >
-      {/* Search */} {/* Search */}
-      <div style={{ flex: 1, minWidth: 220, position: "relative" }}>
+      {/* Search - compact until focused, then grows */}
+      <div
+        style={{
+          flex: "0 1 auto",
+          width: focused || draft ? 300 : 150,
+          minWidth: 0,
+          maxWidth: "100%",
+          position: "relative",
+          transition: "width .2s var(--ease-out)",
+        }}
+      >
         <span
           style={{
             position: "absolute",
@@ -118,7 +127,7 @@ export function FilterBar(
         </span>
         <input
           type="search"
-          placeholder="TAG, localização, categoria…"
+          placeholder="Pesquisa"
           value={draft}
           // NOTE: onInput, not onChange (see BarriersTable goto field).
           onInput={(e) => setDraft(e.currentTarget.value)}
@@ -140,31 +149,31 @@ export function FilterBar(
         />
       </div>
 
-      <Sel
+      <Combo
         value={filters.availability}
         onChange={(v) => onFilter({ availability: v })}
         placeholder="Disponibilidade"
         opts={dispOpts}
       />
-      <Sel
+      <Combo
         value={filters.compliance}
         onChange={(v) => onFilter({ compliance: v })}
         placeholder="Conformidade"
         opts={confOpts}
       />
-      <Sel
+      <Combo
         value={filters.category}
         onChange={(v) => onFilter({ category: v })}
         placeholder={`Categoria (${catOpts.length})`}
         opts={catOpts}
       />
-      <Sel
+      <Combo
         value={filters.criticality}
         onChange={(v) => onFilter({ criticality: v })}
         placeholder="Criticidade"
         opts={critOpts}
       />
-      <Sel
+      <Combo
         value={filters.plan}
         onChange={(v) => onFilter({ plan: v })}
         placeholder="Plano de ação"
