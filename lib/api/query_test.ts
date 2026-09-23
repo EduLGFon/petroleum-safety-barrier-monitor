@@ -104,7 +104,7 @@ Deno.test("cleanDateParam accepts bare or longer ISO dates, rejects garbage", ()
 
 Deno.test("toWireQuery passes through known ids with pageSize/sort intact", () => {
   const q = toWireQuery({
-    location: "SPL",
+    location: "CNC",
     category: "Detector de H₂S",
     query: "",
     page: 2,

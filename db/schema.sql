@@ -20,7 +20,7 @@
 
 create table if not exists locations (
   id    integer primary key,
-  code  text not null unique,          -- 'FAL','CNC','CNS','FAP','RJO','SPL' ('ALL' is UI-only, never a row)
+  code  text not null unique,          -- 'FAL','SML','FSR','IBU','FSL','CNC','JCT','FSJ' ('ALL' is UI-only, never a row)
   type  text not null,                 -- installation type, display only
   name  text                           -- full display name (hover tooltip); null falls back to code
 );

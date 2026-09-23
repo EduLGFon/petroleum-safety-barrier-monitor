@@ -42,8 +42,8 @@ function build(): Barrier[] {
           id: id++,
           tag: `ST${s}-CAT${c}-${k}`,
           typology: `Tipologia ${s % 9}`,
-          location: s < 6
-            ? ["FAL", "CNC", "CNS", "FAP", "RJO", "SPL"][s]
+          location: s < 8
+            ? ["FAL", "SML", "FSR", "IBU", "FSL", "CNC", "JCT", "FSJ"][s]
             : `ST-${s}`,
           locDesc: "Chaos rig",
           criticality: (s + c + k) % 13 === 0 ? NEW_CRIT : "Crítica",

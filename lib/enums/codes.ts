@@ -24,11 +24,13 @@ export function buildReverse<T extends string>(
 export const LOCATION_CODES: Record<number, string> = {
   0: "ALL",
   1: "FAL",
-  2: "CNC",
-  3: "CNS",
-  4: "FAP",
-  5: "RJO",
-  6: "SPL",
+  2: "SML",
+  3: "FSR",
+  4: "IBU",
+  5: "FSL",
+  6: "CNC",
+  7: "JCT",
+  8: "FSJ",
 };
 export const LOCATION_IDS = buildReverse(LOCATION_CODES);
 

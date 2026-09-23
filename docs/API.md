@@ -36,15 +36,17 @@ Every enumerable domain has a resolver in **`lib/enums/`** (barrel
 `lib/enums.ts` over `codes.ts`, `taxonomy.ts`, `context.ts`):
 
 ```ts
-// Location (installation)
+// Location (installation - sheet-real GERAL scope)
 LOCATION_CODES = {
   0: "ALL",
   1: "FAL",
-  2: "CNC",
-  3: "CNS",
-  4: "FAP",
-  5: "RJO",
-  6: "SPL",
+  2: "SML",
+  3: "FSR",
+  4: "IBU",
+  5: "FSL",
+  6: "CNC",
+  7: "JCT",
+  8: "FSJ",
 };
 toLocationId("FAL"); // -> 1
 fromLocationId(1); // -> 'FAL'
