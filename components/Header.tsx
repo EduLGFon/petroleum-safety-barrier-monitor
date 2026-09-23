@@ -17,13 +17,13 @@ import { SyncDetailsModal } from "./header/SyncDetailsModal.tsx";
 
 import { SyncHoverCard } from "./header/SyncHoverCard.tsx";
 
+import { useEffect, useRef, useState } from "preact/hooks";
+
 import { AURORA, AURORA_TYPE } from "../lib/aurora.ts";
 
 import { HealthDot } from "./header/HealthDot.tsx";
 
 import { SyncLine } from "./header/SyncLine.tsx";
-
-import { useState } from "preact/hooks";
 
 interface Props {
   onOpenSettings: () => void;
@@ -104,6 +104,24 @@ export function Header(
   const conn = useConnection(healthUrl);
   const [syncOpen, setSyncOpen] = useState(false);
   const [detailsOpen, setDetailsOpen] = useState(false);
+  // Hover intent: a short close delay forgives cursor slips off the title
+  // or card edges, so reaching the details button never races the dismiss.
+  const closeTimer = useRef<number | undefined>(undefined);
+  const cancelClose = (): void => {
+    if (closeTimer.current !== undefined) {
+      globalThis.clearTimeout(closeTimer.current);
+      closeTimer.current = undefined;
+    }
+  };
+  useEffect(() => cancelClose, []);
+  const openCard = (): void => {
+    cancelClose();
+    setSyncOpen(true);
+  };
+  const scheduleClose = (): void => {
+    cancelClose();
+    closeTimer.current = globalThis.setTimeout(() => setSyncOpen(false), 200);
+  };
   // Opening the dialog dismisses the hover card so the two never stack.
   const openDetails = (): void => {
     setSyncOpen(false);
@@ -137,11 +155,21 @@ export function Header(
         }}
       >
         <div
-          onMouseEnter={() => setSyncOpen(true)}
-          onMouseLeave={() => setSyncOpen(false)}
-          onFocus={() => setSyncOpen(true)}
-          onBlur={() => setSyncOpen(false)}
-          onClick={() => setSyncOpen((v) => !v)}
+          onMouseEnter={openCard}
+          onMouseLeave={scheduleClose}
+          onFocus={openCard}
+          onBlur={(e) => {
+            // Tabbing onto the details button moves focus inside the wrapper;
+            // only a focus exit truly dismisses the card.
+            const next = e.relatedTarget as unknown as Node | null;
+            const host = e.currentTarget as unknown as HTMLDivElement;
+            if (next !== null && host.contains(next)) return;
+            scheduleClose();
+          }}
+          onClick={() => {
+            cancelClose();
+            setSyncOpen((v) => !v);
+          }}
           tabIndex={syncStatus === null ? undefined : 0}
           style={{ position: "relative", outline: "none" }}
         >

@@ -110,95 +110,108 @@ export function SyncHoverCard({ sync, conn, onOpenDetails }: Props) {
     ? "Reconectando…"
     : "Desconectado";
   return (
+    // Bridge: the transparent top padding keeps the cursor inside the hover
+    // wrapper while crossing from the title to the card, so no mouseleave
+    // fires mid-travel and the details button stays clickable.
     <div
-      role="tooltip"
       style={{
         position: "absolute",
-        top: "calc(100% + 8px)",
+        top: "100%",
         left: 0,
         zIndex: 40,
-        width: 320,
-        maxWidth: "min(320px, 80vw)",
-        background: "var(--au-dialog)",
-        border: "1px solid var(--au-card-border)",
-        borderRadius: 12,
-        boxShadow: "0 12px 40px rgb(0 0 0 / .45)",
-        padding: "12px 14px",
-        display: "flex",
-        flexDirection: "column",
-        gap: 8,
-        fontSize: 12,
-        color: "var(--au-pill-text)",
+        paddingTop: 8,
+        background: "transparent",
       }}
     >
-      <div style={{ display: "flex", alignItems: "baseline", gap: 6 }}>
-        <span style={{ fontWeight: 700, color: SYNC_DOT[kind] }}>
-          {healthLabel(kind)}
-        </span>
-        {headlineRel && (
-          <span style={{ color: "var(--au-sub)", fontSize: 11 }}>
-            {headlineRel}
-          </span>
-        )}
-      </div>
-      <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-        {end && <Row k="Quando" v={end.full} />}
-        {run && (
-          <Row k="Duração" v={formatDuration(run.startedAt, run.finishedAt)} />
-        )}
-        {run && <Row k="Origem" v={friendlyScope(run.scope)} />}
-        {!run && <Row k="Quando" v="nenhuma sync registrada ainda" />}
-      </div>
-      {run && (
-        <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-          <SectionTitle text="O QUE MUDOU" />
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "1fr 1fr",
-              border: "1px solid var(--au-row)",
-              borderRadius: 8,
-            }}
-          >
-            <Stat value={run.inserts} caption="Novas" color="#17c964" />
-            <Stat value={run.updates} caption="Atualizadas" color="#f5a524" />
-            <Stat value={run.deletes} caption="Removidas" color="#f31260" />
-            <Stat value={run.skips} caption="Sem alteração" color="#a1a1aa" />
-          </div>
-        </div>
-      )}
-      {run && (
-        <button
-          type="button"
-          onClick={(e) => {
-            e.stopPropagation();
-            onOpenDetails();
-          }}
-          style={{
-            border: `1px solid var(--au-card-border)`,
-            background: "transparent",
-            color: "var(--au-pill-text)",
-            borderRadius: 8,
-            padding: "7px 10px",
-            fontSize: 12,
-            fontWeight: 600,
-            cursor: "pointer",
-            textAlign: "center",
-          }}
-        >
-          Ver detalhes
-        </button>
-      )}
       <div
+        role="tooltip"
         style={{
-          borderTop: "1px solid var(--au-row)",
-          paddingTop: 6,
-          color: "var(--au-sub)",
-          fontSize: 11,
+          width: 320,
+          maxWidth: "min(320px, 80vw)",
+          background: "var(--au-dialog)",
+          border: "1px solid var(--au-card-border)",
+          borderRadius: 12,
+          boxShadow: "0 12px 40px rgb(0 0 0 / .45)",
+          padding: "12px 14px",
+          display: "flex",
+          flexDirection: "column",
+          gap: 8,
+          fontSize: 12,
+          color: "var(--au-pill-text)",
         }}
       >
-        {sync && `${fmt(sync.totals.barriers)} barreiras monitoradas - `}
-        {connLabel} - atualiza a cada 1 min
+        <div style={{ display: "flex", alignItems: "baseline", gap: 6 }}>
+          <span style={{ fontWeight: 700, color: SYNC_DOT[kind] }}>
+            {healthLabel(kind)}
+          </span>
+          {headlineRel && (
+            <span style={{ color: "var(--au-sub)", fontSize: 11 }}>
+              {headlineRel}
+            </span>
+          )}
+        </div>
+        <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+          {end && <Row k="Quando" v={end.full} />}
+          {run && (
+            <Row
+              k="Duração"
+              v={formatDuration(run.startedAt, run.finishedAt)}
+            />
+          )}
+          {run && <Row k="Origem" v={friendlyScope(run.scope)} />}
+          {!run && <Row k="Quando" v="nenhuma sync registrada ainda" />}
+        </div>
+        {run && (
+          <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+            <SectionTitle text="O QUE MUDOU" />
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "1fr 1fr",
+                border: "1px solid var(--au-row)",
+                borderRadius: 8,
+              }}
+            >
+              <Stat value={run.inserts} caption="Novas" color="#17c964" />
+              <Stat value={run.updates} caption="Atualizadas" color="#f5a524" />
+              <Stat value={run.deletes} caption="Removidas" color="#f31260" />
+              <Stat value={run.skips} caption="Sem alteração" color="#a1a1aa" />
+            </div>
+          </div>
+        )}
+        {run && (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              onOpenDetails();
+            }}
+            style={{
+              border: `1px solid var(--au-card-border)`,
+              background: "transparent",
+              color: "var(--au-pill-text)",
+              borderRadius: 8,
+              padding: "7px 10px",
+              fontSize: 12,
+              fontWeight: 600,
+              cursor: "pointer",
+              textAlign: "center",
+            }}
+          >
+            Ver detalhes
+          </button>
+        )}
+        <div
+          style={{
+            borderTop: "1px solid var(--au-row)",
+            paddingTop: 6,
+            color: "var(--au-sub)",
+            fontSize: 11,
+          }}
+        >
+          {sync && `${fmt(sync.totals.barriers)} barreiras monitoradas - `}
+          {connLabel} - atualiza a cada 1 min
+        </div>
       </div>
     </div>
   );
