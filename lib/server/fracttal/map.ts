@@ -155,7 +155,7 @@ export function mapAsset(
   if (criticalityId === undefined) {
     criticalityId = CRITICALITY_DEFAULT;
     warnings.push(
-      `defaulted criticality '${prioridadeLabel || "<none>"}' to 'Não Crítica'`,
+      `defaulted criticality '${prioridadeLabel || "<none>"}' to 'Crítica'`,
     );
   }
 

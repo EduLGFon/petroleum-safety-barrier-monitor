@@ -271,5 +271,5 @@ Deno.test("resolveAvailability follows urgent, planned, stopped, flag, open", ()
 Deno.test("exclusion list documents the known mislabeled row", () => {
   assertStrictEquals(exclusionReason("1013971") !== null, true);
   assertStrictEquals(exclusionReason("1013959"), null);
-  assertStrictEquals(CRITICALITY_DEFAULT, 0);
+  assertStrictEquals(CRITICALITY_DEFAULT, 1);
 });

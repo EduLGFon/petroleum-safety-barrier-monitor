@@ -128,7 +128,7 @@ Deno.test("mapAsset defaults unknown criticality with a warning", () => {
     ctx,
   );
   if (!mapped.ok) throw new Error("expected ok");
-  assertStrictEquals(mapped.input.criticalityId, 0);
+  assertStrictEquals(mapped.input.criticalityId, 1);
   assertStrictEquals(mapped.warnings.length, 1);
 });
 

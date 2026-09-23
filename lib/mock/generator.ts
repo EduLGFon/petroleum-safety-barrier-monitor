@@ -71,7 +71,8 @@ export function getWireBarriers(): WireBarrier[] {
         typologyId: rng.int(0, typCount),
         locationId: loc.id,
         locDescId: rng.int(0, locDescCount),
-        criticalityId: rng.bool(0.78) ? 1 : 0, // 1=Crítica 0=Não Crítica
+        // Sheet inventory is 100% critical barriers - mock mirrors that.
+        criticalityId: 1,
         categoryId,
         groupingId: rng.int(0, grpCount),
         ownerId: hasOwner ? rng.int(0, ownerCount) : -1,

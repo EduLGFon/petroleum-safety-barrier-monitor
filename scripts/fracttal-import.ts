@@ -438,7 +438,9 @@ async function main() {
         typology_id: typologyIdOf(acc.parentDescription),
         location_id: stationIds.get(acc.station) ?? 1,
         loc_desc_id: 0,
-        criticality_id: 0,
+        // Sheet inventory is 100% critical barriers; upstream carries no
+        // usable criticality signal (priorities almost all null in the dump).
+        criticality_id: 1,
         category_id: categoryIds.get(acc.category) ?? 0,
         grouping_id: 0,
         owner_id: null,

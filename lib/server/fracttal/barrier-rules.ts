@@ -29,8 +29,9 @@ export const IMPORT_NOTE = "Importado do Fracttal";
 
 // Category fallback for empty taxonomy labels; criticality default applied
 // with a warning when the upstream label is unknown (listed, not silent).
+// The sheet inventory is 100% critical barriers, so the default is Crítica.
 export const CATEGORY_FALLBACK = "(sem categoria)";
-export const CRITICALITY_DEFAULT = 0;
+export const CRITICALITY_DEFAULT = 1;
 
 // Barrier scope: case/accent-insensitive keywords from
 // docs/FRACTTAL-DATA.md section 3, matched against the asset-type taxonomy
