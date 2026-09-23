@@ -13,7 +13,7 @@ export function csvCell(v: unknown): string {
   return `"${String(v ?? "").replace(/"/g, '""')}"`;
 }
 
-// The 13 export columns, single-sourced: the browser CSV and the server
+// The 30 export columns, single-sourced: the browser CSV and the server
 // /api/export route both build from this, so the files always agree.
 export const CSV_HEADERS = [
   "ID",
@@ -29,6 +29,23 @@ export const CSV_HEADERS = [
   "Conformidade",
   "Comentários",
   "Plano de Ação",
+  "Origem",
+  "Código Fracttal",
+  "Nome Instalação",
+  "Local Instalação",
+  "Tipologia Equip.",
+  "Elem. em Campo?",
+  "Elem. Operacional?",
+  "Status Operac.",
+  "Possui Plano?",
+  "Plano Cumprido?",
+  "Sem Falha?",
+  "Status Manut.",
+  "Há Conting.?",
+  "Desc. Contingência",
+  "Cód. Evidência",
+  "Desc. Degradação",
+  "Comentários 2",
 ];
 
 // Builds ;-separated, quote-escaped CSV with BOM for pt-BR Excel; reuses row(); browser-only.

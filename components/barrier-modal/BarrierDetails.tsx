@@ -12,11 +12,16 @@ import { daysSince, fmtDate, humanDuration } from "../../lib/utils.ts";
 import { Div, FR, Lbl, Sec, Txt } from "./primitives.tsx";
 import type { Barrier } from "../../lib/types.ts";
 import { Badge } from "../ui/Badge.tsx";
-// BarrierDetails shows metadata grid, current status duration, comments, and action plan.
+// BarrierDetails shows metadata grid, inventory sheet columns, current
+// status duration, comments, and action plan.
 export function BarrierDetails({ b }: { b: Barrier }) {
   const dc = DISP_COLORS[b.availability],
     cc = CONF_COLORS[b.compliance],
     crc = CRIT_COLORS[b.criticality];
+  // Sheet text or a muted fallback so empty admin-fillable columns read as
+  // "not provided" instead of blank space.
+  const na = (v: string): string => v || "Não informado";
+  const missing = (v: string): boolean => !v;
   return (
     <div style={{ padding: "var(--d-dialog-body)" }}>
       <div
@@ -45,6 +50,136 @@ export function BarrierDetails({ b }: { b: Barrier }) {
           italic={!b.owner}
         />
       </div>
+      <Div />
+      <Sec>Ficha do Inventário</Sec>
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "1fr 1fr",
+          gap: "var(--d-details-gap)",
+          marginBottom: "var(--d-block-gap)",
+        }}
+      >
+        <FR
+          Icon={BuildingIcon}
+          label="Origem"
+          value={na(b.origin)}
+          full
+          italic={missing(b.origin)}
+        />
+        <FR
+          Icon={BuildingIcon}
+          label="Código Fracttal"
+          value={na(b.externalCode)}
+          italic={missing(b.externalCode)}
+        />
+        <FR
+          Icon={BuildingIcon}
+          label="Nome da Instalação"
+          value={na(b.locationName)}
+          italic={missing(b.locationName)}
+        />
+        <FR
+          Icon={LayersIcon}
+          label="Local de Instalação"
+          value={na(b.installLocal)}
+          full
+          italic={missing(b.installLocal)}
+        />
+        <FR
+          Icon={LayersIcon}
+          label="Tipologia Equipamento"
+          value={na(b.equipTypology)}
+          full
+          italic={missing(b.equipTypology)}
+        />
+        <FR
+          Icon={ShieldCheckIcon}
+          label="Elemento em Campo?"
+          value={na(b.fieldInstalled)}
+          italic={missing(b.fieldInstalled)}
+        />
+        <FR
+          Icon={ShieldCheckIcon}
+          label="Elemento Operacional?"
+          value={na(b.fieldOperational)}
+          italic={missing(b.fieldOperational)}
+        />
+        <FR
+          Icon={ShieldCheckIcon}
+          label="Status Operacional"
+          value={na(b.opStatus)}
+          italic={missing(b.opStatus)}
+        />
+        <FR
+          Icon={ShieldCheckIcon}
+          label="Status Manutenção"
+          value={na(b.maintStatus)}
+          italic={missing(b.maintStatus)}
+        />
+      </div>
+      <Div />
+      <Sec>Plano de Manutenção</Sec>
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "1fr 1fr",
+          gap: "var(--d-details-gap)",
+          marginBottom: "var(--d-block-gap)",
+        }}
+      >
+        <FR
+          Icon={ShieldCheckIcon}
+          label="Possui Plano?"
+          value={na(b.hasMaintPlan)}
+          italic={missing(b.hasMaintPlan)}
+        />
+        <FR
+          Icon={ShieldCheckIcon}
+          label="Plano Cumprido?"
+          value={na(b.planFollowed)}
+          italic={missing(b.planFollowed)}
+        />
+        <FR
+          Icon={ShieldCheckIcon}
+          label="Sem Falha?"
+          value={na(b.failureFree)}
+          italic={missing(b.failureFree)}
+        />
+      </div>
+      <Div />
+      <Sec>Contingência</Sec>
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "1fr 1fr",
+          gap: "var(--d-details-gap)",
+          marginBottom: "var(--d-block-gap)",
+        }}
+      >
+        <FR
+          Icon={ShieldCheckIcon}
+          label="Há Contingência?"
+          value={na(b.hasContingency)}
+          italic={missing(b.hasContingency)}
+        />
+        <FR
+          Icon={BuildingIcon}
+          label="Código Evidência"
+          value={na(b.evidenceCode)}
+          italic={missing(b.evidenceCode)}
+        />
+      </div>
+      <Txt
+        value={b.contingencyDesc || "Sem descrição de contingência."}
+        muted={!b.contingencyDesc}
+      />
+      <Div />
+      <Sec>Degradação</Sec>
+      <Txt
+        value={b.degradationDesc || "Sem degradação registrada."}
+        muted={!b.degradationDesc}
+      />
       <Div />
       <Sec>Status Atual</Sec>
       <div
@@ -107,6 +242,12 @@ export function BarrierDetails({ b }: { b: Barrier }) {
       <Txt
         value={b.comments || "Sem comentários registrados."}
         muted={!b.comments}
+      />
+      <Div />
+      <Sec>Comentários 2</Sec>
+      <Txt
+        value={b.extraComments || "Sem comentários complementares."}
+        muted={!b.extraComments}
       />
       <Div />
       <Sec>Plano de Ação</Sec>

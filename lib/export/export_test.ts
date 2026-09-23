@@ -49,14 +49,55 @@ function mk(over: Partial<Barrier> = {}): Barrier {
   };
 }
 
-Deno.test("row maps a bare barrier to 13 columns", () => {
+Deno.test("row maps a bare barrier to 30 columns", () => {
   const r = row(mk());
-  assertStrictEquals(r.length, 13);
+  assertStrictEquals(r.length, 30);
   assertStrictEquals(r[0], "1");
   assertStrictEquals(r[1], "PSV-001");
   assertStrictEquals(r[2], "FAL");
   assertStrictEquals(r[8], "Disponível");
   assertStrictEquals(r[10], "Conforme");
+});
+
+Deno.test("row appends sheet inventory columns in sheet order", () => {
+  const r = row(mk({
+    origin: "HAZOP: RL-1",
+    externalCode: "1014224",
+    locationName: "Fazenda Alegre",
+    installLocal: "Sistema FAL",
+    equipTypology: "Válvula",
+    fieldInstalled: "Sim",
+    fieldOperational: "Sim",
+    opStatus: "Disponível",
+    hasMaintPlan: "Sim",
+    planFollowed: "Sim",
+    failureFree: "Sim",
+    maintStatus: "Disponível",
+    hasContingency: "Não",
+    contingencyDesc: "",
+    evidenceCode: "",
+    degradationDesc: "",
+    extraComments: "obs",
+  }));
+  assertEquals(r.slice(13), [
+    "HAZOP: RL-1",
+    "1014224",
+    "Fazenda Alegre",
+    "Sistema FAL",
+    "Válvula",
+    "Sim",
+    "Sim",
+    "Disponível",
+    "Sim",
+    "Sim",
+    "Sim",
+    "Disponível",
+    "Não",
+    "",
+    "",
+    "",
+    "obs",
+  ]);
 });
 
 Deno.test("row renders empty who-equals for Conforme rows despite statusSince", () => {

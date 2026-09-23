@@ -30,12 +30,31 @@ export function buildPrintReport(
     "Inst.",
     "Tipologia",
     "Categoria",
+    "Agrupamento",
     "Criticidade",
     "Dono",
     "Disponibilidade",
     "Sem Cont. há",
     "Conformidade",
+    "Comentários",
     "Plano",
+    "Origem",
+    "Código Fracttal",
+    "Nome Instalação",
+    "Local Instalação",
+    "Tipologia Equip.",
+    "Elem. em Campo?",
+    "Elem. Operacional?",
+    "Status Operac.",
+    "Possui Plano?",
+    "Plano Cumprido?",
+    "Sem Falha?",
+    "Status Manut.",
+    "Há Conting.?",
+    "Desc. Contingência",
+    "Cód. Evidência",
+    "Desc. Degradação",
+    "Comentários 2",
   ]
     .map((h) =>
       `<th style="background:#1E3A5F;color:#E2E8F0;font-size:8pt;padding:7px 5px;text-align:left;border-bottom:2pt solid #3B82F6;white-space:nowrap;">${
@@ -73,6 +92,7 @@ export function buildPrintReport(
       cell(b.location) +
       cell(b.typology) +
       cell(b.category) +
+      cell(b.grouping) +
       cell(b.criticality) +
       cell(b.owner || "Não informado") +
       `<td style="font-size:7.5pt;padding:5px;border-bottom:1pt solid #E2E8F0;text-align:center;">${
@@ -85,7 +105,25 @@ export function buildPrintReport(
       `<td style="font-size:7.5pt;padding:5px;border-bottom:1pt solid #E2E8F0;text-align:center;">${
         pill(b.compliance, conf)
       }</td>` +
+      cell(b.comments || "-") +
       cell(b.actionPlan || "-") +
+      cell(b.origin || "-") +
+      cell(b.externalCode || "-") +
+      cell(b.locationName || "-") +
+      cell(b.installLocal || "-") +
+      cell(b.equipTypology || "-") +
+      cell(b.fieldInstalled || "-") +
+      cell(b.fieldOperational || "-") +
+      cell(b.opStatus || "-") +
+      cell(b.hasMaintPlan || "-") +
+      cell(b.planFollowed || "-") +
+      cell(b.failureFree || "-") +
+      cell(b.maintStatus || "-") +
+      cell(b.hasContingency || "-") +
+      cell(b.contingencyDesc || "-") +
+      cell(b.evidenceCode || "-") +
+      cell(b.degradationDesc || "-") +
+      cell(b.extraComments || "-") +
       `</tr>`;
   }).join("");
   const eyebrow = companyName

@@ -36,14 +36,34 @@ const HEADERS = [
   "Conformidade",
   "Comentários",
   "Plano de Ação",
+  "Origem",
+  "Código Fracttal",
+  "Nome Instalação",
+  "Local Instalação",
+  "Tipologia Equip.",
+  "Elem. em Campo?",
+  "Elem. Operacional?",
+  "Status Operac.",
+  "Possui Plano?",
+  "Plano Cumprido?",
+  "Sem Falha?",
+  "Status Manut.",
+  "Há Conting.?",
+  "Desc. Contingência",
+  "Cód. Evidência",
+  "Desc. Degradação",
+  "Comentários 2",
 ];
+
+// Brand/KPI/footer rows span the whole table; derived so columns stay in sync.
+const SPAN = HEADERS.length;
 
 // Approx width per character in points at 9pt, plus cell padding.
 const PT_PER_CHAR = 5.5;
 const CELL_PAD_PT = 12;
 // Columns that may hold long free text wrap at this width instead of
 // stretching the table.
-const WRAP_COLS = new Set([11, 12]);
+const WRAP_COLS = new Set([11, 12, 16, 26, 28, 29]);
 const MAX_WRAP_CHARS = 55;
 const MIN_COL_PT = 40;
 const MAX_COL_PT = 320;
@@ -164,22 +184,22 @@ export function exportToExcel(
     }">${escHtml(v)}</td></tr>`;
   }).join("");
   const productRow = companyName
-    ? `<tr><td colspan="13" style="background:#0A1628;color:#93C5FD;font-size:10pt;letter-spacing:.14em;padding:0 12px 4px 12px;">MONITOR DE BARREIRAS DE SEGURANÇA</td></tr>`
+    ? `<tr><td colspan="${SPAN}" style="background:#0A1628;color:#93C5FD;font-size:10pt;letter-spacing:.14em;padding:0 12px 4px 12px;">MONITOR DE BARREIRAS DE SEGURANÇA</td></tr>`
     : "";
   const html =
     `<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel"><head><meta charset="UTF-8"></head><body>` +
     `<table border="0" cellpadding="0" cellspacing="0" style="border-collapse:collapse;table-layout:auto;font-family:Calibri,Arial,sans-serif;"><colgroup>${cols}</colgroup>` +
-    `<tr><td colspan="13" style="background:#0A1628;color:#fff;font-size:16pt;font-weight:bold;padding:12px 12px 2px 12px;white-space:normal;vertical-align:middle;">${
+    `<tr><td colspan="${SPAN}" style="background:#0A1628;color:#fff;font-size:16pt;font-weight:bold;padding:12px 12px 2px 12px;white-space:normal;vertical-align:middle;">${
       escHtml(brand)
     }</td></tr>` +
     productRow +
-    `<tr><td colspan="13" style="background:#0E2036;color:#94A3B8;font-size:9pt;font-style:italic;padding:5px 12px;white-space:normal;vertical-align:middle;">${
+    `<tr><td colspan="${SPAN}" style="background:#0E2036;color:#94A3B8;font-size:9pt;font-style:italic;padding:5px 12px;white-space:normal;vertical-align:middle;">${
       escHtml(subtitle)
     }</td></tr>` +
-    `<tr><td colspan="13" style="background:#3B82F6;font-size:2pt;padding:0;">&nbsp;</td></tr>` +
+    `<tr><td colspan="${SPAN}" style="background:#3B82F6;font-size:2pt;padding:0;">&nbsp;</td></tr>` +
     kpiStrip +
     `<tr>${head}</tr>${body}` +
-    `<tr><td colspan="13" style="color:#94A3B8;font-size:8pt;font-style:italic;padding:6px 4px;">${
+    `<tr><td colspan="${SPAN}" style="color:#94A3B8;font-size:8pt;font-style:italic;padding:6px 4px;">${
       escHtml(
         withBrand(companyName, "Gerado pelo Monitor de Barreiras de Segurança"),
       )
