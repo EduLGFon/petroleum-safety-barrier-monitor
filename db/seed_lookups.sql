@@ -45,7 +45,11 @@ insert into locations (id, code, type, name) values
   (32, 'SM', 'Instalação', 'São Mateus'),
   (33, 'SML', 'Instalação', 'São Mateus Leste'),
   (34, 'TAB', 'Instalação', 'Tabuiaá'),
-  (35, 'UGV''S MÓVEIS - UGVM''S', 'Instalação', null)
+  (35, 'UGV''S MÓVEIS - UGVM''S', 'Instalação', null),
+  -- Appended after the initial sorted load (never renumber existing rows):
+  -- FCN/MAN come from the inventory sheet TOTAL field list.
+  (36, 'FCN', 'Instalação', 'Fazenda Cedro Norte'),
+  (37, 'MAN', 'Instalação', 'Mariricu Norte')
 on conflict (id) do update set
   code = excluded.code,
   type = excluded.type,
