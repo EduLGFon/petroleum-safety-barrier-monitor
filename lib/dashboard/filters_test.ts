@@ -111,3 +111,26 @@ Deno.test("paginate returns empty past the last page", () => {
   assertEquals(paginate([barrier()], 5, 25), []);
   assert(paginate([barrier()], 1, 25).length === 1);
 });
+
+Deno.test("applyFilters splits on action-plan presence", () => {
+  const rows = [
+    barrier({ id: 1, actionPlan: "Trocar junta" }),
+    barrier({ id: 2, actionPlan: "  " }),
+  ];
+  assertStrictEquals(
+    applyFilters(rows, { ...defaultFilters(), plan: "Com plano" }).length,
+    1,
+  );
+  assertStrictEquals(
+    applyFilters(rows, { ...defaultFilters(), plan: "Sem plano" }).length,
+    1,
+  );
+  assertStrictEquals(applyFilters(rows, defaultFilters()).length, 2);
+});
+
+Deno.test("sanitizeFilterPatch keeps plan values, drops unknown ones", () => {
+  assertEquals(sanitizeFilterPatch({ plan: "Sem plano" }), {
+    plan: "Sem plano",
+  });
+  assertEquals(sanitizeFilterPatch({ plan: "Talvez" }), {});
+});

@@ -21,7 +21,8 @@ export function computeKpi(b: Barrier[]): KpiSnapshot {
     other = 0,
     compliant = 0,
     nonCompliant = 0,
-    criticalNonCompliant = 0;
+    criticalNonCompliant = 0,
+    withoutActionPlan = 0;
   for (const x of b) {
     byAvailability[x.availability] = (byAvailability[x.availability] ?? 0) + 1;
     byCompliance[x.compliance] = (byCompliance[x.compliance] ?? 0) + 1;
@@ -58,6 +59,7 @@ export function computeKpi(b: Barrier[]): KpiSnapshot {
       nonCompliant++;
       if (x.criticality === "Crítica") criticalNonCompliant++;
     }
+    if (x.actionPlan.trim() === "") withoutActionPlan++;
   }
   return {
     total: t,
@@ -71,6 +73,7 @@ export function computeKpi(b: Barrier[]): KpiSnapshot {
     compliant,
     nonCompliant,
     criticalNonCompliant,
+    withoutActionPlan,
     pctCompliant: t > 0 ? Math.round(compliant / t * 100) : 0,
     byAvailability,
     byCompliance,

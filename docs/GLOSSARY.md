@@ -36,6 +36,7 @@ listed here exactly, so the codebase does not fork.
 | Local (descrição)           | `locDesc`                        |
 | Comentários                 | `comments`                       |
 | Plano de ação               | `actionPlan` (SQL `action_plan`) |
+| Com plano / Sem plano       | `hasActionPlan` (filter + wire)  |
 | Tipo de instalação          | `type`                           |
 | Usuário                     | `user`                           |
 | Conta (perfil + senha)      | `account`                        |

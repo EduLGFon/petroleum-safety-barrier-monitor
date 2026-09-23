@@ -17,7 +17,12 @@ import {
 
 import { readThrottle, routeClientKey } from "../../../lib/server/throttle.ts";
 
-import { parseDateParam, parseIntParam, parseQueryParam } from "../_params.ts";
+import {
+  parseBooleanParam,
+  parseDateParam,
+  parseIntParam,
+  parseQueryParam,
+} from "../_params.ts";
 
 import { listBarriers } from "../../../lib/server/sql/barriers.ts";
 
@@ -58,6 +63,7 @@ export const handler = define.handlers({
       availabilityId: parseIntParam(sp.get("availabilityId")),
       complianceId: parseIntParam(sp.get("complianceId")),
       categoryId: parseIntParam(sp.get("categoryId")),
+      hasActionPlan: parseBooleanParam(sp.get("hasActionPlan")),
       query: parseQueryParam(sp.get("query")),
       since: parseDateParam(sp.get("since")),
       until: parseDateParam(sp.get("until")),

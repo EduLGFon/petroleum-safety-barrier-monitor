@@ -122,6 +122,16 @@ Deno.test("toWireQuery passes through known ids with pageSize/sort intact", () =
   });
 });
 
+Deno.test("toWireQuery maps plan presence to hasActionPlan", () => {
+  assertEquals(toWireQuery({ plan: "Com plano" }), { hasActionPlan: true });
+  assertEquals(toWireQuery({ plan: "Sem plano" }), { hasActionPlan: false });
+  assertEquals(toWireQuery({ plan: "" }), {});
+  const warnings = collectWarnings(() => {
+    assertEquals(toWireQuery({ plan: "Talvez" }), {});
+  });
+  assertStrictEquals(warnings.length, 1);
+});
+
 Deno.test("toWireQuery uses dynamic id overrides for location and category", () => {
   const q = toWireQuery(
     { location: "SM", category: "Válvula XV" },

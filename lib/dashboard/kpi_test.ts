@@ -79,3 +79,18 @@ Deno.test("computeKpi counts novel availability in other", () => {
   );
   assertStrictEquals(k.byAvailability?.["Em Comissionamento"], 1);
 });
+
+Deno.test("computeKpi counts barriers without an action plan", () => {
+  const k = computeKpi([
+    barrier({ availability: "Disponível", compliance: "Conforme" }),
+    barrier({
+      id: 2,
+      availability: "Degradado",
+      compliance: "Não Conforme",
+      actionPlan: "Trocar junta",
+    }),
+    barrier({ id: 3, actionPlan: "  " }),
+  ]);
+  assertStrictEquals(k.total, 3);
+  assertStrictEquals(k.withoutActionPlan, 2);
+});

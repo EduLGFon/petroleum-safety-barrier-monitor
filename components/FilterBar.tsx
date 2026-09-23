@@ -155,6 +155,12 @@ export function FilterBar(
         placeholder={`Categoria (${catOpts.length})`}
         opts={catOpts}
       />
+      <Sel
+        value={filters.plan}
+        onChange={(v) => onFilter({ plan: v })}
+        placeholder="Plano de ação"
+        opts={["Com plano", "Sem plano"]}
+      />
       <DateBound
         value={filters.since}
         onChange={(v) => onFilter({ since: v })}

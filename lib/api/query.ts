@@ -59,6 +59,9 @@ export function toWireQuery(
       console.warn(`[toWireQuery] unknown category: ${f.category}`);
     } else q.categoryId = id;
   }
+  if (f.plan === "Com plano") q.hasActionPlan = true;
+  else if (f.plan === "Sem plano") q.hasActionPlan = false;
+  else if (f.plan) console.warn(`[toWireQuery] unknown plan: ${f.plan}`);
   if (f.query) q.query = f.query;
   const since = cleanDateParam(f.since);
   if (since) q.since = since;

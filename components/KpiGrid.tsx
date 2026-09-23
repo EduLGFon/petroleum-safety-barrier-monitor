@@ -117,6 +117,14 @@ export function KpiGrid({ kpi, location }: Props) {
       alert: kpi.criticalNonCompliant > 0,
       delay: 250,
     },
+    {
+      label: "Sem plano de ação",
+      rawNum: kpi.withoutActionPlan,
+      sub: "Barreiras sem plano",
+      share: Math.round(kpi.withoutActionPlan / t * 100),
+      alert: kpi.withoutActionPlan > 0,
+      delay: 275,
+    },
     ...((kpi.other ?? 0) > 0
       ? [{
         label: "Outros Status",

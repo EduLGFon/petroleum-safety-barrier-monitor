@@ -49,6 +49,8 @@ export interface WireKpiSnapshot {
   nonCompliant: number;
   pctCompliant: number;
   criticalNonCompliant: number;
+  // Barriers with an empty action_plan (sheet "Possui Plano" signal).
+  withoutActionPlan: number;
   // Dynamic buckets - keyed by numeric id as string (JSON keys are strings),
   // e.g. byAvailability {"0": 12, "6": 3}. resolveKpi translates these to
   // display-string keys. Optional so old servers still parse; when absent the
@@ -77,6 +79,8 @@ export interface BarriersQuery {
   availabilityId?: number;
   complianceId?: number;
   categoryId?: number;
+  // Action-plan presence: true = with plan, false = without.
+  hasActionPlan?: boolean;
   query?: string;
   // Inclusive ISO-date bounds (YYYY-MM-DD) applied to status_since.
   since?: string;

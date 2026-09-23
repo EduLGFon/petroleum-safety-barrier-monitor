@@ -136,6 +136,7 @@ const newStatusRows = applyFilters(data, {
   availability: NEW_DISP,
   compliance: "",
   category: "",
+  plan: "",
   since: "",
   until: "",
   page: 1,

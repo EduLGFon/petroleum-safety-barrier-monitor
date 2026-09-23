@@ -50,6 +50,11 @@ export function buildWhere(
   if (q.categoryId !== undefined) {
     push("and b.category_id = ", q.categoryId);
   }
+  if (q.hasActionPlan === true) {
+    conds.push("and b.action_plan is not null and b.action_plan <> ''");
+  } else if (q.hasActionPlan === false) {
+    conds.push("and (b.action_plan is null or b.action_plan = '')");
+  }
   if (q.query) {
     const lit = `%${escapeLike(q.query)}%`;
     args.push(lit, lit);

@@ -81,6 +81,9 @@ export interface KpiSnapshot {
   nonCompliant: number;
   pctCompliant: number;
   criticalNonCompliant: number;
+  // Barriers without an action plan (sheet "Possui Plano" signal). The plan
+  // text itself stays on Barrier.actionPlan; this count feeds the KPI card.
+  withoutActionPlan: number;
   // Dynamic buckets - the fixed fields above are the well-known fast path,
   // these maps carry EVERY value present in the data (including future ones)
   // so totals always reconcile and new statuses never go missing. Keyed by
@@ -159,6 +162,8 @@ export interface FilterState {
   availability: string;
   compliance: string;
   category: string;
+  // Action-plan presence: "" (all), "Com plano", "Sem plano".
+  plan: string;
   since: string;
   until: string;
   page: number;

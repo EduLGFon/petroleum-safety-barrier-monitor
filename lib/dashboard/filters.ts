@@ -20,6 +20,10 @@ export function applyFilters(b: Barrier[], f: FilterState): Barrier[] {
   }
   if (f.compliance) d = d.filter((x) => x.compliance === f.compliance);
   if (f.category) d = d.filter((x) => x.category === f.category);
+  if (f.plan === "Com plano") d = d.filter((x) => x.actionPlan.trim() !== "");
+  else if (f.plan === "Sem plano") {
+    d = d.filter((x) => x.actionPlan.trim() === "");
+  }
   // ISO dates compare lexicographically; statusSince is YYYY-MM-DD.
   if (f.since) d = d.filter((x) => x.statusSince >= f.since);
   if (f.until) d = d.filter((x) => x.statusSince <= f.until);
@@ -60,6 +64,7 @@ export function defaultFilters(): FilterState {
     availability: "",
     compliance: "",
     category: "",
+    plan: "",
     since: "",
     until: "",
     page: 1,
@@ -97,6 +102,10 @@ export function sanitizeFilterPatch(raw: unknown): Partial<FilterState> {
   if (conf !== undefined) patch.compliance = conf;
   const cat = text(r.category);
   if (cat !== undefined) patch.category = cat;
+  const plan = text(r.plan);
+  if (plan === "Com plano" || plan === "Sem plano" || plan === "") {
+    patch.plan = plan;
+  }
   // ISO date bounds on statusSince; malformed values drop like the rest.
   const date = (v: unknown) => {
     if (typeof v !== "string") return undefined;
