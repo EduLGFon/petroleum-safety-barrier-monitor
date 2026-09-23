@@ -5,6 +5,7 @@ import {
   toAvailabilityId,
   toCategoryId,
   toComplianceId,
+  toCriticalityId,
   toLocationId,
 } from "../enums.ts";
 import type { BarriersQuery } from "../wireTypes.ts";
@@ -62,6 +63,12 @@ export function toWireQuery(
   if (f.plan === "Com plano") q.hasActionPlan = true;
   else if (f.plan === "Sem plano") q.hasActionPlan = false;
   else if (f.plan) console.warn(`[toWireQuery] unknown plan: ${f.plan}`);
+  if (f.criticality) {
+    const id = toCriticalityId(f.criticality as never);
+    if (id === undefined) {
+      console.warn(`[toWireQuery] unknown criticality: ${f.criticality}`);
+    } else q.criticalityId = id;
+  }
   if (f.query) q.query = f.query;
   const since = cleanDateParam(f.since);
   if (since) q.since = since;

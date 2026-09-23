@@ -17,6 +17,7 @@ interface Props {
   availabilities: string[];
   compliances: string[];
   categories: string[];
+  criticalities: string[];
   onFilter: (p: Partial<FilterState>) => void;
   onReset: () => void;
 }
@@ -61,6 +62,7 @@ export function FilterBar(
     availabilities,
     compliances,
     categories,
+    criticalities,
     onFilter,
     onReset,
   }: Props,
@@ -83,6 +85,7 @@ export function FilterBar(
   const dispOpts = availabilities;
   const confOpts = compliances;
   const catOpts = categories;
+  const critOpts = criticalities;
 
   return (
     <div
@@ -154,6 +157,12 @@ export function FilterBar(
         onChange={(v) => onFilter({ category: v })}
         placeholder={`Categoria (${catOpts.length})`}
         opts={catOpts}
+      />
+      <Sel
+        value={filters.criticality}
+        onChange={(v) => onFilter({ criticality: v })}
+        placeholder="Criticidade"
+        opts={critOpts}
       />
       <Sel
         value={filters.plan}

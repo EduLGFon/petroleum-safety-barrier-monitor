@@ -24,6 +24,7 @@ export interface BarriersApi {
       | "availabilityId"
       | "complianceId"
       | "categoryId"
+      | "criticalityId"
       | "hasActionPlan"
       | "query"
       | "since"
@@ -38,6 +39,7 @@ export interface BarriersApi {
       | "availabilityId"
       | "complianceId"
       | "categoryId"
+      | "criticalityId"
       | "hasActionPlan"
       | "query"
       | "since"
@@ -51,6 +53,7 @@ export interface DomainQuery {
   availability?: string; // display string or ''
   compliance?: string;
   category?: string;
+  criticality?: string;
   plan?: string; // '' | 'Com plano' | 'Sem plano'
   query?: string;
   // Inclusive ISO-date bounds (YYYY-MM-DD) on statusSince.

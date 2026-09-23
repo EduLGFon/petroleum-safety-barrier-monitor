@@ -50,6 +50,9 @@ export function buildWhere(
   if (q.categoryId !== undefined) {
     push("and b.category_id = ", q.categoryId);
   }
+  if (q.criticalityId !== undefined) {
+    push("and b.criticality_id = ", q.criticalityId);
+  }
   if (q.hasActionPlan === true) {
     conds.push("and b.action_plan is not null and b.action_plan <> ''");
   } else if (q.hasActionPlan === false) {

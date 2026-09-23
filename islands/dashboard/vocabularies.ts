@@ -20,5 +20,9 @@ export function useDashboardVocabularies(barriers: Barrier[]) {
     () => distinctBy(barriers, (b) => b.category),
     [barriers],
   );
-  return { dispOpts, confOpts, catOpts };
+  const critOpts = useMemo(
+    () => distinctBy(barriers, (b) => b.criticality),
+    [barriers],
+  );
+  return { dispOpts, confOpts, catOpts, critOpts };
 }

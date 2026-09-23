@@ -120,7 +120,7 @@ Full inventory: `barriers`, `barriers/deleted`,
 `barriers/:id`, `barriers/:id/status`, `export`, `kpi`, `chart`, `health`,
 `recipients`, `recipients/:id` (`_params.ts` is only parsers, never a route):
 
-- `GET /api/barriers?locationId=1&availabilityId=4&complianceId=1&categoryId=2&query=FAL&since=2024-01-01&until=2024-12-31&page=1&pageSize=25&sortCol=statusSince&sortDir=desc` →
+- `GET /api/barriers?locationId=1&availabilityId=4&complianceId=1&categoryId=2&criticalityId=1&hasActionPlan=false&query=FAL&since=2024-01-01&until=2024-12-31&page=1&pageSize=25&sortCol=statusSince&sortDir=desc` →
   `BarriersResponse { items: WireBarrier[], total, page, pageSize, totalPages }`
   - `locationId` omitted/`0` = all; `query` matches `tag ILIKE %q% OR loc.code`
     (`\%_` escaped, capped at 200 chars); `since`/`until` = `YYYY-MM-DD` over

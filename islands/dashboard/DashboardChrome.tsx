@@ -36,6 +36,7 @@ interface OverlaysProps {
   locations?: { code: string; name: string; type: string }[];
   availabilities?: string[];
   compliances?: string[];
+  criticalities?: string[];
   categories?: string[];
 }
 
@@ -50,6 +51,7 @@ export function DashboardOverlays(
     locations,
     availabilities,
     compliances,
+    criticalities,
     categories,
   }: OverlaysProps,
 ) {
@@ -63,6 +65,7 @@ export function DashboardOverlays(
         locations={locations}
         availabilities={availabilities}
         compliances={compliances}
+        criticalities={criticalities}
         categories={categories}
       />
     </>

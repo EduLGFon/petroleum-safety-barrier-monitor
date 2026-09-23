@@ -111,6 +111,7 @@ export interface Vocabularies {
   locations: { id: number; code: string; name: string; count: number }[];
   availabilities: string[];
   compliances: string[];
+  criticalities: string[];
   categories: { id: number; label: string }[];
 }
 
@@ -162,6 +163,8 @@ export interface FilterState {
   availability: string;
   compliance: string;
   category: string;
+  // Sheet GERAL Criticidade (all critical in the managed scope).
+  criticality: string;
   // Action-plan presence: "" (all), "Com plano", "Sem plano".
   plan: string;
   since: string;

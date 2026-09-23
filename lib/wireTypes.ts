@@ -79,6 +79,7 @@ export interface BarriersQuery {
   availabilityId?: number;
   complianceId?: number;
   categoryId?: number;
+  criticalityId?: number;
   // Action-plan presence: true = with plan, false = without.
   hasActionPlan?: boolean;
   query?: string;

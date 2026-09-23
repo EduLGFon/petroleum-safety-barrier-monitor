@@ -38,6 +38,9 @@ function matchesQuery(w: WireBarrier, q: BarriersQuery): boolean {
   if (q.categoryId !== undefined && w.categoryId !== q.categoryId) {
     return false;
   }
+  if (
+    q.criticalityId !== undefined && w.criticalityId !== q.criticalityId
+  ) return false;
   if (q.hasActionPlan !== undefined) {
     const has = w.actionPlan.trim() !== "";
     if (has !== q.hasActionPlan) return false;

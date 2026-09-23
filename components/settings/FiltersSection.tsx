@@ -11,10 +11,11 @@ interface Props {
   setDefaultLoc: (l: string) => void;
   // Live vocabularies from the dashboard (server SSR or client dataset).
   // Empty or absent means "no known values yet": the selects offer only
-  // "Todas" instead of stale seed lists.
+  // "Todas" instead of a fixed seed list.
   locations?: { code: string; name: string; type: string }[];
   availabilities?: string[];
   compliances?: string[];
+  criticalities?: string[];
   categories?: string[];
 }
 
@@ -31,6 +32,7 @@ export function FiltersSection(
     locations,
     availabilities,
     compliances,
+    criticalities,
     categories,
   }: Props,
 ) {
@@ -45,6 +47,7 @@ export function FiltersSection(
     : "ALL";
   const dispOpts = availabilities ?? [];
   const confOpts = compliances ?? [];
+  const critOpts = criticalities ?? [];
   const catOpts = categories ?? [];
   const effAvail = dispOpts.includes(
       (settings.defaultFilters as Record<string, string>).availability ?? "",
@@ -60,6 +63,16 @@ export function FiltersSection(
       (settings.defaultFilters as Record<string, string>).category ?? "",
     )
     ? (settings.defaultFilters as Record<string, string>).category as string
+    : "";
+  const effCrit = critOpts.includes(
+      (settings.defaultFilters as Record<string, string>).criticality ?? "",
+    )
+    ? (settings.defaultFilters as Record<string, string>).criticality as string
+    : "";
+  const effPlan = ["Com plano", "Sem plano"].includes(
+      (settings.defaultFilters as Record<string, string>).plan ?? "",
+    )
+    ? (settings.defaultFilters as Record<string, string>).plan as string
     : "";
   return (
     <div
@@ -112,6 +125,18 @@ export function FiltersSection(
           eff: effConf,
         },
         { label: "Categoria", key: "category", opts: catOpts, eff: effCat },
+        {
+          label: "Criticidade",
+          key: "criticality",
+          opts: critOpts,
+          eff: effCrit,
+        },
+        {
+          label: "Plano de ação",
+          key: "plan",
+          opts: ["Com plano", "Sem plano"],
+          eff: effPlan,
+        },
       ].map(({ label, key, opts, eff }) => (
         <div key={key}>
           <FieldLabel>{label}</FieldLabel>

@@ -86,7 +86,9 @@ function ClientView(
   }, []);
 
   const dash = useDashboard(barriers, defaultLocation);
-  const { dispOpts, confOpts, catOpts } = useDashboardVocabularies(barriers);
+  const { dispOpts, confOpts, catOpts, critOpts } = useDashboardVocabularies(
+    barriers,
+  );
 
   return (
     <>
@@ -99,6 +101,7 @@ function ClientView(
         dispOpts={dispOpts}
         confOpts={confOpts}
         catOpts={catOpts}
+        critOpts={critOpts}
         visible={visible}
         loading={loading}
         companyName={companyName}
@@ -168,6 +171,7 @@ function ServerView(
         dispOpts={vocab?.availabilities ?? []}
         confOpts={vocab?.compliances ?? []}
         catOpts={vocab?.categories.map((c) => c.label) ?? []}
+        critOpts={vocab?.criticalities ?? []}
         visible={shown}
         loading={loading}
         companyName={companyName}

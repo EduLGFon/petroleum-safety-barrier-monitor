@@ -1,7 +1,8 @@
 // API: GET /api/kpi - KPI snapshot over the current filters.
 // This is why it exists: Fresh port of the Next route; the snapshot honors
 // the same filter subset as the table (location, availability, compliance,
-// category, text, dates) so the header never disagrees with the grid.
+// category, criticality, action-plan presence, text, dates) so the header
+// never disagrees with the grid.
 // Authenticated GET (session or ADMIN_TOKEN); anonymous gets 404.
 import {
   internal,

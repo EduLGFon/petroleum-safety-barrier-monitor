@@ -49,6 +49,7 @@ interface SectionsProps {
   dispOpts: string[];
   confOpts: string[];
   catOpts: string[];
+  critOpts: string[];
   visible: boolean;
   loading: boolean;
   companyName: string;
@@ -79,6 +80,7 @@ export function DashboardSections(
     dispOpts,
     confOpts,
     catOpts,
+    critOpts,
     visible,
     loading,
     companyName,
@@ -225,6 +227,7 @@ export function DashboardSections(
             availabilities={dispOpts}
             compliances={confOpts}
             categories={catOpts}
+            criticalities={critOpts}
             onFilter={setFilter}
             onReset={resetFilters}
           />
@@ -259,6 +262,7 @@ export function DashboardSections(
         availabilities={dispOpts}
         compliances={confOpts}
         categories={catOpts}
+        criticalities={critOpts}
       />
     </>
   );

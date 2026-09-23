@@ -132,6 +132,14 @@ Deno.test("toWireQuery maps plan presence to hasActionPlan", () => {
   assertStrictEquals(warnings.length, 1);
 });
 
+Deno.test("toWireQuery maps criticality to id, warns on unknown", () => {
+  assertEquals(toWireQuery({ criticality: "Crítica" }), { criticalityId: 1 });
+  const warnings = collectWarnings(() => {
+    assertEquals(toWireQuery({ criticality: "Talvez" }), {});
+  });
+  assertStrictEquals(warnings.length, 1);
+});
+
 Deno.test("toWireQuery uses dynamic id overrides for location and category", () => {
   const q = toWireQuery(
     { location: "SM", category: "Válvula XV" },

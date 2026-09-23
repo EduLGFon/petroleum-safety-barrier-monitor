@@ -134,3 +134,19 @@ Deno.test("sanitizeFilterPatch keeps plan values, drops unknown ones", () => {
   });
   assertEquals(sanitizeFilterPatch({ plan: "Talvez" }), {});
 });
+
+Deno.test("applyFilters matches criticality exactly", () => {
+  const rows = [
+    barrier({ id: 1, criticality: "Crítica" }),
+    barrier({ id: 2, criticality: "Não Crítica" }),
+  ];
+  assertStrictEquals(
+    applyFilters(rows, { ...defaultFilters(), criticality: "Crítica" }).length,
+    1,
+  );
+  assertStrictEquals(
+    applyFilters(rows, { ...defaultFilters(), criticality: "Não Crítica" })
+      .length,
+    1,
+  );
+});

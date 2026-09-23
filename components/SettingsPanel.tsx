@@ -36,6 +36,7 @@ interface Props {
   locations?: { code: string; name: string; type: string }[];
   availabilities?: string[];
   compliances?: string[];
+  criticalities?: string[];
   categories?: string[];
 }
 
@@ -48,6 +49,7 @@ export function SettingsPanel(
     locations,
     availabilities,
     compliances,
+    criticalities,
     categories,
   }: Props,
 ) {
@@ -271,6 +273,7 @@ export function SettingsPanel(
             locations={locations}
             availabilities={availabilities}
             compliances={compliances}
+            criticalities={criticalities}
             categories={categories}
           />
         )}
