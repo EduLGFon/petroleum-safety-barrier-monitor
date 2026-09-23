@@ -440,3 +440,18 @@ export async function getSyncRecentChanges(limit = 8): Promise<SyncChange[]> {
   );
   return merged.slice(0, take);
 }
+
+// recordSyncFailure: persists a failure that happened outside any run
+// (cycle-level shared fetch, boot checks). Without it, pre-run failures
+// leave zero trace and the dashboard shows an ever-aging success as merely
+// "idle" - indistinguishable from a healthy quiet period.
+export async function recordSyncFailure(
+  scope: string,
+  note: string,
+): Promise<void> {
+  await queryRows(
+    `insert into sync_state (scope, status, started_at, finished_at, note)
+     values ($1, 'failed', now(), now(), $2)`,
+    [scope, note.slice(0, 2000)],
+  );
+}

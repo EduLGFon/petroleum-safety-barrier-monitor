@@ -26,6 +26,14 @@ export interface CycleScope<Shared> {
   run: (scope: string, shared: Shared) => Promise<SyncResult>;
 }
 
+// CycleFailure: a cycle-level failure that never reached a run row
+// (shared fetch threw before any scope started).
+export interface CycleFailure {
+  scope: string;
+  startedAt: string;
+  note: string;
+}
+
 export interface CycleOptions<Shared> {
   scopes: Array<CycleScope<Shared>>;
   // fetchShared runs once per cycle (tenant-global signals such as the work
@@ -36,6 +44,10 @@ export interface CycleOptions<Shared> {
   intervalMs: number;
   // cycleScope labels cycle-level failure notes (default "cycle").
   cycleScope?: string;
+  // onCycleFailure persists cycle-level failures (shared fetch) that never
+  // reach a run row, so ops sees them in sync_state instead of an aging
+  // idle. Best-effort: recording failures never break the cadence.
+  onCycleFailure?: (info: CycleFailure) => Promise<void>;
   timers?: TimerSource;
   onLog?: (line: string) => void;
   now?: () => Date;
@@ -82,12 +94,25 @@ export function createCycleLoop<Shared>(
           shared = await opts.fetchShared();
         } catch (err) {
           const note = err instanceof Error ? err.message : String(err);
-          await notifyFailureToAll(opts.notifiers, {
+          const info: CycleFailure = {
             scope: cycleScope,
             startedAt: now().toISOString(),
             note,
-            runId: null,
-          });
+          };
+          await notifyFailureToAll(opts.notifiers, { ...info, runId: null });
+          if (opts.onCycleFailure !== undefined) {
+            try {
+              await opts.onCycleFailure(info);
+            } catch (recordErr) {
+              log(
+                `[cycle] failure record failed: ${
+                  recordErr instanceof Error
+                    ? recordErr.message
+                    : String(recordErr)
+                }`,
+              );
+            }
+          }
           log(`[cycle] shared fetch failed: ${note}`);
           return;
         }

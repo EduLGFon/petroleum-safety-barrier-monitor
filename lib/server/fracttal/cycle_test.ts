@@ -238,3 +238,33 @@ Deno.test("createCycleLoop stop() waits for the in-flight scope", async () => {
   await stopping;
   assertStrictEquals(done.length, 1);
 });
+
+Deno.test("createCycleLoop records shared-fetch failures via onCycleFailure", async () => {
+  const timers = new ManualTimer();
+  const lines: string[] = [];
+  const recorded: { scope: string; note: string }[] = [];
+  const loop = createCycleLoop<string>({
+    scopes: [{
+      scope: "a",
+      run: (s) => Promise.resolve(okResult(s)),
+    }],
+    fetchShared: () => Promise.reject(new Error("wo down")),
+    lock: { isRunning: () => Promise.resolve(false) },
+    notifiers: [],
+    intervalMs: 1000,
+    cycleScope: "test-cycle",
+    onCycleFailure: (info) => {
+      recorded.push({ scope: info.scope, note: info.note });
+      return Promise.resolve();
+    },
+    timers,
+    onLog: (line) => lines.push(line),
+  });
+  loop.start();
+  await timers.fireAll();
+  await flushCycle(lines);
+  await loop.stop();
+  assertStrictEquals(recorded.length, 1);
+  assertStrictEquals(recorded[0]!.scope, "test-cycle");
+  assertStrictEquals(recorded[0]!.note.includes("wo down"), true);
+});

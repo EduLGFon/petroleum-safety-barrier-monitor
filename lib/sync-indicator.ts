@@ -160,6 +160,7 @@ export function formatDuration(startedAt: string, finishedAt: string): string {
 const SCOPE_LABELS: Record<string, string> = {
   "all": "Todas as instalações",
   "fracttal-live:all": "Fracttal - todas as instalações",
+  "fracttal-cycle": "Verificação do ciclo",
   "dump-import": "Importação de arquivo",
 };
 

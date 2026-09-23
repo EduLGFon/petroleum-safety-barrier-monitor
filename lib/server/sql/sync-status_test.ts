@@ -1,6 +1,13 @@
 // Unit tests for the sync status indicator state decision (pure mapper),
 // plus a read-only DB shape check (no writes, so no cleanup needed).
-import { getSyncStatus, type SyncStatusRow, toSyncStatus } from "./sync.ts";
+import {
+  getSyncStatus,
+  recordSyncFailure,
+  type SyncStatusRow,
+  toSyncStatus,
+} from "./sync.ts";
+
+import { queryRows } from "../db.ts";
 
 import { assertStrictEquals } from "jsr:@std/assert@^1";
 
@@ -84,5 +91,25 @@ Deno.test("getSyncStatus returns the indicator shape read-only", async () => {
   if (status.lastRun !== null) {
     assertStrictEquals(typeof status.lastRun.scope, "string");
     assertStrictEquals(typeof status.lastRun.finishedAt, "string");
+  }
+});
+
+Deno.test("recordSyncFailure persists a visible failed row", async () => {
+  if (!Deno.env.get("DATABASE_URL")) {
+    console.log("skip: DATABASE_URL unset - needs a real Postgres");
+    return;
+  }
+  const scope = "test-cycle-probe";
+  try {
+    await recordSyncFailure(scope, "probe failure");
+    const rows = await queryRows<{ status: string; note: string }>(
+      `select status, note from sync_state
+       where scope = $1 order by id desc limit 1`,
+      [scope],
+    );
+    assertStrictEquals(rows[0]?.status, "failed");
+    assertStrictEquals(rows[0]?.note.includes("probe failure"), true);
+  } finally {
+    await queryRows(`delete from sync_state where scope = $1`, [scope]);
   }
 });

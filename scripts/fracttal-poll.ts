@@ -46,6 +46,12 @@ import {
   smtpEmailNotifier,
 } from "../lib/server/fracttal/notify.ts";
 
+import {
+  getSyncStatus,
+  recordSyncFailure,
+  syncScopeRunning,
+} from "../lib/server/sql/sync.ts";
+
 import { OPEN_WORK_ORDER_STATUSES } from "../lib/server/fracttal/barrier-rules.ts";
 
 import { createFracttalClient } from "../lib/server/fracttal/client.ts";
@@ -55,8 +61,6 @@ import type { ItemTypeValue } from "../lib/server/fracttal/itemType.ts";
 import type { OpsNotifier } from "../lib/server/fracttal/notify.ts";
 
 import { createCycleLoop } from "../lib/server/fracttal/cycle.ts";
-
-import { syncScopeRunning } from "../lib/server/sql/sync.ts";
 
 import { runSync } from "../lib/server/fracttal/sync.ts";
 
@@ -101,6 +105,36 @@ function parseFlags(): PollFlags {
     ),
     baseUrl: Deno.env.get("FRACTTAL_BASE_URL") ?? DEFAULT_BASE_URL,
   };
+}
+
+// logLastRunAge: boot visibility for ops - a poller starting after hours
+// of downtime says so upfront instead of leaving the dashboard to imply
+// it. Read-only; a DB outage here warns and still boots the loop.
+async function logLastRunAge(): Promise<void> {
+  try {
+    const status = await getSyncStatus();
+    const iso = status.runningSince ?? status.lastRun?.finishedAt ?? null;
+    if (iso === null) {
+      console.log("[fracttal-poll] no finished sync run on record");
+      return;
+    }
+    const mins = Math.max(
+      0,
+      Math.floor((Date.now() - new Date(iso).getTime()) / 60_000),
+    );
+    const age = mins < 1
+      ? "just now"
+      : mins < 60
+      ? `${mins} min ago`
+      : `${Math.floor(mins / 60)} h ${mins % 60} min ago`;
+    console.log(`[fracttal-poll] last finished run ${age} (${status.state})`);
+  } catch (err) {
+    console.warn(
+      `[fracttal-poll] last-run check failed: ${
+        err instanceof Error ? err.message : String(err)
+      }`,
+    );
+  }
 }
 
 function main(): void {
@@ -199,6 +233,9 @@ function main(): void {
     notifiers,
     intervalMs: flags.seconds * 1000,
     cycleScope: "fracttal-cycle",
+    // Pre-run failures (shared work fetch) persist as failed rows so the
+    // dashboard shows them instead of an ever-aging success.
+    onCycleFailure: (info) => recordSyncFailure(info.scope, info.note),
   });
 
   const stop = async (): Promise<void> => {
@@ -210,6 +247,7 @@ function main(): void {
   Deno.addSignalListener("SIGTERM", () => void stop());
 
   loop.start();
+  void logLastRunAge();
   console.log(
     `[fracttal-poll] sweeping every ${flags.seconds}s ` +
       `(item_type=${flags.itemType}, max_pages=${flags.maxPages}, ` +
