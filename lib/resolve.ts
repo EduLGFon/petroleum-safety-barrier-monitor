@@ -85,6 +85,24 @@ export function resolveBarrier(
     actionPlan: w.actionPlan,
     statusSince: w.statusSince,
     statusHistory: w.statusHistory.map((h) => resolveHistoryEntry(h, labels)),
+    // Sheet inventory columns travel resolved already (free text, no ids).
+    origin: w.origin,
+    externalCode: w.externalCode,
+    locationName: w.locationName,
+    installLocal: w.installLocal,
+    equipTypology: w.equipTypology,
+    fieldInstalled: w.fieldInstalled,
+    fieldOperational: w.fieldOperational,
+    opStatus: w.opStatus,
+    hasMaintPlan: w.hasMaintPlan,
+    planFollowed: w.planFollowed,
+    failureFree: w.failureFree,
+    maintStatus: w.maintStatus,
+    hasContingency: w.hasContingency,
+    contingencyDesc: w.contingencyDesc,
+    evidenceCode: w.evidenceCode,
+    degradationDesc: w.degradationDesc,
+    extraComments: w.extraComments,
   };
 }
 

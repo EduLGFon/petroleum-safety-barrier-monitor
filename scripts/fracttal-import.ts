@@ -53,6 +53,21 @@ const BARRIER_COLS = [
   "action_plan",
   "status_since",
   "external_code",
+  "origin",
+  "install_local",
+  "equip_typology",
+  "field_installed",
+  "field_operational",
+  "op_status",
+  "has_maint_plan",
+  "plan_followed",
+  "failure_free",
+  "maint_status",
+  "has_contingency",
+  "contingency_desc",
+  "evidence_code",
+  "degradation_desc",
+  "extra_comments",
 ] as const;
 
 const HISTORY_COLS = [

@@ -88,6 +88,7 @@ export async function getBarriersByIds(
     const placeholders = chunk.map((_, i) => `$${i + 1}`).join(", ");
     const rows = await queryRows<BarrierRow>(
       `select ${SELECT_COLUMNS} from barriers b
+       join locations loc on loc.id = b.location_id
        ${HISTORY_JOIN}
        where b.id in (${placeholders}) and b.deleted_at is null`,
       chunk,

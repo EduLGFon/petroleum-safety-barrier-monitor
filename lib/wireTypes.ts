@@ -34,6 +34,25 @@ export interface WireBarrier {
   actionPlan: string;
   statusSince: string; // ISO date
   statusHistory: WireStatusHistoryEntry[];
+  // Sheet inventory columns (GERAL). Free text, "" = unset; Fracttal does
+  // not feed them (import writes ""), admins fill them in later.
+  origin: string;
+  externalCode: string;
+  locationName: string;
+  installLocal: string;
+  equipTypology: string;
+  fieldInstalled: string;
+  fieldOperational: string;
+  opStatus: string;
+  hasMaintPlan: string;
+  planFollowed: string;
+  failureFree: string;
+  maintStatus: string;
+  hasContingency: string;
+  contingencyDesc: string;
+  evidenceCode: string;
+  degradationDesc: string;
+  extraComments: string;
 }
 
 export interface WireKpiSnapshot {

@@ -83,6 +83,23 @@ function wireBarrier(over: Partial<WireBarrier> = {}): WireBarrier {
     actionPlan: "calibrar",
     statusSince: "2026-01-01",
     statusHistory: [],
+    origin: "HAZOP: RL-3655.00-1200-98X-SEA-001",
+    externalCode: "1014224",
+    locationName: "Fazenda Alegre",
+    installLocal: "Sistema Combate a Incêndio FAL",
+    equipTypology: "Válvula de Segurança de Pressão",
+    fieldInstalled: "Sim",
+    fieldOperational: "Sim",
+    opStatus: "Disponível",
+    hasMaintPlan: "Sim",
+    planFollowed: "Sim",
+    failureFree: "Sim",
+    maintStatus: "Degradada",
+    hasContingency: "Não",
+    contingencyDesc: "",
+    evidenceCode: "",
+    degradationDesc: "",
+    extraComments: "",
     ...over,
   };
 }
@@ -99,6 +116,24 @@ Deno.test("resolveBarrier maps known ids; compliance is derived, never trusted f
   assertStrictEquals(b.owner, "Operação");
   assertStrictEquals(b.availability, "Degradado");
   assertStrictEquals(b.compliance, "Não Conforme");
+});
+
+Deno.test("resolveBarrier passes sheet inventory columns through", () => {
+  const b = resolveBarrier(wireBarrier());
+  assertStrictEquals(b.origin, "HAZOP: RL-3655.00-1200-98X-SEA-001");
+  assertStrictEquals(b.externalCode, "1014224");
+  assertStrictEquals(b.locationName, "Fazenda Alegre");
+  assertStrictEquals(b.installLocal, "Sistema Combate a Incêndio FAL");
+  assertStrictEquals(b.equipTypology, "Válvula de Segurança de Pressão");
+  assertStrictEquals(b.fieldInstalled, "Sim");
+  assertStrictEquals(b.fieldOperational, "Sim");
+  assertStrictEquals(b.opStatus, "Disponível");
+  assertStrictEquals(b.hasMaintPlan, "Sim");
+  assertStrictEquals(b.planFollowed, "Sim");
+  assertStrictEquals(b.failureFree, "Sim");
+  assertStrictEquals(b.maintStatus, "Degradada");
+  assertStrictEquals(b.hasContingency, "Não");
+  assertStrictEquals(b.extraComments, "");
 });
 
 Deno.test("resolveBarrier maps unknown numeric ids to explicit sentinels", () => {

@@ -56,6 +56,23 @@ function build(): Barrier[] {
           actionPlan: "",
           statusSince: "2026-01-01",
           statusHistory: [],
+          origin: "",
+          externalCode: "",
+          locationName: "",
+          installLocal: "",
+          equipTypology: "",
+          fieldInstalled: "",
+          fieldOperational: "",
+          opStatus: "",
+          hasMaintPlan: "",
+          planFollowed: "",
+          failureFree: "",
+          maintStatus: "",
+          hasContingency: "",
+          contingencyDesc: "",
+          evidenceCode: "",
+          degradationDesc: "",
+          extraComments: "",
         });
       }
     }

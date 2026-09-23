@@ -92,6 +92,25 @@ function asBarrier(e: UnsentAlert): Barrier {
     actionPlan: "",
     statusSince: e.transitionDate,
     statusHistory: [],
+    // Alert payloads carry no sheet columns; digest ordering only needs the
+    // status fields above, so the inventory columns stay unset here.
+    origin: "",
+    externalCode: "",
+    locationName: "",
+    installLocal: "",
+    equipTypology: "",
+    fieldInstalled: "",
+    fieldOperational: "",
+    opStatus: "",
+    hasMaintPlan: "",
+    planFollowed: "",
+    failureFree: "",
+    maintStatus: "",
+    hasContingency: "",
+    contingencyDesc: "",
+    evidenceCode: "",
+    degradationDesc: "",
+    extraComments: "",
   };
 }
 

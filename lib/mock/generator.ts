@@ -7,8 +7,9 @@ import {
   TYPOLOGY_CODES,
 } from "../enums.ts";
 import { ACTION_PLANS, COMMENTS, generateHistory } from "./history.ts";
-import { LOCATION_DIST_BY_ID } from "../constants.ts";
+import { LOCATION_DIST_BY_ID, LOCATIONS } from "../constants.ts";
 import type { WireBarrier } from "../wireTypes.ts";
+import { genSheetFields } from "./sheet-fields.ts";
 import { createRng } from "./rng.ts";
 import { buildTag } from "./tags.ts";
 
@@ -47,6 +48,9 @@ export function getWireBarriers(): WireBarrier[] {
   const barriers: WireBarrier[] = [];
   let id = 1;
 
+  // Seed display names for locationName (server joins locations instead).
+  const locNames = new Map(LOCATIONS.map((l) => [l.code, l.name]));
+
   const catCount = Object.keys(CATEGORY_CODES).length;
   const typCount = Object.keys(TYPOLOGY_CODES).length;
   const grpCount = Object.keys(GROUPING_CODES).length;
@@ -64,6 +68,7 @@ export function getWireBarriers(): WireBarrier[] {
       const hasOwner = rng.bool(0.65);
       const isNC = ![0, 1, 2, 3].includes(availabilityId); // matches isCompliant logic by id
       const hasAction = isNC && rng.bool(0.4);
+      const sheet = genSheetFields(rng);
 
       barriers.push({
         id,
@@ -81,6 +86,11 @@ export function getWireBarriers(): WireBarrier[] {
         actionPlan: hasAction ? rng.pick(ACTION_PLANS) : "",
         statusSince,
         statusHistory: history,
+        // Synthetic Fracttal code (real rows join by external_code instead).
+        externalCode: String(rng.int(100000, 1999999)),
+        // Display name rides from the seed catalog (server joins locations).
+        locationName: locNames.get(locCode) ?? locCode,
+        ...sheet,
       });
       id++;
     }
