@@ -105,7 +105,7 @@ Deno.test("cleanDateParam accepts bare or longer ISO dates, rejects garbage", ()
 Deno.test("toWireQuery passes through known ids with pageSize/sort intact", () => {
   const q = toWireQuery({
     location: "CNC",
-    category: "Detector de H₂S",
+    category: "Detectores Fixos de F&G",
     query: "",
     page: 2,
     pageSize: 50,
@@ -114,7 +114,7 @@ Deno.test("toWireQuery passes through known ids with pageSize/sort intact", () =
   });
   assertEquals(q, {
     locationId: 6,
-    categoryId: 9,
+    categoryId: 4,
     page: 2,
     pageSize: 50,
     sortCol: "statusSince",
@@ -132,10 +132,10 @@ Deno.test("toWireQuery uses dynamic id overrides for location and category", () 
 
 Deno.test("toWireQuery falls back to static enums when overrides omit the value", () => {
   const q = toWireQuery(
-    { location: "FAL", category: "Detector de H₂S" },
+    { location: "FAL", category: "Detectores Fixos de F&G" },
     { locationIds: { SM: 21 }, categoryIds: { "Válvula XV": 33 } },
   );
-  assertEquals(q, { locationId: 1, categoryId: 9 });
+  assertEquals(q, { locationId: 1, categoryId: 4 });
 });
 
 Deno.test("toWireQuery warns on unknown values even with overrides present", () => {
