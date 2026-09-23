@@ -26,12 +26,12 @@ import {
   stationNameOf,
   tagFor,
   toDisplayName,
-  TYPOLOGY_COMPRESSION,
-  TYPOLOGY_MEASUREMENT,
-  TYPOLOGY_OPERATIONS_BASE,
+  TYPOLOGY_FIELD,
   TYPOLOGY_PIPELINE,
-  TYPOLOGY_PLANT,
   TYPOLOGY_STATION,
+  TYPOLOGY_STEAM,
+  TYPOLOGY_SUBSTATION,
+  TYPOLOGY_WELL,
   typologyIdOf,
 } from "./barrier-rules.ts";
 
@@ -112,13 +112,18 @@ Deno.test("toDisplayName keeps pt-BR particles lowercase", () => {
 });
 
 Deno.test("typologyIdOf follows keyword precedence", () => {
-  assertStrictEquals(typologyIdOf("COMPRESSOR A"), TYPOLOGY_COMPRESSION);
-  assertStrictEquals(typologyIdOf("MEDIÇÃO DE FLUIDOS"), TYPOLOGY_MEASUREMENT);
+  assertStrictEquals(typologyIdOf("COMPRESSOR A"), TYPOLOGY_STATION);
+  assertStrictEquals(typologyIdOf("MEDIÇÃO DE FLUIDOS"), TYPOLOGY_STATION);
   assertStrictEquals(typologyIdOf("DUTO DE TRANSFERÊNCIA"), TYPOLOGY_PIPELINE);
-  assertStrictEquals(typologyIdOf("PLANTA DE PROCESSO"), TYPOLOGY_PLANT);
+  assertStrictEquals(typologyIdOf("PLANTA DE PROCESSO"), TYPOLOGY_STATION);
   assertStrictEquals(typologyIdOf("ESTAÇÃO COLETORA"), TYPOLOGY_STATION);
-  assertStrictEquals(typologyIdOf("POÇO QUALQUER"), TYPOLOGY_OPERATIONS_BASE);
-  assertStrictEquals(typologyIdOf(null), TYPOLOGY_OPERATIONS_BASE);
+  assertStrictEquals(
+    typologyIdOf("ESTAÇÃO DE VAPOR DE CANCÃ"),
+    TYPOLOGY_STEAM,
+  );
+  assertStrictEquals(typologyIdOf("SUBESTAÇÃO SE-69kV"), TYPOLOGY_SUBSTATION);
+  assertStrictEquals(typologyIdOf("POÇO QUALQUER"), TYPOLOGY_WELL);
+  assertStrictEquals(typologyIdOf(null), TYPOLOGY_FIELD);
 });
 
 Deno.test("locationTypeOf classifies station codes", () => {

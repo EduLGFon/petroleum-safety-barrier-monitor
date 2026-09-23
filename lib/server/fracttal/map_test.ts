@@ -140,7 +140,7 @@ Deno.test("mapAsset derives typology from the parent chain", () => {
     ctx,
   );
   if (!mapped.ok) throw new Error("expected ok");
-  assertStrictEquals(mapped.input.typologyId, 4);
+  assertStrictEquals(mapped.input.typologyId, 0);
 });
 
 Deno.test("mapAsset maps work events to status plus comments", () => {

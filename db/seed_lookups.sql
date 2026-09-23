@@ -145,28 +145,27 @@ on conflict (id) do update set label = excluded.label;
 insert into groupings (id, label) values
   (0, 'Sistemas de Alívio'),
   (1, 'Evacuação, Resgate e Abandono'),
-  (2, 'Detecção e Monitoramento'),
-  (3, 'Combate a Incêndio'),
-  (4, 'Controle de Processo'),
-  (5, 'Proteção Elétrica')
+  (2, 'Intertravamento de Segurança'),
+  (3, 'Resposta à Emergência da Brigada'),
+  (4, 'Resposta à Emergência da Operação'),
+  (5, 'Sistemas de Proteção Pós Liberação'),
+  (6, 'Controle de Fonte de Ignição'),
+  (7, 'Alarmes Críticos e Intervenção Humana')
 on conflict (id) do update set label = excluded.label;
 
 insert into typologies (id, label) values
   (0, 'Estação Coletora'),
-  (1, 'Planta de Processamento'),
+  (1, 'Campo'),
   (2, 'Duto de Transferência'),
-  (3, 'Base Operacional'),
-  (4, 'Unidade de Compressão'),
-  (5, 'Unidade de Medição')
+  (3, 'Poço (RTSGI)'),
+  (4, 'Estação de Vapor'),
+  (5, 'Subestação')
 on conflict (id) do update set label = excluded.label;
 
 insert into owners (id, label) values
-  (0, 'Equipe de Manutenção'),
-  (1, 'Operação FAL'),
-  (2, 'Engenharia de Processo'),
-  (3, 'Segurança Industrial'),
-  (4, 'Instrumentação'),
-  (5, 'Utilidades')
+  (0, 'Operação'),
+  (1, 'SMS'),
+  (2, 'Manutenção')
 on conflict (id) do update set label = excluded.label;
 
 insert into loc_descs (id, label) values

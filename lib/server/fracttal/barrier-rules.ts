@@ -11,14 +11,17 @@ export const AVAILABILITY_OUT_OF_SERVICE = 1;
 export const AVAILABILITY_DEGRADED = 4;
 export const AVAILABILITY_UNAVAILABLE = 5;
 
-// Typology ids (db/seed_lookups.sql); the derived value wins whenever a
-// parent chain is present, IMPORT_DEFAULTS covers rows without one.
+// Typology ids (db/seed_lookups.sql) mirror the sheet-real installation
+// types (GERAL Tipologia da Instalação); Duto de Transferência is kept for
+// duto parents (real infra in the full asset base, outside the sheet scope).
+// The derived value wins whenever a parent chain is present, IMPORT_DEFAULTS
+// covers rows without one.
 export const TYPOLOGY_STATION = 0;
-export const TYPOLOGY_PLANT = 1;
+export const TYPOLOGY_FIELD = 1;
 export const TYPOLOGY_PIPELINE = 2;
-export const TYPOLOGY_OPERATIONS_BASE = 3;
-export const TYPOLOGY_COMPRESSION = 4;
-export const TYPOLOGY_MEASUREMENT = 5;
+export const TYPOLOGY_WELL = 3;
+export const TYPOLOGY_STEAM = 4;
+export const TYPOLOGY_SUBSTATION = 5;
 
 // Author row + history note stamped on freshly imported barriers.
 export const AUTHOR_IMPORT = 10;
@@ -147,16 +150,21 @@ export function stationNameOf(
 }
 
 // typologyIdOf derives typology from the parent chain by keyword precedence.
+// Substation and steam come first: 'subestação' and 'estação de vapor' both
+// contain the 'estac' stem, so the generic station check must not win over
+// them. Compressor/metering/plant parents are station facilities and map to
+// the station type; anything unrecognized defaults to the field.
 export function typologyIdOf(
   parentDescription: string | null | undefined,
 ): number {
   const text = foldText(parentDescription);
-  if (/compres/.test(text)) return TYPOLOGY_COMPRESSION;
-  if (/medic|medid/.test(text)) return TYPOLOGY_MEASUREMENT;
-  if (/duto|transfer/.test(text)) return TYPOLOGY_PIPELINE;
-  if (/plant|process/.test(text)) return TYPOLOGY_PLANT;
+  if (/subest|se-[0-9]|69\s?kv/.test(text)) return TYPOLOGY_SUBSTATION;
+  if (/vapor|ugv|caldeira/.test(text)) return TYPOLOGY_STEAM;
   if (/estac|coletor/.test(text)) return TYPOLOGY_STATION;
-  return TYPOLOGY_OPERATIONS_BASE;
+  if (/poco|pocos|rtsgi/.test(text)) return TYPOLOGY_WELL;
+  if (/duto|transfer/.test(text)) return TYPOLOGY_PIPELINE;
+  if (/compres|medic|medid|plant|process/.test(text)) return TYPOLOGY_STATION;
+  return TYPOLOGY_FIELD;
 }
 
 // locationTypeOf classifies a station code for the locations table. Labels

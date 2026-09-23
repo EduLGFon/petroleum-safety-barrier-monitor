@@ -18,28 +18,27 @@ export const CATEGORIES = [
 export const GROUPINGS = [
   "Sistemas de Alívio",
   "Evacuação, Resgate e Abandono",
-  "Detecção e Monitoramento",
-  "Combate a Incêndio",
-  "Controle de Processo",
-  "Proteção Elétrica",
+  "Intertravamento de Segurança",
+  "Resposta à Emergência da Brigada",
+  "Resposta à Emergência da Operação",
+  "Sistemas de Proteção Pós Liberação",
+  "Controle de Fonte de Ignição",
+  "Alarmes Críticos e Intervenção Humana",
 ] as const;
 
 export const TYPOLOGIES = [
   "Estação Coletora",
-  "Planta de Processamento",
+  "Campo",
   "Duto de Transferência",
-  "Base Operacional",
-  "Unidade de Compressão",
-  "Unidade de Medição",
+  "Poço (RTSGI)",
+  "Estação de Vapor",
+  "Subestação",
 ] as const;
 
 export const OWNERS = [
-  "Equipe de Manutenção",
-  "Operação FAL",
-  "Engenharia de Processo",
-  "Segurança Industrial",
-  "Instrumentação",
-  "Utilidades",
+  "Operação",
+  "SMS",
+  "Manutenção",
 ] as const;
 
 export const LOC_DESCS = [

@@ -95,7 +95,7 @@ Deno.test("resolveBarrier maps known ids; compliance is derived, never trusted f
   assertStrictEquals(b.criticality, "Crítica");
   assertStrictEquals(b.category, "Válvula de Alívio de Pressão");
   assertStrictEquals(b.grouping, "Sistemas de Alívio");
-  assertStrictEquals(b.owner, "Equipe de Manutenção");
+  assertStrictEquals(b.owner, "Operação");
   assertStrictEquals(b.availability, "Degradado");
   assertStrictEquals(b.compliance, "Não Conforme");
 });

@@ -36,7 +36,7 @@ import type { FracttalAsset } from "./types.ts";
 // is storage-only (NOT NULL FK): Fracttal carries no location text and the
 // UI/exports never display it, so id 0 is a placeholder, not a real place.
 export const IMPORT_DEFAULTS = {
-  typologyId: 3, // 'Base Operacional'
+  typologyId: 1, // 'Campo'
   groupingId: 0, // 'Sistemas de Alívio'
   locDescId: 0, // storage-only placeholder, never displayed
   ownerId: null as number | null,
