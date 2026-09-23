@@ -48,9 +48,10 @@ input[type="search"]::-webkit-search-cancel-button {
    Aurora Executive Dark is the interface identity. The
    --au-* tokens carry it on every theme: dark is the reference,
    light is the same language on a mist canvas, amoled on pure black.
-   The signature gradient/glow derive from --accent/--accent-2/--glow,
-   which follow the user's accent preset at runtime - so theme and color
-   switching visibly re-tints the whole interface. */
+   The signature gradient/glow AND the wallpaper (--au-page/--au-page-base)
+   derive from --accent/--accent-2/--glow, which follow the user's accent
+   preset at runtime - so theme and color switching visibly re-tints the
+   whole interface. */
 [data-theme="light"] {
   --bg-page: #e9eefb;
   --bg-surface: #ffffff;
@@ -80,10 +81,12 @@ input[type="search"]::-webkit-search-cancel-button {
   --alert-nc-border: rgba(220,38,38,.28);
   --alert-nc-text: #b91c1c;
   --alert-nc-sub: #991b1b;
-  /* Aurora identity on light mist */
+  /* Aurora identity on light mist - wallpaper head/mid derive from the
+     live accent preset via color-mix, so switching Cor Predominante
+     re-tints the page gradient (mid uses --accent-2 for two-tone depth). */
   --au-page:
-    radial-gradient(120vmax 120vmin at 20% 0%,#c7d2fe 0%,#e0f2fe 45%,#e9eefb 100%);
-  --au-page-base: #e9eefb;
+    radial-gradient(120vmax 120vmin at 20% 0%,color-mix(in srgb,var(--accent) 26%,white) 0%,color-mix(in srgb,var(--accent-2) 22%,white) 45%,color-mix(in srgb,var(--accent) 8%,#e9eefb) 100%);
+  --au-page-base: color-mix(in srgb,var(--accent) 8%,#e9eefb);
   --au-card: rgba(255,255,255,.78);
   --au-card-border: rgba(15,23,42,.08);
   --au-data: rgba(255,255,255,.68);
@@ -136,10 +139,12 @@ input[type="search"]::-webkit-search-cancel-button {
   --alert-nc-border: rgba(239,68,68,.25);
   --alert-nc-text: #fca5a5;
   --alert-nc-sub: rgba(252,165,165,.65);
-  /* Aurora identity */
+  /* Aurora identity - wallpaper head/mid derive from the live accent
+     preset via color-mix, so switching Cor Predominante re-tints the
+     page gradient (mid uses --accent-2 for two-tone depth). */
   --au-page:
-    radial-gradient(120vmax 120vmin at 20% 0%,#1d2b64 0%,#0a1128 45%,#050a18 100%);
-  --au-page-base: #050a18;
+    radial-gradient(120vmax 120vmin at 20% 0%,color-mix(in srgb,var(--accent) 36%,#0a1128) 0%,color-mix(in srgb,var(--accent-2) 20%,#0a1128) 45%,color-mix(in srgb,var(--accent) 10%,#050a18) 100%);
+  --au-page-base: color-mix(in srgb,var(--accent) 10%,#050a18);
   --au-card: rgba(255,255,255,.06);
   --au-card-border: rgba(255,255,255,.1);
   --au-data: rgba(255,255,255,.04);
@@ -190,9 +195,10 @@ input[type="search"]::-webkit-search-cancel-button {
   --alert-nc-border: rgba(239,68,68,.25);
   --alert-nc-text: #fca5a5;
   --alert-nc-sub: rgba(252,165,165,.65);
-  /* Aurora identity on pure black */
+  /* Aurora identity on pure black - wallpaper head/mid derive from the
+     live accent preset via color-mix; the deep end stays pure black. */
   --au-page:
-    radial-gradient(120vmax 120vmin at 20% 0%,#141b4d 0%,#05070f 45%,#000000 100%);
+    radial-gradient(120vmax 120vmin at 20% 0%,color-mix(in srgb,var(--accent) 32%,#05070f) 0%,color-mix(in srgb,var(--accent-2) 16%,#05070f) 45%,#000000 100%);
   --au-page-base: #000000;
   --au-card: rgba(255,255,255,.06);
   --au-card-border: rgba(255,255,255,.1);
@@ -214,6 +220,26 @@ input[type="search"]::-webkit-search-cancel-button {
   --au-danger-bg: rgba(239,68,68,.15);
   --au-danger-fg: #fca5a5;
   --au-dialog: #050505;
+}
+
+/* Fallback for browsers without color-mix: keep the original aurora
+   wallpaper so the page still paints a gradient instead of nothing. */
+@supports not (color: color-mix(in srgb,red 50%,blue)) {
+  [data-theme="light"] {
+    --au-page:
+      radial-gradient(120vmax 120vmin at 20% 0%,#c7d2fe 0%,#e0f2fe 45%,#e9eefb 100%);
+    --au-page-base: #e9eefb;
+  }
+  [data-theme="dark"] {
+    --au-page:
+      radial-gradient(120vmax 120vmin at 20% 0%,#1d2b64 0%,#0a1128 45%,#050a18 100%);
+    --au-page-base: #050a18;
+  }
+  [data-theme="amoled"] {
+    --au-page:
+      radial-gradient(120vmax 120vmin at 20% 0%,#141b4d 0%,#05070f 45%,#000000 100%);
+    --au-page-base: #000000;
+  }
 }
 
 /* ── Smooth theme/colour transitions ───────────────────────────────────────── */
