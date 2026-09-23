@@ -8,20 +8,35 @@ import {
   UserIcon,
 } from "../ui/Icons.tsx";
 import { CONF_COLORS, CRIT_COLORS, DISP_COLORS } from "../../lib/constants.ts";
-import { daysSince, fmtDate, humanDuration } from "../../lib/utils.ts";
-import { Div, FR, Lbl, Sec, Txt } from "./primitives.tsx";
+import {
+  daysSince,
+  fmtDate,
+  humanDuration,
+  installationLabel,
+} from "../../lib/utils.ts";
+import { Div, FR, Sec, Txt } from "./primitives.tsx";
 import type { Barrier } from "../../lib/types.ts";
 import { Badge } from "../ui/Badge.tsx";
-// BarrierDetails shows metadata grid, inventory sheet columns, current
-// status duration, comments, and action plan.
+// BarrierDetails shows identification, inventory sheet columns, contingency,
+// degradation, status duration, comments, and action plan. Fields pair two-up
+// (instalação já combina código + nome) and the header badges collapse into a
+// single status strip, so the dialog stays dense.
 export function BarrierDetails({ b }: { b: Barrier }) {
   const dc = DISP_COLORS[b.availability],
     cc = CONF_COLORS[b.compliance],
     crc = CRIT_COLORS[b.criticality];
+  // Unknown vocabularies fall back to a neutral pill instead of broken CSS.
+  const neutral = {
+    solid: "#94a3b8",
+    bg: "transparent",
+    border: "var(--border)",
+  };
   // Sheet text or a muted fallback so empty admin-fillable columns read as
   // "not provided" instead of blank space.
   const na = (v: string): string => v || "Não informado";
   const missing = (v: string): boolean => !v;
+  const durDays = b.statusSince ? daysSince(b.statusSince) : 0;
+  const isNC = b.compliance === "Não Conforme";
   return (
     <div style={{ padding: "var(--d-dialog-body)" }}>
       <div
@@ -29,19 +44,16 @@ export function BarrierDetails({ b }: { b: Barrier }) {
           display: "grid",
           gridTemplateColumns: "1fr 1fr",
           gap: "var(--d-details-gap)",
-          marginBottom: "var(--d-block-gap)",
+          marginBottom: "var(--d-stack-sm)",
         }}
       >
-        <FR Icon={BuildingIcon} label="Instalação" value={b.location} />
-        <FR Icon={BuildingIcon} label="Tipologia" value={b.typology} />
-        <FR Icon={LayersIcon} label="Categoria" value={b.category} full />
-        <FR Icon={LayersIcon} label="Agrupamento" value={b.grouping} full />
         <FR
-          Icon={ShieldCheckIcon}
-          label="Criticidade"
-          value={b.criticality}
-          accent={crc?.solid}
+          Icon={BuildingIcon}
+          label="Instalação"
+          value={installationLabel(b.location, b.locationName)}
+          full
         />
+        <FR Icon={BuildingIcon} label="Tipologia" value={b.typology} />
         <FR
           Icon={UserIcon}
           label="Dono"
@@ -49,6 +61,52 @@ export function BarrierDetails({ b }: { b: Barrier }) {
           accent={!b.owner ? "var(--text-muted)" : undefined}
           italic={!b.owner}
         />
+        <FR Icon={LayersIcon} label="Categoria" value={b.category} />
+        <FR Icon={LayersIcon} label="Agrupamento" value={b.grouping} />
+      </div>
+      <div
+        style={{
+          display: "flex",
+          flexWrap: "wrap",
+          alignItems: "center",
+          gap: "var(--d-gap-xs)",
+          padding: "var(--d-row-pad)",
+          background: "var(--bg-elevated)",
+          border: "1px solid var(--border)",
+          borderRadius: "var(--d-row-radius)",
+          marginBottom: "var(--d-block-gap)",
+        }}
+      >
+        <Badge label={b.availability} {...(dc ?? neutral)} size="sm" />
+        <Badge label={b.compliance} {...(cc ?? neutral)} size="sm" />
+        <Badge label={b.criticality} {...(crc ?? neutral)} size="sm" />
+        {b.statusSince && (
+          <span
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: "var(--d-mini-gap)",
+              marginLeft: "auto",
+              fontSize: "var(--d-small)",
+              fontWeight: 600,
+              color: isNC ? "var(--alert-nc-text)" : "var(--text-muted)",
+              whiteSpace: "nowrap",
+            }}
+          >
+            <ClockIcon
+              size={12}
+              color={isNC ? "var(--alert-nc-text)" : "var(--text-muted)"}
+              strokeWidth={2}
+            />
+            {isNC
+              ? `${humanDuration(durDays)} sem contingenciamento · desde ${
+                fmtDate(b.statusSince)
+              }`
+              : `${humanDuration(durDays)} neste status · desde ${
+                fmtDate(b.statusSince)
+              }`}
+          </span>
+        )}
       </div>
       <Div />
       <Sec>Ficha do Inventário</Sec>
@@ -64,7 +122,6 @@ export function BarrierDetails({ b }: { b: Barrier }) {
           Icon={BuildingIcon}
           label="Origem"
           value={na(b.origin)}
-          full
           italic={missing(b.origin)}
         />
         <FR
@@ -74,23 +131,15 @@ export function BarrierDetails({ b }: { b: Barrier }) {
           italic={missing(b.externalCode)}
         />
         <FR
-          Icon={BuildingIcon}
-          label="Nome da Instalação"
-          value={na(b.locationName)}
-          italic={missing(b.locationName)}
-        />
-        <FR
           Icon={LayersIcon}
           label="Local de Instalação"
           value={na(b.installLocal)}
-          full
           italic={missing(b.installLocal)}
         />
         <FR
           Icon={LayersIcon}
           label="Tipologia Equipamento"
           value={na(b.equipTypology)}
-          full
           italic={missing(b.equipTypology)}
         />
         <FR
@@ -154,7 +203,7 @@ export function BarrierDetails({ b }: { b: Barrier }) {
           display: "grid",
           gridTemplateColumns: "1fr 1fr",
           gap: "var(--d-details-gap)",
-          marginBottom: "var(--d-block-gap)",
+          marginBottom: "var(--d-details-gap)",
         }}
       >
         <FR
@@ -180,63 +229,6 @@ export function BarrierDetails({ b }: { b: Barrier }) {
         value={b.degradationDesc || "Sem degradação registrada."}
         muted={!b.degradationDesc}
       />
-      <Div />
-      <Sec>Status Atual</Sec>
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "1fr 1fr",
-          gap: "var(--d-status-gap)",
-          marginBottom: "var(--d-block-gap)",
-        }}
-      >
-        <div>
-          <Lbl>Disponibilidade</Lbl>
-          <Badge label={b.availability} {...dc} />
-        </div>
-        <div>
-          <Lbl>Conformidade</Lbl>
-          <Badge label={b.compliance} {...cc} />
-        </div>
-        {b.statusSince && (
-          <div
-            style={{
-              gridColumn: "1 / -1",
-              display: "flex",
-              alignItems: "center",
-              gap: "var(--d-opt-gap)",
-            }}
-          >
-            <ClockIcon size={14} color="var(--text-muted)" strokeWidth={2} />
-            <div>
-              <div
-                style={{
-                  fontSize: "var(--d-lead)",
-                  fontWeight: 700,
-                  color: b.compliance === "Não Conforme"
-                    ? "var(--alert-nc-text)"
-                    : "var(--text-secondary)",
-                }}
-              >
-                {b.compliance === "Não Conforme"
-                  ? `${
-                    humanDuration(daysSince(b.statusSince))
-                  } sem contingenciamento`
-                  : `${humanDuration(daysSince(b.statusSince))} neste status`}
-              </div>
-              <div
-                style={{
-                  fontSize: "var(--d-small)",
-                  color: "var(--text-muted)",
-                  marginTop: 1,
-                }}
-              >
-                desde {fmtDate(b.statusSince)}
-              </div>
-            </div>
-          </div>
-        )}
-      </div>
       <Div />
       <Sec>Comentários</Sec>
       <Txt

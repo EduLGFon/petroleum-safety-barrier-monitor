@@ -1,16 +1,16 @@
 // Formatters - pt-BR dates, durations, and numbers shared by UI and exports.
-// This is why it exists: one locale policy (SIM_DATE-relative durations,
+// This is why it exists: one locale policy (today-relative durations,
 // DD/MM/YYYY, thousands separators) instead of scattered toLocaleString calls.
-import { SIM_DATE } from "./constants.ts";
 
-// Days from ISO date to SIM_DATE, floored and clamped at 0 so future dates
+// Days from ISO date to today, floored and clamped at 0 so future dates
 // never go negative; malformed input yields 0 instead of NaN downstream.
-export function daysSince(d: string): number {
+// The optional nowMs (default Date.now()) keeps it deterministic in tests.
+export function daysSince(d: string, nowMs: number = Date.now()): number {
   const ms = new Date(d).getTime();
   if (!Number.isFinite(ms)) return 0;
   return Math.max(
     0,
-    Math.floor((SIM_DATE.getTime() - ms) / 86_400_000),
+    Math.floor((nowMs - ms) / 86_400_000),
   );
 }
 
@@ -34,6 +34,15 @@ export function fmtDate(iso: string): string {
   if (!/^\d{4}-\d{2}-\d{2}/.test(iso)) return iso;
   const [y, m, d] = iso.split("-");
   return `${d}/${m}/${y}`;
+}
+
+// Combines station code + display name ("FAL - Fazenda Alegre"); bare code
+// when the name is missing or just repeats the code.
+export function installationLabel(code: string, name: string): string {
+  const n = name.trim();
+  if (!code) return n;
+  if (!n || n === code) return code;
+  return `${code} - ${n}`;
 }
 // Formats number with pt-BR thousands separator.
 export function fmt(n: number): string {

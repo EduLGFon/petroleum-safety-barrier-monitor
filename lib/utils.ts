@@ -16,6 +16,7 @@ export {
   fmt,
   fmtDate,
   humanDuration,
+  installationLabel,
   pct,
   timeAgoPt,
 } from "./format.ts";

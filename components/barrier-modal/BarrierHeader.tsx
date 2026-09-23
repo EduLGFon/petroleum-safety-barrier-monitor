@@ -1,18 +1,17 @@
-// BarrierHeader - header/badges/NC alert part for the barrier dialog.
-// Why: isolates title/badges/NC alert so the shell Content stays small.
+// BarrierHeader - slim title bar + NC alert for the barrier dialog.
+// Why: isolates the title/alert so the shell Content stays small. Badges and
+// the big tag title live in the Details tab status strip instead.
 import { AlertTriangleIcon, CloseIcon, TagIcon } from "../ui/Icons.tsx";
-import { CONF_COLORS, CRIT_COLORS, DISP_COLORS } from "../../lib/constants.ts";
+import { DISP_COLORS } from "../../lib/constants.ts";
 import { daysSince, fmtDate, humanDuration } from "../../lib/utils.ts";
 import type { Barrier } from "../../lib/types.ts";
-import { Badge } from "../ui/Badge.tsx";
-// BarrierHeader renders title/badges and NC alert with days-since logic.
-// Takes barrier + close handler; tab switching lives in the shell Content.
+// BarrierHeader renders the slim "Barreira #id · tag" bar and NC alert with
+// days-since logic. Takes barrier + close handler; tab switching lives in
+// the shell Content.
 export function BarrierHeader(
   { b, onClose }: { b: Barrier; onClose: () => void },
 ) {
-  const dc = DISP_COLORS[b.availability],
-    cc = CONF_COLORS[b.compliance],
-    crc = CRIT_COLORS[b.criticality];
+  const dc = DISP_COLORS[b.availability];
   const isNC = b.compliance === "Não Conforme";
   const ncDays = isNC && b.statusSince ? daysSince(b.statusSince) : 0;
   return (
@@ -59,44 +58,35 @@ export function BarrierHeader(
           style={{
             display: "flex",
             justifyContent: "space-between",
-            alignItems: "flex-start",
+            alignItems: "center",
             gap: "var(--d-gap)",
           }}
         >
-          <div style={{ minWidth: 0, flex: 1 }}>
-            <div
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: "var(--d-gap-xs)",
+              minWidth: 0,
+              flex: 1,
+            }}
+          >
+            <TagIcon size={11} color="var(--text-muted)" strokeWidth={2} />
+            <span
               style={{
-                display: "flex",
-                alignItems: "center",
-                gap: "var(--d-gap-xs)",
-                marginBottom: "var(--d-gap-xs)",
+                fontSize: "var(--d-caption)",
+                fontWeight: 700,
+                letterSpacing: "0.12em",
+                textTransform: "uppercase",
+                color: "var(--text-muted)",
+                whiteSpace: "nowrap",
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+                minWidth: 0,
               }}
             >
-              <TagIcon size={11} color="var(--text-muted)" strokeWidth={2} />
-              <span
-                style={{
-                  fontSize: "var(--d-caption)",
-                  fontWeight: 700,
-                  letterSpacing: "0.12em",
-                  textTransform: "uppercase",
-                  color: "var(--text-muted)",
-                }}
-              >
-                Barreira #{b.id} · {b.location}
-              </span>
-            </div>
-            <div
-              style={{
-                fontFamily: "var(--font-mono)",
-                fontSize: "var(--d-dialog-title)",
-                fontWeight: 600,
-                color: "var(--text-primary)",
-                wordBreak: "break-all",
-                lineHeight: 1.2,
-              }}
-            >
-              {b.tag}
-            </div>
+              Barreira #{b.id} · {b.tag}
+            </span>
           </div>
           <button
             type="button"
@@ -117,18 +107,6 @@ export function BarrierHeader(
           >
             <CloseIcon size={14} color="var(--text-muted)" strokeWidth={2.5} />
           </button>
-        </div>
-        <div
-          style={{
-            display: "flex",
-            gap: "var(--d-gap-xs)",
-            marginTop: "var(--d-stack)",
-            flexWrap: "wrap",
-          }}
-        >
-          <Badge label={b.availability} {...dc} />
-          <Badge label={b.compliance} {...cc} />
-          <Badge label={b.criticality} {...crc} size="sm" />
         </div>
         {isNC && b.statusSince && (
           <div

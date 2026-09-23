@@ -131,7 +131,7 @@ export function BarrierModal({ barrier, onClose }: Props) {
     </>
   );
 }
-// Content renders header/badges, NC alert with days-since logic, and Details/History tab switch.
+// Content renders header, NC alert with days-since logic, and Details/History tab switch.
 function Content(
   { b, onClose, tab, setTab }: {
     b: Barrier;

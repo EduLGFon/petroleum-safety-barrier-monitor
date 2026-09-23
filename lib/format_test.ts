@@ -1,5 +1,11 @@
 // Unit tests for lib/format.ts - pt-BR date/duration guards.
-import { daysSince, fmtDate, humanDuration, timeAgoPt } from "./format.ts";
+import {
+  daysSince,
+  fmtDate,
+  humanDuration,
+  installationLabel,
+  timeAgoPt,
+} from "./format.ts";
 
 import { assert, assertStrictEquals } from "jsr:@std/assert@^1";
 
@@ -29,6 +35,26 @@ Deno.test("daysSince clamps invalid and future dates to zero", () => {
   assertStrictEquals(daysSince("garbage"), 0);
   assertStrictEquals(daysSince("2999-01-01"), 0);
   assert(daysSince("2026-06-21") >= 1);
+});
+
+Deno.test("daysSince measures against today, not a frozen reference", () => {
+  // Old dates must yield their real span (the frozen-date bug collapsed
+  // every recent status to 0 days -> "1 dia").
+  assert(daysSince("2020-01-01") > 365);
+  const now = new Date("2026-09-23T12:00:00.000Z").getTime();
+  assertStrictEquals(daysSince("2026-09-11", now), 12);
+  assertStrictEquals(daysSince("2026-09-23", now), 0);
+  assertStrictEquals(daysSince("2026-09-24", now), 0);
+});
+
+Deno.test("installationLabel joins code and name", () => {
+  assertStrictEquals(
+    installationLabel("FAL", "Fazenda Alegre"),
+    "FAL - Fazenda Alegre",
+  );
+  assertStrictEquals(installationLabel("FAL", ""), "FAL");
+  assertStrictEquals(installationLabel("FAL", "FAL"), "FAL");
+  assertStrictEquals(installationLabel("", "Fazenda Alegre"), "Fazenda Alegre");
 });
 
 Deno.test("timeAgoPt renders pt-BR relative freshness", () => {
