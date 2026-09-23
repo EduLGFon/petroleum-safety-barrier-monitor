@@ -18,7 +18,7 @@ import { kpiStats } from "./summary.ts";
 
 const REPORT_ID = "print-report";
 
-// Returns the landscape print-report HTML string (KPI chips + 9-col table); pure, no DOM side effects.
+// Returns the landscape print-report HTML string (KPI chips + 11-col table); pure, no DOM side effects.
 export function buildPrintReport(
   barriers: Barrier[],
   companyName = "",
@@ -28,8 +28,10 @@ export function buildPrintReport(
     "#",
     "TAG",
     "Inst.",
+    "Tipologia",
     "Categoria",
     "Criticidade",
+    "Dono",
     "Disponibilidade",
     "Sem Cont. há",
     "Conformidade",
@@ -69,8 +71,10 @@ export function buildPrintReport(
       cell(String(b.id), "text-align:right;color:#64748B;") +
       cell(b.tag, "font-family:Courier,monospace;font-weight:bold;") +
       cell(b.location) +
+      cell(b.typology) +
       cell(b.category) +
       cell(b.criticality) +
+      cell(b.owner || "Não informado") +
       `<td style="font-size:7.5pt;padding:5px;border-bottom:1pt solid #E2E8F0;text-align:center;">${
         pill(b.availability, disp)
       }</td>` +
