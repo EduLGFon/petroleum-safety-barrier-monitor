@@ -129,3 +129,39 @@ Deno.test("token cache rejects a missing access_token", async () => {
   }
   assertStrictEquals(caught?.message.includes("access_token"), true);
 });
+
+Deno.test("token cache falls back to client_credentials on refresh failure", async () => {
+  let now = 1_000_000;
+  const granted: string[] = [];
+  const cache = createTokenCache({
+    fetchToken: (b) => {
+      const grant = b.get("grant_type") ?? "?";
+      granted.push(grant);
+      if (grant === "refresh_token") {
+        return Promise.reject(new Error("[fracttal] token error 400"));
+      }
+      return Promise.resolve(tokenBody("client_credentials"));
+    },
+    creds,
+    now: () => now,
+  });
+  await cache.get();
+  now += 7200_000 + 1; // past expiry: refresh grant fails once...
+  assertStrictEquals(await cache.get(), "tok-client_credentials");
+  // ...and the stale refresh token is dropped, so the next expiry goes
+  // straight to client_credentials instead of retrying the dead grant.
+  assertEquals(granted, [
+    "client_credentials",
+    "refresh_token",
+    "client_credentials",
+  ]);
+  now += 7200_000 + 1;
+  await cache.get();
+  assertEquals(granted, [
+    "client_credentials",
+    "refresh_token",
+    "client_credentials",
+    "refresh_token",
+    "client_credentials",
+  ]);
+});

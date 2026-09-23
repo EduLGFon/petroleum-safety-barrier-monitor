@@ -68,6 +68,8 @@ normalizes `data: []` when missing. Neo limits: every query returns at most
   `FRACTTAL_RATE_PER_MIN` (default 150/min, safe under either window
   semantics) and treats 406/429/5xx with backoff as the server-side net.
 - Token life: 2h (`expires_in: 7200`), cached and refreshed once on `401`.
+  A dead `refresh_token` grant falls back to `client_credentials` (and drops
+  the stale refresh token) so one bad refresh can never wedge later cycles.
   Whether token calls share the 200/min budget is undocumented; the bucket
   margin covers it either way.
 

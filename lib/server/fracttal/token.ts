@@ -62,7 +62,18 @@ export function createTokenCache(
     if (grant === "refresh_token" && refresh !== undefined) {
       body.set("refresh_token", refresh);
     }
-    const token = await fetchToken(body, creds);
+    let token: FracttalToken;
+    try {
+      token = await fetchToken(body, creds);
+    } catch (err) {
+      if (grant !== "refresh_token") throw err;
+      // A dead refresh grant (unsupported or expired) must not wedge the
+      // cache: the stored refresh token stays broken, so every later get()
+      // would retry the same failing grant forever. Drop it and retry once
+      // from client_credentials while the key/secret stay valid.
+      current = null;
+      return acquire("client_credentials");
+    }
     if (typeof token.access_token !== "string" || token.access_token === "") {
       throw new Error("[fracttal] token response missing access_token");
     }

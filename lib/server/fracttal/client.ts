@@ -228,7 +228,20 @@ export function createFracttalClient(
         },
         body: body.toString(),
       });
-      if (!res.ok) throw new Error(`[fracttal] token error ${res.status}`);
+      if (!res.ok) {
+        // Keep the upstream body (truncated): a bare status cannot tell
+        // invalid_client from unsupported_grant_type, and ops needs that
+        // distinction to know whether to rotate keys or fix the grant.
+        let detail = "";
+        try {
+          detail = (await res.text()).slice(0, 300);
+        } catch {
+          // Body already consumed or unreadable; status alone still reports.
+        }
+        throw new Error(
+          `[fracttal] token error ${res.status}${detail ? `: ${detail}` : ""}`,
+        );
+      }
       return await res.json() as FracttalToken;
     },
     creds: credentials,
