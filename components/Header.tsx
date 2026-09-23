@@ -9,13 +9,15 @@ import {
   toHealthKind,
 } from "../lib/sync-indicator.ts";
 
-import { type Conn, useConnection } from "../hooks/useConnection.ts";
-
-import { AURORA, AURORA_TYPE } from "../lib/aurora.ts";
-
 import type { AuthUser, SyncChange, SyncStatus } from "../lib/types.ts";
 
+import { type Conn, useConnection } from "../hooks/useConnection.ts";
+
+import { SyncDetailsModal } from "./header/SyncDetailsModal.tsx";
+
 import { SyncHoverCard } from "./header/SyncHoverCard.tsx";
+
+import { AURORA, AURORA_TYPE } from "../lib/aurora.ts";
 
 import { HealthDot } from "./header/HealthDot.tsx";
 
@@ -84,7 +86,8 @@ async function logoutToLogin(): Promise<void> {
 
 // Header: title + merged health dot plus sync subtitle on the left,
 // settings gear on the right. Hovering or focusing the title block opens
-// the full sync audit card (touch toggles it with a tap).
+// the summary card (touch toggles it with a tap); its button opens the
+// full details dialog.
 export function Header(
   {
     onOpenSettings,
@@ -100,6 +103,12 @@ export function Header(
     : "/api/health";
   const conn = useConnection(healthUrl);
   const [syncOpen, setSyncOpen] = useState(false);
+  const [detailsOpen, setDetailsOpen] = useState(false);
+  // Opening the dialog dismisses the hover card so the two never stack.
+  const openDetails = (): void => {
+    setSyncOpen(false);
+    setDetailsOpen(true);
+  };
   const kind = toHealthKind(syncStatus, conn);
   const instantIso = syncStatus?.runningSince ??
     syncStatus?.lastRun?.finishedAt ?? null;
@@ -110,152 +119,168 @@ export function Header(
       instant ? ` ${instant.dateTime}` : ""
     }`;
   return (
-    <header
-      style={{
-        display: "flex",
-        justifyContent: "space-between",
-        alignItems: "center",
-        gap: 12,
-        flexWrap: "wrap",
-        marginBottom: "var(--d-section)",
-        animation: "cardAppear .35s var(--ease-out) both",
-        // Lifted above the dashboard sections below (slideUp entrances and
-        // glass surfaces paint over the hover card otherwise). Stays below
-        // the chart tooltip (2000) and all overlays (990+).
-        position: "relative",
-        zIndex: 30,
-      }}
-    >
-      <div
-        onMouseEnter={() => setSyncOpen(true)}
-        onMouseLeave={() => setSyncOpen(false)}
-        onFocus={() => setSyncOpen(true)}
-        onBlur={() => setSyncOpen(false)}
-        onClick={() => setSyncOpen((v) => !v)}
-        tabIndex={syncStatus === null ? undefined : 0}
-        style={{ position: "relative", outline: "none" }}
+    <>
+      <header
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          gap: 12,
+          flexWrap: "wrap",
+          marginBottom: "var(--d-section)",
+          animation: "cardAppear .35s var(--ease-out) both",
+          // Lifted above the dashboard sections below (slideUp entrances and
+          // glass surfaces paint over the hover card otherwise). Stays below
+          // the chart tooltip (2000) and all overlays (990+).
+          position: "relative",
+          zIndex: 30,
+        }}
       >
-        {companyName && (
+        <div
+          onMouseEnter={() => setSyncOpen(true)}
+          onMouseLeave={() => setSyncOpen(false)}
+          onFocus={() => setSyncOpen(true)}
+          onBlur={() => setSyncOpen(false)}
+          onClick={() => setSyncOpen((v) => !v)}
+          tabIndex={syncStatus === null ? undefined : 0}
+          style={{ position: "relative", outline: "none" }}
+        >
+          {companyName && (
+            <div
+              style={{
+                fontFamily: "var(--font-sans)",
+                fontSize: AURORA_TYPE.eyebrow.fontSize,
+                letterSpacing: AURORA_TYPE.eyebrow.letterSpacing,
+                fontWeight: AURORA_TYPE.eyebrow.fontWeight,
+                color: AURORA.eyebrow,
+              }}
+            >
+              {companyName.toUpperCase()}
+            </div>
+          )}
           <div
             style={{
-              fontFamily: "var(--font-sans)",
-              fontSize: AURORA_TYPE.eyebrow.fontSize,
-              letterSpacing: AURORA_TYPE.eyebrow.letterSpacing,
-              fontWeight: AURORA_TYPE.eyebrow.fontWeight,
-              color: AURORA.eyebrow,
-            }}
-          >
-            {companyName.toUpperCase()}
-          </div>
-        )}
-        <div
-          style={{
-            fontFamily: "var(--font-display)",
-            fontSize: AURORA_TYPE.hero.fontSize,
-            fontWeight: AURORA_TYPE.hero.fontWeight,
-            letterSpacing: AURORA_TYPE.hero.letterSpacing,
-            color: AURORA.value,
-            display: "flex",
-            alignItems: "center",
-            gap: 10,
-          }}
-        >
-          Monitor de Barreiras
-          <HealthDot
-            conn={conn}
-            kind={syncStatus === null && conn === "connected" ? "synced" : kind}
-            label={dotLabel}
-          />
-        </div>
-        <SyncLine sync={syncStatus} conn={conn} />
-        {syncOpen && syncStatus !== null && (
-          <SyncHoverCard sync={syncStatus} conn={conn} changes={syncChanges} />
-        )}
-      </div>
-      <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-        {sessionUser && (
-          <span
-            className="glass-pill"
-            title={sessionUser.email}
-            style={{
+              fontFamily: "var(--font-display)",
+              fontSize: AURORA_TYPE.hero.fontSize,
+              fontWeight: AURORA_TYPE.hero.fontWeight,
+              letterSpacing: AURORA_TYPE.hero.letterSpacing,
+              color: AURORA.value,
               display: "flex",
               alignItems: "center",
-              gap: 8,
-              padding: "0 6px 0 12px",
+              gap: 10,
+            }}
+          >
+            Monitor de Barreiras
+            <HealthDot
+              conn={conn}
+              kind={syncStatus === null && conn === "connected"
+                ? "synced"
+                : kind}
+              label={dotLabel}
+            />
+          </div>
+          <SyncLine sync={syncStatus} conn={conn} />
+          {syncOpen && syncStatus !== null && (
+            <SyncHoverCard
+              sync={syncStatus}
+              conn={conn}
+              onOpenDetails={openDetails}
+            />
+          )}
+        </div>
+        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+          {sessionUser && (
+            <span
+              className="glass-pill"
+              title={sessionUser.email}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 8,
+                padding: "0 6px 0 12px",
+                height: 32,
+                background: AURORA.pill,
+                border: `1px solid ${AURORA.pillBorder}`,
+                borderRadius: 99,
+                color: AURORA.pillText,
+                fontSize: 12,
+                maxWidth: 260,
+              }}
+            >
+              <span
+                style={{
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
+                  whiteSpace: "nowrap",
+                }}
+              >
+                {sessionUser.email}
+              </span>
+              <span
+                style={{
+                  fontSize: 10,
+                  fontWeight: 700,
+                  letterSpacing: ".08em",
+                  textTransform: "uppercase",
+                  background: AURORA.grad,
+                  color: "#fff",
+                  borderRadius: 99,
+                  padding: "2px 8px",
+                  flexShrink: 0,
+                }}
+              >
+                {sessionUser.role === "admin" ? "Admin" : "Usuário"}
+              </span>
+              <button
+                type="button"
+                onClick={() => void logoutToLogin()}
+                title="Sair"
+                style={{
+                  border: 0,
+                  background: "transparent",
+                  color: AURORA.pillText,
+                  fontSize: 12,
+                  fontWeight: 600,
+                  cursor: "pointer",
+                  padding: "4px 6px",
+                  flexShrink: 0,
+                }}
+              >
+                Sair
+              </button>
+            </span>
+          )}
+          <button
+            type="button"
+            onClick={onOpenSettings}
+            className="glass-pill lift"
+            title="Configurações"
+            aria-label="Configurações"
+            style={{
+              width: 32,
               height: 32,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
               background: AURORA.pill,
               border: `1px solid ${AURORA.pillBorder}`,
               borderRadius: 99,
               color: AURORA.pillText,
-              fontSize: 12,
-              maxWidth: 260,
+              cursor: "pointer",
             }}
           >
-            <span
-              style={{
-                overflow: "hidden",
-                textOverflow: "ellipsis",
-                whiteSpace: "nowrap",
-              }}
-            >
-              {sessionUser.email}
-            </span>
-            <span
-              style={{
-                fontSize: 10,
-                fontWeight: 700,
-                letterSpacing: ".08em",
-                textTransform: "uppercase",
-                background: AURORA.grad,
-                color: "#fff",
-                borderRadius: 99,
-                padding: "2px 8px",
-                flexShrink: 0,
-              }}
-            >
-              {sessionUser.role === "admin" ? "Admin" : "Usuário"}
-            </span>
-            <button
-              type="button"
-              onClick={() => void logoutToLogin()}
-              title="Sair"
-              style={{
-                border: 0,
-                background: "transparent",
-                color: AURORA.pillText,
-                fontSize: 12,
-                fontWeight: 600,
-                cursor: "pointer",
-                padding: "4px 6px",
-                flexShrink: 0,
-              }}
-            >
-              Sair
-            </button>
-          </span>
-        )}
-        <button
-          type="button"
-          onClick={onOpenSettings}
-          className="glass-pill lift"
-          title="Configurações"
-          aria-label="Configurações"
-          style={{
-            width: 32,
-            height: 32,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            background: AURORA.pill,
-            border: `1px solid ${AURORA.pillBorder}`,
-            borderRadius: 99,
-            color: AURORA.pillText,
-            cursor: "pointer",
-          }}
-        >
-          <GearIcon />
-        </button>
-      </div>
-    </header>
+            <GearIcon />
+          </button>
+        </div>
+      </header>
+      {detailsOpen && syncStatus !== null && (
+        <SyncDetailsModal
+          sync={syncStatus}
+          conn={conn}
+          changes={syncChanges}
+          onClose={() => setDetailsOpen(false)}
+        />
+      )}
+    </>
   );
 }
