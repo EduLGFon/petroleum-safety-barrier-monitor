@@ -98,6 +98,25 @@ create table if not exists barriers (
   comments           text        not null default '',
   action_plan        text        not null default '',
 
+  -- Sheet inventory columns (GERAL), admin-fillable. Fracttal does not feed
+  -- them (null = "não informado"); the import writes nulls, later syncs and
+  -- admin edits fill them in. All free text, never FKs.
+  origin             text,                  -- Origem (HAZOP/APR reference)
+  install_local      text,                  -- Local de Instalação
+  equip_typology     text,                  -- Tipologia Equipamento
+  field_installed    text,                  -- Elemento Instalado em Campo? (Sim/Não)
+  field_operational  text,                  -- Elemento Encontra-se Operacional? (Sim/Não)
+  op_status          text,                  -- Status de Disponibilidade (Operacional)
+  has_maint_plan     text,                  -- Possui Plano de Manutenção? (Sim/Não/Verificar)
+  plan_followed      text,                  -- Plano de Manutenção Sendo Cumprido? (Sim/Não/Verificar)
+  failure_free       text,                  -- Ausência de Falha ou Defeito? (Sim/Não/Verificar)
+  maint_status       text,                  -- Status de Disponibilidade (Manutenção)
+  has_contingency    text,                  -- Há Contingência? (Sim/Não)
+  contingency_desc   text,                  -- Descrição da Contingência
+  evidence_code      text,                  -- Código da Evidência
+  degradation_desc   text,                  -- Descrição da Degradação/indisponibilidade
+  extra_comments     text,                  -- Comentários2
+
   status_since       date        not null default current_date,
 
   -- Provenance + soft delete (Fracttal sync, P3). external_code is the
@@ -112,6 +131,24 @@ create table if not exists barriers (
 
 create index if not exists idx_barriers_external_code on barriers(external_code);
 create index if not exists idx_barriers_deleted_at on barriers(deleted_at);
+
+-- Later-added sheet columns ride along idempotently (same pattern as
+-- locations.name above) so existing databases gain them on next migrate.
+alter table barriers add column if not exists origin text;
+alter table barriers add column if not exists install_local text;
+alter table barriers add column if not exists equip_typology text;
+alter table barriers add column if not exists field_installed text;
+alter table barriers add column if not exists field_operational text;
+alter table barriers add column if not exists op_status text;
+alter table barriers add column if not exists has_maint_plan text;
+alter table barriers add column if not exists plan_followed text;
+alter table barriers add column if not exists failure_free text;
+alter table barriers add column if not exists maint_status text;
+alter table barriers add column if not exists has_contingency text;
+alter table barriers add column if not exists contingency_desc text;
+alter table barriers add column if not exists evidence_code text;
+alter table barriers add column if not exists degradation_desc text;
+alter table barriers add column if not exists extra_comments text;
 
 create or replace function barriers_set_compliance() returns trigger as $$
 begin
