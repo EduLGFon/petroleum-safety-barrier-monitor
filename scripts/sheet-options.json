@@ -1,0 +1,1489 @@
+{
+  "generatedAt": "2026-09-23T03:36:08.409Z",
+  "source": "test/inventory.xlsx#GERAL",
+  "dataRows": 3061,
+  "fields": {
+    "origin": {
+      "header": ",",
+      "total": 3061,
+      "blank": 746,
+      "uniqueRaw": 22,
+      "canonical": [
+        {
+          "value": "Gerenciamento das Barreiras de Segurança Operacional: SGSO-PG-0016",
+          "count": 1718,
+          "foldedVariants": []
+        },
+        {
+          "value": "HAZOP: RL-3655.00-1200-98X-SEA-001",
+          "count": 285,
+          "foldedVariants": []
+        },
+        {
+          "value": "HAZOP: RL-3680.00-1253-98X-SEA-001",
+          "count": 76,
+          "foldedVariants": []
+        },
+        {
+          "value": "HAZOP: RL-3656.01-1221-98G-SEA-001",
+          "count": 74,
+          "foldedVariants": []
+        },
+        {
+          "value": "HAZOP: RL-3653.01-1221-98X-SEA-001",
+          "count": 34,
+          "foldedVariants": []
+        },
+        {
+          "value": "APR: RL-3600.00-1210-98V-SEA-001",
+          "count": 33,
+          "foldedVariants": []
+        },
+        {
+          "value": "HAZOP: RL-3692.01-5131-98G-SEA-001 / APR: RL-3692.01-5131-98V-SEA-001",
+          "count": 24,
+          "foldedVariants": []
+        },
+        {
+          "value": "HAZOP: RL-3692.01-5131-98G-SEA-001",
+          "count": 19,
+          "foldedVariants": []
+        },
+        {
+          "value": "APR: RL-3656.01-1221-983-PBA-001",
+          "count": 12,
+          "foldedVariants": []
+        },
+        {
+          "value": "APR: RL-3600.00-1210-98G-SEA-001",
+          "count": 7,
+          "foldedVariants": []
+        },
+        {
+          "value": "HAZOP: RL-3618.01-1221-98X-SEA-001",
+          "count": 7,
+          "foldedVariants": []
+        },
+        {
+          "value": "HAZOP: RL-3621.01-1221-98X-SEA-001",
+          "count": 7,
+          "foldedVariants": []
+        },
+        {
+          "value": "APR: RL-3600.00-1210-98G-SEA-002",
+          "count": 4,
+          "foldedVariants": []
+        },
+        {
+          "value": "HAZOP: RL-3621.08-1220-98G-EVP-002:01",
+          "count": 4,
+          "foldedVariants": []
+        },
+        {
+          "value": "APR: RL-3621.02-1221-98G-PBA-001",
+          "count": 3,
+          "foldedVariants": []
+        },
+        {
+          "value": "APR: RL-3600.00-1210-98G-SEA-003 / RL-3600.00-1210-98G-SEA-004",
+          "count": 2,
+          "foldedVariants": []
+        },
+        {
+          "value": "APR: RL-3600.00-1210-98G-SEA-002 /APR: RL-3600.00-1210-98G-SEA-003 / APR: RL-3600.00-1210-98G-SEA-004",
+          "count": 1,
+          "foldedVariants": []
+        },
+        {
+          "value": "APR: RL-3600.00-1210-98G-SEA-003",
+          "count": 1,
+          "foldedVariants": []
+        },
+        {
+          "value": "APR: RL-3653.01-1221-983-PBA-001 HAZOP: RL-3653.01-1221-98X-SEA-001",
+          "count": 1,
+          "foldedVariants": []
+        },
+        {
+          "value": "HAZOP: RL-3621.01-1221-98X-SEA-001 / RL-3618.01-1221-98X-SEA-001",
+          "count": 1,
+          "foldedVariants": []
+        },
+        {
+          "value": "HAZOP: RL-3621.02-5412-980-SEA-001",
+          "count": 1,
+          "foldedVariants": []
+        },
+        {
+          "value": "HAZOP: RL-3655.00-1200-98X-SEA-001: RL-3655.00-1200-98X-SEA-001",
+          "count": 1,
+          "foldedVariants": []
+        }
+      ],
+      "typos": []
+    },
+    "installLocal": {
+      "header": "Local de Instalação",
+      "total": 3061,
+      "blank": 750,
+      "uniqueRaw": 617,
+      "canonical": [
+        {
+          "value": "Sistema Combate a Incêndio FAL",
+          "count": 261,
+          "foldedVariants": []
+        },
+        {
+          "value": "Não Encontrado",
+          "count": 124,
+          "foldedVariants": []
+        },
+        {
+          "value": "Sistema Combate a Incêndio - SM-08",
+          "count": 83,
+          "foldedVariants": []
+        },
+        {
+          "value": "Cj Detectores de Gás Estação - FAL",
+          "count": 82,
+          "foldedVariants": []
+        },
+        {
+          "value": "Sistema Geração de Vapor para Injeção (UGVF's) - FAL-20",
+          "count": 79,
+          "foldedVariants": []
+        },
+        {
+          "value": "Cj Detectores de Gás Estação - FAL-20",
+          "count": 65,
+          "foldedVariants": []
+        },
+        {
+          "value": "Cj Detectores de Gás - SM-8",
+          "count": 36,
+          "foldedVariants": []
+        },
+        {
+          "value": "Sistema Geração de Vapor para Injeção - IBU-26",
+          "count": 36,
+          "foldedVariants": []
+        },
+        {
+          "value": "Sistema de Tratamento de Petróleo FAL",
+          "count": 36,
+          "foldedVariants": []
+        },
+        {
+          "value": "Sistema Captação Tratamento e Bombeio Água - IBU-26",
+          "count": 35,
+          "foldedVariants": []
+        },
+        {
+          "value": "Sistema Geração de Vapor para Injeção - IBU-40",
+          "count": 35,
+          "foldedVariants": []
+        },
+        {
+          "value": "Cj Detectores de Gás - FSR",
+          "count": 26,
+          "foldedVariants": []
+        },
+        {
+          "value": "Sistema de Tocha (Flare) FAL",
+          "count": 25,
+          "foldedVariants": []
+        },
+        {
+          "value": "Sistema Tratamento Gás - FAL-20",
+          "count": 24,
+          "foldedVariants": []
+        },
+        {
+          "value": "Moto Compressor Gás MC-I - PSE - FSR",
+          "count": 19,
+          "foldedVariants": []
+        },
+        {
+          "value": "Moto Compressor Gás MC-III - PSE - FSR",
+          "count": 19,
+          "foldedVariants": []
+        },
+        {
+          "value": "UGV - Unidade Geradora de Vapor - GV-3692.01002",
+          "count": 19,
+          "foldedVariants": []
+        },
+        {
+          "value": "Cj Tubulação de Combate Incêndio - FSR",
+          "count": 18,
+          "foldedVariants": []
+        },
+        {
+          "value": "Cj Unidade Tratamento Água - UTA",
+          "count": 18,
+          "foldedVariants": []
+        },
+        {
+          "value": "Sistema de Gás Combustível FAL",
+          "count": 18,
+          "foldedVariants": []
+        },
+        {
+          "value": "Sistema de Tratamento de Petróleo - FAL-20",
+          "count": 18,
+          "foldedVariants": []
+        },
+        {
+          "value": "Sistema de Escoamento de Petróleo FAL",
+          "count": 17,
+          "foldedVariants": []
+        },
+        {
+          "value": "UGV - Unidade Geradora de Vapor - GV-3692.01001",
+          "count": 16,
+          "foldedVariants": []
+        },
+        {
+          "value": "Sistema de Geração de Emergência FAL",
+          "count": 15,
+          "foldedVariants": []
+        },
+        {
+          "value": "Cj Detectores de Gás - FSL",
+          "count": 14,
+          "foldedVariants": []
+        },
+        {
+          "value": "Sistema Coleta Petróleo por Transp. Rod. FAL",
+          "count": 14,
+          "foldedVariants": []
+        },
+        {
+          "value": "Sistema Distribuição Energia Elétrica FAL",
+          "count": 14,
+          "foldedVariants": []
+        },
+        {
+          "value": "Sistema de Detecção de Fogo e Gás FAL",
+          "count": 13,
+          "foldedVariants": []
+        },
+        {
+          "value": "Sistema de Geração de Vapor (Caldeiras) FAL",
+          "count": 13,
+          "foldedVariants": []
+        },
+        {
+          "value": "Sistema de Separação de Flúidos FAL",
+          "count": 12,
+          "foldedVariants": []
+        },
+        {
+          "value": "Cj Hidrantes - FSR",
+          "count": 10,
+          "foldedVariants": []
+        },
+        {
+          "value": "Equipamentos Locados SM-08",
+          "count": 10,
+          "foldedVariants": []
+        },
+        {
+          "value": "Sistema de Tratamento de Óleo - SM-08",
+          "count": 10,
+          "foldedVariants": []
+        },
+        {
+          "value": "Sistema de Tratamento e Injeção de Água - SM-8",
+          "count": 10,
+          "foldedVariants": []
+        },
+        {
+          "value": "Abrigo de Emergência",
+          "count": 9,
+          "foldedVariants": []
+        },
+        {
+          "value": "Sistema Ar Comprimido FAL",
+          "count": 9,
+          "foldedVariants": []
+        },
+        {
+          "value": "Sistema de Tocha (Flare) - SM-8",
+          "count": 9,
+          "foldedVariants": []
+        },
+        {
+          "value": "Cj Depurador de Gás Combustível SD-3692.01001",
+          "count": 8,
+          "foldedVariants": []
+        },
+        {
+          "value": "Cj Moto Bba Comb Incêndio B-365607A",
+          "count": 8,
+          "foldedVariants": []
+        },
+        {
+          "value": "Cj Scrubbers SD-365603",
+          "count": 8,
+          "foldedVariants": []
+        },
+        {
+          "value": "Cj Vaso Blow Down V-365302 - FSL",
+          "count": 8,
+          "foldedVariants": []
+        },
+        {
+          "value": "Sistema de Separação de Condensado - IBU-10",
+          "count": 8,
+          "foldedVariants": []
+        },
+        {
+          "value": "Sistema de Tratamento de Gás - UDGN - SM-8 (Desativado)",
+          "count": 8,
+          "foldedVariants": []
+        },
+        {
+          "value": "Cj Flare TA-365601",
+          "count": 7,
+          "foldedVariants": []
+        },
+        {
+          "value": "Cj Vaso Blow Down V-365602",
+          "count": 7,
+          "foldedVariants": []
+        },
+        {
+          "value": "Cj Botoeiras de Emergência - FSL",
+          "count": 6,
+          "foldedVariants": []
+        },
+        {
+          "value": "Cj Separador de Óleo",
+          "count": 6,
+          "foldedVariants": []
+        },
+        {
+          "value": "Cj Tocha (Flare) - FSL",
+          "count": 6,
+          "foldedVariants": []
+        },
+        {
+          "value": "Cj Tratador de Óleo TO-365301",
+          "count": 6,
+          "foldedVariants": []
+        },
+        {
+          "value": "Cj. de Hidrantes de Incêndio - FSL",
+          "count": 6,
+          "foldedVariants": []
+        },
+        {
+          "value": "Conjunto Separador Óleo",
+          "count": 6,
+          "foldedVariants": []
+        },
+        {
+          "value": "Sistema de Ar Comprimido - IBU-10",
+          "count": 6,
+          "foldedVariants": []
+        },
+        {
+          "value": "Sistema de Ar Comprimido - IBU-26",
+          "count": 6,
+          "foldedVariants": []
+        },
+        {
+          "value": "Sistema de Armazenamento de Petróleo - SM-8",
+          "count": 6,
+          "foldedVariants": []
+        },
+        {
+          "value": "Sistema de Escoamento de Petróleo - SM-8",
+          "count": 6,
+          "foldedVariants": []
+        },
+        {
+          "value": "Sistema de Estruturas Auxiliares - SM-8",
+          "count": 6,
+          "foldedVariants": []
+        },
+        {
+          "value": "Sistema de Injeção Química - FAL-20",
+          "count": 6,
+          "foldedVariants": []
+        },
+        {
+          "value": "Cj Alarme de Incêndio - CNC",
+          "count": 5,
+          "foldedVariants": []
+        },
+        {
+          "value": "Cj Moto Bba Comb Incêndio B-365607B",
+          "count": 5,
+          "foldedVariants": []
+        },
+        {
+          "value": "Cj Moto Bomba Comb Inc - M-B-365305A",
+          "count": 5,
+          "foldedVariants": []
+        }
+      ],
+      "typos": [
+        {
+          "from": "Equipamentos de superficie - CNC-16",
+          "to": "Equipamentos de superfície - CNC-16",
+          "count": 1
+        },
+        {
+          "from": "Equipamentos de superfície - FSR-27",
+          "to": "Equipamentos de Superfície - FSR-27",
+          "count": 1
+        },
+        {
+          "from": "Equipamentos de superfície - FSR-60",
+          "to": "Equipamentos de Superfície - FSR-60",
+          "count": 1
+        },
+        {
+          "from": "Equipamentos de superfície - FSR-61",
+          "to": "Equipamentos de Superfície - FSR-61",
+          "count": 1
+        },
+        {
+          "from": "Equipamentos de superfície - FSR-64",
+          "to": "Equipamentos de Superfície - FSR-64",
+          "count": 1
+        }
+      ]
+    },
+    "equipTypology": {
+      "header": "Tipologia Equipamento",
+      "total": 3061,
+      "blank": 751,
+      "uniqueRaw": 100,
+      "canonical": [
+        {
+          "value": "Válvula de Segurança de Pressão",
+          "count": 446,
+          "foldedVariants": []
+        },
+        {
+          "value": "Detector de Gás",
+          "count": 223,
+          "foldedVariants": []
+        },
+        {
+          "value": "Transmissor Indicador de Pressão",
+          "count": 219,
+          "foldedVariants": []
+        },
+        {
+          "value": "Sistema de Combate a Incêndio",
+          "count": 143,
+          "foldedVariants": []
+        },
+        {
+          "value": "Painel Elétrico dos Poços de produção (intertravamento por presão alta)",
+          "count": 120,
+          "foldedVariants": []
+        },
+        {
+          "value": "Válvula",
+          "count": 97,
+          "foldedVariants": []
+        },
+        {
+          "value": "Válvula de Desligamento/Fechamento de Emergência",
+          "count": 91,
+          "foldedVariants": []
+        },
+        {
+          "value": "Painel Elétrico",
+          "count": 63,
+          "foldedVariants": []
+        },
+        {
+          "value": "Dique de Contenção",
+          "count": 51,
+          "foldedVariants": []
+        },
+        {
+          "value": "Transmissor de Pressão",
+          "count": 50,
+          "foldedVariants": []
+        },
+        {
+          "value": "Bomba",
+          "count": 48,
+          "foldedVariants": []
+        },
+        {
+          "value": "Tampa de Emergência",
+          "count": 48,
+          "foldedVariants": []
+        },
+        {
+          "value": "Hidrante",
+          "count": 37,
+          "foldedVariants": []
+        },
+        {
+          "value": "Transmissor de Nível",
+          "count": 34,
+          "foldedVariants": []
+        },
+        {
+          "value": "Sistema de Proteção contra Descarga Armosférica",
+          "count": 32,
+          "foldedVariants": []
+        },
+        {
+          "value": "Malha de Aterramento",
+          "count": 26,
+          "foldedVariants": []
+        },
+        {
+          "value": "Válvula de Controle de Pressão",
+          "count": 26,
+          "foldedVariants": []
+        },
+        {
+          "value": "Motor",
+          "count": 24,
+          "foldedVariants": []
+        },
+        {
+          "value": "Controlador Lógico Programável",
+          "count": 23,
+          "foldedVariants": []
+        },
+        {
+          "value": "Sistemas de Alívio dos Tanques de produção",
+          "count": 22,
+          "foldedVariants": []
+        },
+        {
+          "value": "Transmissor Indicador de Temperatura.",
+          "count": 22,
+          "foldedVariants": []
+        },
+        {
+          "value": "Válvula de Segurança de Fluxo",
+          "count": 22,
+          "foldedVariants": []
+        },
+        {
+          "value": "Conversor de Frequência",
+          "count": 19,
+          "foldedVariants": []
+        },
+        {
+          "value": "Acionador de Alarme de Incêndio",
+          "count": 17,
+          "foldedVariants": []
+        },
+        {
+          "value": "Chave de Nível Alto-Alto",
+          "count": 17,
+          "foldedVariants": []
+        },
+        {
+          "value": "Válvula Manual",
+          "count": 17,
+          "foldedVariants": []
+        },
+        {
+          "value": "Válvula de Intertravamento",
+          "count": 17,
+          "foldedVariants": []
+        },
+        {
+          "value": "Alívio de Tanque",
+          "count": 16,
+          "foldedVariants": []
+        },
+        {
+          "value": "Chave de Pressão Alta",
+          "count": 13,
+          "foldedVariants": []
+        },
+        {
+          "value": "Chave de Pressão Baixa",
+          "count": 13,
+          "foldedVariants": []
+        },
+        {
+          "value": "Conjunto solidário de Barreiras",
+          "count": 13,
+          "foldedVariants": []
+        },
+        {
+          "value": "Porta Corta-chama",
+          "count": 13,
+          "foldedVariants": []
+        },
+        {
+          "value": "Botoeira",
+          "count": 12,
+          "foldedVariants": []
+        },
+        {
+          "value": "Canhão Monitor",
+          "count": 12,
+          "foldedVariants": []
+        },
+        {
+          "value": "Indicador de Nível (visível)",
+          "count": 12,
+          "foldedVariants": []
+        },
+        {
+          "value": "Conjunto autônomo",
+          "count": 11,
+          "foldedVariants": []
+        },
+        {
+          "value": "Banco de baterias",
+          "count": 10,
+          "foldedVariants": [
+            "Banco de Baterias"
+          ]
+        },
+        {
+          "value": "Sensor de Chama",
+          "count": 10,
+          "foldedVariants": []
+        },
+        {
+          "value": "Válvula Controladora de Nível",
+          "count": 10,
+          "foldedVariants": []
+        },
+        {
+          "value": "Válvula de Controle de Vazão.",
+          "count": 10,
+          "foldedVariants": []
+        },
+        {
+          "value": "Abrigo de Equipamentos de Combate a Incêndio",
+          "count": 9,
+          "foldedVariants": []
+        },
+        {
+          "value": "Bateria",
+          "count": 9,
+          "foldedVariants": []
+        },
+        {
+          "value": "Câmara de Espuma",
+          "count": 9,
+          "foldedVariants": []
+        },
+        {
+          "value": "Sensor de Temperatura",
+          "count": 9,
+          "foldedVariants": []
+        },
+        {
+          "value": "Chave de Nível",
+          "count": 7,
+          "foldedVariants": []
+        },
+        {
+          "value": "Gerador de Emergência",
+          "count": 7,
+          "foldedVariants": []
+        },
+        {
+          "value": "Painel/Terminal de Operação.",
+          "count": 7,
+          "foldedVariants": []
+        },
+        {
+          "value": "Chave de nível muito baixo",
+          "count": 6,
+          "foldedVariants": []
+        },
+        {
+          "value": "Vaso",
+          "count": 6,
+          "foldedVariants": []
+        },
+        {
+          "value": "Abrigo de Emergência",
+          "count": 5,
+          "foldedVariants": []
+        },
+        {
+          "value": "Ambulância",
+          "count": 5,
+          "foldedVariants": []
+        },
+        {
+          "value": "Compressor",
+          "count": 5,
+          "foldedVariants": []
+        },
+        {
+          "value": "Disco de Ruptura",
+          "count": 5,
+          "foldedVariants": []
+        },
+        {
+          "value": "Indicador de Pressão",
+          "count": 5,
+          "foldedVariants": []
+        },
+        {
+          "value": "Inversor de Frequência",
+          "count": 5,
+          "foldedVariants": []
+        },
+        {
+          "value": "Chave de Pressão",
+          "count": 4,
+          "foldedVariants": []
+        },
+        {
+          "value": "Chave de acionamento",
+          "count": 4,
+          "foldedVariants": []
+        },
+        {
+          "value": "Reserva Móvel de LGE",
+          "count": 4,
+          "foldedVariants": []
+        },
+        {
+          "value": "Sirene de Emergência",
+          "count": 4,
+          "foldedVariants": []
+        },
+        {
+          "value": "Sistema de Drenagem",
+          "count": 4,
+          "foldedVariants": []
+        },
+        {
+          "value": "Soprador de Ar",
+          "count": 4,
+          "foldedVariants": []
+        },
+        {
+          "value": "Trans Multivariável",
+          "count": 4,
+          "foldedVariants": []
+        },
+        {
+          "value": "Transformador",
+          "count": 4,
+          "foldedVariants": []
+        },
+        {
+          "value": "Válvula de Fluxo",
+          "count": 4,
+          "foldedVariants": []
+        },
+        {
+          "value": "Chave de Nível Baixo",
+          "count": 3,
+          "foldedVariants": []
+        },
+        {
+          "value": "Chave de Pressão Alto-Alto",
+          "count": 3,
+          "foldedVariants": []
+        },
+        {
+          "value": "Chave de Pressão com duplo setpoint",
+          "count": 3,
+          "foldedVariants": []
+        },
+        {
+          "value": "DCBI",
+          "count": 3,
+          "foldedVariants": []
+        },
+        {
+          "value": "Detectores Portáteis de Gás",
+          "count": 3,
+          "foldedVariants": []
+        },
+        {
+          "value": "Sistema de Drenagem ou de outros meios adequados para conter derramamentos",
+          "count": 3,
+          "foldedVariants": []
+        },
+        {
+          "value": "Sistema de Flare",
+          "count": 3,
+          "foldedVariants": []
+        },
+        {
+          "value": "Sistemas de Alívio dos Tanques de produção do Campo",
+          "count": 3,
+          "foldedVariants": []
+        },
+        {
+          "value": "Trava Mecânica",
+          "count": 3,
+          "foldedVariants": []
+        },
+        {
+          "value": "Válvula de Alívio",
+          "count": 3,
+          "foldedVariants": []
+        },
+        {
+          "value": "Chave de posição aberta",
+          "count": 2,
+          "foldedVariants": []
+        },
+        {
+          "value": "Controlador de Pressão",
+          "count": 2,
+          "foldedVariants": []
+        },
+        {
+          "value": "Corta Chamas",
+          "count": 2,
+          "foldedVariants": []
+        },
+        {
+          "value": "Elemento de Medição de Vazão",
+          "count": 2,
+          "foldedVariants": []
+        },
+        {
+          "value": "Plano de Resposta a Emergência",
+          "count": 2,
+          "foldedVariants": []
+        },
+        {
+          "value": "Sistema de Ventilação/Exaustão",
+          "count": 2,
+          "foldedVariants": []
+        },
+        {
+          "value": "Transmissor Indicador de Analisador",
+          "count": 2,
+          "foldedVariants": []
+        },
+        {
+          "value": "Transmissor Indicador de Vazão.",
+          "count": 2,
+          "foldedVariants": []
+        },
+        {
+          "value": "Transmissor Indicador de Vibração",
+          "count": 2,
+          "foldedVariants": []
+        },
+        {
+          "value": "Válvula de Controle de Temperatura.",
+          "count": 2,
+          "foldedVariants": []
+        },
+        {
+          "value": "011-LSH-100-MC-I",
+          "count": 1,
+          "foldedVariants": []
+        },
+        {
+          "value": "011-LSH-100-MC-III",
+          "count": 1,
+          "foldedVariants": []
+        },
+        {
+          "value": "011-LSH-300-MC-I",
+          "count": 1,
+          "foldedVariants": []
+        },
+        {
+          "value": "011-LSH-300-MC-III",
+          "count": 1,
+          "foldedVariants": []
+        },
+        {
+          "value": "Ancoragem",
+          "count": 1,
+          "foldedVariants": []
+        },
+        {
+          "value": "Bateria gerador emergência",
+          "count": 1,
+          "foldedVariants": []
+        },
+        {
+          "value": "Depurador de Gás",
+          "count": 1,
+          "foldedVariants": []
+        },
+        {
+          "value": "Kit de Resgate",
+          "count": 1,
+          "foldedVariants": []
+        },
+        {
+          "value": "Nobreak",
+          "count": 1,
+          "foldedVariants": []
+        },
+        {
+          "value": "Painel de Controle",
+          "count": 1,
+          "foldedVariants": []
+        },
+        {
+          "value": "Para-Raios dos Poços",
+          "count": 1,
+          "foldedVariants": []
+        },
+        {
+          "value": "Reserva Técnica de Incêndio",
+          "count": 1,
+          "foldedVariants": []
+        },
+        {
+          "value": "Sistemas de Alívio",
+          "count": 1,
+          "foldedVariants": []
+        },
+        {
+          "value": "Tanque de LGE",
+          "count": 1,
+          "foldedVariants": []
+        },
+        {
+          "value": "Válvula de Controle de Pressão PCV-1231-001",
+          "count": 1,
+          "foldedVariants": []
+        },
+        {
+          "value": "Válvula de Controle de Pressão PCV-1231-002",
+          "count": 1,
+          "foldedVariants": []
+        }
+      ],
+      "typos": [
+        {
+          "from": "Banco de Baterias",
+          "to": "Banco de baterias",
+          "count": 1
+        }
+      ]
+    },
+    "criticality": {
+      "header": "Criticidade",
+      "total": 3061,
+      "blank": 774,
+      "uniqueRaw": 1,
+      "canonical": [
+        {
+          "value": "Barreira Crítica",
+          "count": 2287,
+          "foldedVariants": []
+        }
+      ],
+      "typos": []
+    },
+    "outOfService": {
+      "header": "Fora de Operação?",
+      "total": 3061,
+      "blank": 745,
+      "uniqueRaw": 2,
+      "canonical": [
+        {
+          "value": "Não",
+          "count": 2146,
+          "foldedVariants": []
+        },
+        {
+          "value": "Sim",
+          "count": 170,
+          "foldedVariants": [
+            "sim",
+            "SIm"
+          ]
+        }
+      ],
+      "typos": [
+        {
+          "from": "sim",
+          "to": "Sim",
+          "count": 5
+        },
+        {
+          "from": "SIm",
+          "to": "Sim",
+          "count": 1
+        }
+      ]
+    },
+    "category": {
+      "header": "Categoria da Barreira de Segurança",
+      "total": 3061,
+      "blank": 806,
+      "uniqueRaw": 32,
+      "canonical": [
+        {
+          "value": "Válvula de Alívio de Pressão",
+          "count": 446,
+          "foldedVariants": []
+        },
+        {
+          "value": "Intertravamento de Segurança - Elemento Iniciador",
+          "count": 433,
+          "foldedVariants": []
+        },
+        {
+          "value": "Intertravamento de Segurança - Elemento Final",
+          "count": 325,
+          "foldedVariants": []
+        },
+        {
+          "value": "Sistema Fixo de Combate a Incêndio",
+          "count": 299,
+          "foldedVariants": []
+        },
+        {
+          "value": "Detectores Fixos de F&G",
+          "count": 223,
+          "foldedVariants": []
+        },
+        {
+          "value": "0",
+          "count": 94,
+          "foldedVariants": []
+        },
+        {
+          "value": "Malha de Aterramento / SPDA",
+          "count": 58,
+          "foldedVariants": []
+        },
+        {
+          "value": "Dique de Contenção",
+          "count": 51,
+          "foldedVariants": []
+        },
+        {
+          "value": "Tampa de Emergência",
+          "count": 48,
+          "foldedVariants": []
+        },
+        {
+          "value": "Malha de Controle de Processo",
+          "count": 37,
+          "foldedVariants": []
+        },
+        {
+          "value": "Geração de Emergência",
+          "count": 31,
+          "foldedVariants": []
+        },
+        {
+          "value": "Intertravamento de Segurança - Lógica",
+          "count": 30,
+          "foldedVariants": []
+        },
+        {
+          "value": "Plano de Resposta a Emergência",
+          "count": 30,
+          "foldedVariants": []
+        },
+        {
+          "value": "Sistema de Alívio",
+          "count": 26,
+          "foldedVariants": []
+        },
+        {
+          "value": "Alarmes de Emergência e Sirene",
+          "count": 21,
+          "foldedVariants": []
+        },
+        {
+          "value": "Válvula Manual",
+          "count": 17,
+          "foldedVariants": []
+        },
+        {
+          "value": "Vent",
+          "count": 16,
+          "foldedVariants": []
+        },
+        {
+          "value": "CSB - Conjunto Solidário de Barreiras",
+          "count": 13,
+          "foldedVariants": []
+        },
+        {
+          "value": "Botoeira",
+          "count": 12,
+          "foldedVariants": []
+        },
+        {
+          "value": "Proteção Passiva",
+          "count": 12,
+          "foldedVariants": []
+        },
+        {
+          "value": "Vaso",
+          "count": 6,
+          "foldedVariants": []
+        },
+        {
+          "value": "Disco de Ruptura",
+          "count": 5,
+          "foldedVariants": []
+        },
+        {
+          "value": "Sistema de drenagem",
+          "count": 4,
+          "foldedVariants": []
+        },
+        {
+          "value": "Sistemas de Alívio",
+          "count": 4,
+          "foldedVariants": []
+        },
+        {
+          "value": "Dispositivo de Controlede Bloqueio e Isolamento",
+          "count": 3,
+          "foldedVariants": []
+        },
+        {
+          "value": "Trava Mecânica",
+          "count": 3,
+          "foldedVariants": []
+        },
+        {
+          "value": "Procedimento Crítico",
+          "count": 2,
+          "foldedVariants": []
+        },
+        {
+          "value": "Sistema de Dispersão",
+          "count": 2,
+          "foldedVariants": []
+        },
+        {
+          "value": "Sistema de Proteção contra Descarga Armosférica",
+          "count": 1,
+          "foldedVariants": []
+        },
+        {
+          "value": "TAG correto 011-LSH-101-MC-I",
+          "count": 1,
+          "foldedVariants": []
+        },
+        {
+          "value": "TAG correto 011-LSH-301-MC-I",
+          "count": 1,
+          "foldedVariants": []
+        },
+        {
+          "value": "UPS",
+          "count": 1,
+          "foldedVariants": []
+        }
+      ],
+      "typos": []
+    },
+    "fieldInstalled": {
+      "header": "Elemento Instalado em Campo?",
+      "total": 3061,
+      "blank": 1060,
+      "uniqueRaw": 2,
+      "canonical": [
+        {
+          "value": "Sim",
+          "count": 1905,
+          "foldedVariants": [
+            "sim"
+          ]
+        },
+        {
+          "value": "Não",
+          "count": 96,
+          "foldedVariants": []
+        }
+      ],
+      "typos": [
+        {
+          "from": "sim",
+          "to": "Sim",
+          "count": 170
+        }
+      ]
+    },
+    "fieldOperational": {
+      "header": "Elemento Encontra-se Operacional ?",
+      "total": 3061,
+      "blank": 1052,
+      "uniqueRaw": 2,
+      "canonical": [
+        {
+          "value": "Sim",
+          "count": 1880,
+          "foldedVariants": [
+            "sim"
+          ]
+        },
+        {
+          "value": "Não",
+          "count": 129,
+          "foldedVariants": []
+        }
+      ],
+      "typos": [
+        {
+          "from": "sim",
+          "to": "Sim",
+          "count": 175
+        }
+      ]
+    },
+    "opStatus": {
+      "header": "Status de Disponibilidade (Operacional)",
+      "total": 3061,
+      "blank": 745,
+      "uniqueRaw": 3,
+      "canonical": [
+        {
+          "value": "Disponível",
+          "count": 1880,
+          "foldedVariants": []
+        },
+        {
+          "value": "Indisponivel",
+          "count": 406,
+          "foldedVariants": []
+        },
+        {
+          "value": "Sem Classificação",
+          "count": 30,
+          "foldedVariants": []
+        }
+      ],
+      "typos": []
+    },
+    "hasMaintPlan": {
+      "header": "Possui Plano de Manutenção ?",
+      "total": 3061,
+      "blank": 649,
+      "uniqueRaw": 3,
+      "canonical": [
+        {
+          "value": "Sim",
+          "count": 2017,
+          "foldedVariants": []
+        },
+        {
+          "value": "Verificar",
+          "count": 300,
+          "foldedVariants": []
+        },
+        {
+          "value": "Não",
+          "count": 95,
+          "foldedVariants": []
+        }
+      ],
+      "typos": []
+    },
+    "planFollowed": {
+      "header": "Plano de Manutenção Sendo Cumprido?",
+      "total": 3061,
+      "blank": 649,
+      "uniqueRaw": 3,
+      "canonical": [
+        {
+          "value": "Sim",
+          "count": 2017,
+          "foldedVariants": []
+        },
+        {
+          "value": "Verificar",
+          "count": 300,
+          "foldedVariants": []
+        },
+        {
+          "value": "Não",
+          "count": 95,
+          "foldedVariants": []
+        }
+      ],
+      "typos": []
+    },
+    "failureFree": {
+      "header": "Ausência de Falha ou Defeito da Barreira ?",
+      "total": 3061,
+      "blank": 649,
+      "uniqueRaw": 3,
+      "canonical": [
+        {
+          "value": "Sim",
+          "count": 2110,
+          "foldedVariants": []
+        },
+        {
+          "value": "Verificar",
+          "count": 300,
+          "foldedVariants": []
+        },
+        {
+          "value": "Não",
+          "count": 2,
+          "foldedVariants": []
+        }
+      ],
+      "typos": []
+    },
+    "maintStatus": {
+      "header": "Status de Disponibilidade (Manutenção)",
+      "total": 3061,
+      "blank": 649,
+      "uniqueRaw": 2,
+      "canonical": [
+        {
+          "value": "Disponível",
+          "count": 2015,
+          "foldedVariants": []
+        },
+        {
+          "value": "Degradada",
+          "count": 397,
+          "foldedVariants": []
+        }
+      ],
+      "typos": []
+    },
+    "hasContingency": {
+      "header": "Há Contingência?",
+      "total": 3061,
+      "blank": 801,
+      "uniqueRaw": 3,
+      "canonical": [
+        {
+          "value": "Não",
+          "count": 2246,
+          "foldedVariants": []
+        },
+        {
+          "value": "Sim",
+          "count": 13,
+          "foldedVariants": []
+        },
+        {
+          "value": "'",
+          "count": 1,
+          "foldedVariants": []
+        }
+      ],
+      "typos": []
+    },
+    "evidenceCode": {
+      "header": "Código da Evidência",
+      "total": 3061,
+      "blank": 3054,
+      "uniqueRaw": 5,
+      "canonical": [
+        {
+          "value": "GM-3653.01-2024-T-004",
+          "count": 2,
+          "foldedVariants": []
+        },
+        {
+          "value": "HAZOP: RL-3692.01-5131-98G-SEA-001",
+          "count": 2,
+          "foldedVariants": []
+        },
+        {
+          "value": "GM-3656.01-2025-T-004",
+          "count": 1,
+          "foldedVariants": []
+        },
+        {
+          "value": "HAZOP: RL-3655.00-1200-98X-SEA-001",
+          "count": 1,
+          "foldedVariants": []
+        },
+        {
+          "value": "SMS-NA-0010",
+          "count": 1,
+          "foldedVariants": []
+        }
+      ],
+      "typos": []
+    },
+    "finalStatus": {
+      "header": "Status Final da Barreira",
+      "total": 3061,
+      "blank": 745,
+      "uniqueRaw": 7,
+      "canonical": [
+        {
+          "value": "Disponível",
+          "count": 1570,
+          "foldedVariants": []
+        },
+        {
+          "value": "Indisponível",
+          "count": 304,
+          "foldedVariants": []
+        },
+        {
+          "value": "Degradada",
+          "count": 264,
+          "foldedVariants": []
+        },
+        {
+          "value": "Fora de Operação",
+          "count": 170,
+          "foldedVariants": []
+        },
+        {
+          "value": "Não avaliado",
+          "count": 4,
+          "foldedVariants": []
+        },
+        {
+          "value": "Indisponível contingenciada",
+          "count": 3,
+          "foldedVariants": []
+        },
+        {
+          "value": "Degradada contingenciada",
+          "count": 1,
+          "foldedVariants": []
+        }
+      ],
+      "typos": []
+    },
+    "compliance": {
+      "header": "Status de Conformidade",
+      "total": 3061,
+      "blank": 748,
+      "uniqueRaw": 3,
+      "canonical": [
+        {
+          "value": "Conforme",
+          "count": 1744,
+          "foldedVariants": []
+        },
+        {
+          "value": "Não Conforme",
+          "count": 568,
+          "foldedVariants": []
+        },
+        {
+          "value": "284",
+          "count": 1,
+          "foldedVariants": []
+        }
+      ],
+      "typos": []
+    }
+  }
+}
