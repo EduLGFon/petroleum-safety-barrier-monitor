@@ -80,8 +80,10 @@ export function defaultFilters(): FilterState {
 const SORT_COLS: SortableColumn[] = [
   "id",
   "tag",
+  "typology",
   "criticality",
   "category",
+  "owner",
   "availability",
   "compliance",
   "statusSince",

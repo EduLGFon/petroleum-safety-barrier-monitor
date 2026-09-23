@@ -69,10 +69,14 @@ function sortWire(
         return (a.id - b.id) * dir;
       case "tag":
         return a.tag.localeCompare(b.tag, "pt-BR") * dir;
+      case "typology":
+        return (a.typologyId - b.typologyId) * dir;
       case "criticality":
         return (a.criticalityId - b.criticalityId) * dir;
       case "category":
         return (a.categoryId - b.categoryId) * dir;
+      case "owner":
+        return (a.ownerId - b.ownerId) * dir;
       case "availability":
         return (a.availabilityId - b.availabilityId) * dir;
       case "compliance":

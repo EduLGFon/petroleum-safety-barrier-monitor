@@ -148,6 +148,29 @@ export function BarrierRow(
       >
         {b.category}
       </td>
+      {/* Typology (sheet Tipologia da Instalação) */}
+      <td
+        onClick={() => onSelect(b)}
+        style={{
+          padding: "var(--d-cell-pad)",
+          fontSize: "var(--d-body)",
+          color: "var(--text-secondary)",
+        }}
+      >
+        {b.typology}
+      </td>
+      {/* Owner (sheet Dono da Barreira) */}
+      <td
+        onClick={() => onSelect(b)}
+        style={{
+          padding: "var(--d-cell-pad)",
+          fontSize: "var(--d-body)",
+          color: b.owner ? "var(--text-secondary)" : "var(--text-muted)",
+          fontStyle: b.owner ? "normal" : "italic",
+        }}
+      >
+        {b.owner || "Não informado"}
+      </td>
       {/* Availability */}
       <td onClick={() => onSelect(b)} style={{ padding: "var(--d-cell-pad)" }}>
         <Badge label={b.availability} {...dispColorFor(b.availability)} />

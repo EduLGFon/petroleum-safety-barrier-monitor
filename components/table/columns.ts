@@ -9,6 +9,8 @@ export const COLS: { col: SortableColumn; label: string; w?: string }[] = [
   { col: "tag", label: "TAG / Identificação" },
   { col: "criticality", label: "Criticidade", w: "140px" },
   { col: "category", label: "Categoria" },
+  { col: "typology", label: "Tipologia" },
+  { col: "owner", label: "Dono" },
   { col: "availability", label: "Disponibilidade", w: "230px" },
   { col: "compliance", label: "Conformidade", w: "148px" },
 ];

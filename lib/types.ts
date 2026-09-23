@@ -151,8 +151,10 @@ export type SortableColumn = keyof Pick<
   Barrier,
   | "id"
   | "tag"
+  | "typology"
   | "criticality"
   | "category"
+  | "owner"
   | "availability"
   | "compliance"
   | "statusSince"

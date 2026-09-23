@@ -8,8 +8,10 @@ import type { BarriersQuery } from "../../wireTypes.ts";
 export const SORTABLE: Record<string, string> = {
   id: "b.id",
   tag: "b.tag",
+  typology: "b.typology_id",
   criticality: "b.criticality_id",
   category: "b.category_id",
+  owner: "b.owner_id",
   availability: "b.availability_id",
   compliance: "b.compliance_id",
   statusSince: "b.status_since",
