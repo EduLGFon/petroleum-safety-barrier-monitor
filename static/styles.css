@@ -96,7 +96,8 @@ input[type="search"]::-webkit-search-cancel-button {
   --au-pill: rgba(255,255,255,.85);
   --au-pill-border: rgba(15,23,42,.12);
   --au-row: rgba(15,23,42,.07);
-  --au-eyebrow: #4f46e5;
+  /* Brand eyebrow above the title - darkened accent for contrast on mist. */
+  --au-eyebrow: color-mix(in srgb,var(--accent) 80%,black);
   --au-label: #64748b;
   --au-value: #0f172a;
   --au-sub: #94a3b8;
@@ -154,7 +155,8 @@ input[type="search"]::-webkit-search-cancel-button {
   --au-pill: rgba(255,255,255,.08);
   --au-pill-border: rgba(255,255,255,.14);
   --au-row: rgba(255,255,255,.06);
-  --au-eyebrow: #818cf8;
+  /* Brand eyebrow above the title - lightened accent for contrast on dark. */
+  --au-eyebrow: color-mix(in srgb,var(--accent) 70%,white);
   --au-label: #94a3b8;
   --au-value: #ffffff;
   --au-sub: #64748b;
@@ -209,7 +211,8 @@ input[type="search"]::-webkit-search-cancel-button {
   --au-pill: rgba(255,255,255,.08);
   --au-pill-border: rgba(255,255,255,.14);
   --au-row: rgba(255,255,255,.06);
-  --au-eyebrow: #818cf8;
+  /* Brand eyebrow above the title - lightened accent for contrast on black. */
+  --au-eyebrow: color-mix(in srgb,var(--accent) 70%,white);
   --au-label: #94a3b8;
   --au-value: #ffffff;
   --au-sub: #64748b;
@@ -223,22 +226,25 @@ input[type="search"]::-webkit-search-cancel-button {
 }
 
 /* Fallback for browsers without color-mix: keep the original aurora
-   wallpaper so the page still paints a gradient instead of nothing. */
+   wallpaper and eyebrow so the page still paints instead of nothing. */
 @supports not (color: color-mix(in srgb,red 50%,blue)) {
   [data-theme="light"] {
     --au-page:
       radial-gradient(120vmax 120vmin at 20% 0%,#c7d2fe 0%,#e0f2fe 45%,#e9eefb 100%);
     --au-page-base: #e9eefb;
+    --au-eyebrow: #4f46e5;
   }
   [data-theme="dark"] {
     --au-page:
       radial-gradient(120vmax 120vmin at 20% 0%,#1d2b64 0%,#0a1128 45%,#050a18 100%);
     --au-page-base: #050a18;
+    --au-eyebrow: #818cf8;
   }
   [data-theme="amoled"] {
     --au-page:
       radial-gradient(120vmax 120vmin at 20% 0%,#141b4d 0%,#05070f 45%,#000000 100%);
     --au-page-base: #000000;
+    --au-eyebrow: #818cf8;
   }
 }
 
