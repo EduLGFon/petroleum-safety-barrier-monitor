@@ -193,6 +193,122 @@ Deno.test("sendMail upgrades via STARTTLS when advertised", async () => {
   assertStrictEquals(log.match(/EHLO/g)?.length, 2);
 });
 
+Deno.test("sendMail uses AUTH LOGIN when the server advertises LOGIN only (Outlook)", async () => {
+  const fake = fakeSocket([
+    "220 fake ESMTP",
+    // Outlook-style: no PLAIN after STARTTLS-less EHLO.
+    "250-fake ESMTP\r\n250-AUTH LOGIN XOAUTH2\r\n250 OK",
+    "334 VXNlcm5hbWU6",
+    "334 UGFzc3dvcmQ6",
+    "235 2.7.0 Authentication successful",
+    "250 2.1.0 Sender ok",
+    "250 2.1.5 Recipient ok",
+    "354 End data",
+    "250 2.0.0 Message accepted",
+    "221 2.0.0 Bye",
+  ]);
+  await sendMail(
+    config({
+      connector: plainConnector(fake.socket),
+      user: "you@outlook.com",
+      pass: "sekret",
+    }),
+    "s",
+    "b",
+  );
+  const log = fake.received();
+  assertStrictEquals(log.includes("AUTH LOGIN"), true);
+  assertStrictEquals(log.includes("AUTH PLAIN"), false);
+});
+
+Deno.test("sendMail falls back from PLAIN to LOGIN when PLAIN is rejected", async () => {
+  const fake = fakeSocket([
+    "220 fake ESMTP",
+    "250-fake ESMTP\r\n250-AUTH PLAIN LOGIN\r\n250 OK",
+    "535 5.7.3 Authentication unsuccessful",
+    "334 VXNlcm5hbWU6",
+    "334 UGFzc3dvcmQ6",
+    "235 2.7.0 Authentication successful",
+    "250 2.1.0 Sender ok",
+    "250 2.1.5 Recipient ok",
+    "354 End data",
+    "250 2.0.0 Message accepted",
+    "221 2.0.0 Bye",
+  ]);
+  await sendMail(
+    config({
+      connector: plainConnector(fake.socket),
+      user: "you@outlook.com",
+      pass: "sekret",
+    }),
+    "s",
+    "b",
+  );
+  const log = fake.received();
+  assertStrictEquals(log.includes("AUTH PLAIN"), true);
+  assertStrictEquals(log.includes("AUTH LOGIN"), true);
+});
+
+Deno.test("sendMail treats port 465 as implicit TLS by default", async () => {
+  const fake = fakeSocket([
+    "220 fake ESMTP",
+    "250 fake",
+    "250 2.1.0 Sender ok",
+    "250 2.1.5 Recipient ok",
+    "354 End data",
+    "250 2.0.0 Message accepted",
+    "221 2.0.0 Bye",
+  ]);
+  let seenSecure: boolean | undefined;
+  await sendMail(
+    config({
+      hostname: "smtp.gmail.com",
+      port: 465,
+      connector: (opts) => {
+        seenSecure = opts.secure;
+        return Promise.resolve({ socket: fake.socket });
+      },
+    }),
+    "s",
+    "b",
+  );
+  assertStrictEquals(seenSecure, true);
+});
+
+Deno.test("composeMessage builds multipart when html is given", () => {
+  const msg = composeMessage(
+    "a@b.c",
+    "d@e.f",
+    "sync ok",
+    "line1\nline2",
+    "Tue, 1 Jan 2026 00:00:00 GMT",
+    "<p>line1</p>",
+  );
+  assertStrictEquals(msg.includes("multipart/alternative"), true);
+  assertStrictEquals(msg.includes("Content-Type: text/plain"), true);
+  assertStrictEquals(msg.includes("Content-Type: text/html"), true);
+  assertStrictEquals(msg.includes("<p>line1</p>"), true);
+});
+
+Deno.test("sendMail forwards the html part inside the DATA payload", async () => {
+  const fake = fakeSocket([
+    "220 fake ESMTP",
+    "250 fake",
+    "250 2.1.0 Sender ok",
+    "250 2.1.5 Recipient ok",
+    "354 End data",
+    "250 2.0.0 Message accepted",
+    "221 2.0.0 Bye",
+  ]);
+  await sendMail(
+    config({ connector: plainConnector(fake.socket) }),
+    "s",
+    "plain body",
+    "<p>rich body</p>",
+  );
+  assertStrictEquals(fake.received().includes("<p>rich body</p>"), true);
+});
+
 Deno.test("composeMessage builds a CRLF message", () => {
   const msg = composeMessage(
     "a@b.c",

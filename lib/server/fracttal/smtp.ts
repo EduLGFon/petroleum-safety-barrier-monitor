@@ -1,7 +1,7 @@
 // Minimal Deno-native SMTP submission client (P3 ops alerting, optional).
 // This is why it exists: sync failures must never go silent, and ops email is
 // the optional escalation channel. One submit path (MAIL FROM / RCPT TO /
-// DATA) with EHLO + optional STARTTLS + AUTH PLAIN. Boundary code: the socket
+// DATA) with EHLO + optional STARTTLS + AUTH PLAIN / AUTH LOGIN fallback. Boundary code: the socket
 // and line IO are isolated behind small interfaces so the whole sequence is
 // testable headless with a scripted fake socket (real TLS is never touched
 // in tests).
@@ -64,11 +64,19 @@ class SmtpLineIO {
     this.#reader = socket.readable.getReader();
   }
 
-  // releaseReader: cancels the current reader so the underlying socket can be
-  // handed to Deno.startTls (which requires both streams unlocked).
-  async releaseReader(): Promise<void> {
+  // releaseReader: releases the reader lock so the underlying socket can be
+  // handed to Deno.startTls (which throws BadResource "Bad resource ID"
+  // while either stream is still locked). It must NOT cancel: cancelling
+  // the readable tears down the TCP resource itself, which is exactly
+  // what made startTls fail. Callers only invoke this right after a
+  // completed reply, so no unread bytes are outstanding.
+  releaseReader(): void {
     if (this.#reader !== null) {
-      await this.#reader.cancel();
+      try {
+        this.#reader.releaseLock();
+      } catch {
+        // Already released - upgrade must still proceed.
+      }
       this.#reader = null;
     }
   }
@@ -163,7 +171,19 @@ class SmtpLineIO {
 
   close(): void {
     if (this.#reader !== null) {
-      this.#reader.cancel().catch(() => {});
+      try {
+        // cancel() may throw synchronously on a dead resource and may
+        // reject async after a peer FIN - neither may fail the send.
+        this.#reader.cancel().catch(() => {});
+      } catch {
+        // fall through to unlock + close below
+      }
+      try {
+        this.#reader.releaseLock();
+      } catch {
+        // already unlocked - safe to close the socket
+      }
+      this.#reader = null;
     }
     try {
       this.#socket.close();
@@ -189,13 +209,15 @@ export function encodeSubject(subject: string): string {
   return subject;
 }
 
-// composeMessage: minimal single-part text/plain message with CRLF.
+// composeMessage: single-part text/plain without html, otherwise
+// multipart/alternative (plain fallback first, HTML part second) with CRLF.
 export function composeMessage(
   from: string,
   to: string,
   subject: string,
   body: string,
   date: string,
+  html?: string,
 ): string {
   const head = [
     `From: ${from}`,
@@ -203,43 +225,127 @@ export function composeMessage(
     `Subject: ${encodeSubject(subject)}`,
     `Date: ${date}`,
     `MIME-Version: 1.0`,
-    `Content-Type: text/plain; charset=utf-8`,
-  ].join("\r\n");
+  ];
   const bodyCrlf = body.replace(/\n/g, "\r\n");
-  return `${head}\r\n\r\n${bodyCrlf}`;
+  if (!html) {
+    return `${
+      [...head, `Content-Type: text/plain; charset=utf-8`].join("\r\n")
+    }\r\n\r\n${bodyCrlf}`;
+  }
+  const boundary = `barrier-${crypto.randomUUID().replace(/-/g, "")}`;
+  const htmlCrlf = html.replace(/\r?\n/g, "\r\n");
+  return [
+    ...head,
+    `Content-Type: multipart/alternative; boundary="${boundary}"`,
+    "",
+    `--${boundary}`,
+    `Content-Type: text/plain; charset=utf-8`,
+    `Content-Transfer-Encoding: 8bit`,
+    "",
+    bodyCrlf,
+    `--${boundary}`,
+    `Content-Type: text/html; charset=utf-8`,
+    `Content-Transfer-Encoding: 8bit`,
+    "",
+    htmlCrlf,
+    `--${boundary}--`,
+    "",
+  ].join("\r\n");
+}
+
+// authPlain: single-round AUTH PLAIN (Gmail advertises it).
+async function authPlain(
+  io: SmtpLineIO,
+  user: string,
+  pass: string,
+): Promise<void> {
+  const token = b64(
+    new TextEncoder().encode(`\u0000${user}\u0000${pass}`),
+  );
+  await io.command(`AUTH PLAIN ${token}`, 235);
+}
+
+// authLogin: challenge-response AUTH LOGIN (Outlook/Exchange advertises
+// LOGIN only - no PLAIN). No-initial-response flow for widest compat:
+// server sends "334 VXNlcm5hbWU6" (Username:), we answer with b64(user),
+// then "334 UGFzc3dvcmQ6" (Password:), we answer with b64(pass).
+async function authLogin(
+  io: SmtpLineIO,
+  user: string,
+  pass: string,
+): Promise<void> {
+  await io.command("AUTH LOGIN", 334);
+  await io.command(b64(new TextEncoder().encode(user)), 334);
+  await io.command(b64(new TextEncoder().encode(pass)), 235);
+}
+
+// authenticate: pick a mechanism from EHLO caps, with cross-fallback.
+// Gmail advertises PLAIN+LOGIN (prefer PLAIN, one roundtrip); Outlook
+// advertises LOGIN only (must use LOGIN); servers advertising neither
+// (or fakes in tests) still try PLAIN first then LOGIN, so an
+// unadvertised LOGIN-only relay still connects.
+async function authenticate(
+  io: SmtpLineIO,
+  caps: Set<string>,
+  user: string,
+  pass: string,
+): Promise<void> {
+  // Gmail shows the app password spaced ("xxxx xxxx xxxx xxxx") but the
+  // SMTP secret is the 16 letters without whitespace - normalize here so
+  // both paste styles work.
+  user = user.trim();
+  pass = pass.replace(/\s+/g, "");
+  const hasPlain = caps.has("PLAIN");
+  const hasLogin = caps.has("LOGIN");
+  const order: Array<"PLAIN" | "LOGIN"> = hasPlain && !hasLogin
+    ? ["PLAIN", "LOGIN"]
+    : !hasPlain && hasLogin
+    ? ["LOGIN", "PLAIN"]
+    : ["PLAIN", "LOGIN"];
+  let last: unknown = null;
+  for (const mech of order) {
+    try {
+      if (mech === "PLAIN") await authPlain(io, user, pass);
+      else await authLogin(io, user, pass);
+      return;
+    } catch (err) {
+      last = err;
+      // PLAIN rejected (535 auth failed, 504 unrecognized) falls through
+      // to LOGIN and vice versa; anything else would fail twice anyway.
+    }
+  }
+  throw last;
 }
 
 // sendMail: one submission, best-effort semantics live in the caller.
+// html (when given) rides as the multipart/alternative rich part.
 export async function sendMail(
   config: SmtpConfig,
   subject: string,
   body: string,
+  html?: string,
 ): Promise<void> {
+  const secure = config.secure ?? config.port === 465;
   const connector = config.connector ?? defaultSmtpConnector;
   const { socket, upgrade } = await connector({
     hostname: config.hostname,
     port: config.port,
-    secure: config.secure ?? false,
+    secure,
   });
   let conn: SmtpSocket = socket;
   let io = new SmtpLineIO(conn);
   try {
     await io.expectCode(220);
     let caps = await io.ehlo([]);
-    if (!(config.secure ?? false) && upgrade && caps.has("STARTTLS")) {
+    if (!secure && upgrade && caps.has("STARTTLS")) {
       await io.command("STARTTLS", 220);
       await io.releaseReader();
       conn = await upgrade(conn);
       io = new SmtpLineIO(conn);
-      caps = await io.ehlo([...caps]);
+      caps = await io.ehlo([]);
     }
     if (config.user !== undefined) {
-      const token = b64(
-        new TextEncoder().encode(
-          `\u0000${config.user}\u0000${config.pass ?? ""}`,
-        ),
-      );
-      await io.command(`AUTH PLAIN ${token}`, 235);
+      await authenticate(io, caps, config.user, config.pass ?? "");
     }
     await io.command(`MAIL FROM:<${config.from}>`, 250);
     await io.command(`RCPT TO:<${config.to}>`, 250);
@@ -251,6 +357,7 @@ export async function sendMail(
         subject,
         body,
         new Date().toUTCString(),
+        html,
       ),
     );
     await io.command("QUIT", 221);

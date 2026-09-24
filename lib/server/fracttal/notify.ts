@@ -68,18 +68,24 @@ export function smtpEmailNotifier(
 
 // smtpConfigFromEnv: null when the optional channel is unconfigured. Port 465
 // implies implicit TLS; any other port starts plain and upgrades via STARTTLS.
-export function smtpConfigFromEnv(): SmtpConfig | null {
-  const hostname = Deno.env.get("OPS_SMTP_HOST");
-  const to = Deno.env.get("OPS_EMAIL_TO");
+// MAIL_USER/MAIL_PASS (and MAIL_HOST) are accepted as aliases for the
+// OPS_SMTP_* pair, and from falls back to the authenticated user so
+// Gmail/Outlook (which reject foreign From addresses) work out of the box.
+export function smtpConfigFromEnv(
+  get: (name: string) => string | undefined = (n) => Deno.env.get(n),
+): SmtpConfig | null {
+  const hostname = get("OPS_SMTP_HOST") ?? get("MAIL_HOST");
+  const to = get("OPS_EMAIL_TO");
   if (!hostname || !to) return null;
-  const port = Number(Deno.env.get("OPS_SMTP_PORT") ?? 587);
+  const port = Number(get("OPS_SMTP_PORT") ?? 587);
+  const user = get("OPS_SMTP_USER") ?? get("MAIL_USER");
   return {
     hostname,
     port,
     secure: port === 465,
-    user: Deno.env.get("OPS_SMTP_USER"),
-    pass: Deno.env.get("OPS_SMTP_PASS"),
-    from: Deno.env.get("OPS_EMAIL_FROM") ?? "barrier-monitor@local",
+    user,
+    pass: get("OPS_SMTP_PASS") ?? get("MAIL_PASS"),
+    from: get("OPS_EMAIL_FROM") ?? user ?? "barrier-monitor@local",
     to,
   };
 }

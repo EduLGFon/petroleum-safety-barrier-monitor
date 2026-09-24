@@ -11,7 +11,9 @@ import type { AlertRule } from "../sql/alert_rules.ts";
 
 import type { WireBarrier } from "../../wireTypes.ts";
 
-import { resolveBarrier } from "../../resolve.ts";
+import { resolveBarrier, type ResolverLabels } from "../../resolve.ts";
+
+import { extractDetail } from "./enrich.ts";
 
 import { matchRules } from "./rules.ts";
 
@@ -31,6 +33,7 @@ export async function detectUrgentTransitions(
   onlyBarrierIds?: number[],
   rules: AlertRule[] = [],
   hasAnyRule = false,
+  labels?: ResolverLabels,
 ): Promise<DetectedUrgent[]> {
   const candidates = await store.recentTransitions(since, onlyBarrierIds);
   const barriers = await loadBarriers(candidates.map((c) => c.barrierId));
@@ -53,6 +56,12 @@ export async function detectUrgentTransitions(
     );
     if (!match.matched) continue; // muted category, narrowed or calm
     if (!hasAnyRule && urgency === "none") continue; // legacy calm skip
+    const detail = extractDetail(
+      wire,
+      c.transitionDate,
+      c.statusId,
+      labels,
+    );
     out.push({
       barrierId: c.barrierId,
       transitionDate: c.transitionDate,
@@ -70,6 +79,7 @@ export async function detectUrgentTransitions(
         delivered: [],
         category: barrier.category,
         immediate: match.immediate,
+        ...detail,
       },
       urgency,
     });

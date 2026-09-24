@@ -23,6 +23,8 @@ import {
 
 import { listStaleBarriers } from "../lib/server/sql/alert_rules.ts";
 
+import { getResolverLabels } from "../lib/server/sql/vocabularies.ts";
+
 import { listAlertRules } from "../lib/server/sql/alert_rules.ts";
 
 import { getBarriersByIds } from "../lib/server/sql/barriers.ts";
@@ -100,6 +102,15 @@ async function main(): Promise<void> {
   const mailer = dryRun
     ? { name: "none" as const, send: () => Promise.resolve() }
     : smtpAlertMailer(smtpAlertConfigFromEnv());
+  // Display labels (authors included) so enqueued payloads carry real names;
+  // best-effort: without them the seed-enum fallback still renders.
+  let labels: Awaited<ReturnType<typeof getResolverLabels>> | undefined;
+  try {
+    labels = await getResolverLabels();
+  } catch {
+    labels = undefined;
+  }
+  const brand = Deno.env.get("COMPANY_NAME") || undefined;
   try {
     const result = await runAlertCycle({
       store: sqlAlertStore,
@@ -115,6 +126,8 @@ async function main(): Promise<void> {
       rules: rules!,
       hasAnyRule: (rules?.length ?? 0) > 0,
       listStale: (days) => listStaleBarriers(days),
+      labels,
+      brand,
     });
     if (flags.json) console.log(JSON.stringify(result));
     else {

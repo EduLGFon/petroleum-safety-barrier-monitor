@@ -69,43 +69,47 @@ Deno.test("failureBody renders a null runId as not-recorded", () => {
 });
 
 Deno.test("smtpConfigFromEnv is null unless host and recipient are set", () => {
-  const originals: Array<[string, string | undefined]> = [];
-  const snapshot = (key: string) => {
-    originals.push([key, Deno.env.get(key)]);
-  };
-  for (
-    const key of [
-      "OPS_SMTP_HOST",
-      "OPS_SMTP_PORT",
-      "OPS_SMTP_USER",
-      "OPS_SMTP_PASS",
-      "OPS_EMAIL_TO",
-      "OPS_EMAIL_FROM",
-    ]
-  ) snapshot(key);
+  const get = (vals: Record<string, string>) => (k: string) => vals[k];
+  assertStrictEquals(
+    smtpConfigFromEnv(get({})),
+    null,
+  );
+  const cfg = smtpConfigFromEnv(
+    get({
+      OPS_SMTP_HOST: "smtp.example.com",
+      OPS_EMAIL_TO: "team@example.com",
+    }),
+  );
+  assertStrictEquals(cfg !== null, true);
+  assertStrictEquals(cfg!.hostname, "smtp.example.com");
+  assertStrictEquals(cfg!.port, 587);
+  assertStrictEquals(cfg!.secure, false);
 
-  Deno.env.delete("OPS_SMTP_HOST");
-  Deno.env.delete("OPS_EMAIL_TO");
-  try {
-    assertStrictEquals(smtpConfigFromEnv(), null);
+  const tls = smtpConfigFromEnv(
+    get({
+      OPS_SMTP_HOST: "smtp.example.com",
+      OPS_EMAIL_TO: "team@example.com",
+      OPS_SMTP_PORT: "465",
+    }),
+  );
+  assertStrictEquals(tls!.secure, true);
+});
 
-    Deno.env.set("OPS_SMTP_HOST", "smtp.example.com");
-    Deno.env.set("OPS_EMAIL_TO", "team@example.com");
-    Deno.env.delete("OPS_SMTP_PORT");
-    const cfg = smtpConfigFromEnv();
-    assertStrictEquals(cfg !== null, true);
-    assertStrictEquals(cfg!.hostname, "smtp.example.com");
-    assertStrictEquals(cfg!.port, 587);
-    assertStrictEquals(cfg!.secure, false);
-
-    Deno.env.set("OPS_SMTP_PORT", "465");
-    assertStrictEquals(smtpConfigFromEnv()!.secure, true);
-  } finally {
-    for (const [key, value] of originals) {
-      if (value === undefined) Deno.env.delete(key);
-      else Deno.env.set(key, value);
-    }
-  }
+Deno.test("smtpConfigFromEnv falls back to MAIL_* aliases and user From", () => {
+  const cfg = smtpConfigFromEnv((k) =>
+    (
+      {
+        MAIL_HOST: "smtp.gmail.com",
+        OPS_EMAIL_TO: "team@example.com",
+        MAIL_USER: "you@gmail.com",
+        MAIL_PASS: "sekret",
+      } as Record<string, string>
+    )[k]
+  );
+  assertStrictEquals(cfg!.hostname, "smtp.gmail.com");
+  assertStrictEquals(cfg!.user, "you@gmail.com");
+  assertStrictEquals(cfg!.pass, "sekret");
+  assertStrictEquals(cfg!.from, "you@gmail.com");
 });
 
 Deno.test("notifyFailureToAll fans out and swallows a throwing notifier", async () => {

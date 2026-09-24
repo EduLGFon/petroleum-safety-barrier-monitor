@@ -40,6 +40,8 @@ import { listRecipients } from "../../../../lib/server/sql/recipients.ts";
 
 import { getOrCreateAuthor } from "../../../../lib/server/sql/authors.ts";
 
+import { getResolverLabels } from "../../../../lib/server/sql/vocabularies.ts";
+
 import { sqlAlertStore } from "../../../../lib/server/sql/alerts.ts";
 
 import { loadServerConfig } from "../../../../lib/server/config.ts";
@@ -156,6 +158,14 @@ export const handler = define.handlers({
         } catch {
           mailer = undefined; // no relay: enqueue only, cron sends
         }
+        let labels:
+          | Awaited<ReturnType<typeof getResolverLabels>>
+          | undefined;
+        try {
+          labels = await getResolverLabels();
+        } catch {
+          labels = undefined;
+        }
         const fanout = await maybeSendImmediate({
           store: sqlAlertStore,
           barrier: updated,
@@ -166,6 +176,8 @@ export const handler = define.handlers({
           mailer,
           recipients,
           logger: (line) => console.log(`[status ${requestId}] ${line}`),
+          labels,
+          brand: Deno.env.get("COMPANY_NAME") || undefined,
         });
         if (fanout.matched) {
           console.log(

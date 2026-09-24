@@ -36,6 +36,18 @@ export interface AlertPayload {
   category?: string;
   ruleId?: number | null;
   immediate?: boolean;
+  // Rich detail (optional so rows enqueued before the premium template
+  // still render - the template falls back gracefully when absent):
+  typology?: string;
+  grouping?: string;
+  owner?: string;
+  compliance?: string;
+  locationName?: string;
+  // author: who recorded the transition (latest matching history entry),
+  // note: their note. Absent for sync rows without attribution.
+  author?: string;
+  note?: string;
+  actionPlan?: string;
 }
 
 export interface UnsentAlert {

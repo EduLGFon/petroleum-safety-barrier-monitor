@@ -4,9 +4,17 @@
 // route calls this after record_status_change commits; send failures never
 // throw (the event stays unsent for the cron), only store failures do, and
 // the route logs those without failing the already-committed PATCH.
-import { immediateSubject, urgentDigestBody } from "./templates.ts";
+import {
+  immediateSubject,
+  urgentDigestBody,
+  urgentDigestHtml,
+} from "./templates.ts";
 
 import { type AlertMailer, sendWithRetry } from "./mailer.ts";
+
+import { extractDetail } from "./enrich.ts";
+
+import type { ResolverLabels } from "../../resolve.ts";
 
 import type { AlertRule } from "../sql/alert_rules.ts";
 
@@ -43,6 +51,8 @@ export interface ImmediateOptions {
   timeoutMs?: number;
   now?: () => Date;
   logger?: (line: string) => void;
+  labels?: ResolverLabels;
+  brand?: string;
 }
 
 export interface ImmediateResult {
@@ -59,8 +69,9 @@ export function buildImmediateEvent(
   transitionDate: string,
   statusId: number,
   immediate: boolean,
+  labels?: ResolverLabels,
 ): DetectedUrgent {
-  const resolved = resolveBarrier(barrier);
+  const resolved = resolveBarrier(barrier, labels);
   const urgency = urgencyOf(resolved);
   return {
     barrierId: barrier.id,
@@ -79,6 +90,7 @@ export function buildImmediateEvent(
       delivered: [],
       category: resolved.category,
       immediate,
+      ...extractDetail(barrier, transitionDate, statusId, labels),
     },
     urgency,
   };
@@ -115,6 +127,8 @@ export async function maybeSendImmediate(
     timeoutMs = IMMEDIATE_TIMEOUT_MS,
     now = () => new Date(),
     logger = () => {},
+    labels,
+    brand,
   } = options;
   const resolved = resolveBarrier(barrier);
   const match = matchRules(
@@ -138,6 +152,7 @@ export async function maybeSendImmediate(
     transitionDate,
     statusId,
     match.immediate,
+    labels,
   );
   const enqueued = await store.enqueue([event]);
   logger(`[immediate] enqueued=${enqueued} ${event.dedupKey}`);
@@ -151,17 +166,26 @@ export async function maybeSendImmediate(
   }
   const critical = urgencyOf(resolved) === "critical" ? 1 : 0;
   const subject = immediateSubject(1, critical);
-  const body = urgentDigestBody(
-    [{
-      tag: event.payload.tag,
-      location: event.payload.location,
-      availability: event.payload.availability,
-      criticality: event.payload.criticality,
-      transitionDate,
-      urgency: event.payload.urgency,
-    }],
-    now().toISOString(),
-  );
+  const runAt = now().toISOString();
+  const digestEvents = [{
+    tag: event.payload.tag,
+    location: event.payload.location,
+    availability: event.payload.availability,
+    criticality: event.payload.criticality,
+    transitionDate,
+    urgency: event.payload.urgency,
+    category: event.payload.category,
+    typology: event.payload.typology,
+    grouping: event.payload.grouping,
+    owner: event.payload.owner,
+    compliance: event.payload.compliance,
+    locationName: event.payload.locationName,
+    author: event.payload.author,
+    note: event.payload.note,
+    actionPlan: event.payload.actionPlan,
+  }];
+  const body = urgentDigestBody(digestEvents, runAt);
+  const html = urgentDigestHtml(digestEvents, runAt, brand);
   // Fresh id lookup: a dedup-hit (enqueued 0) may already be delivered, in
   // which case there is nothing to send.
   const unsent = await store.listUnsent();
@@ -177,7 +201,7 @@ export async function maybeSendImmediate(
       await withTimeout(
         sendWithRetry(mailer, [recipient.email], subject, body, {
           attempts: 1,
-        }),
+        }, html),
         timeoutMs,
       );
       emailed++;

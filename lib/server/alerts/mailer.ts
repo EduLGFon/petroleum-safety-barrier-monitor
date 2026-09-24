@@ -7,27 +7,39 @@ import { sendMail, type SmtpConfig } from "../fracttal/smtp.ts";
 
 export interface AlertMailer {
   name: string;
-  send(to: string[], subject: string, body: string): Promise<void>;
+  send(
+    to: string[],
+    subject: string,
+    body: string,
+    html?: string,
+  ): Promise<void>;
 }
 
 export type MailSend = (
   config: SmtpConfig,
   subject: string,
   body: string,
+  html?: string,
 ) => Promise<void>;
 
 // smtpAlertMailer: the one provider, over the P3 SMTP client. One SMTP
 // session per recipient - the audience is small and per-recipient sessions
-// keep delivery failures attributable.
+// keep delivery failures attributable. html (when given) rides as the
+// multipart/alternative rich part with body as the plain fallback.
 export function smtpAlertMailer(
   config: SmtpConfig,
   sendImpl: MailSend = sendMail,
 ): AlertMailer {
   return {
     name: "smtp",
-    async send(to: string[], subject: string, body: string): Promise<void> {
+    async send(
+      to: string[],
+      subject: string,
+      body: string,
+      html?: string,
+    ): Promise<void> {
       for (const address of to) {
-        await sendImpl({ ...config, to: address }, subject, body);
+        await sendImpl({ ...config, to: address }, subject, body, html);
       }
     },
   };
@@ -36,21 +48,26 @@ export function smtpAlertMailer(
 // smtpAlertConfigFromEnv: reuses the P3 OPS_SMTP_* variables (same relay as
 // ops mail). Host is required; from falls back to the user, then a
 // host-based default so a missing OPS_EMAIL_FROM never blocks sending.
+// MAIL_USER/MAIL_PASS (and MAIL_HOST) are accepted as aliases so a plain
+// Gmail/Outlook app-password pair works without renaming. Port 465 implies
+// implicit TLS (same rule as the ops notifier + smtp client default).
 export function smtpAlertConfigFromEnv(
   get: (name: string) => string | undefined = (n) => Deno.env.get(n),
 ): SmtpConfig {
-  const hostname = get("OPS_SMTP_HOST");
+  const hostname = get("OPS_SMTP_HOST") ?? get("MAIL_HOST");
   if (!hostname) {
     throw new Error(
       "OPS_SMTP_HOST is not set (alert mail needs the P3 SMTP relay).",
     );
   }
-  const user = get("OPS_SMTP_USER");
+  const user = get("OPS_SMTP_USER") ?? get("MAIL_USER");
+  const port = Number(get("OPS_SMTP_PORT")) || 587;
   return {
     hostname,
-    port: Number(get("OPS_SMTP_PORT")) || 587,
+    port,
+    secure: port === 465,
     user,
-    pass: get("OPS_SMTP_PASS"),
+    pass: get("OPS_SMTP_PASS") ?? get("MAIL_PASS"),
     from: get("OPS_EMAIL_FROM") ?? user ?? `barrier-monitor@${hostname}`,
     to: "",
   };
@@ -73,6 +90,7 @@ export async function sendWithRetry(
   subject: string,
   body: string,
   policy: Partial<RetryPolicy> = {},
+  html?: string,
 ): Promise<void> {
   const attempts = policy.attempts ?? 3;
   const backoffMs = policy.backoffMs ?? [2_000, 8_000];
@@ -80,7 +98,7 @@ export async function sendWithRetry(
   let last: unknown = null;
   for (let i = 0; i < attempts; i++) {
     try {
-      await mailer.send(to, subject, body);
+      await mailer.send(to, subject, body, html);
       return;
     } catch (err) {
       last = err;

@@ -8,8 +8,13 @@
 import {
   type DigestEvent,
   urgentDigestBody,
+  urgentDigestHtml,
   urgentDigestSubject,
 } from "./templates.ts";
+
+import { extractDetail } from "./enrich.ts";
+
+import type { ResolverLabels } from "../../resolve.ts";
 
 import {
   type AlertStore,
@@ -59,6 +64,10 @@ export interface AlertCycleOptions {
   rules?: AlertRule[];
   hasAnyRule?: boolean;
   listStale?: (staleDays: number) => Promise<StaleCandidate[]>;
+  // labels: DB id->label maps (authors included) so enqueued payloads carry
+  // real names instead of seed-enum sentinels. brand: COMPANY_NAME for mail.
+  labels?: ResolverLabels;
+  brand?: string;
 }
 
 export interface AlertCycleResult {
@@ -122,6 +131,15 @@ function toDigest(e: UnsentAlert): DigestEvent {
     criticality: e.payload.criticality,
     transitionDate: e.transitionDate,
     urgency: e.payload.urgency,
+    category: e.payload.category,
+    typology: e.payload.typology,
+    grouping: e.payload.grouping,
+    owner: e.payload.owner,
+    compliance: e.payload.compliance,
+    locationName: e.payload.locationName,
+    author: e.payload.author,
+    note: e.payload.note,
+    actionPlan: e.payload.actionPlan,
   };
 }
 
@@ -154,6 +172,8 @@ export async function runAlertCycle(
     rules = [],
     hasAnyRule = false,
     listStale,
+    labels,
+    brand,
   } = options;
   const active = recipients.filter((r) => r.email !== "");
   const activeEmails = active.map((r) => r.email);
@@ -181,6 +201,7 @@ export async function runAlertCycle(
     options.onlyBarrierIds,
     rules,
     hasAnyRule,
+    labels,
   );
   result.detected = detected.length;
   logger(
@@ -235,6 +256,7 @@ export async function runAlertCycle(
               delivered: [],
               ruleId: r.id,
               immediate: r.notify_immediate,
+              ...extractDetail(wire, today, wire.availabilityId, labels),
             },
             urgency: wire.criticalityId === 1 ? "critical" : "urgent",
           });
@@ -283,12 +305,19 @@ export async function runAlertCycle(
       e.payload.urgency === "critical"
     ).length;
     const subject = urgentDigestSubject(pending.length, critical);
-    const body = urgentDigestBody(
-      pending.map(toDigest),
-      now().toISOString(),
-    );
+    const events = pending.map(toDigest);
+    const runAt = now().toISOString();
+    const body = urgentDigestBody(events, runAt);
+    const html = urgentDigestHtml(events, runAt, brand);
     try {
-      await sendWithRetry(mailer, [recipient.email], subject, body, retry);
+      await sendWithRetry(
+        mailer,
+        [recipient.email],
+        subject,
+        body,
+        retry,
+        html,
+      );
       result.emails++;
       logger(
         `[alerts] digest sent to ${recipient.email} (${pending.length} events)`,
