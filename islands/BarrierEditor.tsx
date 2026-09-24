@@ -1,16 +1,7 @@
 // BarrierEditor - admin barrier metadata and sheet inventory editor.
 // This is why it exists: admins can edit every barrier field directly from
 // the modal, picking from curated option lists or typing custom text.
-import {
-  BuildingIcon,
-  LayersIcon,
-  ShieldCheckIcon,
-  UserIcon,
-} from "../components/ui/Icons.tsx";
-import {
-  type FieldKey,
-  SEED_DEFAULTS,
-} from "../lib/field-options.ts";
+import { type FieldKey, SEED_DEFAULTS } from "../lib/field-options.ts";
 import { AURORA } from "../lib/aurora.ts";
 import type { Barrier } from "../lib/types.ts";
 import { useEffect, useState } from "preact/hooks";
@@ -45,7 +36,9 @@ const inputStyle = {
 
 export function BarrierEditor({ barrier, onSaved, onCancel }: Props) {
   const [lookups, setLookups] = useState<Lookups | null>(null);
-  const [fieldOpts, setFieldOpts] = useState<Record<string, string[]>>(SEED_DEFAULTS);
+  const [fieldOpts, setFieldOpts] = useState<Record<string, string[]>>(
+    SEED_DEFAULTS,
+  );
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
@@ -57,8 +50,12 @@ export function BarrierEditor({ barrier, onSaved, onCancel }: Props) {
   const [categoryId, setCategoryId] = useState<number | undefined>(undefined);
   const [groupingId, setGroupingId] = useState<number | undefined>(undefined);
   const [ownerId, setOwnerId] = useState<number | undefined>(undefined);
-  const [criticalityId, setCriticalityId] = useState<number | undefined>(undefined);
-  const [availabilityId, setAvailabilityId] = useState<number | undefined>(undefined);
+  const [criticalityId, setCriticalityId] = useState<number | undefined>(
+    undefined,
+  );
+  const [availabilityId, setAvailabilityId] = useState<number | undefined>(
+    undefined,
+  );
   const [statusNote, setStatusNote] = useState("");
   const [comments, setComments] = useState(barrier.comments);
   const [actionPlan, setActionPlan] = useState(barrier.actionPlan);
@@ -68,16 +65,22 @@ export function BarrierEditor({ barrier, onSaved, onCancel }: Props) {
   const [installLocal, setInstallLocal] = useState(barrier.installLocal);
   const [equipTypology, setEquipTypology] = useState(barrier.equipTypology);
   const [fieldInstalled, setFieldInstalled] = useState(barrier.fieldInstalled);
-  const [fieldOperational, setFieldOperational] = useState(barrier.fieldOperational);
+  const [fieldOperational, setFieldOperational] = useState(
+    barrier.fieldOperational,
+  );
   const [opStatus, setOpStatus] = useState(barrier.opStatus);
   const [hasMaintPlan, setHasMaintPlan] = useState(barrier.hasMaintPlan);
   const [planFollowed, setPlanFollowed] = useState(barrier.planFollowed);
   const [failureFree, setFailureFree] = useState(barrier.failureFree);
   const [maintStatus, setMaintStatus] = useState(barrier.maintStatus);
   const [hasContingency, setHasContingency] = useState(barrier.hasContingency);
-  const [contingencyDesc, setContingencyDesc] = useState(barrier.contingencyDesc);
+  const [contingencyDesc, setContingencyDesc] = useState(
+    barrier.contingencyDesc,
+  );
   const [evidenceCode, setEvidenceCode] = useState(barrier.evidenceCode);
-  const [degradationDesc, setDegradationDesc] = useState(barrier.degradationDesc);
+  const [degradationDesc, setDegradationDesc] = useState(
+    barrier.degradationDesc,
+  );
   const [extraComments, setExtraComments] = useState(barrier.extraComments);
 
   useEffect(() => {
@@ -94,31 +97,45 @@ export function BarrierEditor({ barrier, onSaved, onCancel }: Props) {
         setLookups(l);
         // Find matching ids for the barrier
         if (l.locations) {
-          const m = l.locations.find((x: { code: string }) => x.code === barrier.location);
+          const m = l.locations.find((x: { code: string }) =>
+            x.code === barrier.location
+          );
           if (m) setLocationId(m.id);
         }
         if (l.typologies) {
-          const m = l.typologies.find((x: { label: string }) => x.label === barrier.typology);
+          const m = l.typologies.find((x: { label: string }) =>
+            x.label === barrier.typology
+          );
           if (m) setTypologyId(m.id);
         }
         if (l.categories) {
-          const m = l.categories.find((x: { label: string }) => x.label === barrier.category);
+          const m = l.categories.find((x: { label: string }) =>
+            x.label === barrier.category
+          );
           if (m) setCategoryId(m.id);
         }
         if (l.groupings) {
-          const m = l.groupings.find((x: { label: string }) => x.label === barrier.grouping);
+          const m = l.groupings.find((x: { label: string }) =>
+            x.label === barrier.grouping
+          );
           if (m) setGroupingId(m.id);
         }
         if (l.owners && barrier.owner) {
-          const m = l.owners.find((x: { label: string }) => x.label === barrier.owner);
+          const m = l.owners.find((x: { label: string }) =>
+            x.label === barrier.owner
+          );
           if (m) setOwnerId(m.id);
         }
         if (l.criticalities) {
-          const m = l.criticalities.find((x: { label: string }) => x.label === barrier.criticality);
+          const m = l.criticalities.find((x: { label: string }) =>
+            x.label === barrier.criticality
+          );
           if (m) setCriticalityId(m.id);
         }
         if (l.availabilities) {
-          const m = l.availabilities.find((x: { label: string }) => x.label === barrier.availability);
+          const m = l.availabilities.find((x: { label: string }) =>
+            x.label === barrier.availability
+          );
           if (m) setAvailabilityId(m.id);
         }
       }
@@ -222,7 +239,10 @@ export function BarrierEditor({ barrier, onSaved, onCancel }: Props) {
               const v = e.currentTarget.value;
               if (v !== "__custom__") setValue(v);
             }}
-            style={{ ...inputStyle, flex: opts.includes(value) ? 1 : "0 0 130px" }}
+            style={{
+              ...inputStyle,
+              flex: opts.includes(value) ? 1 : "0 0 130px",
+            }}
           >
             {opts.map((o) => (
               <option key={o} value={o}>
@@ -511,29 +531,31 @@ export function BarrierEditor({ barrier, onSaved, onCancel }: Props) {
         </div>
 
         {availabilityId !== undefined &&
-          lookups?.availabilities?.find((a) => a.id === availabilityId)?.label !==
-            barrier.availability && (
-          <div style={{ marginTop: 10 }}>
-            <label
-              style={{
-                fontSize: "var(--d-micro)",
-                fontWeight: 700,
-                color: "var(--accent)",
-                textTransform: "uppercase",
-                letterSpacing: "0.1em",
-              }}
-            >
-              Motivo / Nota da Alteração de Status
-            </label>
-            <input
-              type="text"
-              placeholder="Ex: Manutenção preventiva realizada"
-              value={statusNote}
-              onInput={(e) => setStatusNote(e.currentTarget.value)}
-              style={{ ...inputStyle, marginTop: 4 }}
-            />
-          </div>
-        )}
+          lookups?.availabilities?.find((a) => a.id === availabilityId)
+              ?.label !==
+            barrier.availability &&
+          (
+            <div style={{ marginTop: 10 }}>
+              <label
+                style={{
+                  fontSize: "var(--d-micro)",
+                  fontWeight: 700,
+                  color: "var(--accent)",
+                  textTransform: "uppercase",
+                  letterSpacing: "0.1em",
+                }}
+              >
+                Motivo / Nota da Alteração de Status
+              </label>
+              <input
+                type="text"
+                placeholder="Ex: Manutenção preventiva realizada"
+                value={statusNote}
+                onInput={(e) => setStatusNote(e.currentTarget.value)}
+                style={{ ...inputStyle, marginTop: 4 }}
+              />
+            </div>
+          )}
       </div>
 
       <hr
