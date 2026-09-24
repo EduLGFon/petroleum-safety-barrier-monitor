@@ -346,7 +346,7 @@ toWireQuery({ location: "FAL", availability: "Degradado", page: 1 });
 | `routes/api/lookups.ts`              | `GET /api/lookups` (authenticated id lists for admin forms)                                                   |
 | `routes/api/field-options.ts`        | `GET/PUT /api/field-options` (curated sheet-question options)                                                 |
 | `routes/api/barriers/[id].ts`        | `GET/PATCH /api/barriers/:id` (admin field update)                                                            |
-| `lib/server/sql/field-options.ts`    | `field_option_sets` store + GERAL seed defaults                                                                |
+| `lib/server/sql/field-options.ts`    | `field_option_sets` store + GERAL seed defaults                                                               |
 | `lib/server/sql/barriers.ts`         | `updateBarrier` (metadata + sheet fields; status via transition)                                              |
 | `lib/field-options.ts`               | Field registry, pt-BR labels, seed defaults, option validation                                                |
 | `islands/BarrierEditor.tsx`          | Admin barrier edit form (modal Editar tab)                                                                    |

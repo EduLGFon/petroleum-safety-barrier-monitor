@@ -19,7 +19,9 @@ interface Props {
   onSaved?: () => void;
 }
 // BarrierModal renders the detail dialog shell; handles ESC close, body scroll-lock, and backdrop dismiss.
-export function BarrierModal({ barrier, onClose, sessionUser, onSaved }: Props) {
+export function BarrierModal(
+  { barrier, onClose, sessionUser, onSaved }: Props,
+) {
   const [tab, setTab] = useState<Tab>("details");
   const key = useCallback((e: KeyboardEvent) => {
     if (e.key === "Escape") onClose();

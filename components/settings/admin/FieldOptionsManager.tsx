@@ -15,8 +15,8 @@ import {
 import {
   FIELD_KEYS,
   FIELD_LABELS,
-  SEED_DEFAULTS,
   type FieldKey,
+  SEED_DEFAULTS,
 } from "../../../lib/field-options.ts";
 import { adminApi } from "../../../lib/api/admin-client.ts";
 import { useEffect, useState } from "preact/hooks";

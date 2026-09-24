@@ -9,11 +9,7 @@ import {
   SEED_DEFAULTS,
 } from "./field-options.ts";
 
-import {
-  assert,
-  assertEquals,
-  assertThrows,
-} from "jsr:@std/assert@^1";
+import { assert, assertEquals, assertThrows } from "jsr:@std/assert@^1";
 
 Deno.test("isFieldKey validates known field keys", () => {
   assert(isFieldKey("opStatus"));
@@ -52,6 +48,9 @@ Deno.test("normalizeOptions caps length and count", () => {
   const normalized = normalizeOptions([longStr]);
   assertEquals(normalized[0].length, MAX_OPTION_LEN);
 
-  const many = Array.from({ length: MAX_OPTIONS + 20 }, (_, i) => `Option ${i}`);
+  const many = Array.from(
+    { length: MAX_OPTIONS + 20 },
+    (_, i) => `Option ${i}`,
+  );
   assertEquals(normalizeOptions(many).length, MAX_OPTIONS);
 });
