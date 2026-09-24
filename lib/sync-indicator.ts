@@ -24,6 +24,7 @@ export type HealthKind =
   | "syncing"
   | "failed"
   | "stale"
+  | "outdated"
   | "never"
   | "offline";
 
@@ -43,6 +44,7 @@ export const SYNC_DOT = {
   syncing: "#f5a524",
   failed: "#f31260",
   stale: "#f31260",
+  outdated: "#fb923c",
   never: "#a1a1aa",
   offline: "#f87171",
 } as const;
@@ -66,11 +68,18 @@ export function toDeltas(
   };
 }
 
+// SYNC_OUTDATED_MINUTES: an `ok` last run older than this stops rendering
+// green. The default poll cadence produces a finished run every ~7 minutes,
+// so 30 minutes without one means the poller is not producing (dead, not
+// slow) - the exact case a calm "Sincronizado" label used to hide.
+export const SYNC_OUTDATED_MINUTES = 30;
+
 // toHealthKind: precedence matrix. Offline wins over everything so a dead
 // backend never shows a calm green dot; syncing beats idle/failed/stale.
 export function toHealthKind(
   sync: SyncStatus | null,
   conn: Conn,
+  nowMs: number = Date.now(),
 ): HealthKind {
   if (conn === "disconnected") return "offline";
   if (sync === null) return "never";
@@ -80,7 +89,17 @@ export function toHealthKind(
   if (sync.state === "stale") return "stale";
   if (sync.state === "unknown" || sync.lastRun === null) return "never";
   if (sync.lastRun.status === "failed") return "failed";
+  if (isOutdated(sync.lastRun.finishedAt, nowMs)) return "outdated";
   return "synced";
+}
+
+// isOutdated: true when the last finished run is older than the outdated
+// window. Malformed timestamps never count (display falls back to the raw
+// string elsewhere); only a provably old success degrades the dot.
+function isOutdated(finishedAt: string, nowMs: number): boolean {
+  const ms = new Date(finishedAt).getTime();
+  if (!Number.isFinite(ms)) return false;
+  return nowMs - ms > SYNC_OUTDATED_MINUTES * 60_000;
 }
 
 // InstantParts: absolute local date/time plus relative fallback.
@@ -178,6 +197,7 @@ export function healthLabel(kind: HealthKind): string {
   if (kind === "syncing") return "Sincronizando…";
   if (kind === "failed") return "Falha na sincronização";
   if (kind === "stale") return "Sincronização possivelmente travada";
+  if (kind === "outdated") return "Sincronização desatualizada";
   if (kind === "never") return "Sem sincronizações";
   if (kind === "offline") return "Offline";
   return "Sincronizado";

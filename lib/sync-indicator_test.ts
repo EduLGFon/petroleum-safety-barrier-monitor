@@ -5,6 +5,7 @@ import {
   formatDuration,
   formatInstant,
   friendlyScope,
+  healthLabel,
   toDeltas,
   toHealthKind,
 } from "./sync-indicator.ts";
@@ -40,28 +41,67 @@ Deno.test("toDeltas sums changed items", () => {
   assertStrictEquals(toDeltas(null), null);
 });
 
+// NOW_FRESH is 5 minutes after the fixture run (healthy cadence);
+// NOW_STALE is 14 hours after it (the dead-poller report).
+const NOW_FRESH = new Date("2026-09-22T10:10:00.000Z").getTime();
+const NOW_STALE = new Date("2026-09-23T00:05:00.000Z").getTime();
+
 Deno.test("toHealthKind prefers offline over sync state", () => {
-  assertStrictEquals(toHealthKind(sync(), "disconnected"), "offline");
-  assertStrictEquals(toHealthKind(sync(), "connected"), "synced");
-  assertStrictEquals(toHealthKind(null, "connected"), "never");
+  assertStrictEquals(
+    toHealthKind(sync(), "disconnected", NOW_FRESH),
+    "offline",
+  );
+  assertStrictEquals(toHealthKind(sync(), "connected", NOW_FRESH), "synced");
+  assertStrictEquals(toHealthKind(null, "connected", NOW_FRESH), "never");
 });
 
 Deno.test("toHealthKind surfaces syncing, failed and stale", () => {
   assertStrictEquals(
-    toHealthKind(sync({ state: "syncing" }), "connected"),
+    toHealthKind(sync({ state: "syncing" }), "connected", NOW_FRESH),
     "syncing",
   );
   assertStrictEquals(
     toHealthKind(
       sync({ lastRun: { ...sync().lastRun!, status: "failed" } }),
       "connected",
+      NOW_FRESH,
     ),
     "failed",
   );
   assertStrictEquals(
-    toHealthKind(sync({ state: "stale" }), "connected"),
+    toHealthKind(sync({ state: "stale" }), "connected", NOW_FRESH),
     "stale",
   );
+});
+
+Deno.test("toHealthKind flags an aging ok run as outdated", () => {
+  assertStrictEquals(
+    toHealthKind(sync(), "connected", NOW_STALE),
+    "outdated",
+  );
+  assertStrictEquals(healthLabel("outdated"), "Sincronização desatualizada");
+});
+
+Deno.test("toHealthKind keeps failure signals above outdated", () => {
+  const failed = sync({
+    lastRun: { ...sync().lastRun!, status: "failed" },
+  });
+  assertStrictEquals(toHealthKind(failed, "connected", NOW_STALE), "failed");
+  assertStrictEquals(
+    toHealthKind(sync({ state: "stale" }), "connected", NOW_STALE),
+    "stale",
+  );
+  assertStrictEquals(
+    toHealthKind(sync({ state: "syncing" }), "connected", NOW_STALE),
+    "syncing",
+  );
+});
+
+Deno.test("toHealthKind never downgrades a malformed timestamp", () => {
+  const broken = sync({
+    lastRun: { ...sync().lastRun!, finishedAt: "not-a-date" },
+  });
+  assertStrictEquals(toHealthKind(broken, "connected", NOW_STALE), "synced");
 });
 
 Deno.test("formatInstant renders pt-BR date and time parts", () => {
