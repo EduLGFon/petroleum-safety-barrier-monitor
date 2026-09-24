@@ -31,10 +31,14 @@ import { useEffect, useMemo, useState } from "preact/hooks";
 import { KpiSections } from "./KpiSections.tsx";
 
 // Either data hook return, plus optional server-only fetch state.
+// isInitial = first paint with zero rows (splash territory).
+// isRefreshing = background refetch with stale rows kept (table-local shimmer).
 export type Dash =
   & ReturnType<typeof useDashboard>
   & {
     loading?: boolean;
+    isInitial?: boolean;
+    isRefreshing?: boolean;
     error?: string | null;
     retry?: () => void;
   };
@@ -116,7 +120,12 @@ export function DashboardSections(
     toggleSelect,
     selectAll,
     clearAll,
+    isRefreshing = false,
   } = dash;
+
+  // Table entrance runs exactly once on mount (CSS animation on a stable
+  // element replays only if remounted). Row updates animate inside
+  // BarriersTable only, so the wrapper never yanks the viewport.
 
   // Apply settings default filters after hydration (once). The patch is
   // sanitized so a stale or tampered preset can never wedge the grid.
@@ -228,19 +237,24 @@ export function DashboardSections(
             compliances={confOpts}
             categories={catOpts}
             criticalities={critOpts}
+            isRefreshing={isRefreshing}
             onFilter={setFilter}
             onReset={resetFilters}
           />
         </div>
 
-        {/* Table */}
-        <div style={{ animation: "slideUp .3s .4s var(--ease-out) both" }}>
+        {
+          /* Table - entrance runs once on mount; row/filter/page/pageSize
+            updates animate inside BarriersTable. */
+        }
+        <div className="animate-slide-up-once">
           <BarriersTable
             rows={rows}
             filters={filters}
             filteredTotal={filteredTotal}
             totalPages={totalPages}
             selectedIds={selectedIds}
+            isRefreshing={isRefreshing}
             onToggleSelect={toggleSelect}
             onSort={setSort}
             onPageChange={(p) => setFilter({ page: p })}

@@ -133,8 +133,15 @@ function ServerView(
     vocabularies,
     300_000,
   );
-  const { loading, error, retry, rows, liveVocabularies, exportServerCsv } =
-    dash;
+  const {
+    loading,
+    isInitial,
+    error,
+    retry,
+    rows,
+    liveVocabularies,
+    exportServerCsv,
+  } = dash;
   // Live vocabulary wins once the cadence refreshes it; the SSR seed covers
   // the first paint so tabs never flash empty.
   const vocab = liveVocabularies ?? vocabularies;
@@ -144,11 +151,14 @@ function ServerView(
   const syncChanges = useSyncChanges(baseUrl, 60_000, true);
 
   // Fade the shell in once the first scope resolves; later refetches keep
-  // showing stale data instead of flashing the splash on every keystroke.
+  // showing stale data instead of flashing the splash on every keystroke,
+  // page turn, page-size change, or search input. isInitial is true only
+  // while zero rows have ever loaded, so background refreshes never reopen
+  // the splash.
   useEffect(() => {
-    if (!loading && !error) setShown(true);
-  }, [loading, error]);
-  const firstLoad = loading && rows.length === 0 && !splashDone;
+    if (!isInitial && !error) setShown(true);
+  }, [isInitial, error]);
+  const firstLoad = !!isInitial && !splashDone;
 
   if (error && rows.length === 0) {
     return <ServerErrorCard error={error} retry={retry} />;

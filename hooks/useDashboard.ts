@@ -114,5 +114,11 @@ export function useDashboard(allBarriers: Barrier[], defaultLocation = "ALL") {
     toggleSelect,
     selectAll,
     clearAll,
+    // Client mode derives synchronously: never a global load, never a
+    // background refresh. Present so DashboardSections can treat both modes
+    // with one `dash.isRefreshing` contract.
+    loading: false,
+    isInitial: false,
+    isRefreshing: false,
   };
 }

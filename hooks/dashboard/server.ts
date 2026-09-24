@@ -250,6 +250,13 @@ export function useServerDashboard(
     ? items.find((b) => b.id === openId) ?? null
     : null;
 
+  // Split loading into initial vs refresh so row updates (filter/page/search/
+  // pageSize) keep stale rows on screen instead of flashing the full splash.
+  // Initial = first paint with zero rows; refreshing = background refetch
+  // with stale rows still visible.
+  const isInitial = loading && items.length === 0;
+  const isRefreshing = loading && items.length > 0;
+
   // Retries the current scope after a fetch failure.
   const retry = useCallback(() => setReloadKey((k) => k + 1), []);
 
@@ -357,6 +364,8 @@ export function useServerDashboard(
     selectAll,
     clearAll,
     loading,
+    isInitial,
+    isRefreshing,
     error,
     retry,
     exportServerCsv,

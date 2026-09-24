@@ -18,6 +18,9 @@ interface Props {
   compliances: string[];
   categories: string[];
   criticalities: string[];
+  // True while a background refetch is in flight (server mode). Drives the
+  // search-field busy pulse; never blocks typing.
+  isRefreshing?: boolean;
   onFilter: (p: Partial<FilterState>) => void;
   onReset: () => void;
 }
@@ -63,6 +66,7 @@ export function FilterBar(
     compliances,
     categories,
     criticalities,
+    isRefreshing = false,
     onFilter,
     onReset,
   }: Props,
@@ -118,11 +122,16 @@ export function FilterBar(
             display: "flex",
             transition: "transform .2s var(--ease-out)",
             ...(focused ? { transform: "translateY(-50%) scale(1.1)" } : {}),
+            ...(isRefreshing
+              ? { animation: "pulse 1.1s var(--ease-std) infinite" }
+              : {}),
           }}
         >
           <SearchIcon
             size={14}
-            color={focused || draft ? "var(--accent-2)" : AURORA.sub}
+            color={focused || draft || isRefreshing
+              ? "var(--accent-2)"
+              : AURORA.sub}
           />
         </span>
         <input

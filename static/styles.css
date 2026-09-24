@@ -31,6 +31,11 @@ body {
   background-color: var(--au-page-base);
   overscroll-behavior-y: none;
 }
+/* Stable scrollbar gutter: table height changes (filter/page/pageSize)
+   never shift the viewport horizontally when the scrollbar appears. */
+html {
+  scrollbar-gutter: stable;
+}
 body {
   min-height: 100dvh;
 }
@@ -1029,6 +1034,101 @@ select option {
 }
 .animate-check {
   animation: checkIn 0.18s var(--ease-out) both;
+}
+/* Table mount-once entrance: runs on first paint only. The element is
+   never remounted on filter/page/search/pageSize updates, so row refreshes
+   animate inside the card without replaying this wrapper. */
+.animate-slide-up-once {
+  animation: slideUp 0.3s 0.4s var(--ease-out) both;
+}
+
+/* ── Barriers table refresh - premium row updates ───────────────────────
+   Stale rows stay mounted while refetching (no splash, no empty flash).
+   Refreshing dims + desaturates the body and sweeps an accent hairline;
+   fresh rows enter with a short fade/rise/blur stagger. Heights are locked
+   via inline min-height so shorter results or a smaller pageSize ease down
+   instead of snapping the footer and viewport. */
+@keyframes rowRefreshIn {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+    filter: blur(2px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+    filter: none;
+  }
+}
+@keyframes hairlineSweep {
+  from {
+    transform: scaleX(0);
+    opacity: 1;
+  }
+  to {
+    transform: scaleX(1);
+    opacity: 1;
+  }
+}
+.table-card {
+  transition: min-height 0.28s var(--ease-out);
+  overflow-anchor: auto;
+}
+.table-fixed {
+  table-layout: fixed;
+}
+.table-hairline {
+  position: absolute;
+  top: 0;
+  left: 12px;
+  right: 12px;
+  height: 2px;
+  border-radius: 2px;
+  background: linear-gradient(90deg, var(--accent), var(--accent-2));
+  box-shadow: 0 0 12px var(--glow);
+  transform-origin: left center;
+  transform: scaleX(0);
+  opacity: 0;
+  pointer-events: none;
+  z-index: 2;
+}
+.table-hairline.is-on {
+  opacity: 1;
+  animation: hairlineSweep 0.45s var(--ease-out) both;
+}
+tbody.table-refreshing {
+  opacity: 0.6;
+  filter: saturate(0.92);
+  transition: opacity 0.18s var(--ease-std), filter 0.18s var(--ease-std);
+  pointer-events: none;
+}
+.table-row-enter {
+  animation: rowRefreshIn 0.18s var(--ease-out) var(--row-delay, 0ms) both;
+  content-visibility: auto;
+  contain-intrinsic-size: auto 56px;
+  transition: background 0.15s var(--ease-std);
+}
+/* Single-line clamp keeps every row the same height so pageSize growth
+   extends downward smoothly and column widths never jitter. */
+.trow-ellipsis {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+/* Fixed NC slot: non-NC rows reserve the badge height so toggling filters
+   between Conforme / Não Conforme never changes row height. */
+.trow-nc-slot {
+  min-height: 22px;
+}
+/* Empty state holds ~4 rows of height so the footer stays put. */
+.table-empty {
+  height: 320px;
+  vertical-align: middle;
+}
+/* Pager space is always reserved so the pager appearing/disappearing or
+   pageSize options changing never moves content below the table. */
+.table-pager-reserve {
+  min-height: var(--d-page-btn);
 }
 
 /* ── Button lift - professional hover with NO bounce ──────────────────────── */

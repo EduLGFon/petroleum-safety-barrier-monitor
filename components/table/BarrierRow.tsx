@@ -11,6 +11,7 @@ import type { Barrier } from "../../lib/types.ts";
 import { ClockIcon } from "../ui/Icons.tsx";
 import { Badge } from "../ui/Badge.tsx";
 import { RowChk } from "./RowCheck.tsx";
+import type { CSSProperties } from "preact";
 
 interface BarrierRowProps {
   barrier: Barrier;
@@ -21,6 +22,11 @@ interface BarrierRowProps {
 }
 
 // BarrierRow: renders one ledger row with select checkbox, badges, and detail open.
+// Entrance uses the shared .table-row-enter class (stagger via --row-delay)
+// so selection toggles reuse the DOM node without replaying the animation;
+// only newly mounted ids (filter/page/search/pageSize changes) animate in.
+// Text cells clamp to one line and the NC slot keeps a fixed reserve so row
+// heights stay stable and pageSize changes grow/shrink smoothly.
 export function BarrierRow(
   { barrier: b, index: i, selected: isSel, onToggleSelect, onSelect }:
     BarrierRowProps,
@@ -31,21 +37,13 @@ export function BarrierRow(
     <tr
       key={b.id}
       tabIndex={0}
-      onKeyDown={(e) => {
-        if (e.key === "Enter" || e.key === " ") {
-          e.preventDefault();
-          onSelect(b);
-        }
-      }}
+      className="table-row-enter"
       style={{
+        ["--row-delay" as string]: `${Math.min(i * 20, 200)}ms`,
         borderBottom: `1px solid ${AURORA.rowDivider}`,
         background: isSel ? "rgba(99,102,241,.12)" : "transparent",
         cursor: "pointer",
-        transition: "background .15s var(--ease-std)",
-        animation: `rowAppear .22s ${
-          Math.min(i * 18, 280)
-        }ms var(--ease-out) both`,
-      }}
+      } as CSSProperties}
       onMouseEnter={(e) => {
         if (!isSel) {
           (e.currentTarget as HTMLTableRowElement).style.background =
@@ -95,10 +93,10 @@ export function BarrierRow(
       >
         {b.id}
       </td>
-      {/* TAG + NC badge */}
+      {/* TAG + NC badge (NC slot reserves fixed height to keep rows stable) */}
       <td onClick={() => onSelect(b)} style={{ padding: "var(--d-cell-pad)" }}>
         <div
-          className="tnum"
+          className="tnum trow-ellipsis"
           style={{
             fontFamily: "var(--font-mono)",
             fontWeight: AURORA_TYPE.tag.fontWeight,
@@ -109,25 +107,28 @@ export function BarrierRow(
           {b.tag}
         </div>
         {/* "sem contingenciamento" duration label for NC items */}
-        {isNC && b.statusSince && (
-          <div
-            style={{
-              display: "inline-flex",
-              alignItems: "center",
-              gap: "var(--d-mini-gap)",
-              marginTop: "var(--d-gap-xs)",
-              padding: "var(--d-nc-pad)",
-              background: AURORA.dangerBg,
-              borderRadius: 7,
-              fontSize: "var(--d-caption)",
-              fontWeight: 600,
-              color: AURORA.dangerFg,
-            }}
-          >
-            <ClockIcon size={10} color={AURORA.dangerFg} strokeWidth={2.5} />
-            {humanDuration(ncDays)} sem contingenciamento
-          </div>
-        )}
+        <div className="trow-nc-slot">
+          {isNC && b.statusSince && (
+            <div
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: "var(--d-mini-gap)",
+                marginTop: "var(--d-gap-xs)",
+                padding: "var(--d-nc-pad)",
+                background: AURORA.dangerBg,
+                borderRadius: 7,
+                fontSize: "var(--d-caption)",
+                fontWeight: 600,
+                color: AURORA.dangerFg,
+                whiteSpace: "nowrap",
+              }}
+            >
+              <ClockIcon size={10} color={AURORA.dangerFg} strokeWidth={2.5} />
+              {humanDuration(ncDays)} sem contingenciamento
+            </div>
+          )}
+        </div>
       </td>
       {/* Criticality */}
       <td onClick={() => onSelect(b)} style={{ padding: "var(--d-cell-pad)" }}>
@@ -140,6 +141,7 @@ export function BarrierRow(
       {/* Category */}
       <td
         onClick={() => onSelect(b)}
+        className="trow-ellipsis"
         style={{
           padding: "var(--d-cell-pad)",
           fontSize: "var(--d-body)",
@@ -151,6 +153,7 @@ export function BarrierRow(
       {/* Typology (sheet Tipologia da Instalação) */}
       <td
         onClick={() => onSelect(b)}
+        className="trow-ellipsis"
         style={{
           padding: "var(--d-cell-pad)",
           fontSize: "var(--d-body)",
@@ -162,6 +165,7 @@ export function BarrierRow(
       {/* Owner (sheet Dono da Barreira) */}
       <td
         onClick={() => onSelect(b)}
+        className="trow-ellipsis"
         style={{
           padding: "var(--d-cell-pad)",
           fontSize: "var(--d-body)",
