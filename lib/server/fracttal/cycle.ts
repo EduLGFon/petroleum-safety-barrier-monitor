@@ -68,6 +68,7 @@ export function createCycleLoop<Shared>(
   let stopped = false;
   let started = false;
   let running = false;
+  let attempt = 0;
   let handle: unknown = null;
   let current: Promise<void> | null = null;
   const timers = opts.timers ?? defaultTimerSource;
@@ -87,6 +88,9 @@ export function createCycleLoop<Shared>(
       return;
     }
     running = true;
+    attempt++;
+    const n = attempt;
+    log(`[cycle] start attempt=${n} scopes=${opts.scopes.length}`);
     current = (async () => {
       try {
         let shared: Shared;
@@ -147,8 +151,8 @@ export function createCycleLoop<Shared>(
           );
         }
         log(
-          `[cycle] done ok=${ok} skipped=${skipped} failed=${failed} ` +
-            `${Date.now() - t0}ms`,
+          `[cycle] done attempt=${n} ok=${ok} skipped=${skipped} failed=${failed} ` +
+            `${Date.now() - t0}ms next=${Math.round(opts.intervalMs / 1000)}s`,
         );
       } catch (err) {
         // Last-resort guard: every step above already guards itself, so this

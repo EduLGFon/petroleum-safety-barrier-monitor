@@ -248,6 +248,20 @@ function main(): void {
 
   loop.start();
   void logLastRunAge();
+  // Boot target line: one line proving which tenant host, work mode, and
+  // notify channels this process runs with. Host only (no path, no
+  // secret); a malformed URL is used as-is and fails loudly on first fetch.
+  let target = flags.baseUrl;
+  try {
+    target = new URL(flags.baseUrl).hostname;
+  } catch {
+    // Keep the raw value; the first fetch reports the real problem.
+  }
+  console.log(
+    `[fracttal-poll] target=${target} work=${
+      openOnly ? "open sweep" : "newest window"
+    } notifiers=console${smtp ? ",email" : ""}`,
+  );
   console.log(
     `[fracttal-poll] sweeping every ${flags.seconds}s ` +
       `(item_type=${flags.itemType}, max_pages=${flags.maxPages}, ` +

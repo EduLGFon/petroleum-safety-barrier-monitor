@@ -126,6 +126,7 @@ export const defaultSyncIo: SyncIo = {
     );
     const started = rows[0];
     if (!started) throw new Error("startRun returned no row");
+    console.log(`[sync] start scope=${scope} runId=${started.id}`);
     return started.id;
   },
 
@@ -230,6 +231,13 @@ export const defaultSyncIo: SyncIo = {
         counts.skips,
         note,
       ],
+    );
+    // Finish line mirrors the audit row (counts plus the note head) so a
+    // cycle is traceable in stderr alone when the DB is unreachable later.
+    console.log(
+      `[sync] finish runId=${runId} status=${status} ` +
+        `i=${counts.inserts} u=${counts.updates} d=${counts.deletes} ` +
+        `s=${counts.skips} note=${note.slice(0, 120)}`,
     );
   },
 };
@@ -453,5 +461,11 @@ export async function recordSyncFailure(
     `insert into sync_state (scope, status, started_at, finished_at, note)
      values ($1, 'failed', now(), now(), $2)`,
     [scope, note.slice(0, 2000)],
+  );
+  // Persistence confirmation: the cycle path already notifies via [ops],
+  // but only this line proves the failed row actually landed in sync_state
+  // (a DB outage between notify and insert would otherwise look recorded).
+  console.error(
+    `[sync] recorded failure scope=${scope} note=${note.slice(0, 200)}`,
   );
 }
