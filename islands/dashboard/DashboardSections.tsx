@@ -255,6 +255,7 @@ export function DashboardSections(
       <DashboardOverlays
         openBarrier={openBarrier}
         onCloseBarrier={() => setOpenId(null)}
+        onBarrierSaved={() => dash.retry?.()}
         settingsOpen={settingsOpen}
         onCloseSettings={() => setSettingsOpen(false)}
         sessionUser={sessionUser}

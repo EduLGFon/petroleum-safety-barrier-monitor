@@ -1,9 +1,11 @@
 // AdminSection - admin-only tab content inside the settings sidepanel.
 // This is why it exists: the old /admin console moves into the drawer so
 // admins manage users, recipients, and rules without leaving the monitor.
-import { RecipientsManager } from "./admin/RecipientsManager.tsx";
+import { BellIcon, MailIcon, SlidersIcon, UsersIcon } from "../ui/Icons.tsx";
 
-import { BellIcon, MailIcon, UsersIcon } from "../ui/Icons.tsx";
+import { FieldOptionsManager } from "./admin/FieldOptionsManager.tsx";
+
+import { RecipientsManager } from "./admin/RecipientsManager.tsx";
 
 import { RulesManager } from "./admin/RulesManager.tsx";
 
@@ -15,7 +17,7 @@ import type { ComponentType } from "preact";
 
 import { useState } from "preact/hooks";
 
-type Sub = "users" | "recipients" | "rules";
+type Sub = "users" | "recipients" | "rules" | "options";
 
 interface SubDef {
   key: Sub;
@@ -28,6 +30,7 @@ const SUBS: SubDef[] = [
   { key: "users", label: "Usuários", Icon: UsersIcon },
   { key: "recipients", label: "Destinatários", Icon: MailIcon },
   { key: "rules", label: "Regras", Icon: BellIcon },
+  { key: "options", label: "Opções", Icon: SlidersIcon },
 ];
 
 // AdminSection: fail-closed sub-nav shell; lazy-mounts one manager at a time.
@@ -39,6 +42,7 @@ export function AdminSection(
     users: null,
     recipients: null,
     rules: null,
+    options: null,
   });
 
   if (sessionUser?.role !== "admin") {
@@ -167,6 +171,11 @@ export function AdminSection(
       )}
       {sub === "rules" && (
         <RulesManager onCount={(n) => setCounts((c) => ({ ...c, rules: n }))} />
+      )}
+      {sub === "options" && (
+        <FieldOptionsManager
+          onCount={(n) => setCounts((c) => ({ ...c, options: n }))}
+        />
       )}
     </div>
   );

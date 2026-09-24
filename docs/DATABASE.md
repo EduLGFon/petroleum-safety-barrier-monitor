@@ -118,6 +118,11 @@ alert_recipients
   id                    identity, PK
   email                 text unique
   name                  text, default ''
+
+field_option_sets
+  field                 text, PK (barrier sheet-question key)
+  options               jsonb (curated answer list, seeded from GERAL)
+  updated_by / updated_at
   active                boolean, default true
   created_at
 
@@ -200,8 +205,8 @@ the corresponding row in the history.
 that function - it is the only place in the application code that should do
 this.
 
-This is exposed via `PATCH /api/barriers/:id/status` and the admin-only
-`StatusEditor` island in the barrier modal. Session admins may omit
+This is exposed via `PATCH /api/barriers/:id/status` and the modal Editar
+tab (`BarrierEditor` island). Session admins may omit
 `authorId` (derived from their user via `authors`); token callers keep the
 explicit `authorId` contract. Only `admin` roles may write.
 
@@ -280,7 +285,8 @@ splitter that respects dollar-quoted bodies (`$$`), quotes, and comments
 | `scripts/migrate.ts`                 | Applies the two files above against `DATABASE_URL` (pool size 1)                                                                                                                                |
 | `scripts/seed.ts`                    | Populates `barriers`/`barrier_status_history` with mock data (batches of 500, `--force` truncates)                                                                                              |
 | `lib/server/db.ts`                   | Lazy server-only Postgres pool (`globalThis.__barrierPool`, `queryRows<T>`)                                                                                                                     |
-| `lib/server/sql/barriers.ts`         | `listBarriers` (paginated + count), `getBarrierById`, `getKpi` (fixed + `GROUP BY` buckets), `transitionBarrierStatus`                                                                          |
+| `lib/server/sql/barriers.ts`         | `listBarriers` (paginated + count), `getBarrierById`, `getKpi` (fixed + `GROUP BY` buckets), `transitionBarrierStatus`, `updateBarrier` (metadata + sheet fields)                                 |
+| `lib/server/sql/field-options.ts`    | `field_option_sets` store (`list`/`upsert`/`seed` from GERAL extraction)                                                                                                                          |
 | `lib/server/sql/chart.ts`            | `getChartData` (`GROUP BY category_id`, `compliant` + `total`)                                                                                                                                  |
 | `lib/server/sql/vocabularies.ts`     | `getVocabularies()` (labels + counts, SSR-only, no HTTP route)                                                                                                                                  |
 | `lib/server/sql/where.ts`            | `buildWhere` (args `$n`, `escapeLike`), `resolveOrderBy` (whitelist `SORTABLE`)                                                                                                                 |

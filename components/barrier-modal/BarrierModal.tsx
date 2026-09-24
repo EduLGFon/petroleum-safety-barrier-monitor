@@ -2,20 +2,25 @@
 // This is why it exists: surfaces full metadata, status badges, NC alert, and
 // chronological statusHistory without leaving the dashboard grid.
 import { useCallback, useEffect, useRef, useState } from "preact/hooks";
-import { StatusEditor } from "../../islands/StatusEditor.tsx";
+import { BarrierEditor } from "../../islands/BarrierEditor.tsx";
 import { lockBody, unlockBody } from "../../lib/body-lock.ts";
-import { HistoryIcon, InfoIcon } from "../ui/Icons.tsx";
+import { HistoryIcon, InfoIcon, PencilIcon } from "../ui/Icons.tsx";
 import { BarrierDetails } from "./BarrierDetails.tsx";
 import { BarrierHistory } from "./BarrierHistory.tsx";
 import { BarrierHeader } from "./BarrierHeader.tsx";
-import type { Barrier } from "../../lib/types.ts";
+import type { AuthUser, Barrier } from "../../lib/types.ts";
+
+type Tab = "details" | "history" | "edit";
+
 interface Props {
   barrier: Barrier | null;
   onClose: () => void;
+  sessionUser?: AuthUser | null;
+  onSaved?: () => void;
 }
 // BarrierModal renders the detail dialog shell; handles ESC close, body scroll-lock, and backdrop dismiss.
-export function BarrierModal({ barrier, onClose }: Props) {
-  const [tab, setTab] = useState<"details" | "history">("details");
+export function BarrierModal({ barrier, onClose, sessionUser, onSaved }: Props) {
+  const [tab, setTab] = useState<Tab>("details");
   const key = useCallback((e: KeyboardEvent) => {
     if (e.key === "Escape") onClose();
   }, [onClose]);
@@ -124,25 +129,48 @@ export function BarrierModal({ barrier, onClose }: Props) {
           }}
         >
           {barrier && (
-            <Content b={barrier} onClose={onClose} tab={tab} setTab={setTab} />
+            <Content
+              b={barrier}
+              onClose={onClose}
+              tab={tab}
+              setTab={setTab}
+              sessionUser={sessionUser}
+              onSaved={onSaved}
+            />
           )}
         </div>
       </div>
     </>
   );
 }
-// Content renders header, NC alert with days-since logic, and Details/History tab switch.
+// Content renders header, NC alert with days-since logic, and tab switch.
+// Admins get a third Editar tab hosting the BarrierEditor island.
 function Content(
-  { b, onClose, tab, setTab }: {
+  { b, onClose, tab, setTab, sessionUser, onSaved }: {
     b: Barrier;
     onClose: () => void;
-    tab: "details" | "history";
-    setTab: (t: "details" | "history") => void;
+    tab: Tab;
+    setTab: (t: Tab) => void;
+    sessionUser?: AuthUser | null;
+    onSaved?: () => void;
   },
 ) {
+  // Local copy so a save refreshes Details without closing the dialog.
+  const [local, setLocal] = useState(b);
+  useEffect(() => {
+    setLocal(b);
+  }, [b]);
+  const isAdmin = sessionUser?.role === "admin";
+  const tabs: { key: Tab; label: string; Icon: typeof InfoIcon }[] = [
+    { key: "details", label: "Detalhes", Icon: InfoIcon },
+    { key: "history", label: "Histórico", Icon: HistoryIcon },
+    ...(isAdmin
+      ? [{ key: "edit" as Tab, label: "Editar", Icon: PencilIcon }]
+      : []),
+  ];
   return (
     <>
-      <BarrierHeader b={b} onClose={onClose} />
+      <BarrierHeader b={local} onClose={onClose} />
       {/* Tabs */}
       <div
         style={{
@@ -152,11 +180,11 @@ function Content(
           flexShrink: 0,
         }}
       >
-        {(["details", "history"] as const).map((t) => (
+        {tabs.map(({ key, label, Icon }) => (
           <button
             type="button"
-            key={t}
-            onClick={() => setTab(t)}
+            key={key}
+            onClick={() => setTab(key)}
             style={{
               display: "flex",
               alignItems: "center",
@@ -167,54 +195,39 @@ function Content(
               border: "none",
               cursor: "pointer",
               background: "transparent",
-              color: tab === t ? "var(--accent)" : "var(--text-muted)",
-              borderBottom: tab === t
+              color: tab === key ? "var(--accent)" : "var(--text-muted)",
+              borderBottom: tab === key
                 ? "2px solid var(--accent)"
                 : "2px solid transparent",
               transition: "all .2s",
               marginBottom: -1,
             }}
           >
-            {t === "details"
-              ? (
-                <>
-                  <InfoIcon
-                    size={14}
-                    color={tab === t ? "var(--accent)" : "var(--text-muted)"}
-                    strokeWidth={2}
-                  />{" "}
-                  Detalhes
-                </>
-              )
-              : (
-                <>
-                  <HistoryIcon
-                    size={14}
-                    color={tab === t ? "var(--accent)" : "var(--text-muted)"}
-                    strokeWidth={2}
-                  />{" "}
-                  Histórico
-                </>
-              )}
+            <Icon
+              size={14}
+              color={tab === key ? "var(--accent)" : "var(--text-muted)"}
+              strokeWidth={2}
+            />{" "}
+            {label}
           </button>
         ))}
       </div>
       {/* Body */}
       <div style={{ overflowY: "auto", flex: 1 }}>
-        {tab === "details"
-          ? (
-            <>
-              <BarrierDetails b={b} />
-              <div
-                style={{
-                  padding: "0 var(--d-dialog-body) var(--d-dialog-body)",
-                }}
-              >
-                <StatusEditor barrierId={b.id} />
-              </div>
-            </>
-          )
-          : <BarrierHistory b={b} />}
+        {tab === "details" && <BarrierDetails b={local} />}
+        {tab === "history" && <BarrierHistory b={local} />}
+        {tab === "edit" && isAdmin && (
+          <BarrierEditor
+            key={local.id}
+            barrier={local}
+            onSaved={(updated) => {
+              if (updated) setLocal(updated);
+              setTab("details");
+              onSaved?.();
+            }}
+            onCancel={() => setTab("details")}
+          />
+        )}
       </div>
     </>
   );

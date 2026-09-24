@@ -193,8 +193,20 @@ Full inventory: `barriers`, `barriers/deleted`,
   - all require admin. `categoryId: null` means all categories; no active
     rule covering a category mutes it.
 - `GET /api/lookups` → `{ availabilities: [{ id, label }],
-  categories: [{ id, label }], authors: [{ id, name }] }` - requires any
-  authenticated caller (session or token); feeds the admin forms.
+  categories: [{ id, label }], locations: [{ id, code, name }],
+  criticalities/typologies/groupings/owners: [{ id, label }],
+  authors: [{ id, name }] }` - requires any authenticated caller (session
+  or token); feeds the admin forms.
+- `GET /api/field-options` → `[{ field, options, updated_at, updated_by }]`
+  (any authenticated caller; missing rows seed from the GERAL extraction);
+  `PUT /api/field-options?field=<key>` `{ options: string[] }` (admin only)
+  - curated answer lists for the barrier sheet questions.
+- `PATCH /api/barriers/:id` (admin only) - partial update of editable core
+  and sheet fields (`tag`, `locationId`, `typologyId`, `categoryId`,
+  `groupingId`, `ownerId`, `criticalityId`, `comments`, `actionPlan`, plus
+  the 15 sheet columns); `availabilityId` routes through
+  `record_status_change()` so history and alerts keep working. Compliance
+  and `statusSince` are never writable.
 
 ## Errors, auth, and throttle (P4)
 
@@ -204,11 +216,12 @@ Every failure responds with the `{ error, code, requestId }` envelope + the
 message is fixed per route and the detail goes to the log with the `requestId`).
 
 Login => Dashboard: **dashboard GETs require auth** (`barriers`, `:id`,
-`kpi`, `chart`, `export`, `vocabularies`) - session cookie or `ADMIN_TOKEN`.
-Anonymous callers get `404` camouflage (`NOT_FOUND`, same shape as a missing
-route); dead credentials get `401`. **Writes and admin data require
-admin** (session cookie or `ADMIN_TOKEN`): `PATCH .../status`, recipients,
-users, alert-rules, `GET /api/barriers/deleted`, `GET /api/lookups`.
+`kpi`, `chart`, `export`, `vocabularies`, `field-options`) - session cookie
+or `ADMIN_TOKEN`. Anonymous callers get `404` camouflage (`NOT_FOUND`, same
+shape as a missing route); dead credentials get `401`. **Writes and admin
+data require admin** (session cookie or `ADMIN_TOKEN`): `PATCH
+.../status`, `PATCH .../:id`, `PUT .../field-options`, recipients, users,
+alert-rules, `GET /api/barriers/deleted`, `GET /api/lookups`.
 `403` never leaks existence; `admin only` when a non-admin session calls.
 Pages: `/login` is the only public route - `/` redirects logged-out
 sessions to `/login?next=`. Admin management lives in the settings
@@ -331,6 +344,12 @@ toWireQuery({ location: "FAL", availability: "Degradado", page: 1 });
 | `routes/api/alert-rules.ts`          | `GET/POST /api/alert-rules` (admin, per-category triggers)                                                    |
 | `routes/api/alert-rules/[id].ts`     | `PATCH/DELETE /api/alert-rules/:id` (admin)                                                                   |
 | `routes/api/lookups.ts`              | `GET /api/lookups` (authenticated id lists for admin forms)                                                   |
+| `routes/api/field-options.ts`        | `GET/PUT /api/field-options` (curated sheet-question options)                                                 |
+| `routes/api/barriers/[id].ts`        | `GET/PATCH /api/barriers/:id` (admin field update)                                                            |
+| `lib/server/sql/field-options.ts`    | `field_option_sets` store + GERAL seed defaults                                                                |
+| `lib/server/sql/barriers.ts`         | `updateBarrier` (metadata + sheet fields; status via transition)                                              |
+| `lib/field-options.ts`               | Field registry, pt-BR labels, seed defaults, option validation                                                |
+| `islands/BarrierEditor.tsx`          | Admin barrier edit form (modal Editar tab)                                                                    |
 | `lib/server/config.ts`               | `loadServerConfig` (http boot), `loadSyncConfig` (Fracttal credentials for scripts)                           |
 | `lib/server/errors.ts`               | Envelope `{ error, code, requestId }` + `x-request-id`                                                        |
 | `lib/server/auth.ts`                 | `checkAdminAuth` (Bearer) + `resolveRequestAuth`/`requireAdminAuth`/`requireAuthenticated` (session or token) |

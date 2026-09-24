@@ -29,6 +29,7 @@ export function DashboardFooter() {
 interface OverlaysProps {
   openBarrier: Barrier | null;
   onCloseBarrier: () => void;
+  onBarrierSaved?: () => void;
   settingsOpen: boolean;
   onCloseSettings: () => void;
   sessionUser?: AuthUser | null;
@@ -45,6 +46,7 @@ export function DashboardOverlays(
   {
     openBarrier,
     onCloseBarrier,
+    onBarrierSaved,
     settingsOpen,
     onCloseSettings,
     sessionUser = null,
@@ -57,7 +59,12 @@ export function DashboardOverlays(
 ) {
   return (
     <>
-      <BarrierModal barrier={openBarrier} onClose={onCloseBarrier} />
+      <BarrierModal
+        barrier={openBarrier}
+        onClose={onCloseBarrier}
+        sessionUser={sessionUser}
+        onSaved={onBarrierSaved}
+      />
       <SettingsPanel
         open={settingsOpen}
         onClose={onCloseSettings}

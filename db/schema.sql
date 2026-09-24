@@ -367,3 +367,15 @@ create table if not exists throttle_buckets (
   reset_at  timestamptz not null,
   primary key (bucket, key)
 );
+
+-- ─── Field option sets (admin-curated answers for sheet questions) ─────────
+-- One row per barrier details field: admins settle default options in
+-- Settings and the barrier editor offers them. Rows seed from the GERAL
+-- extraction (see scripts/sheet-options.json) on first read, so a fresh
+-- database already suggests real workbook values.
+create table if not exists field_option_sets (
+  field      text        not null primary key,
+  options    jsonb       not null default '[]'::jsonb,
+  updated_by text        not null default '',
+  updated_at timestamptz not null default now()
+);

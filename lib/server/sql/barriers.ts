@@ -211,3 +211,80 @@ export async function transitionBarrierStatus(
   ]);
   return getBarrierById(barrierId);
 }
+
+export interface BarrierUpdatePayload {
+  tag?: string;
+  locationId?: number;
+  typologyId?: number;
+  categoryId?: number;
+  groupingId?: number;
+  ownerId?: number | null;
+  criticalityId?: number;
+  comments?: string;
+  actionPlan?: string;
+  origin?: string;
+  installLocal?: string;
+  equipTypology?: string;
+  fieldInstalled?: string;
+  fieldOperational?: string;
+  opStatus?: string;
+  hasMaintPlan?: string;
+  planFollowed?: string;
+  failureFree?: string;
+  maintStatus?: string;
+  hasContingency?: string;
+  contingencyDesc?: string;
+  evidenceCode?: string;
+  degradationDesc?: string;
+  extraComments?: string;
+}
+
+// updateBarrier: updates editable metadata and sheet inventory fields.
+// Availability is excluded here (routes through transitionBarrierStatus).
+export async function updateBarrier(
+  id: number,
+  patch: BarrierUpdatePayload,
+): Promise<WireBarrier | null> {
+  const sets: string[] = [];
+  const args: unknown[] = [id];
+
+  const add = (col: string, val: unknown) => {
+    args.push(val);
+    sets.push(`${col} = $${args.length}`);
+  };
+
+  if (patch.tag !== undefined) add("tag", patch.tag.trim());
+  if (patch.locationId !== undefined) add("location_id", patch.locationId);
+  if (patch.typologyId !== undefined) add("typology_id", patch.typologyId);
+  if (patch.categoryId !== undefined) add("category_id", patch.categoryId);
+  if (patch.groupingId !== undefined) add("grouping_id", patch.groupingId);
+  if (patch.ownerId !== undefined) {
+    add("owner_id", patch.ownerId == null || patch.ownerId <= 0 ? null : patch.ownerId);
+  }
+  if (patch.criticalityId !== undefined) add("criticality_id", patch.criticalityId);
+  if (patch.comments !== undefined) add("comments", patch.comments.trim());
+  if (patch.actionPlan !== undefined) add("action_plan", patch.actionPlan.trim());
+  if (patch.origin !== undefined) add("origin", patch.origin.trim() || null);
+  if (patch.installLocal !== undefined) add("install_local", patch.installLocal.trim() || null);
+  if (patch.equipTypology !== undefined) add("equip_typology", patch.equipTypology.trim() || null);
+  if (patch.fieldInstalled !== undefined) add("field_installed", patch.fieldInstalled.trim() || null);
+  if (patch.fieldOperational !== undefined) add("field_operational", patch.fieldOperational.trim() || null);
+  if (patch.opStatus !== undefined) add("op_status", patch.opStatus.trim() || null);
+  if (patch.hasMaintPlan !== undefined) add("has_maint_plan", patch.hasMaintPlan.trim() || null);
+  if (patch.planFollowed !== undefined) add("plan_followed", patch.planFollowed.trim() || null);
+  if (patch.failureFree !== undefined) add("failure_free", patch.failureFree.trim() || null);
+  if (patch.maintStatus !== undefined) add("maint_status", patch.maintStatus.trim() || null);
+  if (patch.hasContingency !== undefined) add("has_contingency", patch.hasContingency.trim() || null);
+  if (patch.contingencyDesc !== undefined) add("contingency_desc", patch.contingencyDesc.trim() || null);
+  if (patch.evidenceCode !== undefined) add("evidence_code", patch.evidenceCode.trim() || null);
+  if (patch.degradationDesc !== undefined) add("degradation_desc", patch.degradationDesc.trim() || null);
+  if (patch.extraComments !== undefined) add("extra_comments", patch.extraComments.trim() || null);
+
+  if (sets.length > 0) {
+    await queryRows(
+      `update barriers set ${sets.join(", ")} where id = $1 and deleted_at is null`,
+      args,
+    );
+  }
+  return getBarrierById(id);
+}

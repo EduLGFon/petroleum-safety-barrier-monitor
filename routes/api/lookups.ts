@@ -31,16 +31,49 @@ export const handler = define.handlers({
     const auth = await requireAuthenticated(ctx.req);
     if (!auth.ok) return denyByCredentials(ctx.req, auth.message, requestId);
     try {
-      const [availabilities, categories, authors] = await Promise.all([
+      const [
+        availabilities,
+        categories,
+        locations,
+        criticalities,
+        typologies,
+        groupings,
+        owners,
+        authors,
+      ] = await Promise.all([
         queryRows<{ id: number; label: string }>(
           `select id, label from availability_statuses order by id`,
         ),
         queryRows<{ id: number; label: string }>(
           `select id, label from categories order by label`,
         ),
+        queryRows<{ id: number; code: string; name: string | null }>(
+          `select id, code, name from locations order by code`,
+        ),
+        queryRows<{ id: number; label: string }>(
+          `select id, label from criticality_levels order by id`,
+        ),
+        queryRows<{ id: number; label: string }>(
+          `select id, label from typologies order by label`,
+        ),
+        queryRows<{ id: number; label: string }>(
+          `select id, label from groupings order by label`,
+        ),
+        queryRows<{ id: number; label: string }>(
+          `select id, label from owners order by label`,
+        ),
         listAuthors(),
       ]);
-      return Response.json({ availabilities, categories, authors });
+      return Response.json({
+        availabilities,
+        categories,
+        locations,
+        criticalities,
+        typologies,
+        groupings,
+        owners,
+        authors,
+      });
     } catch (err) {
       return internal(
         "GET /api/lookups",

@@ -117,3 +117,12 @@ export const ArrowRightIcon = (
   { size = 16, color = "currentColor", strokeWidth = 2 }: P,
 ) =>
   D(size, color, strokeWidth, '<path d="M5 12h14"/><path d="m12 5 7 7-7 7"/>');
+export const PencilIcon = (
+  { size = 16, color = "currentColor", strokeWidth = 2 }: P,
+) =>
+  D(
+    size,
+    color,
+    strokeWidth,
+    '<path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/>',
+  );
