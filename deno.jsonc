@@ -17,7 +17,7 @@
     "db:seed": "deno run -A --env-file=.env scripts/seed.ts",
     "fracttal:import": "deno run -A --env-file=.env scripts/fracttal-import.ts",
     "fracttal:sync": "deno run -A --env-file=.env scripts/fracttal-sync.ts",
-    "fracttal:poll": "deno run -A scripts/fracttal-poll.ts",
+    "fracttal:poll": "deno run -A --env-file=.env scripts/fracttal-poll.ts",
     "fracttal:audit": "deno run -A --env-file=.env scripts/fracttal-audit-stations.ts",
     "fracttal:capture": "deno run -A scripts/fracttal-capture.ts",
     "fracttal:extract": "deno run -A scripts/fracttal-extract.ts",

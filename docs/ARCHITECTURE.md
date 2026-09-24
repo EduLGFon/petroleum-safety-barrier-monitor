@@ -25,7 +25,7 @@ plus `fsRoutes()`. `client.ts` only imports `static/styles.css` for HMR.
 | `fracttal:import`               | `deno run -A --env-file=.env scripts/fracttal-import.ts`                                                                                                                                 | `.env` (`DATABASE_URL`)                                     |
 | `fracttal:sync`                 | `deno run -A --env-file=.env scripts/fracttal-sync.ts`                                                                                                                                   | `.env` (`DATABASE_URL` + `FRACTTAL_*` live)                 |
 | `fracttal:audit`                | `deno run -A --env-file=.env scripts/fracttal-audit-stations.ts`                                                                                                                         | `.env` (`DATABASE_URL` + `FRACTTAL_*` live)                 |
-| `fracttal:poll`                 | `deno run -A scripts/fracttal-poll.ts`                                                                                                                                                   | shell only (`FRACTTAL_*`, like `dev`)                       |
+| `fracttal:poll`                 | `deno run -A --env-file=.env scripts/fracttal-poll.ts`                                                                                                                                   | `.env` (`DATABASE_URL` + `FRACTTAL_*` live)                 |
 | `fracttal:capture` / `:extract` | read-only live probes                                                                                                                                                                    | shell only (`FRACTTAL_*`)                                   |
 | `alerts:check`                  | `deno run -A --env-file=.env scripts/alerts-check.ts`                                                                                                                                    | `.env` (`DATABASE_URL` + `OPS_*`)                           |
 | `admin:create`                  | `deno run -A --env-file=.env scripts/create-admin.ts`                                                                                                                                    | `.env` (`DATABASE_URL`)                                     |
@@ -203,7 +203,7 @@ the author signature, the settings panel and loading splash have no brand
 copy, and the login footer is an unbranded session marker.
 `PUBLIC_API_MODE` (`mock`/`http`) + `PUBLIC_API_BASE_URL` select the
 adapter. `DATABASE_URL` feeds `lib/server/db.ts` and both `db:*` tasks.
-`dev` needs shell exports; `start`/`db:*` read `.env`.
+`dev` needs shell exports; `start`/`db:*`/`fracttal:poll` read `.env`.
 
 ## Design principles
 
