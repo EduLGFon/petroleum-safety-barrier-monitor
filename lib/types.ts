@@ -132,6 +132,10 @@ export interface Vocabularies {
   compliances: string[];
   criticalities: string[];
   categories: { id: number; label: string }[];
+  // Status-history authors so wire authorIds beyond the seed enum resolve
+  // to real names client-side (see resolve.ts). Optional so cached/older
+  // payloads still parse; absent means seed-enum fallback.
+  authors?: { id: number; name: string }[];
 }
 
 // Sync pipeline status for the dashboard indicator (served by

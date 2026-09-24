@@ -5,11 +5,15 @@
 // admin alert rules (per-category enable/disable, critical-only, recovery).
 import { type AlertStore, dedupKey, type NewAlertEvent } from "./store.ts";
 
-import { isUrgent, urgencyOf } from "../../dashboard/urgent.ts";
+import { isUrgent } from "../../dashboard/urgent.ts";
 
 import type { AlertRule } from "../sql/alert_rules.ts";
 
 import type { WireBarrier } from "../../wireTypes.ts";
+
+import { isCompliant } from "../../constants.ts";
+
+import { fromAvailabilityId } from "../../enums.ts";
 
 import { resolveBarrier, type ResolverLabels } from "../../resolve.ts";
 
@@ -19,6 +23,29 @@ import { matchRules } from "./rules.ts";
 
 export interface DetectedUrgent extends NewAlertEvent {
   urgency: "critical" | "urgent" | "none";
+}
+
+// StatusInfo: the landing status looked up by id (authoritative when loaded
+// from availability_statuses; seed-enum fallback otherwise, fail-closed:
+// unknown ids count as non-compliant so novel statuses alert).
+export interface StatusInfo {
+  labelOf?: (statusId: number) => string;
+  compliantOf?: (statusId: number) => boolean;
+}
+
+export function landingLabel(
+  statusId: number,
+  info?: StatusInfo,
+): string {
+  return info?.labelOf?.(statusId) ?? fromAvailabilityId(statusId);
+}
+
+export function landingCompliant(
+  statusId: number,
+  info?: StatusInfo,
+): boolean {
+  return info?.compliantOf?.(statusId) ??
+    isCompliant(fromAvailabilityId(statusId));
 }
 
 // detectUrgentTransitions: candidates since the watermark, resolved to
@@ -34,6 +61,7 @@ export async function detectUrgentTransitions(
   rules: AlertRule[] = [],
   hasAnyRule = false,
   labels?: ResolverLabels,
+  statusInfo?: StatusInfo,
 ): Promise<DetectedUrgent[]> {
   const candidates = await store.recentTransitions(since, onlyBarrierIds);
   const barriers = await loadBarriers(candidates.map((c) => c.barrierId));
@@ -41,9 +69,15 @@ export async function detectUrgentTransitions(
   for (const c of candidates) {
     const wire = barriers.get(c.barrierId);
     if (!wire) continue; // barrier deleted after the transition
-    const barrier = resolveBarrier(wire);
-    const urgency = urgencyOf(barrier);
-    const compliant = barrier.compliance === "Conforme";
+    const barrier = resolveBarrier(wire, labels);
+    // Landing truth, not current state: the barrier may have moved on
+    // since (the sync poller reverts manual edits within a minute), so
+    // compliance, urgency and the display status all derive from the
+    // candidate statusId - otherwise reverted transitions go invisible.
+    const compliant = landingCompliant(c.statusId, statusInfo);
+    const urgency = !compliant
+      ? (wire.criticalityId === 1 ? "critical" : "urgent")
+      : "none";
     const match = matchRules(
       {
         categoryId: wire.categoryId,
@@ -70,7 +104,7 @@ export async function detectUrgentTransitions(
       payload: {
         tag: barrier.tag,
         location: barrier.location,
-        availability: barrier.availability,
+        availability: landingLabel(c.statusId, statusInfo),
         criticality: barrier.criticality,
         urgency,
         attempts: 0,

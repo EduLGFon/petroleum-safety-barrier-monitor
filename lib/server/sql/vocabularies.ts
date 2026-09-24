@@ -63,42 +63,46 @@ export async function getResolverLabels(): Promise<{
 // Station names ride along for hover tooltips (null falls back to code);
 // codes stay the filter keys everywhere.
 export async function getVocabularies(): Promise<Vocabularies> {
-  const [locRows, dispRows, confRows, critRows, catRows] = await Promise.all([
-    queryRows<{ id: number; code: string; name: string; count: string }>(
-      `select loc.id as id, loc.code as code,
+  const [locRows, dispRows, confRows, critRows, catRows, authorRows] =
+    await Promise.all([
+      queryRows<{ id: number; code: string; name: string; count: string }>(
+        `select loc.id as id, loc.code as code,
         coalesce(loc.name, loc.code) as name, count(b.id)::text as count
        from locations loc
        left join barriers b on b.location_id = loc.id and b.deleted_at is null
        group by loc.id, loc.code, loc.name
        order by count(b.id) desc, loc.code`,
-    ),
-    queryRows<{ label: string }>(
-      `select distinct disp.label as label from barriers b
+      ),
+      queryRows<{ label: string }>(
+        `select distinct disp.label as label from barriers b
        join availability_statuses disp on disp.id = b.availability_id
        where b.deleted_at is null
        order by disp.label`,
-    ),
-    queryRows<{ label: string }>(
-      `select distinct case when disp.is_compliant then 'Conforme'
+      ),
+      queryRows<{ label: string }>(
+        `select distinct case when disp.is_compliant then 'Conforme'
          else 'Não Conforme' end as label
        from barriers b
        join availability_statuses disp on disp.id = b.availability_id
        where b.deleted_at is null
        order by label`,
-    ),
-    queryRows<{ label: string }>(
-      `select distinct crit.label as label from barriers b
+      ),
+      queryRows<{ label: string }>(
+        `select distinct crit.label as label from barriers b
        join criticality_levels crit on crit.id = b.criticality_id
        where b.deleted_at is null
        order by crit.label`,
-    ),
-    queryRows<{ id: number; label: string }>(
-      `select distinct cat.id as id, cat.label as label from barriers b
-       join categories cat on cat.id = b.category_id
-       where b.deleted_at is null
-       order by cat.label`,
-    ),
-  ]);
+      ),
+      queryRows<{ id: number; label: string }>(
+        `select distinct cat.id as id, cat.label as label from barriers b
+        join categories cat on cat.id = b.category_id
+        where b.deleted_at is null
+        order by cat.label`,
+      ),
+      queryRows<{ id: number; name: string }>(
+        `select id, name from authors order by name`,
+      ),
+    ]);
   return {
     locations: locRows.map((r) => ({
       id: r.id,
@@ -110,5 +114,6 @@ export async function getVocabularies(): Promise<Vocabularies> {
     compliances: confRows.map((r) => r.label),
     criticalities: critRows.map((r) => r.label),
     categories: catRows.map((r) => ({ id: r.id, label: r.label })),
+    authors: authorRows.map((r) => ({ id: r.id, name: r.name })),
   };
 }

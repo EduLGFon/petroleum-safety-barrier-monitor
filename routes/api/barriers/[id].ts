@@ -26,6 +26,16 @@ import {
 } from "../../../lib/server/auth.ts";
 import { getOrCreateAuthor } from "../../../lib/server/sql/authors.ts";
 import { loadServerConfig } from "../../../lib/server/config.ts";
+import {
+  type AlertMailer,
+  smtpAlertConfigFromEnv,
+  smtpAlertMailer,
+} from "../../../lib/server/alerts/mailer.ts";
+import { maybeSendImmediate } from "../../../lib/server/alerts/immediate.ts";
+import { listAlertRules } from "../../../lib/server/sql/alert_rules.ts";
+import { listRecipients } from "../../../lib/server/sql/recipients.ts";
+import { sqlAlertStore } from "../../../lib/server/sql/alerts.ts";
+import { getResolverLabels } from "../../../lib/server/sql/vocabularies.ts";
 import { define } from "../../../utils.ts";
 
 function optStr(raw: unknown, max = 2000): string | undefined {
@@ -150,6 +160,11 @@ export const handler = define.handlers({
       const extraComments = optStr(body.extraComments);
 
       // Status change routes through record_status_change for audit/alerts.
+      // Like the dedicated status route below, a matching transition is
+      // enqueued (and immediately mailed for immediate rules) - without
+      // this the dashboard editor would write history no alert run ever
+      // sees, since detection only fires on enqueued transitions.
+      let statusChangedTo: number | undefined;
       if (
         body.availabilityId !== undefined &&
         body.availabilityId !== existing.availabilityId
@@ -163,6 +178,7 @@ export const handler = define.handlers({
             ? body.statusNote
             : "Edição de barreira";
           await transitionBarrierStatus(barrierId, availId, author.id, note);
+          statusChangedTo = availId;
         }
       }
 
@@ -192,6 +208,50 @@ export const handler = define.handlers({
         degradationDesc,
         extraComments,
       });
+
+      // Best-effort alert fan-out for the status change above: the
+      // transition already committed, so nothing here may fail the
+      // response. Failures only log; the digest cron retries via history.
+      if (statusChangedTo !== undefined) {
+        try {
+          const [rules, recipients] = await Promise.all([
+            listAlertRules(false),
+            listRecipients(true),
+          ]);
+          let mailer: AlertMailer | undefined;
+          try {
+            mailer = smtpAlertMailer(smtpAlertConfigFromEnv());
+          } catch {
+            mailer = undefined; // no relay: enqueue only, cron sends
+          }
+          let labels:
+            | Awaited<ReturnType<typeof getResolverLabels>>
+            | undefined;
+          try {
+            labels = await getResolverLabels();
+          } catch {
+            labels = undefined;
+          }
+          await maybeSendImmediate({
+            store: sqlAlertStore,
+            barrier: updated ?? existing,
+            statusId: statusChangedTo,
+            transitionDate: (updated ?? existing).statusSince.slice(0, 10),
+            rules,
+            hasAnyRule: rules.length > 0,
+            mailer,
+            recipients,
+            logger: (line) => console.log(`[barrier ${requestId}] ${line}`),
+            labels,
+            brand: Deno.env.get("COMPANY_NAME") || undefined,
+          });
+        } catch (err) {
+          console.error(
+            `[PATCH /api/barriers/${ctx.params.id}] requestId=${requestId} immediate fan-out failed`,
+            err,
+          );
+        }
+      }
 
       return Response.json(updated ?? existing);
     } catch (err) {

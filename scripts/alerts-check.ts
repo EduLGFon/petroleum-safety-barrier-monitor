@@ -33,6 +33,10 @@ import { listRecipients } from "../lib/server/sql/recipients.ts";
 
 import { sqlAlertStore } from "../lib/server/sql/alerts.ts";
 
+import type { StatusInfo } from "../lib/server/alerts/detect.ts";
+
+import { queryRows } from "../lib/server/db.ts";
+
 import { runAlertCycle } from "../lib/server/alerts/run.ts";
 
 interface Flags {
@@ -110,6 +114,23 @@ async function main(): Promise<void> {
   } catch {
     labels = undefined;
   }
+  // Authoritative status labels/compliance so detection judges the landing
+  // status even when the barrier has since moved on (sync reverts); falls
+  // back to the seed-enum mapping inside detect.ts when unavailable.
+  let statusInfo: StatusInfo | undefined;
+  try {
+    const rows = await queryRows<{ id: number; label: string; ok: boolean }>(
+      `select id, label, is_compliant as ok from availability_statuses`,
+    );
+    const labelById = new Map(rows.map((r) => [r.id, r.label]));
+    const okById = new Map(rows.map((r) => [r.id, r.ok]));
+    statusInfo = {
+      labelOf: (id) => labelById.get(id) ?? `Disponibilidade (${id})`,
+      compliantOf: (id) => okById.get(id) ?? false,
+    };
+  } catch {
+    statusInfo = undefined;
+  }
   const brand = Deno.env.get("COMPANY_NAME") || undefined;
   try {
     const result = await runAlertCycle({
@@ -128,6 +149,7 @@ async function main(): Promise<void> {
       listStale: (days) => listStaleBarriers(days),
       labels,
       brand,
+      statusInfo,
     });
     if (flags.json) console.log(JSON.stringify(result));
     else {

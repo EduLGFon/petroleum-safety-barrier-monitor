@@ -97,6 +97,11 @@ export function useServerDashboard(
             categories: Object.fromEntries(
               liveVocab.categories.map((c) => [c.id, c.label]),
             ) as Record<number, string>,
+            // History authors (e.g. admin-created names past the seed
+            // enum) resolve to real names; absent keeps seed fallback.
+            authors: Object.fromEntries(
+              (liveVocab.authors ?? []).map((a) => [a.id, a.name]),
+            ) as Record<number, string>,
           },
           query: {
             locationIds: Object.fromEntries(

@@ -88,6 +88,33 @@ Deno.test("detectUrgentTransitions drops calm landings and gone barriers", async
   assertStrictEquals(out.length, 0);
 });
 
+Deno.test("detectUrgentTransitions sees reverted landings, not current state", async () => {
+  // The sync poller reverts manual edits within a minute: the wire barrier
+  // is back to Disponível while history holds the Indisponível landing.
+  // Detection must judge the landing, or the transition goes invisible.
+  const candidates: TransitionCandidate[] = [
+    { barrierId: 1, transitionDate: "2026-09-24", statusId: 5 },
+  ];
+  const store = {
+    recentTransitions: (_since: string | null, _only?: number[]) =>
+      Promise.resolve(candidates),
+  };
+  const out = await detectUrgentTransitions(
+    store,
+    (ids) => {
+      const out = new Map<number, WireBarrier>();
+      for (const id of ids) {
+        if (id === 1) out.set(id, wire({ availabilityId: 0 }));
+      }
+      return Promise.resolve(out);
+    },
+    "2026-09-24",
+  );
+  assertStrictEquals(out.length, 1);
+  assertStrictEquals(out[0]!.payload.availability, "Indisponível");
+  assertStrictEquals(out[0]!.urgency, "critical");
+});
+
 Deno.test("detectUrgentTransitions tiers critical by criticality", async () => {
   const candidates: TransitionCandidate[] = [
     { barrierId: 9, transitionDate: "2026-09-13", statusId: 5 },

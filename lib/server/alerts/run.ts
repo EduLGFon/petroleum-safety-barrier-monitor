@@ -14,6 +14,8 @@ import {
 
 import { extractDetail } from "./enrich.ts";
 
+import type { StatusInfo } from "./detect.ts";
+
 import type { ResolverLabels } from "../../resolve.ts";
 
 import {
@@ -66,8 +68,11 @@ export interface AlertCycleOptions {
   listStale?: (staleDays: number) => Promise<StaleCandidate[]>;
   // labels: DB id->label maps (authors included) so enqueued payloads carry
   // real names instead of seed-enum sentinels. brand: COMPANY_NAME for mail.
+  // statusInfo: authoritative status labels/compliance (DB-backed when the
+  // caller loads it) so reverted transitions still detect on their landing.
   labels?: ResolverLabels;
   brand?: string;
+  statusInfo?: StatusInfo;
 }
 
 export interface AlertCycleResult {
@@ -174,6 +179,7 @@ export async function runAlertCycle(
     listStale,
     labels,
     brand,
+    statusInfo,
   } = options;
   const active = recipients.filter((r) => r.email !== "");
   const activeEmails = active.map((r) => r.email);
@@ -202,6 +208,7 @@ export async function runAlertCycle(
     rules,
     hasAnyRule,
     labels,
+    statusInfo,
   );
   result.detected = detected.length;
   logger(

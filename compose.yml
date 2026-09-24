@@ -46,6 +46,18 @@ services:
       - ./.env:/app/.env:ro
     restart: unless-stopped
 
+  # Scheduled alert digest (detect -> enqueue -> mail, same wiring as the
+  # alerts:check --apply one-shot). Needs DATABASE_URL + OPS_SMTP_* in .env;
+  # without a relay it dry-runs (detect + report only). Cadence via
+  # ALERTS_POLL_SECONDS (default 900).
+  alerts:
+    image: barrier-monitor:latest
+    command: ["run", "-A", "scripts/alerts-poll.ts"]
+    env_file: [.env]
+    volumes:
+      - ./.env:/app/.env:ro
+    restart: unless-stopped
+
   # One-off toolbox (migrate, seed, import, sync, alerts). Never started by
   # `compose up`; invoked explicitly, e.g.:
   #   docker compose run --rm tools deno run -A --env-file=.env scripts/migrate.ts
