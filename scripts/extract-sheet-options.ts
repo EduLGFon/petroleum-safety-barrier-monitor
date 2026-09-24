@@ -2,7 +2,6 @@
 // Why: admin option defaults must come from the team's real workbook (not
 // guesses), with case/space/accent typos grouped so reviewers pick one
 // canonical spelling per meaning. Writes scripts/sheet-options.json.
-import { readFile } from "node:fs/promises";
 import * as XLSX from "npm:xlsx@0.18.5";
 
 // Workbook location relative to the repo root (script runs from anywhere).
@@ -99,7 +98,7 @@ function pool(values: string[]): Omit<FieldPool, "header"> {
 }
 
 async function main(): Promise<void> {
-  const buf = await readFile(SHEET_PATH);
+  const buf = await Deno.readFile(SHEET_PATH);
   const wb = XLSX.read(buf, { type: "buffer" });
   const ws = wb.Sheets["GERAL"];
   if (!ws) throw new Error("GERAL sheet not found");
