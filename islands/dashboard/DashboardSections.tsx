@@ -8,7 +8,6 @@ import type {
   SyncStatus,
 } from "../../lib/types.ts";
 import { LocationFilter } from "../../components/LocationFilter.tsx";
-import { ExportToolbar } from "../../components/ExportToolbar.tsx";
 import { ExportMenu } from "../../components/export/ExportMenu.tsx";
 import { BarriersTable } from "../../components/BarriersTable.tsx";
 import { DashboardFooter, DashboardOverlays } from "./DashboardChrome.tsx";
@@ -226,18 +225,10 @@ export function DashboardSections(
         />
 
         {
-          /* Unified toolbar: selection + Colunas dialog + result count +
-            filter reset + exports in one bar. Per-column filter boxes live
-            in the table header itself, one box directly above its column. */
+          /* Filter bar with the Colunas + export icon-button cluster and
+            the result count; bulk selection lives in the table header. */
         }
         <div style={{ animation: "slideUp .3s .36s var(--ease-out) both" }}>
-          <ExportToolbar
-            selectedIds={selectedIds}
-            allFiltered={allFiltered}
-            pageRows={rows}
-            onClearAll={clearAll}
-            serverMode={serverMode}
-          />
           <FilterBar
             filters={filters}
             vocabs={{

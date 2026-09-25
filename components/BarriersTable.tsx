@@ -108,14 +108,17 @@ export function BarriersTable(
 
   // Header bulk state over the visible page slice: checked = every visible
   // row selected, indeterminate = some but not all visible rows selected.
+  // Scope (page-only vs whole filtered set) is carried by the adjacent
+  // inline text + checkbox color, never a fourth checkbox state.
   const selOnPage = rows.reduce(
     (n, b) => n + (selectedIds.has(b.id) ? 1 : 0),
     0,
   );
   const allPageSel = rows.length > 0 && selOnPage === rows.length;
   const somePageSel = selOnPage > 0 && !allPageSel;
-  // Gmail-style extension: the header checkbox selects the page; when the
-  // page is fully picked but the filter spans more, offer all N filtered.
+  // Full filtered scope: the page is fully picked and the selection covers
+  // the whole filtered set. Page-only extension offer: page fully picked
+  // but the filter spans more rows.
   const allFilteredSel = filteredTotal > 0 &&
     selectedIds.size >= filteredTotal && allPageSel;
   const showExtend = allPageSel && !allFilteredSel &&
@@ -130,6 +133,28 @@ export function BarriersTable(
       setExtending(false);
     }
   }
+  // Inline scope text next to the header checkbox (replaces the old
+  // below-table banner): tiny, muted, links underlined in accent.
+  const scopeTextSt = {
+    fontSize: "var(--d-small)",
+    fontWeight: 400,
+    textTransform: "none",
+    letterSpacing: "normal",
+    color: "var(--text-muted)",
+    whiteSpace: "nowrap",
+  } as const;
+  const scopeLinkSt = {
+    background: "transparent",
+    border: "none",
+    padding: 0,
+    fontSize: "var(--d-small)",
+    fontWeight: 600,
+    color: "var(--accent)",
+    cursor: "pointer",
+    textDecoration: "underline",
+    textUnderlineOffset: 2,
+    whiteSpace: "nowrap",
+  } as const;
 
   return (
     <div>
@@ -168,7 +193,6 @@ export function BarriersTable(
                   scope="col"
                   style={{
                     ...thSt,
-                    width: 44,
                     cursor: "default",
                     textAlign: "center",
                     verticalAlign: "middle",
@@ -176,50 +200,111 @@ export function BarriersTable(
                   }}
                 >
                   <span
-                    role="checkbox"
-                    aria-checked={allPageSel
-                      ? "true"
-                      : somePageSel
-                      ? "mixed"
-                      : "false"}
-                    aria-label={allPageSel
-                      ? "Limpar seleção da página"
-                      : "Selecionar página"}
-                    title={allPageSel
-                      ? "Limpar seleção"
-                      : "Selecionar todos desta página"}
-                    tabIndex={rows.length > 0 ? 0 : -1}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      if (rows.length === 0) return;
-                      if (allPageSel) onClearAll();
-                      else onSelectPage();
-                    }}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter" || e.key === " ") {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        if (rows.length === 0) return;
-                        if (allPageSel) onClearAll();
-                        else onSelectPage();
-                      }
-                    }}
                     style={{
                       display: "inline-flex",
                       alignItems: "center",
                       justifyContent: "center",
-                      outline: "none",
+                      gap: 6,
+                      whiteSpace: "nowrap",
                     }}
                   >
-                    <TriCheck
-                      checked={allPageSel}
-                      indeterminate={somePageSel}
-                      onChange={() => {
+                    <span
+                      role="checkbox"
+                      aria-checked={allPageSel
+                        ? "true"
+                        : somePageSel
+                        ? "mixed"
+                        : "false"}
+                      aria-label={allFilteredSel
+                        ? `Todas as ${fmt(filteredTotal)} selecionadas`
+                        : allPageSel
+                        ? "Limpar seleção da página"
+                        : "Selecionar página"}
+                      title={allFilteredSel
+                        ? "Toda a seleção filtrada ativa — limpar tudo"
+                        : allPageSel
+                        ? "Limpar seleção"
+                        : "Selecionar todos desta página"}
+                      tabIndex={rows.length > 0 ? 0 : -1}
+                      onClick={(e) => {
+                        e.stopPropagation();
                         if (rows.length === 0) return;
                         if (allPageSel) onClearAll();
                         else onSelectPage();
                       }}
-                    />
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" || e.key === " ") {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          if (rows.length === 0) return;
+                          if (allPageSel) onClearAll();
+                          else onSelectPage();
+                        }
+                      }}
+                      style={{
+                        display: "inline-flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        outline: "none",
+                      }}
+                    >
+                      <TriCheck
+                        checked={allPageSel}
+                        indeterminate={somePageSel}
+                        variant={allFilteredSel ? "full" : "page"}
+                        onChange={() => {
+                          if (rows.length === 0) return;
+                          if (allPageSel) onClearAll();
+                          else onSelectPage();
+                        }}
+                      />
+                    </span>
+                    {allFilteredSel
+                      ? (
+                        <span style={scopeTextSt}>
+                          <span className="tnum">
+                            {fmt(filteredTotal)} selecionadas
+                          </span>
+                          {" · "}
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onClearAll();
+                            }}
+                            style={scopeLinkSt}
+                          >
+                            Limpar
+                          </button>
+                        </span>
+                      )
+                      : showExtend
+                      ? (
+                        <span style={scopeTextSt}>
+                          <span className="tnum">
+                            {fmt(rows.length)} selecionadas
+                          </span>
+                          {" · "}
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleExtend();
+                            }}
+                            disabled={extending}
+                            style={{
+                              ...scopeLinkSt,
+                              cursor: extending ? "wait" : "pointer",
+                              opacity: extending ? 0.6 : 1,
+                            }}
+                          >
+                            {extending
+                              ? "Selecionando…"
+                              : `Selecionar todas as ${fmt(filteredTotal)}`}
+                          </button>
+                        </span>
+                      )
+                      : null}
                   </span>
                 </th>
                 {visibleCols.map((key) => {
@@ -326,81 +411,6 @@ export function BarriersTable(
           </table>
         </div>
       </div>
-
-      {/* Gmail-style bulk scope: page checkbox selects the visible page;
-          when the filter spans more, offer the full filtered set inline. */}
-      {(showExtend || allFilteredSel) && (
-        <div
-          role="status"
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: "var(--d-gap-xs)",
-            flexWrap: "wrap",
-            fontSize: "var(--d-small)",
-            color: "var(--text-muted)",
-            background: AURORA.data,
-            border: `1px solid ${AURORA.dataBorder}`,
-            borderRadius: AURORA.dataRadius,
-            padding: "6px 12px",
-            marginBottom: "var(--d-stack-sm)",
-          }}
-        >
-          {allFilteredSel
-            ? (
-              <>
-                <span className="tnum">
-                  Todos os {fmt(filteredTotal)} resultados selecionados.
-                </span>
-                <button
-                  type="button"
-                  onClick={onClearAll}
-                  style={{
-                    background: "transparent",
-                    border: "none",
-                    padding: 0,
-                    fontSize: "var(--d-small)",
-                    fontWeight: 700,
-                    color: "var(--accent)",
-                    cursor: "pointer",
-                    textDecoration: "underline",
-                    textUnderlineOffset: 2,
-                  }}
-                >
-                  Limpar seleção
-                </button>
-              </>
-            )
-            : (
-              <>
-                <span className="tnum">
-                  Todas as {fmt(rows.length)} desta página selecionadas.
-                </span>
-                <button
-                  type="button"
-                  onClick={handleExtend}
-                  disabled={extending}
-                  style={{
-                    background: "transparent",
-                    border: "none",
-                    padding: 0,
-                    fontSize: "var(--d-small)",
-                    fontWeight: 700,
-                    color: "var(--accent)",
-                    cursor: extending ? "wait" : "pointer",
-                    textDecoration: "underline",
-                    textUnderlineOffset: 2,
-                    opacity: extending ? 0.6 : 1,
-                  }}
-                >
-                  {extending
-                    ? "Selecionando…"
-                    : `Selecionar todos os ${fmt(filteredTotal)} resultados`}
-                </button>
-              </>
-            )}
-        </div>
-      )}
 
       {
         /* Pagination space is always reserved (fixed min-height) so the last

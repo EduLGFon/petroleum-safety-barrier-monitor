@@ -56,6 +56,7 @@ export function ExportMenu(
     [pageList, selectedIds],
   );
   const count = fullExportable.length;
+  const pageCount = pageExportable.length;
   const empty = count === 0;
 
   // Outside click or Escape closes while open.
@@ -228,6 +229,20 @@ export function ExportMenu(
               {error}
             </div>
           )}
+          <div
+            role="note"
+            data-page-export-note
+            className="tnum"
+            style={{
+              padding: "6px 10px 4px",
+              fontSize: "var(--d-micro)",
+              color: AURORA.sub,
+              whiteSpace: "normal",
+            }}
+          >
+            CSV abrange o conjunto filtrado ({fmt(count)}); XLS/PDF somente
+            a página atual ({fmt(pageCount)})
+          </div>
         </div>
       )}
     </div>

@@ -71,7 +71,7 @@ routes/index.tsx --api.getAllBarriers()--> lib/api/mock.ts
   --> lib/mock/generator.ts --> resolveBarriers --> Barrier[]
   --> <Dashboard initialBarriers={full list} apiMode="mock" vocabularies={null}>
   --> DashboardView ClientView --> useDashboard + useDashboardVocabularies
-  --> DashboardSections (Header, KpiSections, ExportToolbar with selection and exports, FilterBar filter row ending in reset, Colunas dialog and count, BarriersTable with switchable columns)
+  --> DashboardSections (Header, KpiSections, FilterBar filter row with Colunas + export icon buttons, result count and reset, BarriersTable with switchable columns and header bulk selection)
 ```
 
 Full list ships as island props. No DB, no `fetch`. Filtering, sorting,
