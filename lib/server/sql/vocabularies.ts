@@ -63,7 +63,7 @@ export async function getResolverLabels(): Promise<{
 // Station names ride along for hover tooltips (null falls back to code);
 // codes stay the filter keys everywhere.
 export async function getVocabularies(): Promise<Vocabularies> {
-  const [locRows, dispRows, confRows, critRows, catRows, authorRows] =
+  const [locRows, dispRows, confRows, critRows, catRows, typRows, authorRows] =
     await Promise.all([
       queryRows<{ id: number; code: string; name: string; count: string }>(
         `select loc.id as id, loc.code as code,
@@ -99,6 +99,12 @@ export async function getVocabularies(): Promise<Vocabularies> {
         where b.deleted_at is null
         order by cat.label`,
       ),
+      queryRows<{ id: number; label: string }>(
+        `select distinct typ.id as id, typ.label as label from barriers b
+        join typologies typ on typ.id = b.typology_id
+        where b.deleted_at is null
+        order by typ.label`,
+      ),
       queryRows<{ id: number; name: string }>(
         `select id, name from authors order by name`,
       ),
@@ -114,6 +120,7 @@ export async function getVocabularies(): Promise<Vocabularies> {
     compliances: confRows.map((r) => r.label),
     criticalities: critRows.map((r) => r.label),
     categories: catRows.map((r) => ({ id: r.id, label: r.label })),
+    typologies: typRows.map((r) => ({ id: r.id, label: r.label })),
     authors: authorRows.map((r) => ({ id: r.id, name: r.name })),
   };
 }

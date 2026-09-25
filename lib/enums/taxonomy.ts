@@ -75,6 +75,10 @@ export const TYPOLOGY_CODES: Record<number, string> = {
 };
 export const TYPOLOGY_IDS = buildReverse(TYPOLOGY_CODES);
 
+export function toTypologyId(v: string): number | undefined {
+  return TYPOLOGY_IDS[v];
+}
+
 export function fromTypologyId(id: number): string {
   return TYPOLOGY_CODES[id] ?? `Tipologia (${id})`;
 }

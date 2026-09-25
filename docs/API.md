@@ -120,13 +120,14 @@ Full inventory: `barriers`, `barriers/deleted`,
 `barriers/:id`, `barriers/:id/status`, `export`, `kpi`, `chart`, `health`,
 `recipients`, `recipients/:id` (`_params.ts` is only parsers, never a route):
 
-- `GET /api/barriers?locationId=1&availabilityId=4&complianceId=1&categoryId=2&criticalityId=1&hasActionPlan=false&query=FAL&since=2024-01-01&until=2024-12-31&page=1&pageSize=25&sortCol=statusSince&sortDir=desc` →
+- `GET /api/barriers?locationId=1&availabilityId=4&complianceId=1&categoryId=2&typologyId=0&criticalityId=1&hasActionPlan=false&query=FAL&since=2024-01-01&until=2024-12-31&page=1&pageSize=25&sortCol=statusSince&sortDir=desc` →
   `BarriersResponse { items: WireBarrier[], total, page, pageSize, totalPages }`
   - `locationId` omitted/`0` = all; `query` matches `tag ILIKE %q% OR loc.code`
-    (`\%_` escaped, capped at 200 chars); `since`/`until` = `YYYY-MM-DD` over
+    (`\%_` escaped, capped at 200 chars); `typologyId` filters the Tipologia
+    column; `since`/`until` = `YYYY-MM-DD` over
     `status_since`; `page` default 1 (floor, min 1); `pageSize` default 25
     (clamped `1..100000`); `sortCol` whitelist
-    (`id/tag/criticality/category/availability/compliance/statusSince`,
+    (`id/tag/location/typology/criticality/category/owner/availability/compliance/statusSince`,
     default `id`); strict parsers in `routes/api/_params.ts`; `{ error, code,
     requestId }` envelope on DB failure (see the P4 section below).
 - `GET /api/barriers/:id` → `WireBarrier` (`400` invalid id, `404` missing)

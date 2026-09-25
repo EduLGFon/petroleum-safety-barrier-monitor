@@ -99,6 +99,8 @@ export interface BarriersQuery {
   complianceId?: number;
   categoryId?: number;
   criticalityId?: number;
+  // Installation typology filter (Tipologia column).
+  typologyId?: number;
   // Action-plan presence: true = with plan, false = without.
   hasActionPlan?: boolean;
   query?: string;

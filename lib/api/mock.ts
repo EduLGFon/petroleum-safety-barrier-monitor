@@ -38,6 +38,9 @@ function matchesQuery(w: WireBarrier, q: BarriersQuery): boolean {
   if (q.categoryId !== undefined && w.categoryId !== q.categoryId) {
     return false;
   }
+  if (q.typologyId !== undefined && w.typologyId !== q.typologyId) {
+    return false;
+  }
   if (
     q.criticalityId !== undefined && w.criticalityId !== q.criticalityId
   ) return false;
@@ -69,6 +72,11 @@ function sortWire(
         return (a.id - b.id) * dir;
       case "tag":
         return a.tag.localeCompare(b.tag, "pt-BR") * dir;
+      case "location":
+        return fromLocationId(a.locationId).localeCompare(
+          fromLocationId(b.locationId),
+          "pt-BR",
+        ) * dir;
       case "typology":
         return (a.typologyId - b.typologyId) * dir;
       case "criticality":

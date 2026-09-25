@@ -140,6 +140,25 @@ Deno.test("toWireQuery maps criticality to id, warns on unknown", () => {
   assertStrictEquals(warnings.length, 1);
 });
 
+Deno.test("toWireQuery maps typology to id, warns on unknown", () => {
+  assertEquals(
+    toWireQuery({ typology: "Estação Coletora" }),
+    { typologyId: 0 },
+  );
+  const warnings = collectWarnings(() => {
+    assertEquals(toWireQuery({ typology: "Talvez" }), {});
+  });
+  assertStrictEquals(warnings.length, 1);
+});
+
+Deno.test("toWireQuery uses dynamic id overrides for typology", () => {
+  const q = toWireQuery(
+    { typology: "Duto Novo" },
+    { typologyIds: { "Duto Novo": 41 } },
+  );
+  assertEquals(q, { typologyId: 41 });
+});
+
 Deno.test("toWireQuery uses dynamic id overrides for location and category", () => {
   const q = toWireQuery(
     { location: "SM", category: "Válvula XV" },

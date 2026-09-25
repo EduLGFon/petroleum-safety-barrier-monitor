@@ -167,3 +167,22 @@ Deno.test("applyFilters matches criticality exactly", () => {
     1,
   );
 });
+
+Deno.test("applyFilters matches typology exactly", () => {
+  const rows = [
+    barrier({ id: 1, typology: "Campo" }),
+    barrier({ id: 2, typology: "Estação Coletora" }),
+  ];
+  assertStrictEquals(
+    applyFilters(rows, { ...defaultFilters(), typology: "Campo" }).length,
+    1,
+  );
+  assertStrictEquals(applyFilters(rows, defaultFilters()).length, 2);
+});
+
+Deno.test("sanitizeFilterPatch keeps typology text, drops non-strings", () => {
+  assertEquals(sanitizeFilterPatch({ typology: "  Campo " }), {
+    typology: "Campo",
+  });
+  assertEquals(sanitizeFilterPatch({ typology: 7 }), {});
+});

@@ -24,6 +24,7 @@ export interface BarriersApi {
       | "availabilityId"
       | "complianceId"
       | "categoryId"
+      | "typologyId"
       | "criticalityId"
       | "hasActionPlan"
       | "query"
@@ -39,6 +40,7 @@ export interface BarriersApi {
       | "availabilityId"
       | "complianceId"
       | "categoryId"
+      | "typologyId"
       | "criticalityId"
       | "hasActionPlan"
       | "query"
@@ -53,6 +55,7 @@ export interface DomainQuery {
   availability?: string; // display string or ''
   compliance?: string;
   category?: string;
+  typology?: string;
   criticality?: string;
   plan?: string; // '' | 'Com plano' | 'Sem plano'
   query?: string;

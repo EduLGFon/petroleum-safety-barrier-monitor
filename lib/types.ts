@@ -132,6 +132,9 @@ export interface Vocabularies {
   compliances: string[];
   criticalities: string[];
   categories: { id: number; label: string }[];
+  // Installation typologies carrying numeric ids, like categories above, so
+  // the typology column filters by id instead of seed enums (see resolve.ts).
+  typologies: { id: number; label: string }[];
   // Status-history authors so wire authorIds beyond the seed enum resolve
   // to real names client-side (see resolve.ts). Optional so cached/older
   // payloads still parse; absent means seed-enum fallback.
@@ -174,6 +177,7 @@ export type SortableColumn = keyof Pick<
   Barrier,
   | "id"
   | "tag"
+  | "location"
   | "typology"
   | "criticality"
   | "category"
@@ -188,6 +192,8 @@ export interface FilterState {
   availability: string;
   compliance: string;
   category: string;
+  // Installation typology (Tipologia column filter, "" = all).
+  typology: string;
   // Sheet GERAL Criticidade (all critical in the managed scope).
   criticality: string;
   // Action-plan presence: "" (all), "Com plano", "Sem plano".

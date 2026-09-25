@@ -7,6 +7,7 @@ import {
   toComplianceId,
   toCriticalityId,
   toLocationId,
+  toTypologyId,
 } from "../enums.ts";
 import type { BarriersQuery } from "../wireTypes.ts";
 import type { DomainQuery } from "./types.ts";
@@ -18,11 +19,13 @@ export function cleanDateParam(v: string | undefined): string | undefined {
   return /^\d{4}-\d{2}-\d{2}$/.test(date) ? date : undefined;
 }
 
-// Dynamic label->id overrides for stations/categories supplied by the server
-// vocabulary; real imported values beyond the seed enums still encode.
+// Dynamic label->id overrides for stations/categories/typologies supplied
+// by the server vocabulary; real imported values beyond the seed enums
+// still encode.
 export interface QueryIdOverrides {
   locationIds?: Record<string, number>;
   categoryIds?: Record<string, number>;
+  typologyIds?: Record<string, number>;
 }
 
 /** Converts UI-facing string filters into the numeric wire query the API expects.
@@ -59,6 +62,12 @@ export function toWireQuery(
     if (id === undefined) {
       console.warn(`[toWireQuery] unknown category: ${f.category}`);
     } else q.categoryId = id;
+  }
+  if (f.typology) {
+    const id = overrides?.typologyIds?.[f.typology] ?? toTypologyId(f.typology);
+    if (id === undefined) {
+      console.warn(`[toWireQuery] unknown typology: ${f.typology}`);
+    } else q.typologyId = id;
   }
   if (f.plan === "Com plano") q.hasActionPlan = true;
   else if (f.plan === "Sem plano") q.hasActionPlan = false;

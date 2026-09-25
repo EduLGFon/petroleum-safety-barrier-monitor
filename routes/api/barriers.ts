@@ -65,6 +65,7 @@ export const handler = define.handlers({
       availabilityId: parseIntParam(sp.get("availabilityId")),
       complianceId: parseIntParam(sp.get("complianceId")),
       categoryId: parseIntParam(sp.get("categoryId")),
+      typologyId: parseIntParam(sp.get("typologyId")),
       criticalityId: parseIntParam(sp.get("criticalityId")),
       hasActionPlan: parseBooleanParam(sp.get("hasActionPlan")),
       query: parseQueryParam(sp.get("query")),

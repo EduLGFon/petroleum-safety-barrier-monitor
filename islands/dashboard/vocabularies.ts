@@ -1,6 +1,6 @@
 // Dashboard filter vocabularies - live select options derived from the dataset.
 // This is why it exists: new statuses/categories become filterable with no code
-// change, keeping FilterBar vocabularies in one reusable hook.
+// change, keeping header-filter vocabularies in one reusable hook.
 import { distinctBy } from "../../lib/constants.ts";
 import type { Barrier } from "../../lib/types.ts";
 import { useMemo } from "preact/hooks";
@@ -20,9 +20,13 @@ export function useDashboardVocabularies(barriers: Barrier[]) {
     () => distinctBy(barriers, (b) => b.category),
     [barriers],
   );
+  const typoOpts = useMemo(
+    () => distinctBy(barriers, (b) => b.typology),
+    [barriers],
+  );
   const critOpts = useMemo(
     () => distinctBy(barriers, (b) => b.criticality),
     [barriers],
   );
-  return { dispOpts, confOpts, catOpts, critOpts };
+  return { dispOpts, confOpts, catOpts, critOpts, typoOpts };
 }

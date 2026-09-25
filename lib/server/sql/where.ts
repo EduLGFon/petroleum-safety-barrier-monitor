@@ -8,6 +8,7 @@ import type { BarriersQuery } from "../../wireTypes.ts";
 export const SORTABLE: Record<string, string> = {
   id: "b.id",
   tag: "b.tag",
+  location: "loc.code",
   typology: "b.typology_id",
   criticality: "b.criticality_id",
   category: "b.category_id",
@@ -52,6 +53,9 @@ export function buildWhere(
   if (q.categoryId !== undefined) {
     push("and b.category_id = ", q.categoryId);
   }
+  if (q.typologyId !== undefined) {
+    push("and b.typology_id = ", q.typologyId);
+  }
   if (q.criticalityId !== undefined) {
     push("and b.criticality_id = ", q.criticalityId);
   }
@@ -69,8 +73,18 @@ export function buildWhere(
       `and (b.tag ilike $${a} escape '\\' or loc.code ilike $${b} escape '\\')`,
     );
   }
-  if (q.since) push("and b.status_since >= ", q.since);
-  if (q.until) push("and b.status_since <= ", q.until);
+  // Date bounds are inclusive YYYY-MM-DD on the date column. The explicit
+  // ::date cast keeps text-typed bound params comparing as dates (not text),
+  // so same-day Desde/Até ranges include that day instead of missing by
+  // collation/timezone coercion.
+  if (q.since) {
+    args.push(q.since);
+    conds.push(`and b.status_since >= $${args.length}::date`);
+  }
+  if (q.until) {
+    args.push(q.until);
+    conds.push(`and b.status_since <= $${args.length}::date`);
+  }
   // Soft-delete scope: default views hide deleted rows; the admin deleted
   // listing (GET /api/barriers/deleted) flips to deleted-only. Keeps the
   // clause first so every barrier query inherits the filter without callers

@@ -20,14 +20,28 @@ export function applyFilters(b: Barrier[], f: FilterState): Barrier[] {
   }
   if (f.compliance) d = d.filter((x) => x.compliance === f.compliance);
   if (f.category) d = d.filter((x) => x.category === f.category);
+  if (f.typology) d = d.filter((x) => x.typology === f.typology);
   if (f.criticality) d = d.filter((x) => x.criticality === f.criticality);
   if (f.plan === "Com plano") d = d.filter((x) => x.actionPlan.trim() !== "");
   else if (f.plan === "Sem plano") {
     d = d.filter((x) => x.actionPlan.trim() === "");
   }
-  // ISO dates compare lexicographically; statusSince is YYYY-MM-DD.
-  if (f.since) d = d.filter((x) => x.statusSince >= f.since);
-  if (f.until) d = d.filter((x) => x.statusSince <= f.until);
+  // ISO dates compare lexicographically on the YYYY-MM-DD date part only;
+  // statusSince rides as YYYY-MM-DD (wire to_char) but may carry a time
+  // suffix in some payloads - slicing both sides keeps same-day Desde/Até
+  // ranges inclusive instead of dropping the boundary day (off-by-one).
+  // Empty statusSince never matches an active bound (fail-closed).
+  if (f.since) {
+    const since = f.since.slice(0, 10);
+    d = d.filter((x) => (x.statusSince || "").slice(0, 10) >= since);
+  }
+  if (f.until) {
+    const until = f.until.slice(0, 10);
+    d = d.filter((x) => {
+      const ds = (x.statusSince || "").slice(0, 10);
+      return ds !== "" && ds <= until;
+    });
+  }
   return d;
 }
 
@@ -65,6 +79,7 @@ export function defaultFilters(): FilterState {
     availability: "",
     compliance: "",
     category: "",
+    typology: "",
     criticality: "",
     plan: "",
     since: "",
@@ -80,6 +95,7 @@ export function defaultFilters(): FilterState {
 const SORT_COLS: SortableColumn[] = [
   "id",
   "tag",
+  "location",
   "typology",
   "criticality",
   "category",
@@ -106,6 +122,8 @@ export function sanitizeFilterPatch(raw: unknown): Partial<FilterState> {
   if (conf !== undefined) patch.compliance = conf;
   const cat = text(r.category);
   if (cat !== undefined) patch.category = cat;
+  const typo = text(r.typology);
+  if (typo !== undefined) patch.typology = typo;
   const crit = text(r.criticality);
   if (crit !== undefined) patch.criticality = crit;
   const plan = text(r.plan);

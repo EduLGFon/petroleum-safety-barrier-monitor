@@ -60,6 +60,7 @@ export function useFilterState(defaultLocation = "ALL") {
         availability: "",
         compliance: "Não Conforme",
         category: "",
+        typology: "",
         criticality: "",
         plan: "",
         since: "",
@@ -74,7 +75,8 @@ export function useFilterState(defaultLocation = "ALL") {
   const hasActiveFilters = state.location !== "ALL" ||
     !!state.filters.query ||
     !!state.filters.availability || !!state.filters.compliance ||
-    !!state.filters.category || !!state.filters.criticality ||
+    !!state.filters.category || !!state.filters.typology ||
+    !!state.filters.criticality ||
     !!state.filters.plan || !!state.filters.since ||
     !!state.filters.until;
 
