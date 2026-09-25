@@ -2,6 +2,7 @@
 // plus a read-only DB shape check (no writes, so no cleanup needed).
 import {
   getSyncStatus,
+  isStaleActive,
   recordSyncFailure,
   type SyncStatusRow,
   toSyncStatus,
@@ -75,6 +76,26 @@ Deno.test("toSyncStatus reports unknown on an empty table", () => {
   });
   assertStrictEquals(status.state, "unknown");
   assertStrictEquals(status.lastRun, null);
+});
+
+Deno.test("isStaleActive ignores orphans superseded by newer finished runs", () => {
+  const latest = row({ id: 620, finished_at: "2026-09-25T18:13:51.000Z" });
+  // Prod case: run 569 orphaned at 13:11, later ok runs through 620 kept
+  // landing - must not latch stale.
+  assertStrictEquals(
+    isStaleActive({ id: 569, started_at: "2026-09-25T13:11:12.000Z" }, latest),
+    false,
+  );
+  // A genuinely stuck current run (newer than the last finish) stays stale.
+  assertStrictEquals(
+    isStaleActive({ id: 621, started_at: "2026-09-25T18:20:00.000Z" }, latest),
+    true,
+  );
+  assertStrictEquals(isStaleActive(null, latest), false);
+  assertStrictEquals(
+    isStaleActive({ id: 1, started_at: latest.finished_at }, null),
+    true,
+  );
 });
 
 Deno.test("getSyncStatus returns the indicator shape read-only", async () => {

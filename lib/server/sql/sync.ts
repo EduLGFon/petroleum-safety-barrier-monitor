@@ -43,6 +43,31 @@ export async function syncScopeRunning(
   return rows.length > 0;
 }
 
+// reapStaleRuns: self-healing for orphaned `running` rows (process killed
+// between startRun and finishRun, e.g. SIGKILL / redeploy mid-sweep).
+// Marks them `failed` so they stop latching the dashboard `stale` state
+// forever. Best-effort: a failure here never blocks the new run.
+export async function reapStaleRuns(
+  scope: string,
+  staleMinutes = SYNC_STALE_MINUTES,
+): Promise<number> {
+  const rows = await queryRows<{ n: number }>(
+    `with reaped as (
+       update sync_state
+       set status = 'failed',
+           finished_at = now(),
+           note = 'reaped: orphaned running row (superseded, never finished)'
+       where scope = $1 and status = 'running'
+         and started_at < now() - make_interval(mins => $2)
+       returning 1
+     ) select count(*)::int as n from reaped`,
+    [scope, staleMinutes],
+  );
+  const n = rows[0]?.n ?? 0;
+  if (n > 0) console.log(`[sync] reaped ${n} stale running row(s) scope=${scope}`);
+  return n;
+}
+
 // defaultSyncIo: the wiring runSync uses when no custom io is injected.
 export const defaultSyncIo: SyncIo = {
   async buildMapContext(): Promise<MapContext> {
@@ -118,6 +143,16 @@ export const defaultSyncIo: SyncIo = {
   },
 
   async startRun(scope: string): Promise<number> {
+    // Self-heal before opening a new run: a previous process may have died
+    // between startRun and finishRun, leaving a `running` row that would
+    // otherwise latch the dashboard `stale` state forever even as fresh
+    // `ok` runs keep landing. Reaping is scoped + best-effort.
+    try {
+      await reapStaleRuns(scope);
+    } catch {
+      // A reaping failure must never block the new run; the stale flag
+      // below already ignores superseded orphans as a second defense.
+    }
     const rows = await queryRows<{ id: number }>(
       `insert into sync_state (scope, status, started_at, finished_at)
        values ($1, 'running', now(), now())
@@ -302,6 +337,22 @@ export interface SyncStatusRow {
   finished_at: string;
 }
 
+// isStaleActive: pure guard so superseded orphans never latch `stale`.
+// A stale `running` candidate only counts when it is newer than the
+// latest finished run (id is monotonic; timestamp is the cross-scope
+// fallback). An older orphan means healthy runs kept landing after the
+// crash - the indicator must report idle, not stuck.
+export function isStaleActive(
+  staleRow: { id: number; started_at: string } | null | undefined,
+  latest: Pick<SyncStatusRow, "id" | "finished_at"> | null,
+): boolean {
+  if (staleRow === null || staleRow === undefined) return false;
+  if (latest === null) return true;
+  if (staleRow.id !== latest.id) return staleRow.id > latest.id;
+  return new Date(staleRow.started_at).getTime() >
+    new Date(latest.finished_at).getTime();
+}
+
 // toSyncStatus: pure state decision over the three reads below. A fresh
 // `running` row means in flight; a stale one (no fresh row) means the
 // poller likely died mid-run; otherwise the latest finished row decides,
@@ -346,6 +397,12 @@ export function toSyncStatus(args: {
 // getSyncStatus: dashboard indicator data - latest finished run, fresh
 // running row, stale-run flag, and the tracked barrier total. Read-only;
 // the route serves it to any authenticated dashboard user.
+//
+// Stale defense in depth: a `running` row older than SYNC_STALE_MINUTES
+// only counts when it is NEWER than the latest finished run. An orphan
+// left by a killed process (superseded by later `ok` rows) is ignored
+// here and reaped on the next startRun, instead of latching `stale`
+// forever while healthy runs keep landing.
 export async function getSyncStatus(): Promise<SyncStatus> {
   const [finished, running, stale, counted] = await Promise.all([
     queryRows<SyncStatusRow>(
@@ -361,21 +418,26 @@ export async function getSyncStatus(): Promise<SyncStatus> {
        order by id desc limit 1`,
       [SYNC_FRESH_MINUTES],
     ),
-    queryRows<{ one: number }>(
-      `select 1 as one from sync_state
+    queryRows<{ id: number; started_at: string }>(
+      `select id, started_at from sync_state
        where status = 'running'
          and started_at < now() - make_interval(mins => $1)
-       limit 1`,
+       order by id desc limit 1`,
       [SYNC_STALE_MINUTES],
     ),
     queryRows<{ n: number }>(
       `select count(*)::int as n from barriers where deleted_at is null`,
     ),
   ]);
+  const latest = finished[0] ?? null;
+  const staleRow = stale[0] ?? null;
+  // A stale candidate superseded by a newer finished run is an orphan,
+  // not an in-flight stuck sync (see isStaleActive).
+  const staleRunning = isStaleActive(staleRow, latest);
   return toSyncStatus({
-    latest: finished[0] ?? null,
+    latest,
     running: running[0] ?? null,
-    staleRunning: stale.length > 0,
+    staleRunning,
     barriers: counted[0]?.n ?? 0,
   });
 }
