@@ -40,8 +40,9 @@ const linkSt = {
 } as const;
 
 // SelectionScope: toolbar subtext for the header-owned bulk selection;
-// renders nothing unless the page is fully picked (extension offer) or the
-// whole filtered set is covered (clear offer).
+// renders nothing unless at least one visible row is selected. Partial
+// page picks show a plain count; a fully picked page offers extension to
+// the full filtered set, which in turn offers an inline clear link.
 export function SelectionScope(
   {
     pageIds,
@@ -61,7 +62,7 @@ export function SelectionScope(
     selectedIds.size >= filteredTotal && allPageSel;
   const showExtend = allPageSel && !allFilteredSel &&
     filteredTotal > pageIds.length;
-  if (!allPageSel || (!showExtend && !allFilteredSel)) return null;
+  if (selOnPage === 0) return null;
   async function handleExtend() {
     if (extending) return;
     setExtending(true);
@@ -87,7 +88,8 @@ export function SelectionScope(
             </button>
           </>
         )
-        : (
+        : showExtend
+        ? (
           <>
             <span className="tnum">{fmt(pageIds.length)} selecionadas</span>
             {" · "}
@@ -106,6 +108,11 @@ export function SelectionScope(
                 : `Selecionar todas as ${fmt(filteredTotal)}`}
             </button>
           </>
+        )
+        : (
+          <span className="tnum">
+            {fmt(selOnPage)} selecionada{selOnPage !== 1 ? "s" : ""}
+          </span>
         )}
     </span>
   );

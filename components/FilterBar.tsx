@@ -11,9 +11,8 @@ import { useEffect, useState } from "preact/hooks";
 import type { ComponentChildren } from "preact";
 import { ColumnsMenu } from "./table/ColumnsMenu.tsx";
 import type { ColumnKey, PinnedKey } from "./table/columns.ts";
-import { CloseIcon, FilterIcon, SearchIcon } from "./ui/Icons.tsx";
+import { SearchIcon } from "./ui/Icons.tsx";
 import { AURORA } from "../lib/aurora.ts";
-import { fmt } from "../lib/utils.ts";
 
 export interface FilterVocabs {
   typologies: string[];
@@ -32,21 +31,16 @@ interface Props {
   // search-field busy pulse; never blocks typing.
   isRefreshing?: boolean;
   onFilter: (p: Partial<FilterState>) => void;
-  // End-of-bar cluster: column switcher, result count and filter reset.
+  // End-of-bar cluster: column switcher only (count, selection summary
+  // and filter reset live in the TableStatusRow below the filters).
   visible: ColumnKey[];
   onToggleCol: (key: ColumnKey) => void;
   onMoveCol: (key: ColumnKey, dir: -1 | 1) => void;
   onResetCols: () => void;
   onTogglePinned: (key: PinnedKey) => void;
-  filteredTotal: number;
-  hasActiveFilters: boolean;
-  onResetFilters: () => void;
   // Icon-button cluster at the end of the bar: the caller passes the
   // export menu node so it sits directly beside the columns button.
   exportMenu?: ComponentChildren;
-  // Secondary line under the bar: the caller passes the selection-scope
-  // node so it reads as toolbar subtext without widening the table.
-  subtext?: ComponentChildren;
 }
 
 // DateBound: native date input for statusSince bounds; empty clears the bound.
@@ -89,8 +83,8 @@ function DateBound(
 
 // FilterBar: controlled search + faceted selects in table-column order
 // (TAG search, Tipologia, Categoria, Criticidade, Disponibilidade,
-// Conformidade) plus Plano and Desde/Até bounds, ending with the filter
-// reset, the Colunas dialog and the result count; onFilter patches state.
+// Conformidade) plus Plano and Desde/Até bounds, ending with the Colunas
+// dialog; onFilter patches state.
 export function FilterBar(
   {
     filters,
@@ -103,11 +97,7 @@ export function FilterBar(
     onMoveCol,
     onResetCols,
     onTogglePinned,
-    filteredTotal,
-    hasActiveFilters,
-    onResetFilters,
     exportMenu,
-    subtext,
   }: Props,
 ) {
   const [focused, setFocused] = useState(false);
@@ -244,8 +234,7 @@ export function FilterBar(
           />
         </>
       )}
-      {/* End cluster: reset (when filtering), Colunas + export icon
-          buttons side by side, count. */}
+      {/* End cluster: Colunas dialog + export menu icon buttons. */}
       <div
         style={{
           display: "flex",
@@ -255,29 +244,6 @@ export function FilterBar(
           marginLeft: "auto",
         }}
       >
-        {hasActiveFilters && (
-          <button
-            type="button"
-            onClick={onResetFilters}
-            className="lift animate-filter-on"
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: "var(--d-mini-gap)",
-              padding: "var(--d-input-y) var(--d-input-x)",
-              fontSize: "var(--d-body)",
-              fontWeight: 700,
-              background: AURORA.dangerBg,
-              border: "1px solid rgba(239,68,68,.35)",
-              borderRadius: 10,
-              color: AURORA.dangerFg,
-              cursor: "pointer",
-              whiteSpace: "nowrap",
-            }}
-          >
-            <CloseIcon size={12} color={AURORA.dangerFg} />Limpar filtros
-          </button>
-        )}
         <ColumnsMenu
           visible={visible}
           onToggle={onToggleCol}
@@ -287,36 +253,7 @@ export function FilterBar(
           onTogglePinned={onTogglePinned}
         />
         {exportMenu}
-        <span
-          className="tnum"
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: "var(--d-mini-gap)",
-            fontSize: "var(--d-body)",
-            color: hasActiveFilters ? "var(--accent-2)" : AURORA.sub,
-            fontWeight: hasActiveFilters ? 600 : 400,
-            whiteSpace: "nowrap",
-          }}
-        >
-          <FilterIcon
-            size={12}
-            color={hasActiveFilters ? "var(--accent-2)" : AURORA.sub}
-          />
-          {fmt(filteredTotal)} resultado{filteredTotal !== 1 ? "s" : ""}
-        </span>
       </div>
-      {subtext && (
-        <div
-          style={{
-            flexBasis: "100%",
-            display: "flex",
-            justifyContent: "flex-end",
-          }}
-        >
-          {subtext}
-        </div>
-      )}
     </div>
   );
 }

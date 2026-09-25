@@ -9,7 +9,7 @@ import type {
 } from "../../lib/types.ts";
 import { LocationFilter } from "../../components/LocationFilter.tsx";
 import { ExportMenu } from "../../components/export/ExportMenu.tsx";
-import { SelectionScope } from "../../components/table/SelectionScope.tsx";
+import { TableStatusRow } from "../../components/table/TableStatusRow.tsx";
 import { BarriersTable } from "../../components/BarriersTable.tsx";
 import { DashboardFooter, DashboardOverlays } from "./DashboardChrome.tsx";
 import { useSettings } from "../../context/SettingsContext.tsx";
@@ -226,8 +226,8 @@ export function DashboardSections(
         />
 
         {
-          /* Filter bar with the Colunas + export icon-button cluster and
-            the result count; bulk selection lives in the table header. */
+          /* Filter row (filter-only) + status row (master checkbox, count
+            / selection summary, filter reset) directly above the table. */
         }
         <div style={{ animation: "slideUp .3s .36s var(--ease-out) both" }}>
           <FilterBar
@@ -247,9 +247,6 @@ export function DashboardSections(
             onMoveCol={moveCol}
             onResetCols={resetCols}
             onTogglePinned={togglePinned}
-            filteredTotal={filteredTotal}
-            hasActiveFilters={hasActiveFilters}
-            onResetFilters={resetFilters}
             exportMenu={
               <ExportMenu
                 selectedIds={selectedIds}
@@ -260,15 +257,16 @@ export function DashboardSections(
                 onServerCsv={onServerCsv}
               />
             }
-            subtext={
-              <SelectionScope
-                pageIds={rows.map((b) => b.id)}
-                selectedIds={selectedIds}
-                filteredTotal={filteredTotal}
-                onSelectAll={selectAllFiltered}
-                onClearAll={clearAll}
-              />
-            }
+          />
+          <TableStatusRow
+            pageIds={rows.map((b) => b.id)}
+            selectedIds={selectedIds}
+            filteredTotal={filteredTotal}
+            hasActiveFilters={hasActiveFilters}
+            onSelectPage={selectPage}
+            onSelectAll={selectAllFiltered}
+            onClearAll={clearAll}
+            onResetFilters={resetFilters}
           />
         </div>
 
@@ -286,8 +284,6 @@ export function DashboardSections(
             visibleCols={visibleCols}
             isRefreshing={isRefreshing}
             onToggleSelect={toggleSelect}
-            onSelectPage={selectPage}
-            onClearAll={clearAll}
             onSort={setSort}
             onPageChange={(p) => setFilter({ page: p })}
             onPageSize={(n) => setFilter({ pageSize: n })}

@@ -19,8 +19,6 @@ import { ChevronDownIcon, ChevronUpIcon, SortIcon } from "./ui/Icons.tsx";
 import { useEffect, useRef, useState } from "preact/hooks";
 import { BarrierRow } from "./table/BarrierRow.tsx";
 import { Pagination } from "./table/Pagination.tsx";
-import { TriCheck } from "./export/TriCheck.tsx";
-import { fmt } from "../lib/utils.ts";
 import { AURORA } from "../lib/aurora.ts";
 
 interface Props {
@@ -36,11 +34,8 @@ interface Props {
   // False on first paint (splash covers) and in sync client mode.
   isRefreshing?: boolean;
   onToggleSelect: (id: number) => void;
-  // Header bulk control over the visible page: onSelectPage merges the
-  // page into the set; onClearAll empties it. Scope text + extension live
-  // in the toolbar subtext (SelectionScope), so this header stays narrow.
-  onSelectPage: () => void;
-  onClearAll: () => void;
+  // Bulk selection lives in the TableStatusRow above the table; per-row
+  // checkboxes stay in the body.
   onSort: (c: SortableColumn) => void;
   onPageChange: (p: number) => void;
   onPageSize: (n: number) => void;
@@ -58,8 +53,6 @@ export function BarriersTable(
     visibleCols,
     isRefreshing = false,
     onToggleSelect,
-    onSelectPage,
-    onClearAll,
     onSort,
     onPageChange,
     onPageSize,
@@ -104,21 +97,6 @@ export function BarriersTable(
   // state spans them all.
   const bodySpan = visibleCols.length + 2;
 
-  // Header bulk state over the visible page slice: checked = every visible
-  // row selected, indeterminate = some but not all visible rows selected.
-  // Scope (page-only vs whole filtered set) is carried by the toolbar
-  // subtext + checkbox color, never a fourth checkbox state.
-  const selOnPage = rows.reduce(
-    (n, b) => n + (selectedIds.has(b.id) ? 1 : 0),
-    0,
-  );
-  const allPageSel = rows.length > 0 && selOnPage === rows.length;
-  const somePageSel = selOnPage > 0 && !allPageSel;
-  // Full filtered scope: the page is fully picked and the selection covers
-  // the whole filtered set (emerald checkbox variant + toolbar subtext).
-  const allFilteredSel = filteredTotal > 0 &&
-    selectedIds.size >= filteredTotal && allPageSel;
-
   return (
     <div>
       <div
@@ -152,69 +130,19 @@ export function BarriersTable(
           >
             <thead>
               <tr>
+                {/* Empty corner cell: the master checkbox lives in the
+                  TableStatusRow above the table, so this column keeps a
+                  clean gap here while staying aligned with the per-row
+                  checkboxes in the body. */}
                 <th
                   scope="col"
+                  aria-hidden="true"
                   style={{
                     ...thSt,
                     width: 44,
                     cursor: "default",
-                    textAlign: "center",
-                    verticalAlign: "middle",
-                    padding: "var(--d-cell-pad)",
                   }}
-                >
-                  <span
-                    role="checkbox"
-                    aria-checked={allPageSel
-                      ? "true"
-                      : somePageSel
-                      ? "mixed"
-                      : "false"}
-                    aria-label={allFilteredSel
-                      ? `Todas as ${fmt(filteredTotal)} selecionadas`
-                      : allPageSel
-                      ? "Limpar seleção da página"
-                      : "Selecionar página"}
-                    title={allFilteredSel
-                      ? "Toda a seleção filtrada ativa — limpar tudo"
-                      : allPageSel
-                      ? "Limpar seleção"
-                      : "Selecionar todos desta página"}
-                    tabIndex={rows.length > 0 ? 0 : -1}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      if (rows.length === 0) return;
-                      if (allPageSel) onClearAll();
-                      else onSelectPage();
-                    }}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter" || e.key === " ") {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        if (rows.length === 0) return;
-                        if (allPageSel) onClearAll();
-                        else onSelectPage();
-                      }
-                    }}
-                    style={{
-                      display: "inline-flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      outline: "none",
-                    }}
-                  >
-                    <TriCheck
-                      checked={allPageSel}
-                      indeterminate={somePageSel}
-                      variant={allFilteredSel ? "full" : "page"}
-                      onChange={() => {
-                        if (rows.length === 0) return;
-                        if (allPageSel) onClearAll();
-                        else onSelectPage();
-                      }}
-                    />
-                  </span>
-                </th>
+                />
                 {visibleCols.map((key) => {
                   const col = sortKeyFor(key);
                   return (
