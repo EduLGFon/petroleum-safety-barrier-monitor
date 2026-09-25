@@ -44,6 +44,9 @@ interface Props {
   // Icon-button cluster at the end of the bar: the caller passes the
   // export menu node so it sits directly beside the columns button.
   exportMenu?: ComponentChildren;
+  // Secondary line under the bar: the caller passes the selection-scope
+  // node so it reads as toolbar subtext without widening the table.
+  subtext?: ComponentChildren;
 }
 
 // DateBound: native date input for statusSince bounds; empty clears the bound.
@@ -104,6 +107,7 @@ export function FilterBar(
     hasActiveFilters,
     onResetFilters,
     exportMenu,
+    subtext,
   }: Props,
 ) {
   const [focused, setFocused] = useState(false);
@@ -302,6 +306,17 @@ export function FilterBar(
           {fmt(filteredTotal)} resultado{filteredTotal !== 1 ? "s" : ""}
         </span>
       </div>
+      {subtext && (
+        <div
+          style={{
+            flexBasis: "100%",
+            display: "flex",
+            justifyContent: "flex-end",
+          }}
+        >
+          {subtext}
+        </div>
+      )}
     </div>
   );
 }

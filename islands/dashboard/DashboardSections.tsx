@@ -9,6 +9,7 @@ import type {
 } from "../../lib/types.ts";
 import { LocationFilter } from "../../components/LocationFilter.tsx";
 import { ExportMenu } from "../../components/export/ExportMenu.tsx";
+import { SelectionScope } from "../../components/table/SelectionScope.tsx";
 import { BarriersTable } from "../../components/BarriersTable.tsx";
 import { DashboardFooter, DashboardOverlays } from "./DashboardChrome.tsx";
 import { useSettings } from "../../context/SettingsContext.tsx";
@@ -259,6 +260,15 @@ export function DashboardSections(
                 onServerCsv={onServerCsv}
               />
             }
+            subtext={
+              <SelectionScope
+                pageIds={rows.map((b) => b.id)}
+                selectedIds={selectedIds}
+                filteredTotal={filteredTotal}
+                onSelectAll={selectAllFiltered}
+                onClearAll={clearAll}
+              />
+            }
           />
         </div>
 
@@ -277,7 +287,6 @@ export function DashboardSections(
             isRefreshing={isRefreshing}
             onToggleSelect={toggleSelect}
             onSelectPage={selectPage}
-            onSelectAll={selectAllFiltered}
             onClearAll={clearAll}
             onSort={setSort}
             onPageChange={(p) => setFilter({ page: p })}
