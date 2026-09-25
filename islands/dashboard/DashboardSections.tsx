@@ -1,33 +1,24 @@
 // Dashboard sections - page shell with every dashboard section.
 // Why: client (mock) and server (HTTP) modes share one render tree; only the
 // data hook feeding `dash` differs. Settings defaults gate lives here too.
-import { DashboardFooter, DashboardOverlays } from "./DashboardChrome.tsx";
-
 import type {
   AuthUser,
   Barrier,
   SyncChange,
   SyncStatus,
 } from "../../lib/types.ts";
-
 import { LocationFilter } from "../../components/LocationFilter.tsx";
-
 import { ExportToolbar } from "../../components/ExportToolbar.tsx";
-
+import { ExportMenu } from "../../components/export/ExportMenu.tsx";
 import { BarriersTable } from "../../components/BarriersTable.tsx";
-
+import { DashboardFooter, DashboardOverlays } from "./DashboardChrome.tsx";
 import { useSettings } from "../../context/SettingsContext.tsx";
-
-import type { useDashboard } from "../../hooks/useDashboard.ts";
-
 import { FilterBar } from "../../components/FilterBar.tsx";
-
-import { sanitizeFilterPatch } from "../../lib/utils.ts";
-
-import { Header } from "../../components/Header.tsx";
-
+import type { useDashboard } from "../../hooks/useDashboard.ts";
 import { useEffect, useMemo, useState } from "preact/hooks";
-
+import { sanitizeFilterPatch } from "../../lib/utils.ts";
+import { distinctBy } from "../../lib/constants.ts";
+import { Header } from "../../components/Header.tsx";
 import { KpiSections } from "./KpiSections.tsx";
 
 // Either data hook return, plus optional server-only fetch state.
@@ -54,6 +45,7 @@ interface SectionsProps {
   confOpts: string[];
   catOpts: string[];
   critOpts: string[];
+  typoOpts: string[];
   visible: boolean;
   loading: boolean;
   companyName: string;
@@ -85,6 +77,7 @@ export function DashboardSections(
     confOpts,
     catOpts,
     critOpts,
+    typoOpts,
     visible,
     loading,
     companyName,
@@ -119,13 +112,27 @@ export function DashboardSections(
     showUrgent,
     toggleSelect,
     selectAll,
+    selectPage,
     clearAll,
     isRefreshing = false,
+    visibleCols,
+    hiddenPinned,
+    toggleCol,
+    moveCol,
+    resetCols,
+    togglePinned,
   } = dash;
 
   // Table entrance runs exactly once on mount (CSS animation on a stable
   // element replays only if remounted). Row updates animate inside
   // BarriersTable only, so the wrapper never yanks the viewport.
+
+  // Header bulk scope: the table checkbox selects the page; the inline
+  // prompt extends to the full filtered set. Server mode resolves all ids
+  // through the adapter, client mode already holds the filtered list.
+  const selectAllFiltered = (dash as unknown as {
+    selectAllFiltered?: () => Promise<void>;
+  }).selectAllFiltered ?? selectAll;
 
   // Apply settings default filters after hydration (once). The patch is
   // sanitized so a stale or tampered preset can never wedge the grid.
@@ -218,28 +225,49 @@ export function DashboardSections(
           resetFilters={resetFilters}
         />
 
-        {/* Export toolbar + filters */}
+        {
+          /* Unified toolbar: selection + Colunas dialog + result count +
+            filter reset + exports in one bar. Per-column filter boxes live
+            in the table header itself, one box directly above its column. */
+        }
         <div style={{ animation: "slideUp .3s .36s var(--ease-out) both" }}>
           <ExportToolbar
             selectedIds={selectedIds}
             allFiltered={allFiltered}
-            onSelectAll={selectAll}
+            pageRows={rows}
             onClearAll={clearAll}
-            companyName={companyName}
             serverMode={serverMode}
-            onServerCsv={onServerCsv}
           />
           <FilterBar
             filters={filters}
-            filteredTotal={filteredTotal}
-            hasActiveFilters={hasActiveFilters}
-            availabilities={dispOpts}
-            compliances={confOpts}
-            categories={catOpts}
-            criticalities={critOpts}
+            vocabs={{
+              typologies: typoOpts,
+              categories: catOpts,
+              availabilities: dispOpts,
+              compliances: confOpts,
+              criticalities: critOpts,
+            }}
+            hiddenPinned={hiddenPinned}
             isRefreshing={isRefreshing}
             onFilter={setFilter}
-            onReset={resetFilters}
+            visible={visibleCols}
+            onToggleCol={toggleCol}
+            onMoveCol={moveCol}
+            onResetCols={resetCols}
+            onTogglePinned={togglePinned}
+            filteredTotal={filteredTotal}
+            hasActiveFilters={hasActiveFilters}
+            onResetFilters={resetFilters}
+            exportMenu={
+              <ExportMenu
+                selectedIds={selectedIds}
+                allFiltered={allFiltered}
+                pageRows={rows}
+                companyName={companyName}
+                serverMode={serverMode}
+                onServerCsv={onServerCsv}
+              />
+            }
           />
         </div>
 
@@ -254,8 +282,12 @@ export function DashboardSections(
             filteredTotal={filteredTotal}
             totalPages={totalPages}
             selectedIds={selectedIds}
+            visibleCols={visibleCols}
             isRefreshing={isRefreshing}
             onToggleSelect={toggleSelect}
+            onSelectPage={selectPage}
+            onSelectAll={selectAllFiltered}
+            onClearAll={clearAll}
             onSort={setSort}
             onPageChange={(p) => setFilter({ page: p })}
             onPageSize={(n) => setFilter({ pageSize: n })}
@@ -278,6 +310,7 @@ export function DashboardSections(
         compliances={confOpts}
         categories={catOpts}
         criticalities={critOpts}
+        typologies={typoOpts}
       />
     </>
   );

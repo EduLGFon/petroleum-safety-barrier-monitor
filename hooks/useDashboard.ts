@@ -7,6 +7,7 @@
  * persistence (SSR-safe hydration), and paged rows/KPI/chart derivations.
  * Sole data source for dashboard islands in client (mock) mode.
  */
+import { useVisibleColumns } from "./dashboard/visible-columns.ts";
 import { loadDash, saveDash } from "./dashboard/persistence.ts";
 import { useDashboardDerived } from "./dashboard/derived.ts";
 import { useFilterState } from "./dashboard/filter-state.ts";
@@ -37,6 +38,14 @@ export function useDashboard(allBarriers: Barrier[], defaultLocation = "ALL") {
     toggleSelect,
     clearAll,
   } = useSelection();
+  const {
+    visibleCols,
+    hiddenPinned,
+    toggleCol,
+    moveCol,
+    resetCols,
+    togglePinned,
+  } = useVisibleColumns();
 
   // After mount: restore validated selection/openId (filters restore inside
   // useFilterState; corrupt values fall back instead of wedging state).
@@ -53,8 +62,18 @@ export function useDashboard(allBarriers: Barrier[], defaultLocation = "ALL") {
       filters,
       selectedIds: [...selectedIds],
       openId,
+      visibleCols,
+      hiddenPinned,
     });
-  }, [location, filters, hydrated, selectedIds, openId]);
+  }, [
+    location,
+    filters,
+    hydrated,
+    selectedIds,
+    openId,
+    visibleCols,
+    hiddenPinned,
+  ]);
 
   const {
     kpi,
@@ -91,6 +110,20 @@ export function useDashboard(allBarriers: Barrier[], defaultLocation = "ALL") {
     [sorted, setSelectedIds],
   );
 
+  // Selects only the current page slice (merges into the existing set so
+  // the header checkbox can offer a Gmail-style "select all filtered"
+  // extension without losing prior picks).
+  const selectPage = useCallback(
+    () => {
+      setSelectedIds((prev) => {
+        const next = new Set(prev);
+        for (const b of rows) next.add(b.id);
+        return next;
+      });
+    },
+    [rows, setSelectedIds],
+  );
+
   return {
     location,
     locationDetails,
@@ -113,7 +146,14 @@ export function useDashboard(allBarriers: Barrier[], defaultLocation = "ALL") {
     showUrgent,
     toggleSelect,
     selectAll,
+    selectPage,
     clearAll,
+    visibleCols,
+    hiddenPinned,
+    toggleCol,
+    moveCol,
+    resetCols,
+    togglePinned,
     // Client mode derives synchronously: never a global load, never a
     // background refresh. Present so DashboardSections can treat both modes
     // with one `dash.isRefreshing` contract.

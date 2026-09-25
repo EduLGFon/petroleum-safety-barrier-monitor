@@ -1,28 +1,49 @@
 // Filter bar - Aurora glass search plus faceted selects fed by the data.
 // This is why it exists: vocabularies are dynamic (new statuses, 70+
-// categories), so option lists arrive as props derived from live data.
-// Empty props mean still loading or truly empty data: selects show only
-// the placeholder instead of a fixed seed list.
-import { CloseIcon, FilterIcon, SearchIcon } from "./ui/Icons.tsx";
+// categories, typologies), so option lists arrive as props derived from
+// live data. Empty props mean still loading or truly empty data: selects
+// show only the placeholder instead of a fixed seed list. Station filtering
+// stays on the location tabs; plan and date boxes hide via the Colunas
+// dialog Filtros toggles.
 import { Combo, GLASS_INPUT } from "./filter/FilterSelect.tsx";
-import { useEffect, useState } from "preact/hooks";
 import type { FilterState } from "../lib/types.ts";
+import { useEffect, useState } from "preact/hooks";
+import type { ComponentChildren } from "preact";
+import { ColumnsMenu } from "./table/ColumnsMenu.tsx";
+import type { ColumnKey, PinnedKey } from "./table/columns.ts";
+import { CloseIcon, FilterIcon, SearchIcon } from "./ui/Icons.tsx";
 import { AURORA } from "../lib/aurora.ts";
 import { fmt } from "../lib/utils.ts";
 
-interface Props {
-  filters: FilterState;
-  filteredTotal: number;
-  hasActiveFilters: boolean;
+export interface FilterVocabs {
+  typologies: string[];
+  categories: string[];
   availabilities: string[];
   compliances: string[];
-  categories: string[];
   criticalities: string[];
+}
+
+interface Props {
+  filters: FilterState;
+  vocabs: FilterVocabs;
+  // Pinned filter boxes hidden by the user (Plano/Período toggles).
+  hiddenPinned: PinnedKey[];
   // True while a background refetch is in flight (server mode). Drives the
   // search-field busy pulse; never blocks typing.
   isRefreshing?: boolean;
   onFilter: (p: Partial<FilterState>) => void;
-  onReset: () => void;
+  // End-of-bar cluster: column switcher, result count and filter reset.
+  visible: ColumnKey[];
+  onToggleCol: (key: ColumnKey) => void;
+  onMoveCol: (key: ColumnKey, dir: -1 | 1) => void;
+  onResetCols: () => void;
+  onTogglePinned: (key: PinnedKey) => void;
+  filteredTotal: number;
+  hasActiveFilters: boolean;
+  onResetFilters: () => void;
+  // Icon-button cluster at the end of the bar: the caller passes the
+  // export menu node so it sits directly beside the columns button.
+  exportMenu?: ComponentChildren;
 }
 
 // DateBound: native date input for statusSince bounds; empty clears the bound.
@@ -33,13 +54,20 @@ function DateBound(
     title: string;
   },
 ) {
+  const commit = (v: string) => {
+    // Slice to YYYY-MM-DD so datetime payloads still match the date-only
+    // SQL/client compare; malformed input clears instead of wedging.
+    const d = v ? v.slice(0, 10) : "";
+    onChange(/^\d{4}-\d{2}-\d{2}$/.test(d) ? d : v === "" ? "" : d);
+  };
   return (
     <input
       type="date"
       value={value}
       title={title}
       aria-label={title}
-      onInput={(e) => onChange(e.currentTarget.value)}
+      onInput={(e) => commit(e.currentTarget.value)}
+      onChange={(e) => commit(e.currentTarget.value)}
       style={{
         padding: "var(--d-sel-pad)",
         fontSize: "var(--d-body)",
@@ -56,19 +84,26 @@ function DateBound(
   );
 }
 
-// FilterBar: controlled search + three faceted selects over live vocab props (fallbacks for empty data); onFilter patches state, onReset clears.
+// FilterBar: controlled search + faceted selects in table-column order
+// (TAG search, Tipologia, Categoria, Criticidade, Disponibilidade,
+// Conformidade) plus Plano and Desde/Até bounds, ending with the filter
+// reset, the Colunas dialog and the result count; onFilter patches state.
 export function FilterBar(
   {
     filters,
-    filteredTotal,
-    hasActiveFilters,
-    availabilities,
-    compliances,
-    categories,
-    criticalities,
+    vocabs,
+    hiddenPinned,
     isRefreshing = false,
     onFilter,
-    onReset,
+    visible,
+    onToggleCol,
+    onMoveCol,
+    onResetCols,
+    onTogglePinned,
+    filteredTotal,
+    hasActiveFilters,
+    onResetFilters,
+    exportMenu,
   }: Props,
 ) {
   const [focused, setFocused] = useState(false);
@@ -85,11 +120,6 @@ export function FilterBar(
     const t = setTimeout(() => onFilter({ query: draft }), 200);
     return () => clearTimeout(t);
   }, [draft, filters.query, onFilter]);
-  // Props carry the live vocabulary; empty means loading or no data.
-  const dispOpts = availabilities;
-  const confOpts = compliances;
-  const catOpts = categories;
-  const critOpts = criticalities;
 
   return (
     <div
@@ -159,92 +189,116 @@ export function FilterBar(
       </div>
 
       <Combo
-        value={filters.availability}
-        onChange={(v) => onFilter({ availability: v })}
-        placeholder="Disponibilidade"
-        opts={dispOpts}
-      />
-      <Combo
-        value={filters.compliance}
-        onChange={(v) => onFilter({ compliance: v })}
-        placeholder="Conformidade"
-        opts={confOpts}
+        value={filters.typology}
+        onChange={(v) => onFilter({ typology: v })}
+        placeholder={`Tipologia (${vocabs.typologies.length})`}
+        opts={vocabs.typologies}
       />
       <Combo
         value={filters.category}
         onChange={(v) => onFilter({ category: v })}
-        placeholder={`Categoria (${catOpts.length})`}
-        opts={catOpts}
+        placeholder={`Categoria (${vocabs.categories.length})`}
+        opts={vocabs.categories}
       />
       <Combo
         value={filters.criticality}
         onChange={(v) => onFilter({ criticality: v })}
         placeholder="Criticidade"
-        opts={critOpts}
+        opts={vocabs.criticalities}
       />
       <Combo
-        value={filters.plan}
-        onChange={(v) => onFilter({ plan: v })}
-        placeholder="Plano de ação"
-        opts={["Com plano", "Sem plano"]}
+        value={filters.availability}
+        onChange={(v) => onFilter({ availability: v })}
+        placeholder="Disponibilidade"
+        opts={vocabs.availabilities}
       />
-      <DateBound
-        value={filters.since}
-        onChange={(v) => onFilter({ since: v })}
-        title="Desde (status desde)"
+      <Combo
+        value={filters.compliance}
+        onChange={(v) => onFilter({ compliance: v })}
+        placeholder="Conformidade"
+        opts={vocabs.compliances}
       />
-      <DateBound
-        value={filters.until}
-        onChange={(v) => onFilter({ until: v })}
-        title="Até (status desde)"
-      />
-
-      {hasActiveFilters && (
-        <button
-          type="button"
-          onClick={onReset}
-          className="lift animate-filter-on"
+      {!hiddenPinned.includes("plan") && (
+        <Combo
+          value={filters.plan}
+          onChange={(v) => onFilter({ plan: v })}
+          placeholder="Plano de ação"
+          opts={["Com plano", "Sem plano"]}
+        />
+      )}
+      {!hiddenPinned.includes("dates") && (
+        <>
+          <DateBound
+            value={filters.since}
+            onChange={(v) => onFilter({ since: v })}
+            title="Desde (status desde)"
+          />
+          <DateBound
+            value={filters.until}
+            onChange={(v) => onFilter({ until: v })}
+            title="Até (status desde)"
+          />
+        </>
+      )}
+      {/* End cluster: reset (when filtering), Colunas + export icon
+          buttons side by side, count. */}
+      <div
+        style={{
+          display: "flex",
+          gap: "var(--d-opt-gap)",
+          flexWrap: "wrap",
+          alignItems: "center",
+          marginLeft: "auto",
+        }}
+      >
+        {hasActiveFilters && (
+          <button
+            type="button"
+            onClick={onResetFilters}
+            className="lift animate-filter-on"
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: "var(--d-mini-gap)",
+              padding: "var(--d-input-y) var(--d-input-x)",
+              fontSize: "var(--d-body)",
+              fontWeight: 700,
+              background: AURORA.dangerBg,
+              border: "1px solid rgba(239,68,68,.35)",
+              borderRadius: 10,
+              color: AURORA.dangerFg,
+              cursor: "pointer",
+              whiteSpace: "nowrap",
+            }}
+          >
+            <CloseIcon size={12} color={AURORA.dangerFg} />Limpar filtros
+          </button>
+        )}
+        <ColumnsMenu
+          visible={visible}
+          onToggle={onToggleCol}
+          onMove={onMoveCol}
+          onReset={onResetCols}
+          hiddenPinned={hiddenPinned}
+          onTogglePinned={onTogglePinned}
+        />
+        {exportMenu}
+        <span
+          className="tnum"
           style={{
             display: "flex",
             alignItems: "center",
             gap: "var(--d-mini-gap)",
-            padding: "var(--d-input-y) var(--d-input-x)",
-            fontSize: "var(--d-body)",
-            fontWeight: 700,
-            background: AURORA.dangerBg,
-            border: "1px solid rgba(239,68,68,.35)",
-            borderRadius: 10,
-            color: AURORA.dangerFg,
-            cursor: "pointer",
-            whiteSpace: "nowrap",
-          }}
-        >
-          <CloseIcon size={12} color={AURORA.dangerFg} />Limpar filtros
-        </button>
-      )}
-
-      <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          gap: "var(--d-mini-gap)",
-          marginLeft: "auto",
-        }}
-      >
-        <FilterIcon
-          size={12}
-          color={hasActiveFilters ? "var(--accent-2)" : AURORA.sub}
-        />
-        <span
-          className="tnum"
-          style={{
             fontSize: "var(--d-body)",
             color: hasActiveFilters ? "var(--accent-2)" : AURORA.sub,
             fontWeight: hasActiveFilters ? 600 : 400,
             whiteSpace: "nowrap",
-            transition: "color .2s",
           }}
         >
+          <FilterIcon
+            size={12}
+            color={hasActiveFilters ? "var(--accent-2)" : AURORA.sub}
+          />
           {fmt(filteredTotal)} resultado{filteredTotal !== 1 ? "s" : ""}
         </span>
       </div>

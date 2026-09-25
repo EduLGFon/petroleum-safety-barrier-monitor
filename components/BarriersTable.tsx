@@ -1,24 +1,27 @@
 // Barriers table - Aurora glass ledger.
-// This is why it exists: the tabular inventory itself; rows read as dark
-// list items (mono tag, dim location, glass pills) while
-// sorting, selection and pagination keep working underneath.
+// This is why it exists: the tabular inventory itself; columns read as
+// centered cells (TAG left for mono scannability), the table fills the card
+// width when few columns are shown, while sorting, selection and pagination
+// keep working underneath. Visible columns arrive via props (Colunas dialog
+// order); filters live in the toolbar row above the table.
 //
 // Refresh contract: row updates (filter/page/search/pageSize/sort) never
 // unmount the card, never flash the global splash, and never yank the
 // viewport. While `isRefreshing` the stale rows stay mounted (dimmed +
-// hairline sweep); the card locks its previous height so shorter results
-// or a smaller pageSize ease down instead of snapping the footer up.
-// Short pages (always the last page) additionally hold the learned
-// full-page height, so last<->previous paging never moves the pagination
-// or the viewport. Single-page results render at natural height.
+// hairline sweep); the card locks its previous height so the in-flight
+// refetch never collapses the page mid-flight. Every page renders at
+// natural height with identical row heights, so short pages (always the
+// last page) end right after their last row with the pager directly below
+// and no blank gap.
+import { type ColumnKey, defFor, sortKeyFor, thSt } from "./table/columns.ts";
 import type { Barrier, FilterState, SortableColumn } from "../lib/types.ts";
 import { ChevronDownIcon, ChevronUpIcon, SortIcon } from "./ui/Icons.tsx";
+import { useEffect, useRef, useState } from "preact/hooks";
 import { BarrierRow } from "./table/BarrierRow.tsx";
 import { Pagination } from "./table/Pagination.tsx";
-import { COLS, thSt } from "./table/columns.ts";
+import { TriCheck } from "./export/TriCheck.tsx";
+import { fmt } from "../lib/utils.ts";
 import { AURORA } from "../lib/aurora.ts";
-import { useSettings } from "../context/SettingsContext.tsx";
-import { useEffect, useRef, useState } from "preact/hooks";
 
 interface Props {
   rows: Barrier[];
@@ -26,10 +29,19 @@ interface Props {
   filteredTotal: number;
   totalPages: number;
   selectedIds: Set<number>;
+  // Ordered visible columns (Colunas dialog); headers, rows and the
+  // empty state all follow this order.
+  visibleCols: ColumnKey[];
   // True while a background refetch is in flight with stale rows on screen.
   // False on first paint (splash covers) and in sync client mode.
   isRefreshing?: boolean;
   onToggleSelect: (id: number) => void;
+  // Header bulk control: page-only toggle plus full-filtered extension
+  // (Gmail-style). onSelectPage merges the visible page into the set;
+  // onSelectAll extends to every filtered row; onClearAll empties it.
+  onSelectPage: () => void;
+  onSelectAll: () => void | Promise<void>;
+  onClearAll: () => void;
   onSort: (c: SortableColumn) => void;
   onPageChange: (p: number) => void;
   onPageSize: (n: number) => void;
@@ -44,8 +56,12 @@ export function BarriersTable(
     filteredTotal,
     totalPages,
     selectedIds,
+    visibleCols,
     isRefreshing = false,
     onToggleSelect,
+    onSelectPage,
+    onSelectAll,
+    onClearAll,
     onSort,
     onPageChange,
     onPageSize,
@@ -53,17 +69,11 @@ export function BarriersTable(
   }: Props,
 ) {
   const cardRef = useRef<HTMLDivElement>(null);
-  const { settings } = useSettings();
-  // Locked card height captured when a refresh starts: keeps shorter
-  // results / smaller pageSize from collapsing the page mid-flight.
-  // Released (eased down via CSS transition) once fresh rows land.
+  // Locked card height captured when a refresh starts: keeps the in-flight
+  // refetch from collapsing the page mid-flight. Released (eased down via
+  // CSS transition) once fresh rows land. Every page renders at natural
+  // height, so the pager sits directly below the last row.
   const [lockedMinH, setLockedMinH] = useState<number | null>(null);
-  // Full-page floor for short pages. Geometry (header + per-row height) is
-  // learned from settled renders with no artificial floor applied, so it
-  // tracks the active density; short pages then hold
-  // headerH + rowH * pageSize while paged results exist.
-  const metricsRef = useRef({ headerH: 0, rowH: 0 });
-  const [floorH, setFloorH] = useState<number | null>(null);
   // Delayed visual refresh state: avoids flashing dim/hairline on fast
   // (<150ms) fetches; only sustained refetches dim the stale rows.
   const [showRefreshing, setShowRefreshing] = useState(false);
@@ -91,55 +101,35 @@ export function BarriersTable(
     }
   }, [isRefreshing]);
 
-  // Learn row geometry from settled renders and hold short pages at full
-  // height. Learning skips refreshing renders and renders with a floor or
-  // lock applied (both inflate the measurement). Any non-empty settled page
-  // teaches rowH since rows share one stable height (single-line cells +
-  // fixed NC slot); the header is re-measured live so density switches
-  // correct the floor even before a full page re-renders.
-  useEffect(() => {
-    if (isRefreshing || rows.length === 0) {
-      if (rows.length === 0) setFloorH(null);
-      return;
-    }
-    const card = cardRef.current;
-    if (!card) return;
-    const headerH = card.querySelector("thead")?.offsetHeight ??
-      metricsRef.current.headerH;
-    const inflated = lockedMinH != null || floorH != null;
-    if (!inflated && rows.length > 0) {
-      const rowH = (card.offsetHeight - headerH) / rows.length;
-      if (rowH > 0 && Number.isFinite(rowH)) {
-        metricsRef.current = { headerH, rowH };
-      }
-    }
-    // Short pages hold full-page height only while paging exists: a lone
-    // short result set renders at natural height instead of a giant card.
-    if (rows.length < filters.pageSize && totalPages > 1) {
-      const { rowH } = metricsRef.current;
-      if (rowH > 0) {
-        const floor = Math.round(headerH + rowH * filters.pageSize);
-        setFloorH((prev) => (prev === floor ? prev : floor));
-        return;
-      }
-    }
-    // Full pages need no floor (bails out when already null).
-    setFloorH(null);
-  }, [
-    rows,
-    filters.pageSize,
-    totalPages,
-    isRefreshing,
-    lockedMinH,
-    floorH,
-    settings.density,
-  ]);
-
-  // Effective floor: refresh lock wins mid-flight, learned floor the rest
-  // of the time. PageSize growth extends downward (normal flow, no
-  // auto-scroll); shrink and short pages hold still instead of snapping.
-  const minH = Math.max(lockedMinH ?? 0, floorH ?? 0);
   const refreshing = showRefreshing && isRefreshing;
+  // Body cells per row: checkbox + visible columns + arrow. The empty
+  // state spans them all.
+  const bodySpan = visibleCols.length + 2;
+
+  // Header bulk state over the visible page slice: checked = every visible
+  // row selected, indeterminate = some but not all visible rows selected.
+  const selOnPage = rows.reduce(
+    (n, b) => n + (selectedIds.has(b.id) ? 1 : 0),
+    0,
+  );
+  const allPageSel = rows.length > 0 && selOnPage === rows.length;
+  const somePageSel = selOnPage > 0 && !allPageSel;
+  // Gmail-style extension: the header checkbox selects the page; when the
+  // page is fully picked but the filter spans more, offer all N filtered.
+  const allFilteredSel = filteredTotal > 0 &&
+    selectedIds.size >= filteredTotal && allPageSel;
+  const showExtend = allPageSel && !allFilteredSel &&
+    filteredTotal > rows.length;
+  const [extending, setExtending] = useState(false);
+  async function handleExtend() {
+    if (extending) return;
+    setExtending(true);
+    try {
+      await onSelectAll();
+    } finally {
+      setExtending(false);
+    }
+  }
 
   return (
     <div>
@@ -153,9 +143,8 @@ export function BarriersTable(
           overflow: "hidden",
           marginBottom: "var(--d-stack-sm)",
           position: "relative",
-          // Locked floor while refreshing (eased release after fresh rows)
-          // plus the learned full-page floor for short pages.
-          minHeight: minH > 0 ? `${minH}px` : undefined,
+          // Locked floor while refreshing only (eased release after rows land).
+          minHeight: lockedMinH != null ? `${lockedMinH}px` : undefined,
         }}
       >
         {/* Premium refresh hairline: accent sweep across the card top. */}
@@ -165,63 +154,139 @@ export function BarriersTable(
         />
         <div style={{ overflowX: "auto" }}>
           <table
-            className="table-fixed"
-            style={{ width: "100%", borderCollapse: "collapse", minWidth: 720 }}
+            style={{
+              // Fill the card when few columns are shown (no blank edges);
+              // wider content overflows into the scroll wrapper instead.
+              width: "100%",
+              borderCollapse: "collapse",
+              tableLayout: "auto",
+            }}
           >
             <thead>
               <tr>
-                <th style={{ ...thSt, width: 44, cursor: "default" }} />
-                {COLS.map((c) => (
-                  <th
-                    key={c.col}
-                    scope="col"
-                    aria-sort={filters.sortCol === c.col
-                      ? filters.sortDir === "asc" ? "ascending" : "descending"
-                      : "none"}
-                    tabIndex={0}
-                    onClick={() => onSort(c.col)}
+                <th
+                  scope="col"
+                  style={{
+                    ...thSt,
+                    width: 44,
+                    cursor: "default",
+                    textAlign: "center",
+                    verticalAlign: "middle",
+                    padding: "var(--d-cell-pad)",
+                  }}
+                >
+                  <span
+                    role="checkbox"
+                    aria-checked={allPageSel
+                      ? "true"
+                      : somePageSel
+                      ? "mixed"
+                      : "false"}
+                    aria-label={allPageSel
+                      ? "Limpar seleção da página"
+                      : "Selecionar página"}
+                    title={allPageSel
+                      ? "Limpar seleção"
+                      : "Selecionar todos desta página"}
+                    tabIndex={rows.length > 0 ? 0 : -1}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (rows.length === 0) return;
+                      if (allPageSel) onClearAll();
+                      else onSelectPage();
+                    }}
                     onKeyDown={(e) => {
                       if (e.key === "Enter" || e.key === " ") {
                         e.preventDefault();
-                        onSort(c.col);
+                        e.stopPropagation();
+                        if (rows.length === 0) return;
+                        if (allPageSel) onClearAll();
+                        else onSelectPage();
                       }
                     }}
                     style={{
-                      ...thSt,
-                      width: c.w,
-                      cursor: "pointer",
-                      color: filters.sortCol === c.col
-                        ? "var(--accent)"
-                        : "var(--text-muted)",
+                      display: "inline-flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      outline: "none",
                     }}
                   >
-                    {c.label}
-                    {filters.sortCol === c.col
-                      ? filters.sortDir === "asc"
-                        ? (
-                          <ChevronUpIcon
-                            size={12}
-                            color="var(--accent)"
-                            strokeWidth={2.5}
-                          />
-                        )
+                    <TriCheck
+                      checked={allPageSel}
+                      indeterminate={somePageSel}
+                      onChange={() => {
+                        if (rows.length === 0) return;
+                        if (allPageSel) onClearAll();
+                        else onSelectPage();
+                      }}
+                    />
+                  </span>
+                </th>
+                {visibleCols.map((key) => {
+                  const col = sortKeyFor(key);
+                  return (
+                    <th
+                      key={key}
+                      scope="col"
+                      aria-sort={filters.sortCol === col
+                        ? filters.sortDir === "asc" ? "ascending" : "descending"
+                        : "none"}
+                      tabIndex={0}
+                      onClick={() => onSort(col)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" || e.key === " ") {
+                          e.preventDefault();
+                          onSort(col);
+                        }
+                      }}
+                      style={{
+                        ...thSt,
+                        cursor: "pointer",
+                        // TAG header stays left to match its left-aligned
+                        // column; every other header centers.
+                        textAlign: key === "tag" ? "left" : "center",
+                        verticalAlign: "middle",
+                        color: filters.sortCol === col
+                          ? "var(--accent)"
+                          : "var(--text-muted)",
+                      }}
+                    >
+                      {defFor(key).label}
+                      {filters.sortCol === col
+                        ? filters.sortDir === "asc"
+                          ? (
+                            <ChevronUpIcon
+                              size={12}
+                              color="var(--accent)"
+                              strokeWidth={2.5}
+                            />
+                          )
+                          : (
+                            <ChevronDownIcon
+                              size={12}
+                              color="var(--accent)"
+                              strokeWidth={2.5}
+                            />
+                          )
                         : (
-                          <ChevronDownIcon
-                            size={12}
-                            color="var(--accent)"
-                            strokeWidth={2.5}
+                          <SortIcon
+                            size={11}
+                            color="var(--border)"
+                            strokeWidth={2}
                           />
-                        )
-                      : (
-                        <SortIcon
-                          size={11}
-                          color="var(--border)"
-                          strokeWidth={2}
-                        />
-                      )}
-                  </th>
-                ))}
-                <th style={{ ...thSt, width: 40, cursor: "default" }} />
+                        )}
+                    </th>
+                  );
+                })}
+                <th
+                  style={{
+                    ...thSt,
+                    width: 40,
+                    cursor: "default",
+                    textAlign: "center",
+                    verticalAlign: "middle",
+                  }}
+                />
               </tr>
             </thead>
             <tbody
@@ -233,7 +298,7 @@ export function BarriersTable(
                 ? (
                   <tr>
                     <td
-                      colSpan={COLS.length + 2}
+                      colSpan={bodySpan}
                       className="table-empty"
                       style={{
                         padding: "var(--d-empty-pad)",
@@ -252,6 +317,7 @@ export function BarriersTable(
                     barrier={b}
                     index={i}
                     selected={selectedIds.has(b.id)}
+                    visibleCols={visibleCols}
                     onToggleSelect={onToggleSelect}
                     onSelect={onSelect}
                   />
@@ -260,6 +326,81 @@ export function BarriersTable(
           </table>
         </div>
       </div>
+
+      {/* Gmail-style bulk scope: page checkbox selects the visible page;
+          when the filter spans more, offer the full filtered set inline. */}
+      {(showExtend || allFilteredSel) && (
+        <div
+          role="status"
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: "var(--d-gap-xs)",
+            flexWrap: "wrap",
+            fontSize: "var(--d-small)",
+            color: "var(--text-muted)",
+            background: AURORA.data,
+            border: `1px solid ${AURORA.dataBorder}`,
+            borderRadius: AURORA.dataRadius,
+            padding: "6px 12px",
+            marginBottom: "var(--d-stack-sm)",
+          }}
+        >
+          {allFilteredSel
+            ? (
+              <>
+                <span className="tnum">
+                  Todos os {fmt(filteredTotal)} resultados selecionados.
+                </span>
+                <button
+                  type="button"
+                  onClick={onClearAll}
+                  style={{
+                    background: "transparent",
+                    border: "none",
+                    padding: 0,
+                    fontSize: "var(--d-small)",
+                    fontWeight: 700,
+                    color: "var(--accent)",
+                    cursor: "pointer",
+                    textDecoration: "underline",
+                    textUnderlineOffset: 2,
+                  }}
+                >
+                  Limpar seleção
+                </button>
+              </>
+            )
+            : (
+              <>
+                <span className="tnum">
+                  Todas as {fmt(rows.length)} desta página selecionadas.
+                </span>
+                <button
+                  type="button"
+                  onClick={handleExtend}
+                  disabled={extending}
+                  style={{
+                    background: "transparent",
+                    border: "none",
+                    padding: 0,
+                    fontSize: "var(--d-small)",
+                    fontWeight: 700,
+                    color: "var(--accent)",
+                    cursor: extending ? "wait" : "pointer",
+                    textDecoration: "underline",
+                    textUnderlineOffset: 2,
+                    opacity: extending ? 0.6 : 1,
+                  }}
+                >
+                  {extending
+                    ? "Selecionando…"
+                    : `Selecionar todos os ${fmt(filteredTotal)} resultados`}
+                </button>
+              </>
+            )}
+        </div>
+      )}
 
       {
         /* Pagination space is always reserved (fixed min-height) so the last

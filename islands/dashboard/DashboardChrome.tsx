@@ -39,6 +39,7 @@ interface OverlaysProps {
   compliances?: string[];
   criticalities?: string[];
   categories?: string[];
+  typologies?: string[];
 }
 
 // DashboardOverlays: detail modal plus settings drawer above the page.
@@ -55,6 +56,7 @@ export function DashboardOverlays(
     compliances,
     criticalities,
     categories,
+    typologies,
   }: OverlaysProps,
 ) {
   return (
@@ -74,6 +76,7 @@ export function DashboardOverlays(
         compliances={compliances}
         criticalities={criticalities}
         categories={categories}
+        typologies={typologies}
       />
     </>
   );

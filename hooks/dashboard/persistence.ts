@@ -10,6 +10,12 @@ export interface Persisted {
   filters: FilterState;
   selectedIds: number[];
   openId: number | null;
+  // Ordered visible table columns (ColumnKey strings); absent or corrupt
+  // resolves to the registry defaults via resolveVisibleCols.
+  visibleCols?: string[];
+  // Hidden pinned filter columns ("plan"/"dates" strings); absent or
+  // corrupt resolves to none hidden.
+  hiddenPinned?: string[];
 }
 
 // Loads persisted dashboard slice from `barrier-dashboard` key; SSR-safe, returns {} on miss/error.

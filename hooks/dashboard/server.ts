@@ -24,6 +24,7 @@ import { loadDash, saveDash } from "./persistence.ts";
 import { toWireQuery } from "../../lib/api/query.ts";
 
 import { useFilterState } from "./filter-state.ts";
+import { useVisibleColumns } from "./visible-columns.ts";
 
 import { LOCATIONS } from "../../lib/constants.ts";
 
@@ -77,6 +78,14 @@ export function useServerDashboard(
     toggleSelect,
     clearAll,
   } = useSelection();
+  const {
+    visibleCols,
+    hiddenPinned,
+    toggleCol,
+    moveCol,
+    resetCols,
+    togglePinned,
+  } = useVisibleColumns();
   // Dynamic id<->label maps derived from the live vocabulary (SSR seed,
   // refreshed on cadence); null in mock mode, where static enums apply.
   const [liveVocab, setLiveVocab] = useState<Vocabularies | null>(
@@ -97,6 +106,11 @@ export function useServerDashboard(
             categories: Object.fromEntries(
               liveVocab.categories.map((c) => [c.id, c.label]),
             ) as Record<number, string>,
+            // Installation typologies beyond the seed enum resolve to real
+            // labels; absent keeps seed fallback.
+            typologies: Object.fromEntries(
+              (liveVocab.typologies ?? []).map((t) => [t.id, t.label]),
+            ) as Record<number, string>,
             // History authors (e.g. admin-created names past the seed
             // enum) resolve to real names; absent keeps seed fallback.
             authors: Object.fromEntries(
@@ -109,6 +123,9 @@ export function useServerDashboard(
             ) as Record<string, number>,
             categoryIds: Object.fromEntries(
               liveVocab.categories.map((c) => [c.label, c.id]),
+            ) as Record<string, number>,
+            typologyIds: Object.fromEntries(
+              (liveVocab.typologies ?? []).map((t) => [t.label, t.id]),
             ) as Record<string, number>,
           },
         }
@@ -144,8 +161,18 @@ export function useServerDashboard(
       filters,
       selectedIds: [...selectedIds],
       openId,
+      visibleCols,
+      hiddenPinned,
     });
-  }, [location, filters, hydrated, selectedIds, openId]);
+  }, [
+    location,
+    filters,
+    hydrated,
+    selectedIds,
+    openId,
+    visibleCols,
+    hiddenPinned,
+  ]);
 
   // Fetch page + KPI + chart on scope change; superseded responses are
   // dropped via cancellation so fast typing never renders stale data. KPI
@@ -160,6 +187,7 @@ export function useServerDashboard(
       availability: filters.availability || undefined,
       compliance: filters.compliance || undefined,
       category: filters.category || undefined,
+      typology: filters.typology || undefined,
       criticality: filters.criticality || undefined,
       plan: filters.plan || undefined,
       query: filters.query || undefined,
@@ -175,6 +203,7 @@ export function useServerDashboard(
       availabilityId: wq.availabilityId,
       complianceId: wq.complianceId,
       categoryId: wq.categoryId,
+      typologyId: wq.typologyId,
       criticalityId: wq.criticalityId,
       hasActionPlan: wq.hasActionPlan,
       query: wq.query,
@@ -244,6 +273,41 @@ export function useServerDashboard(
     [items, setSelectedIds],
   );
 
+  // Merges the current page into the selection (header checkbox action).
+  const selectPage = useCallback(
+    () => {
+      setSelectedIds((prev) => {
+        const next = new Set(prev);
+        for (const b of items) next.add(b.id);
+        return next;
+      });
+    },
+    [items, setSelectedIds],
+  );
+
+  // Selects every row matching the current filter scope (Gmail-style
+  // "select all that match") by resolving all ids through the adapter.
+  // Page-local selectAll stays for the toolbar contract; the table header
+  // prompt calls this to extend a page selection to the full filtered set.
+  const selectAllFiltered = useCallback(async () => {
+    const wq = toWireQuery({
+      location,
+      availability: filters.availability || undefined,
+      compliance: filters.compliance || undefined,
+      category: filters.category || undefined,
+      typology: filters.typology || undefined,
+      criticality: filters.criticality || undefined,
+      plan: filters.plan || undefined,
+      query: filters.query || undefined,
+      since: filters.since || undefined,
+      until: filters.until || undefined,
+      sortCol: filters.sortCol,
+      sortDir: filters.sortDir,
+    }, idMaps?.query);
+    const all = await adapter.getAllBarriers(wq);
+    setSelectedIds(new Set(all.map((b) => b.id)));
+  }, [adapter, location, filters, idMaps, setSelectedIds]);
+
   // Detail resolves from the current page only; a persisted id from another
   // page re-resolves when the user navigates back to it.
   const openBarrier = openId
@@ -297,6 +361,7 @@ export function useServerDashboard(
       availability: filters.availability || undefined,
       compliance: filters.compliance || undefined,
       category: filters.category || undefined,
+      typology: filters.typology || undefined,
       criticality: filters.criticality || undefined,
       plan: filters.plan || undefined,
       query: filters.query || undefined,
@@ -362,7 +427,15 @@ export function useServerDashboard(
     showUrgent,
     toggleSelect,
     selectAll,
+    selectPage,
+    selectAllFiltered,
     clearAll,
+    visibleCols,
+    hiddenPinned,
+    toggleCol,
+    moveCol,
+    resetCols,
+    togglePinned,
     loading,
     isInitial,
     isRefreshing,

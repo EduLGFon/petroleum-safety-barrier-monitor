@@ -5,34 +5,53 @@ import {
   critColorFor,
   dispColorFor,
 } from "../../lib/constants.ts";
-import { daysSince, humanDuration } from "../../lib/utils.ts";
+import { daysSince, fmtDate, humanDuration } from "../../lib/utils.ts";
 import { AURORA, AURORA_TYPE } from "../../lib/aurora.ts";
 import type { Barrier } from "../../lib/types.ts";
-import { ClockIcon } from "../ui/Icons.tsx";
-import { Badge } from "../ui/Badge.tsx";
-import { RowChk } from "./RowCheck.tsx";
+import type { ColumnKey } from "./columns.ts";
 import type { CSSProperties } from "preact";
+import { ClockIcon } from "../ui/Icons.tsx";
+import { RowChk } from "./RowCheck.tsx";
+import { Badge } from "../ui/Badge.tsx";
 
 interface BarrierRowProps {
   barrier: Barrier;
   index: number;
   selected: boolean;
+  // Ordered visible columns from the registry; cells render in this order.
+  visibleCols: ColumnKey[];
   onToggleSelect: (id: number) => void;
   onSelect: (b: Barrier) => void;
 }
+
+// Shared centered cell: vertically middle + horizontally centered + shrunk
+// to its content (width 1% under auto layout). TAG overrides alignment.
+const tdC: CSSProperties = {
+  padding: "var(--d-cell-pad)",
+  textAlign: "center",
+  verticalAlign: "middle",
+  whiteSpace: "nowrap",
+  width: "1%",
+};
 
 // BarrierRow: renders one ledger row with select checkbox, badges, and detail open.
 // Entrance uses the shared .table-row-enter class (stagger via --row-delay)
 // so selection toggles reuse the DOM node without replaying the animation;
 // only newly mounted ids (filter/page/search/pageSize changes) animate in.
 // Text cells clamp to one line and the NC slot keeps a fixed reserve so row
-// heights stay stable and pageSize changes grow/shrink smoothly.
+// heights stay stable and identical on every page.
+// Centering: every cell is vertically middle + horizontally centered, except
+// the TAG column which stays left-aligned for mono scannability (per UX).
 export function BarrierRow(
-  { barrier: b, index: i, selected: isSel, onToggleSelect, onSelect }:
-    BarrierRowProps,
+  {
+    barrier: b,
+    index: i,
+    selected: isSel,
+    visibleCols,
+    onToggleSelect,
+    onSelect,
+  }: BarrierRowProps,
 ) {
-  const isNC = b.compliance === "Não Conforme";
-  const ncDays = isNC && b.statusSince ? daysSince(b.statusSince) : 0;
   return (
     <tr
       key={b.id}
@@ -57,7 +76,7 @@ export function BarrierRow(
       }}
     >
       {/* Checkbox */}
-      <td style={{ padding: "var(--d-cell-pad)" }}>
+      <td style={tdC}>
         <label
           className="trow-chk-label"
           onClick={(e) => {
@@ -81,117 +100,21 @@ export function BarrierRow(
           <RowChk checked={isSel} />
         </label>
       </td>
-      {/* # */}
-      <td
-        onClick={() => onSelect(b)}
-        style={{
-          padding: "var(--d-cell-pad)",
-          fontSize: "var(--d-body)",
-          color: AURORA.sub,
-          fontWeight: 600,
-        }}
-      >
-        {b.id}
-      </td>
-      {/* TAG + NC badge (NC slot reserves fixed height to keep rows stable) */}
-      <td onClick={() => onSelect(b)} style={{ padding: "var(--d-cell-pad)" }}>
-        <div
-          className="tnum trow-ellipsis"
-          style={{
-            fontFamily: "var(--font-mono)",
-            fontWeight: AURORA_TYPE.tag.fontWeight,
-            fontSize: AURORA_TYPE.tag.fontSize,
-            color: AURORA.value,
-          }}
-        >
-          {b.tag}
-        </div>
-        {/* "sem contingenciamento" duration label for NC items */}
-        <div className="trow-nc-slot">
-          {isNC && b.statusSince && (
-            <div
-              style={{
-                display: "inline-flex",
-                alignItems: "center",
-                gap: "var(--d-mini-gap)",
-                marginTop: "var(--d-gap-xs)",
-                padding: "var(--d-nc-pad)",
-                background: AURORA.dangerBg,
-                borderRadius: 7,
-                fontSize: "var(--d-caption)",
-                fontWeight: 600,
-                color: AURORA.dangerFg,
-                whiteSpace: "nowrap",
-              }}
-            >
-              <ClockIcon size={10} color={AURORA.dangerFg} strokeWidth={2.5} />
-              {humanDuration(ncDays)} sem contingenciamento
-            </div>
-          )}
-        </div>
-      </td>
-      {/* Criticality */}
-      <td onClick={() => onSelect(b)} style={{ padding: "var(--d-cell-pad)" }}>
-        <Badge
-          label={b.criticality}
-          {...critColorFor(b.criticality)}
-          size="sm"
-        />
-      </td>
-      {/* Category */}
-      <td
-        onClick={() => onSelect(b)}
-        className="trow-ellipsis"
-        style={{
-          padding: "var(--d-cell-pad)",
-          fontSize: "var(--d-body)",
-          color: "var(--text-secondary)",
-        }}
-      >
-        {b.category}
-      </td>
-      {/* Typology (sheet Tipologia da Instalação) */}
-      <td
-        onClick={() => onSelect(b)}
-        className="trow-ellipsis"
-        style={{
-          padding: "var(--d-cell-pad)",
-          fontSize: "var(--d-body)",
-          color: "var(--text-secondary)",
-        }}
-      >
-        {b.typology}
-      </td>
-      {/* Owner (sheet Dono da Barreira) */}
-      <td
-        onClick={() => onSelect(b)}
-        className="trow-ellipsis"
-        style={{
-          padding: "var(--d-cell-pad)",
-          fontSize: "var(--d-body)",
-          color: b.owner ? "var(--text-secondary)" : "var(--text-muted)",
-          fontStyle: b.owner ? "normal" : "italic",
-        }}
-      >
-        {b.owner || "Não informado"}
-      </td>
-      {/* Availability */}
-      <td onClick={() => onSelect(b)} style={{ padding: "var(--d-cell-pad)" }}>
-        <Badge label={b.availability} {...dispColorFor(b.availability)} />
-      </td>
-      {/* Compliance */}
-      <td onClick={() => onSelect(b)} style={{ padding: "var(--d-cell-pad)" }}>
-        <Badge label={b.compliance} {...confColorFor(b.compliance)} />
-      </td>
+      {visibleCols.map((key) => (
+        <Cell key={key} col={key} barrier={b} onSelect={onSelect} />
+      ))}
       {/* Arrow */}
       <td
         onClick={() => onSelect(b)}
         style={{
           padding: "var(--d-arrow-pad)",
           textAlign: "center",
+          verticalAlign: "middle",
           fontSize: "var(--d-arrow)",
           color: "var(--text-muted)",
           transition: "color .15s,transform .15s",
+          whiteSpace: "nowrap",
+          width: "1%",
         }}
         onMouseEnter={(e) => {
           (e.currentTarget as HTMLTableCellElement).style.color =
@@ -209,4 +132,183 @@ export function BarrierRow(
       </td>
     </tr>
   );
+}
+
+interface CellProps {
+  col: ColumnKey;
+  barrier: Barrier;
+  onSelect: (b: Barrier) => void;
+}
+
+// Cell: one registry-column <td> for the row. Unknown keys render nothing
+// so a corrupt visibleCols entry degrades to a missing cell, never a crash.
+function Cell({ col, barrier: b, onSelect }: CellProps) {
+  switch (col) {
+    case "id":
+      return (
+        <td
+          onClick={() => onSelect(b)}
+          style={{
+            ...tdC,
+            fontSize: "var(--d-body)",
+            color: AURORA.sub,
+            fontWeight: 600,
+          }}
+        >
+          {b.id}
+        </td>
+      );
+    case "tag": {
+      const isNC = b.compliance === "Não Conforme";
+      const ncDays = isNC && b.statusSince ? daysSince(b.statusSince) : 0;
+      return (
+        <td
+          onClick={() => onSelect(b)}
+          style={{
+            padding: "var(--d-cell-pad)",
+            textAlign: "left",
+            verticalAlign: "middle",
+            whiteSpace: "nowrap",
+          }}
+        >
+          <div
+            className="tnum trow-ellipsis"
+            style={{
+              fontFamily: "var(--font-mono)",
+              fontWeight: AURORA_TYPE.tag.fontWeight,
+              fontSize: AURORA_TYPE.tag.fontSize,
+              color: AURORA.value,
+            }}
+          >
+            {b.tag}
+          </div>
+          {/* "sem contingenciamento" duration label for NC items */}
+          <div className="trow-nc-slot">
+            {isNC && b.statusSince && (
+              <div
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: "var(--d-mini-gap)",
+                  marginTop: "var(--d-gap-xs)",
+                  padding: "var(--d-nc-pad)",
+                  background: AURORA.dangerBg,
+                  borderRadius: 7,
+                  fontSize: "var(--d-caption)",
+                  fontWeight: 600,
+                  color: AURORA.dangerFg,
+                  whiteSpace: "nowrap",
+                }}
+              >
+                <ClockIcon
+                  size={10}
+                  color={AURORA.dangerFg}
+                  strokeWidth={2.5}
+                />
+                {humanDuration(ncDays)} sem contingenciamento
+              </div>
+            )}
+          </div>
+        </td>
+      );
+    }
+    case "typology":
+      return (
+        <td
+          onClick={() => onSelect(b)}
+          className="trow-ellipsis"
+          style={{
+            ...tdC,
+            fontSize: "var(--d-body)",
+            color: "var(--text-secondary)",
+          }}
+        >
+          {b.typology}
+        </td>
+      );
+    case "location":
+      return (
+        <td
+          onClick={() => onSelect(b)}
+          className="tnum trow-ellipsis"
+          style={{
+            ...tdC,
+            fontSize: "var(--d-body)",
+            fontWeight: 700,
+            color: "var(--text-secondary)",
+          }}
+        >
+          {b.location}
+        </td>
+      );
+    case "criticality":
+      return (
+        <td onClick={() => onSelect(b)} style={tdC}>
+          <Badge
+            label={b.criticality}
+            {...critColorFor(b.criticality)}
+            size="sm"
+          />
+        </td>
+      );
+    case "category":
+      return (
+        <td
+          onClick={() => onSelect(b)}
+          className="trow-ellipsis"
+          style={{
+            ...tdC,
+            fontSize: "var(--d-body)",
+            color: "var(--text-secondary)",
+          }}
+        >
+          {b.category}
+        </td>
+      );
+    case "owner":
+      return (
+        <td
+          onClick={() => onSelect(b)}
+          className="trow-ellipsis"
+          style={{
+            ...tdC,
+            fontSize: "var(--d-body)",
+            color: b.owner ? "var(--text-secondary)" : "var(--text-muted)",
+            fontStyle: b.owner ? "normal" : "italic",
+          }}
+        >
+          {b.owner || "Não informado"}
+        </td>
+      );
+    case "availability":
+      return (
+        <td onClick={() => onSelect(b)} style={tdC}>
+          <Badge label={b.availability} {...dispColorFor(b.availability)} />
+        </td>
+      );
+    case "compliance":
+      return (
+        <td onClick={() => onSelect(b)} style={tdC}>
+          <Badge label={b.compliance} {...confColorFor(b.compliance)} />
+        </td>
+      );
+    case "statusSince":
+      return (
+        <td
+          onClick={() => onSelect(b)}
+          className="tnum"
+          style={{
+            ...tdC,
+            fontSize: "var(--d-body)",
+            color: b.statusSince
+              ? "var(--text-secondary)"
+              : "var(--text-muted)",
+          }}
+        >
+          {b.statusSince ? fmtDate(b.statusSince) : "—"}
+        </td>
+      );
+    default:
+      return null;
+  }
 }

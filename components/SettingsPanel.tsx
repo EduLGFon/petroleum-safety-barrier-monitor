@@ -38,6 +38,7 @@ interface Props {
   compliances?: string[];
   criticalities?: string[];
   categories?: string[];
+  typologies?: string[];
 }
 
 // SettingsPanel: slide-over dialog hosting appearance, filters, and admin sections.
@@ -51,6 +52,7 @@ export function SettingsPanel(
     compliances,
     criticalities,
     categories,
+    typologies,
   }: Props,
 ) {
   const {
@@ -275,6 +277,7 @@ export function SettingsPanel(
             compliances={compliances}
             criticalities={criticalities}
             categories={categories}
+            typologies={typologies}
           />
         )}
 

@@ -17,6 +17,7 @@ interface Props {
   compliances?: string[];
   criticalities?: string[];
   categories?: string[];
+  typologies?: string[];
 }
 
 // FiltersSection: startup filter defaults form with restore-defaults action.
@@ -34,6 +35,7 @@ export function FiltersSection(
     compliances,
     criticalities,
     categories,
+    typologies,
   }: Props,
 ) {
   const liveLocs = locations ?? [];
@@ -49,6 +51,7 @@ export function FiltersSection(
   const confOpts = compliances ?? [];
   const critOpts = criticalities ?? [];
   const catOpts = categories ?? [];
+  const typoOpts = typologies ?? [];
   const effAvail = dispOpts.includes(
       (settings.defaultFilters as Record<string, string>).availability ?? "",
     )
@@ -68,6 +71,11 @@ export function FiltersSection(
       (settings.defaultFilters as Record<string, string>).criticality ?? "",
     )
     ? (settings.defaultFilters as Record<string, string>).criticality as string
+    : "";
+  const effTypo = typoOpts.includes(
+      (settings.defaultFilters as Record<string, string>).typology ?? "",
+    )
+    ? (settings.defaultFilters as Record<string, string>).typology as string
     : "";
   const effPlan = ["Com plano", "Sem plano"].includes(
       (settings.defaultFilters as Record<string, string>).plan ?? "",
@@ -125,6 +133,7 @@ export function FiltersSection(
           eff: effConf,
         },
         { label: "Categoria", key: "category", opts: catOpts, eff: effCat },
+        { label: "Tipologia", key: "typology", opts: typoOpts, eff: effTypo },
         {
           label: "Criticidade",
           key: "criticality",

@@ -71,7 +71,7 @@ routes/index.tsx --api.getAllBarriers()--> lib/api/mock.ts
   --> lib/mock/generator.ts --> resolveBarriers --> Barrier[]
   --> <Dashboard initialBarriers={full list} apiMode="mock" vocabularies={null}>
   --> DashboardView ClientView --> useDashboard + useDashboardVocabularies
-  --> DashboardSections (Header, KpiSections, ExportToolbar, FilterBar, BarriersTable)
+  --> DashboardSections (Header, KpiSections, ExportToolbar with selection and exports, FilterBar filter row ending in reset, Colunas dialog and count, BarriersTable with switchable columns)
 ```
 
 Full list ships as island props. No DB, no `fetch`. Filtering, sorting,
@@ -80,7 +80,7 @@ Export covers the full filtered set.
 
 ### HTTP mode (`PUBLIC_API_MODE=http`)
 
-SSR in `routes/index.tsx` calls `getVocabularies()` (4 parallel SQL queries)
+SSR in `routes/index.tsx` calls `getVocabularies()` (7 parallel SQL queries)
 and renders `<Dashboard initialBarriers={[]} vocabularies={...}>`. Rows never
 cross the island boundary (50k+ scale).
 
@@ -193,7 +193,8 @@ Full contract lives in `docs/API.md`. Summary:
   bulk-inserts `getWireBarriers()` output in batches of 500 (`--force`
   truncates first).
 - Browser `localStorage`: `barrier-dashboard` (location, filters, selection,
-  openId; validated per-field on restore, stale page self-heals) and
+  openId, ordered visible table columns plus hidden pinned filters;
+  validated per-field on restore, stale page self-heals) and
   `barrier-settings` (theme, accent, density, motion, defaults).
 
 ## Config
