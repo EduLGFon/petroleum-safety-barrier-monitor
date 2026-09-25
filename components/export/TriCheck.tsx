@@ -2,6 +2,9 @@
 // This is why it exists: the toolbar shell needs one shared tri-state box so checked shows a check and partial shows a dash.
 import { AURORA } from "../../lib/aurora.ts";
 // Chk: tri-state select-all box (checked check vs indeterminate dash); click delegates to onChange.
+// Stops propagation so wrapping toggle affordances (e.g. the table header
+// cell, which carries the same toggle on click/keyboard) never fire twice
+// for one click - a double toggle is a silent no-op that looks broken.
 export function TriCheck(
   { checked, indeterminate, onChange }: {
     checked: boolean;
@@ -12,7 +15,10 @@ export function TriCheck(
   const a = checked || indeterminate;
   return (
     <div
-      onClick={onChange}
+      onClick={(e) => {
+        e.stopPropagation();
+        onChange();
+      }}
       style={{
         width: "var(--d-chk)",
         height: "var(--d-chk)",

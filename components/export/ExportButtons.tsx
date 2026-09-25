@@ -13,8 +13,14 @@ export type Fmt = "xls" | "pdf" | "csv";
 type I = FunctionComponent<
   { size?: number; color?: string; strokeWidth?: number }
 >;
-const FMTS: { key: Fmt; Icon: I; label: string; ext: string; color: string }[] =
-  [
+export interface FmtDef {
+  key: Fmt;
+  Icon: I;
+  label: string;
+  ext: string;
+  color: string;
+}
+const FMTS: FmtDef[] = [
     {
       key: "xls",
       Icon: FileSpreadsheetIcon,
@@ -37,6 +43,7 @@ const FMTS: { key: Fmt; Icon: I; label: string; ext: string; color: string }[] =
       color: "#6366f1",
     },
   ];
+export { FMTS };
 // ExportButtons: renders header count plus FMTS buttons; shows spinner on the active format.
 export function ExportButtons(
   { count, loading, onExport }: {

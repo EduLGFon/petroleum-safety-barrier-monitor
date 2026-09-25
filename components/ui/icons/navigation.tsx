@@ -66,3 +66,12 @@ export const ChevronsRightIcon = (
     strokeWidth,
     '<path d="m6 17 5-5-5-5"/><path d="m13 17 5-5-5-5"/>',
   );
+export const ColumnsIcon = (
+  { size = 16, color = "currentColor", strokeWidth = 2 }: P,
+) =>
+  D(
+    size,
+    color,
+    strokeWidth,
+    '<rect width="18" height="18" x="3" y="3" rx="2"/><path d="M9 3v18"/><path d="M15 3v18"/>',
+  );
