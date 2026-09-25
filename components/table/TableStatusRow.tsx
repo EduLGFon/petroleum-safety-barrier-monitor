@@ -8,7 +8,7 @@
 // (only while a filter is active), relocated here from the filter row.
 import { SelectionScope } from "./SelectionScope.tsx";
 import { TriCheck } from "../export/TriCheck.tsx";
-import { CloseIcon, FilterIcon } from "../ui/Icons.tsx";
+import { FilterIcon } from "../ui/Icons.tsx";
 import { AURORA } from "../../lib/aurora.ts";
 import { fmt } from "../../lib/utils.ts";
 
@@ -147,23 +147,22 @@ export function TableStatusRow(
         <button
           type="button"
           onClick={onResetFilters}
-          className="lift animate-filter-on"
+          title="Limpar filtros ativos"
+          className="animate-filter-on"
           style={{
-            display: "flex",
-            alignItems: "center",
-            gap: "var(--d-mini-gap)",
-            padding: "var(--d-input-y) var(--d-input-x)",
-            fontSize: "var(--d-body)",
-            fontWeight: 700,
-            background: AURORA.dangerBg,
-            border: "1px solid rgba(239,68,68,.35)",
-            borderRadius: 10,
+            background: "transparent",
+            border: "none",
+            padding: 0,
+            fontSize: "var(--d-small)",
+            fontWeight: 600,
             color: AURORA.dangerFg,
             cursor: "pointer",
+            textDecoration: "underline",
+            textUnderlineOffset: 2,
             whiteSpace: "nowrap",
           }}
         >
-          <CloseIcon size={12} color={AURORA.dangerFg} />Limpar filtros
+          Limpar filtros
         </button>
       )}
     </div>
