@@ -25,7 +25,7 @@ import { Badge } from "../ui/Badge.tsx";
 
 // BarrierDetails shows identification, inventory sheet columns, contingency,
 // degradation, status duration, comments, and action plan. Fields pair two-up
-// (instalação já combina código + nome) and the header badges collapse into a
+// (location already combines code + name) and the header badges collapse into a
 // single status strip, so the dialog stays dense.
 export function BarrierDetails({ b }: { b: Barrier }) {
   const dc = DISP_COLORS[b.availability],

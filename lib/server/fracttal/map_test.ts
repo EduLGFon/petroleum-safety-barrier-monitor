@@ -43,7 +43,7 @@ function asset(over: Partial<FracttalAsset> = {}): FracttalAsset {
   };
 }
 
-Deno.test("availabilityFromAsset: unavailable is Indisponível, else Disponível", () => {
+Deno.test("availabilityFromAsset: unavailable maps to unavailable id, else available id", () => {
   const unavailable = mapAsset(asset({ available: false }), ctx);
   if (!unavailable.ok) throw new Error("expected ok");
   assertStrictEquals(
@@ -157,7 +157,7 @@ Deno.test("mapAsset maps work events to status plus comments", () => {
   assertStrictEquals(mapped.input.comments, "OS - 1: fix");
 });
 
-Deno.test("mapAsset maps out-of-service dates to Fora de Operação", () => {
+Deno.test("mapAsset maps out-of-service dates to outOfService id", () => {
   const mapped = mapAsset(
     asset({ initial_date_out_of_service: "2026-08-01T00:00:00" }),
     ctx,
@@ -167,7 +167,7 @@ Deno.test("mapAsset maps out-of-service dates to Fora de Operação", () => {
   assertStrictEquals(mapped.input.availabilityId, 1);
 });
 
-Deno.test("mapAsset applies work stop flags to Fora de Operação", () => {
+Deno.test("mapAsset applies work stop flags to outOfService id", () => {
   const mapped = mapAsset(asset(), ctx, {
     work: { stopAssets: true },
     today: "2026-09-15",

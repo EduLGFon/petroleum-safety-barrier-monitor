@@ -91,10 +91,16 @@ export function BarrierEditor({ barrier, onSaved, onCancel }: Props) {
     Promise.all([
       fetch("/api/lookups", { credentials: "same-origin" })
         .then((r) => (r.ok ? r.json() : null))
-        .catch(() => null),
+        .catch((err) => {
+          console.warn("BarrierEditor: lookups fetch failed", err);
+          return null;
+        }),
       fetch("/api/field-options", { credentials: "same-origin" })
         .then((r) => (r.ok ? r.json() : null))
-        .catch(() => null),
+        .catch((err) => {
+          console.warn("BarrierEditor: field-options fetch failed", err);
+          return null;
+        }),
     ]).then(([l, f]) => {
       if (l) {
         setLookups(l);
@@ -311,7 +317,7 @@ export function BarrierEditor({ barrier, onSaved, onCancel }: Props) {
         </div>
       )}
 
-      {/* Section: Identificação */}
+      {/* Section: Identification */}
       <div>
         <div
           style={{
@@ -569,7 +575,7 @@ export function BarrierEditor({ barrier, onSaved, onCancel }: Props) {
         }}
       />
 
-      {/* Section: Ficha do Inventário */}
+      {/* Section: Inventory record */}
       <div>
         <div
           style={{
@@ -638,7 +644,7 @@ export function BarrierEditor({ barrier, onSaved, onCancel }: Props) {
         }}
       />
 
-      {/* Section: Plano de Manutenção */}
+      {/* Section: Maintenance plan */}
       <div>
         <div
           style={{
@@ -688,7 +694,7 @@ export function BarrierEditor({ barrier, onSaved, onCancel }: Props) {
         }}
       />
 
-      {/* Section: Contingência */}
+      {/* Section: Contingency */}
       <div>
         <div
           style={{
@@ -767,7 +773,7 @@ export function BarrierEditor({ barrier, onSaved, onCancel }: Props) {
         }}
       />
 
-      {/* Section: Degradação & Comentários */}
+      {/* Section: Degradation and comments */}
       <div style={{ display: "grid", gap: "var(--d-stack-sm)" }}>
         <div
           style={{

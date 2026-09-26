@@ -192,7 +192,7 @@ export function UsersManager({ onCount }: { onCount?: (n: number) => void }) {
                   )}
                 </span>
                 <StatusBadge tone={u.role === "admin" ? "admin" : "neutral"}>
-                  {u.role === "admin" ? "Administrador" : "Usuário"}
+                  {u.role === "admin" ? "Admin" : "Usuário"}
                 </StatusBadge>
                 <StatusBadge tone={u.active ? "active" : "inactive"}>
                   {u.active ? "Ativo" : "Inativo"}

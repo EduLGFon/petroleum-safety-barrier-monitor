@@ -26,7 +26,7 @@ export function StatusBand({ kpi, activeFilter, onFilter }: Props) {
     "Degradado Contingenciado": kpi.degradedContingency,
     "Degradado": kpi.degraded,
     "Indisponível": kpi.unavailable,
-    ...(kpi.other > 0 ? { "Outras": kpi.other } : {}),
+    ...(kpi.other > 0 ? { "Outros Status": kpi.other } : {}),
   };
   // Sort comparator: known statuses in KNOWN_ORDER first; unknowns trail by volume.
   const keys = Object.keys(counts).sort((a, b) => {

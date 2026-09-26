@@ -2,7 +2,7 @@
 // Why: admin option defaults must come from the team's real workbook (not
 // guesses), with case/space/accent typos grouped so reviewers pick one
 // canonical spelling per meaning. Writes scripts/sheet-options.json.
-import * as XLSX from "npm:xlsx@0.18.5";
+import * as XLSX from "xlsx";
 
 // Workbook location relative to the repo root (script runs from anywhere).
 const SHEET_PATH = new URL("../test/inventory.xlsx", import.meta.url);

@@ -1,7 +1,7 @@
 // SyncDeltas: colored actual-change counts for the subtitle line.
 // This is why it exists: operators see what changed (+new ~updated
 // -removed) without opening the hover card. Unchanged items stay out of
-// this row - the card explains them under "Sem alteração". Purely
+// this row - the card explains them under the no-change label. Purely
 // presentational.
 import type { Deltas } from "../../lib/sync-indicator.ts";
 
@@ -33,7 +33,7 @@ function Chip(
 }
 
 // SyncDeltas: +3 ~12 -1 chips for real changes. Zero-change runs render
-// "sem alterações" so an empty sync never looks broken.
+// a no-change label so an empty run never looks broken.
 export function SyncDeltas({ deltas }: { deltas: Deltas | null }) {
   if (deltas === null) return null;
   if (deltas.changed === 0) {

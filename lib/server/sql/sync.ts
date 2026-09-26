@@ -151,9 +151,10 @@ export const defaultSyncIo: SyncIo = {
     // `ok` runs keep landing. Reaping is scoped + best-effort.
     try {
       await reapStaleRuns(scope);
-    } catch {
+    } catch (err) {
       // A reaping failure must never block the new run; the stale flag
       // below already ignores superseded orphans as a second defense.
+      console.warn("sync: best-effort reapStaleRuns failed", err);
     }
     const rows = await queryRows<{ id: number }>(
       `insert into sync_state (scope, status, started_at, finished_at)

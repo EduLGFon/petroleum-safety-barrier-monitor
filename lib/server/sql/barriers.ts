@@ -139,8 +139,8 @@ export async function getKpi(
         count(*) filter (where b.availability_id = 5)::text as unavailable,
         count(*) filter (where b.availability_id not in (0, 1, 2, 3, 4, 5))::text as other,
         count(*) filter (where b.compliance_id = 0)::text as compliant,
-        count(*) filter (where b.compliance_id = 1)::text as non_compliant,
-        count(*) filter (where b.compliance_id = 1 and b.criticality_id = 1)::text as critical_non_compliant,
+        count(*) filter (where coalesce(b.compliance_id, 1) <> 0)::text as non_compliant,
+        count(*) filter (where coalesce(b.compliance_id, 1) <> 0 and b.criticality_id = 1)::text as critical_non_compliant,
         count(*) filter (where b.action_plan is null or b.action_plan = '')::text as without_action_plan
       from barriers b join locations loc on loc.id = b.location_id ${where.text}`,
       where.args,

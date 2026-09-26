@@ -23,8 +23,8 @@ export type ColumnKey =
   | "statusSince";
 
 // FilterKind selects the control rendered in the header filter row under a
-// column. "none" means sort-only (ID has no filter; Dono has no owner
-// dimension; Desde is covered by the pinned date cells). "plan"/"dates"
+// column. "none" means sort-only (ID has no filter; owner has no owner
+// dimension; statusSince is covered by the pinned date cells). "plan"/"dates"
 // only occur on pinned end-cells, never on a data column.
 export type FilterKind =
   | "none"
@@ -45,7 +45,7 @@ export interface ColumnDef {
 }
 
 // Canonical column order. Toggling an optional column back on inserts it at
-// its slot here; drag-free reorder in the Colunas menu overrides the order.
+// its slot here; drag-free reorder in the Columns menu overrides the order.
 export const COLUMN_DEFS: ColumnDef[] = [
   { key: "id", label: "#", filter: "none" },
   { key: "tag", label: "TAG", filter: "search" },
@@ -59,9 +59,9 @@ export const COLUMN_DEFS: ColumnDef[] = [
   { key: "statusSince", label: "Desde", filter: "none" },
 ];
 
-// Default visible set: ID | TAG | Tipologia | Estação | Categoria |
-// Disponibilidade | Conformidade. Criticidade, Dono and Desde toggle back
-// on from the Colunas menu.
+// Default visible set: ID | TAG | typology | location | category |
+// availability | compliance. criticality, owner and statusSince toggle back
+// on from the Columns menu.
 export const DEFAULT_VISIBLE_COLS: ColumnKey[] = [
   "id",
   "tag",
@@ -72,7 +72,7 @@ export const DEFAULT_VISIBLE_COLS: ColumnKey[] = [
   "compliance",
 ];
 
-// MENU_ORDER: registry keys in canonical slots for the Colunas menu list.
+// MENU_ORDER: registry keys in canonical slots for the Columns menu list.
 export const MENU_ORDER: ColumnKey[] = COLUMN_DEFS.map((d) => d.key);
 
 const DEF_BY_KEY: Record<ColumnKey, ColumnDef> = Object.fromEntries(
@@ -115,8 +115,8 @@ export function resolveVisibleCols(stored: unknown): ColumnKey[] {
 
 // PinnedKey: filter-only end-columns with no data column (plan presence and
 // the date bounds). They stay pinned after the last data column whatever
-// the visible order is, and toggle independently from the Colunas dialog
-// "Filtros" section.
+// the visible order is, and toggle independently from the Columns dialog
+// filters section.
 export type PinnedKey = "plan" | "dates";
 
 export const PINNED_FILTERS: { key: PinnedKey; label: string }[] = [

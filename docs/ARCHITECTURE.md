@@ -32,6 +32,13 @@ plus `fsRoutes()`. `client.ts` only imports `static/styles.css` for HMR.
 | `admin:create`                  | `deno run -A --env-file=.env scripts/create-admin.ts`                                                                                                                                                                  | `.env` (`DATABASE_URL`)                                     |
 
 `build` emits `_fresh/server.js` + `_fresh/server/` + `_fresh/client/`.
+
+Helper scripts (also under `scripts/`, correctly placed per workflow rules):
+`browser-shot.ts` / `browser-pdf.ts` / `browser-smoke.ts` (headless Chrome
+probes), `chaos-scale.ts` (50k-row dynamic-data contract check), `test-dom.ts`
+(linkedom harness for hook tests), `import-sort.ts` (agents.md import-order
+enforcer), `extract-sheet-options.ts` (one-off xlsx pool) and
+`inventory-probe.py` (one-off Python probe, predates the Deno-only rule).
 `COMPANY_NAME` is read per request, not baked at build time.
 `routes/_app.tsx` renders the HTML shell plus a FOUC guard that restores
 theme/accent/density/motion from `barrier-settings` before hydration.
@@ -50,11 +57,14 @@ theme/accent/density/motion from `barrier-settings` before hydration.
   (non-server). Must never import `lib/server/*`.
 - `components/` - static presentational UI, bundled as part of the island
   subtree. Props-driven; vocabularies arrive via props.
-- `hooks/dashboard/` + `hooks/useDashboard.ts` - client state (island-only).
+- `hooks/dashboard/` + `hooks/useDashboard.ts` + `hooks/useConnection.ts`
+  - client state (island-only).
 - `context/` - `SettingsContext` + `ThemeContext`, provided inside the
   island root because server route context does not reach hydrated islands.
-- `lib/server/` - server-only Postgres pool (`db.ts`) + SQL repositories.
-  Only `routes/index.tsx` and `routes/api/*` may import it.
+- `lib/server/` - server-only Postgres pool (`db.ts`) + SQL repositories
+  - edge helpers (`errors.ts`, `throttle.ts`, `config.ts`, `page-auth.ts`,
+    `exportCsv.ts`).
+    Only `routes/index.tsx` and `routes/api/*` may import it.
 
 Server-only boundary is enforced by convention: `lib/server/db.ts` holds a
 lazy `Pool` on `globalThis.__barrierPool` (import never throws; first
@@ -110,6 +120,7 @@ boundary as props from `routes/index.tsx`:
 - `apiMode` (`PUBLIC_API_MODE`, default `mock`)
 - `apiBaseUrl` (`PUBLIC_API_BASE_URL`)
 - `vocabularies` (`getVocabularies()` in http mode, `null` in mock mode)
+- `sessionUser` (authenticated user or `null`, from `routes/index.tsx`)
 
 `SettingsProvider` + `ThemeProvider` wrap `DashboardView` inside
 `islands/Dashboard.tsx` for the same reason. Dual-use modules
@@ -172,8 +183,8 @@ Full contract lives in `docs/API.md`. Summary:
   streaming slices of the 480 MB tenant dump.
 - Import pipeline (`scripts/fracttal-import.ts`): streams the dump from
   disk (char-scan JSON reader, constant memory), rebuilds `locations`,
-  `categories`, and `barriers` from real data, and stamps `lib/map.ts`
-  import defaults. Dry-runs without `--apply`.
+  `categories`, and `barriers` from real data, and stamps
+  `lib/server/fracttal/map.ts` import defaults. Dry-runs without `--apply`.
 - Shared mapping rules (`lib/server/fracttal/barrier-rules.ts`): the one
   converged source for scope keywords, station parse, typology,
   work-event classification, and 4-state availability used by both the

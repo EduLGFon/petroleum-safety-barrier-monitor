@@ -3,8 +3,8 @@
 // categories, typologies), so option lists arrive as props derived from
 // live data. Empty props mean still loading or truly empty data: selects
 // show only the placeholder instead of a fixed seed list. Station filtering
-// stays on the location tabs; plan and date boxes hide via the Colunas
-// dialog Filtros toggles.
+// stays on the location tabs; plan and date boxes hide via the Columns
+// dialog filters toggles.
 import { Combo, GLASS_INPUT } from "./filter/FilterSelect.tsx";
 
 import type { ColumnKey, PinnedKey } from "./table/columns.ts";
@@ -32,7 +32,7 @@ export interface FilterVocabs {
 interface Props {
   filters: FilterState;
   vocabs: FilterVocabs;
-  // Pinned filter boxes hidden by the user (Plano/Período toggles).
+  // Pinned filter boxes hidden by the user (plan/period toggles).
   hiddenPinned: PinnedKey[];
   // True while a background refetch is in flight (server mode). Drives the
   // search-field busy pulse; never blocks typing.
@@ -89,8 +89,8 @@ function DateBound(
 }
 
 // FilterBar: controlled search + faceted selects in table-column order
-// (TAG search, Tipologia, Categoria, Criticidade, Disponibilidade,
-// Conformidade) plus Plano and Desde/Até bounds, ending with the Colunas
+// (TAG search, typology, category, criticality, availability,
+// compliance) plus plan and statusSince date bounds, ending with the Columns
 // dialog; onFilter patches state.
 export function FilterBar(
   {
@@ -241,7 +241,7 @@ export function FilterBar(
           />
         </>
       )}
-      {/* End cluster: Colunas dialog + export menu icon buttons. */}
+      {/* End cluster: Columns dialog + export menu icon buttons. */}
       <div
         style={{
           display: "flex",

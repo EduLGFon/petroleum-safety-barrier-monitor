@@ -2,7 +2,7 @@
 // This is why it exists: the tabular inventory itself; columns read as
 // centered cells (TAG left for mono scannability), the table fills the card
 // width when few columns are shown, while sorting, selection and pagination
-// keep working underneath. Visible columns arrive via props (Colunas dialog
+// keep working underneath. Visible columns arrive via props (Columns dialog
 // order); filters live in the toolbar row above the table.
 //
 // Refresh contract: row updates (filter/page/search/pageSize/sort) never
@@ -27,7 +27,7 @@ interface Props {
   filteredTotal: number;
   totalPages: number;
   selectedIds: Set<number>;
-  // Ordered visible columns (Colunas dialog); headers, rows and the
+  // Ordered visible columns (Columns dialog); headers, rows and the
   // empty state all follow this order.
   visibleCols: ColumnKey[];
   // True while a background refetch is in flight with stale rows on screen.

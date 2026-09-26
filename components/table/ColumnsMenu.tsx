@@ -25,7 +25,7 @@ interface Props {
   onToggle: (key: ColumnKey) => void;
   onMove: (key: ColumnKey, dir: -1 | 1) => void;
   onReset: () => void;
-  // Pinned filter columns (Plano/Período) hidden by the user.
+  // Pinned filter columns (plan/period) hidden by the user.
   hiddenPinned: PinnedKey[];
   onTogglePinned: (key: PinnedKey) => void;
 }
