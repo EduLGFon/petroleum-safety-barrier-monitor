@@ -143,7 +143,7 @@ export function UsersManager({ onCount }: { onCount?: (n: number) => void }) {
               style={inputSt}
             >
               <option value="user">Usuário</option>
-              <option value="admin">Administrador</option>
+              <option value="admin">Admin</option>
             </select>
           </Field>
           <div style={{ display: "flex", alignItems: "end", flex: "1 1 100%" }}>
