@@ -199,6 +199,6 @@ export function healthLabel(kind: HealthKind): string {
   if (kind === "stale") return "Sincronização possivelmente travada";
   if (kind === "outdated") return "Sincronização desatualizada";
   if (kind === "never") return "Sem sincronizações";
-  if (kind === "offline") return "Offline";
+  if (kind === "offline") return "Desconectado";
   return "Sincronizado";
 }

@@ -26,7 +26,7 @@ export function SyncLine({ sync, conn }: Props) {
   if (sync === null) return null;
   const kind = toHealthKind(sync, conn);
   const label = conn === "disconnected" && sync.lastRun !== null
-    ? `Offline - última`
+    ? `Desconectado - última`
     : healthLabel(kind);
   const instantIso = kind === "syncing" && sync.runningSince !== null
     ? sync.runningSince

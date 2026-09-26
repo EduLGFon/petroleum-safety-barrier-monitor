@@ -305,7 +305,7 @@ function Cell({ col, barrier: b, onSelect }: CellProps) {
               : "var(--text-muted)",
           }}
         >
-          {b.statusSince ? fmtDate(b.statusSince) : "—"}
+          {b.statusSince ? fmtDate(b.statusSince) : "-"}
         </td>
       );
     default:

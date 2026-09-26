@@ -79,7 +79,7 @@ export function TableStatusRow(
           ? "Limpar seleção da página"
           : "Selecionar página"}
         title={allFilteredSel
-          ? "Toda a seleção filtrada ativa — limpar tudo"
+          ? "Toda a seleção filtrada ativa - limpar tudo"
           : allPageSel
           ? "Limpar seleção"
           : "Selecionar todos desta página"}
