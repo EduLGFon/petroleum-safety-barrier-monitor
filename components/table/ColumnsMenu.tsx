@@ -11,9 +11,13 @@ import {
   PINNED_FILTERS,
   type PinnedKey,
 } from "./columns.ts";
+
 import { useEffect, useRef, useState } from "preact/hooks";
-import { createPortal } from "preact/compat";
+
 import { ColumnsIcon } from "../ui/Icons.tsx";
+
+import { createPortal } from "preact/compat";
+
 import { AURORA } from "../../lib/aurora.ts";
 
 interface Props {

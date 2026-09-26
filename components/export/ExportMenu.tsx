@@ -6,11 +6,17 @@
 // XLS/PDF stay page-local. The menu closes on outside click or Escape,
 // matching the dialog/menu dismissal used elsewhere in the app.
 import { exportToCSV, exportToExcel, exportToPDF } from "../../lib/export.ts";
-import { FMTS, type Fmt } from "./ExportButtons.tsx";
+
 import { useEffect, useMemo, useRef, useState } from "preact/hooks";
-import { DownloadIcon } from "../ui/Icons.tsx";
+
+import { type Fmt, FMTS } from "./ExportButtons.tsx";
+
 import type { Barrier } from "../../lib/types.ts";
+
+import { DownloadIcon } from "../ui/Icons.tsx";
+
 import { AURORA } from "../../lib/aurora.ts";
+
 import { fmt } from "../../lib/utils.ts";
 
 interface Props {
@@ -240,8 +246,8 @@ export function ExportMenu(
               whiteSpace: "normal",
             }}
           >
-            CSV abrange o conjunto filtrado ({fmt(count)}); XLS/PDF somente
-            a página atual ({fmt(pageCount)})
+            CSV abrange o conjunto filtrado ({fmt(count)}); XLS/PDF somente a
+            página atual ({fmt(pageCount)})
           </div>
         </div>
       )}

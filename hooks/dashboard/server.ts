@@ -17,6 +17,8 @@ import { httpAdapterFactory } from "../../lib/api/http.ts";
 
 import type { BarriersApi } from "../../lib/api/types.ts";
 
+import { useVisibleColumns } from "./visible-columns.ts";
+
 import { isAuthExpired } from "../../lib/api/http.ts";
 
 import { loadDash, saveDash } from "./persistence.ts";
@@ -24,7 +26,6 @@ import { loadDash, saveDash } from "./persistence.ts";
 import { toWireQuery } from "../../lib/api/query.ts";
 
 import { useFilterState } from "./filter-state.ts";
-import { useVisibleColumns } from "./visible-columns.ts";
 
 import { LOCATIONS } from "../../lib/constants.ts";
 

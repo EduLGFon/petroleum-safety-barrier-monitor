@@ -7,16 +7,22 @@ import {
   ShieldCheckIcon,
   UserIcon,
 } from "../ui/Icons.tsx";
-import { CONF_COLORS, CRIT_COLORS, DISP_COLORS } from "../../lib/constants.ts";
+
 import {
   daysSince,
   fmtDate,
   humanDuration,
   installationLabel,
 } from "../../lib/utils.ts";
+
+import { CONF_COLORS, CRIT_COLORS, DISP_COLORS } from "../../lib/constants.ts";
+
 import { Div, FR, Sec, Txt } from "./primitives.tsx";
+
 import type { Barrier } from "../../lib/types.ts";
+
 import { Badge } from "../ui/Badge.tsx";
+
 // BarrierDetails shows identification, inventory sheet columns, contingency,
 // degradation, status duration, comments, and action plan. Fields pair two-up
 // (instalação já combina código + nome) and the header badges collapse into a

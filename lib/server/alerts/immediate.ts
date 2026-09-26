@@ -12,8 +12,6 @@ import {
 
 import { type AlertMailer, sendWithRetry } from "./mailer.ts";
 
-import { extractDetail } from "./enrich.ts";
-
 import type { ResolverLabels } from "../../resolve.ts";
 
 import type { AlertRule } from "../sql/alert_rules.ts";
@@ -27,6 +25,8 @@ import type { WireBarrier } from "../../wireTypes.ts";
 import { resolveBarrier } from "../../resolve.ts";
 
 import type { DetectedUrgent } from "./detect.ts";
+
+import { extractDetail } from "./enrich.ts";
 
 import { matchRules } from "./rules.ts";
 

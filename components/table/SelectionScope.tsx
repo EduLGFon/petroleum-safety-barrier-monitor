@@ -4,8 +4,9 @@
 // the toolbar row. Scope is carried by text + checkbox color, never a
 // fourth checkbox state: page-only offers extension to the full filtered
 // set, full-filtered offers an inline clear link.
-import { useState } from "preact/hooks";
 import { fmt } from "../../lib/utils.ts";
+
+import { useState } from "preact/hooks";
 
 interface Props {
   // Ids of the visible rows on the current page.

@@ -12,12 +12,6 @@ import {
   urgentDigestSubject,
 } from "./templates.ts";
 
-import { extractDetail } from "./enrich.ts";
-
-import type { StatusInfo } from "./detect.ts";
-
-import type { ResolverLabels } from "../../resolve.ts";
-
 import {
   type AlertStore,
   isDead,
@@ -29,13 +23,19 @@ import { type AlertMailer, type RetryPolicy, sendWithRetry } from "./mailer.ts";
 
 import { compareUrgency } from "../../dashboard/urgent.ts";
 
+import type { ResolverLabels } from "../../resolve.ts";
+
 import type { AlertRule } from "../sql/alert_rules.ts";
 
 import type { WireBarrier } from "../../wireTypes.ts";
 
 import { detectUrgentTransitions } from "./detect.ts";
 
+import type { StatusInfo } from "./detect.ts";
+
 import type { Barrier } from "../../types.ts";
+
+import { extractDetail } from "./enrich.ts";
 
 // MAX_SEND_RUNS: failed send runs per event before it dead-letters. Retries
 // inside one run (sendWithRetry) don't count - only whole-run failures do,

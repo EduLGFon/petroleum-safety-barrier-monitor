@@ -2,9 +2,9 @@
 // This is why it exists: one glyph replaces the old lone connection dot
 // and the separate sync pill. Core fill carries sync state, the halo
 // carries connection state, so both dimensions read at a glance.
-import type { Conn } from "../../hooks/useConnection.ts";
-
 import type { HealthKind } from "../../lib/sync-indicator.ts";
+
+import type { Conn } from "../../hooks/useConnection.ts";
 
 import { SYNC_DOT } from "../../lib/sync-indicator.ts";
 

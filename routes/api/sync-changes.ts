@@ -12,9 +12,9 @@ import {
 
 import { readThrottle, routeClientKey } from "../../lib/server/throttle.ts";
 
-import { loadServerConfig } from "../../lib/server/config.ts";
-
 import { getSyncRecentChanges } from "../../lib/server/sql/sync.ts";
+
+import { loadServerConfig } from "../../lib/server/config.ts";
 
 import { requireDataAuth } from "../../lib/server/auth.ts";
 

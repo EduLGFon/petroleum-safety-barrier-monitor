@@ -11,9 +11,9 @@ import {
   type SyncIo,
 } from "../fracttal/sync.ts";
 
-import type { MapContext } from "../fracttal/map.ts";
-
 import type { SyncChange, SyncStatus } from "../../types.ts";
+
+import type { MapContext } from "../fracttal/map.ts";
 
 import { queryRows } from "../db.ts";
 
@@ -64,7 +64,9 @@ export async function reapStaleRuns(
     [scope, staleMinutes],
   );
   const n = rows[0]?.n ?? 0;
-  if (n > 0) console.log(`[sync] reaped ${n} stale running row(s) scope=${scope}`);
+  if (n > 0) {
+    console.log(`[sync] reaped ${n} stale running row(s) scope=${scope}`);
+  }
   return n;
 }
 

@@ -29,15 +29,13 @@ import {
   smtpAlertMailer,
 } from "../lib/server/alerts/mailer.ts";
 
-import type { StatusInfo } from "../lib/server/alerts/detect.ts";
-
-import { queryRows } from "../lib/server/db.ts";
+import { getResolverLabels } from "../lib/server/sql/vocabularies.ts";
 
 import { listStaleBarriers } from "../lib/server/sql/alert_rules.ts";
 
 import { listAlertRules } from "../lib/server/sql/alert_rules.ts";
 
-import { getResolverLabels } from "../lib/server/sql/vocabularies.ts";
+import type { StatusInfo } from "../lib/server/alerts/detect.ts";
 
 import { getBarriersByIds } from "../lib/server/sql/barriers.ts";
 
@@ -46,6 +44,8 @@ import { listRecipients } from "../lib/server/sql/recipients.ts";
 import { sqlAlertStore } from "../lib/server/sql/alerts.ts";
 
 import { runAlertCycle } from "../lib/server/alerts/run.ts";
+
+import { queryRows } from "../lib/server/db.ts";
 
 const seconds = Math.max(
   60,

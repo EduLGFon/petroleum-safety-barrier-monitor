@@ -2,9 +2,13 @@
 // Why: isolates the title/alert so the shell Content stays small. Badges and
 // the big tag title live in the Details tab status strip instead.
 import { AlertTriangleIcon, CloseIcon, TagIcon } from "../ui/Icons.tsx";
-import { DISP_COLORS } from "../../lib/constants.ts";
+
 import { daysSince, fmtDate, humanDuration } from "../../lib/utils.ts";
+
+import { DISP_COLORS } from "../../lib/constants.ts";
+
 import type { Barrier } from "../../lib/types.ts";
+
 // BarrierHeader renders the slim "Barreira #id · tag" bar and NC alert with
 // days-since logic. Takes barrier + close handler; tab switching lives in
 // the shell Content.

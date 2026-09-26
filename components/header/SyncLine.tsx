@@ -2,18 +2,18 @@
 // This is why it exists: the exact local sync instant plus colored delta
 // chips live here, keeping the h1 row clean. Format follows the approved
 // concept: label, time date, then +3 ~12 -1 chips.
-import type { Conn } from "../../hooks/useConnection.ts";
-
-import type { SyncStatus } from "../../lib/types.ts";
-
-import { SyncDeltas } from "./SyncDeltas.tsx";
-
 import {
   formatInstant,
   healthLabel,
   toDeltas,
   toHealthKind,
 } from "../../lib/sync-indicator.ts";
+
+import type { Conn } from "../../hooks/useConnection.ts";
+
+import type { SyncStatus } from "../../lib/types.ts";
+
+import { SyncDeltas } from "./SyncDeltas.tsx";
 
 interface Props {
   sync: SyncStatus | null;

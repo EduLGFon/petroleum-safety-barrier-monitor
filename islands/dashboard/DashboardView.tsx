@@ -5,9 +5,9 @@ import type { AuthUser, Barrier, Vocabularies } from "../../lib/types.ts";
 
 import { ServerErrorBanner, ServerErrorCard } from "./ServerError.tsx";
 
-import { useServerDashboard } from "../../hooks/dashboard/server.ts";
-
 import { useSyncChanges } from "../../hooks/dashboard/sync-changes.ts";
+
+import { useServerDashboard } from "../../hooks/dashboard/server.ts";
 
 import { useSyncStatus } from "../../hooks/dashboard/sync-status.ts";
 

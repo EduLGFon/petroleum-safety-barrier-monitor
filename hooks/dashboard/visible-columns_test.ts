@@ -1,9 +1,13 @@
 // Hook tests for hooks/dashboard/visible-columns.ts - defaults, restore,
 // toggle/move/reset semantics through the linkedom renderHook harness.
-import { assertEquals, assertStrictEquals } from "jsr:@std/assert@^1";
-import { memoryStorage, renderHook } from "../../scripts/test-dom.ts";
-import { useVisibleColumns } from "./visible-columns.ts";
 import { DEFAULT_VISIBLE_COLS } from "../../components/table/columns.ts";
+
+import { assertEquals, assertStrictEquals } from "jsr:@std/assert@^1";
+
+import { memoryStorage, renderHook } from "../../scripts/test-dom.ts";
+
+import { useVisibleColumns } from "./visible-columns.ts";
+
 import { STORE_KEY } from "./persistence.ts";
 
 Deno.test("useVisibleColumns starts from defaults with empty storage", async () => {

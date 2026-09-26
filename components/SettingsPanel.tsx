@@ -11,8 +11,6 @@ import {
 
 import { FilterIcon, ShieldIcon, SunIcon, UserIcon } from "./ui/Icons.tsx";
 
-import { PanelHeader } from "./settings/PanelChrome.tsx";
-
 import { AppearanceSection } from "./settings/AppearanceSection.tsx";
 
 import { AccountSection } from "./settings/AccountSection.tsx";
@@ -24,6 +22,8 @@ import { AdminSection } from "./settings/AdminSection.tsx";
 import { lockBody, unlockBody } from "../lib/body-lock.ts";
 
 import { useEffect, useRef, useState } from "preact/hooks";
+
+import { PanelHeader } from "./settings/PanelChrome.tsx";
 
 import type { AuthUser, Theme } from "../lib/types.ts";
 

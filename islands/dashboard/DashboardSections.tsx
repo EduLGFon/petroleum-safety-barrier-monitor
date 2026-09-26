@@ -7,18 +7,31 @@ import type {
   SyncChange,
   SyncStatus,
 } from "../../lib/types.ts";
-import { LocationFilter } from "../../components/LocationFilter.tsx";
-import { ExportMenu } from "../../components/export/ExportMenu.tsx";
+
 import { TableStatusRow } from "../../components/table/TableStatusRow.tsx";
-import { BarriersTable } from "../../components/BarriersTable.tsx";
+
 import { DashboardFooter, DashboardOverlays } from "./DashboardChrome.tsx";
+
+import { LocationFilter } from "../../components/LocationFilter.tsx";
+
+import { ExportMenu } from "../../components/export/ExportMenu.tsx";
+
+import { BarriersTable } from "../../components/BarriersTable.tsx";
+
 import { useSettings } from "../../context/SettingsContext.tsx";
-import { FilterBar } from "../../components/FilterBar.tsx";
+
 import type { useDashboard } from "../../hooks/useDashboard.ts";
+
 import { useEffect, useMemo, useState } from "preact/hooks";
+
+import { FilterBar } from "../../components/FilterBar.tsx";
+
 import { sanitizeFilterPatch } from "../../lib/utils.ts";
-import { distinctBy } from "../../lib/constants.ts";
+
 import { Header } from "../../components/Header.tsx";
+
+import { distinctBy } from "../../lib/constants.ts";
+
 import { KpiSections } from "./KpiSections.tsx";
 
 // Either data hook return, plus optional server-only fetch state.

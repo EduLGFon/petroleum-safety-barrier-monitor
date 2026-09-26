@@ -9,33 +9,45 @@ import {
   rateLimited,
   unauthorized,
 } from "../../../lib/server/errors.ts";
-import {
-  readThrottle,
-  routeClientKey,
-  writeThrottle,
-} from "../../../lib/server/throttle.ts";
-import {
-  getBarrierById,
-  transitionBarrierStatus,
-  updateBarrier,
-} from "../../../lib/server/sql/barriers.ts";
-import {
-  denyByCredentials,
-  requireAdminAuth,
-  requireDataAuth,
-} from "../../../lib/server/auth.ts";
-import { getOrCreateAuthor } from "../../../lib/server/sql/authors.ts";
-import { loadServerConfig } from "../../../lib/server/config.ts";
+
 import {
   type AlertMailer,
   smtpAlertConfigFromEnv,
   smtpAlertMailer,
 } from "../../../lib/server/alerts/mailer.ts";
+
+import {
+  getBarrierById,
+  transitionBarrierStatus,
+  updateBarrier,
+} from "../../../lib/server/sql/barriers.ts";
+
+import {
+  denyByCredentials,
+  requireAdminAuth,
+  requireDataAuth,
+} from "../../../lib/server/auth.ts";
+
+import {
+  readThrottle,
+  routeClientKey,
+  writeThrottle,
+} from "../../../lib/server/throttle.ts";
+
 import { maybeSendImmediate } from "../../../lib/server/alerts/immediate.ts";
-import { listAlertRules } from "../../../lib/server/sql/alert_rules.ts";
-import { listRecipients } from "../../../lib/server/sql/recipients.ts";
-import { sqlAlertStore } from "../../../lib/server/sql/alerts.ts";
+
 import { getResolverLabels } from "../../../lib/server/sql/vocabularies.ts";
+
+import { listAlertRules } from "../../../lib/server/sql/alert_rules.ts";
+
+import { getOrCreateAuthor } from "../../../lib/server/sql/authors.ts";
+
+import { listRecipients } from "../../../lib/server/sql/recipients.ts";
+
+import { sqlAlertStore } from "../../../lib/server/sql/alerts.ts";
+
+import { loadServerConfig } from "../../../lib/server/config.ts";
+
 import { define } from "../../../utils.ts";
 
 function optStr(raw: unknown, max = 2000): string | undefined {

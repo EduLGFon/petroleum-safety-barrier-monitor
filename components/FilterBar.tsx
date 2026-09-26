@@ -6,12 +6,19 @@
 // stays on the location tabs; plan and date boxes hide via the Colunas
 // dialog Filtros toggles.
 import { Combo, GLASS_INPUT } from "./filter/FilterSelect.tsx";
-import type { FilterState } from "../lib/types.ts";
-import { useEffect, useState } from "preact/hooks";
-import type { ComponentChildren } from "preact";
-import { ColumnsMenu } from "./table/ColumnsMenu.tsx";
+
 import type { ColumnKey, PinnedKey } from "./table/columns.ts";
+
+import { ColumnsMenu } from "./table/ColumnsMenu.tsx";
+
+import type { FilterState } from "../lib/types.ts";
+
+import { useEffect, useState } from "preact/hooks";
+
+import type { ComponentChildren } from "preact";
+
 import { SearchIcon } from "./ui/Icons.tsx";
+
 import { AURORA } from "../lib/aurora.ts";
 
 export interface FilterVocabs {

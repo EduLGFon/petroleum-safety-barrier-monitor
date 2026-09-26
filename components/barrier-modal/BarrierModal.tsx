@@ -2,13 +2,20 @@
 // This is why it exists: surfaces full metadata, status badges, NC alert, and
 // chronological statusHistory without leaving the dashboard grid.
 import { useCallback, useEffect, useRef, useState } from "preact/hooks";
-import { BarrierEditor } from "../../islands/BarrierEditor.tsx";
-import { lockBody, unlockBody } from "../../lib/body-lock.ts";
+
 import { HistoryIcon, InfoIcon, PencilIcon } from "../ui/Icons.tsx";
-import { BarrierDetails } from "./BarrierDetails.tsx";
-import { BarrierHistory } from "./BarrierHistory.tsx";
-import { BarrierHeader } from "./BarrierHeader.tsx";
+
+import { BarrierEditor } from "../../islands/BarrierEditor.tsx";
+
+import { lockBody, unlockBody } from "../../lib/body-lock.ts";
+
 import type { AuthUser, Barrier } from "../../lib/types.ts";
+
+import { BarrierDetails } from "./BarrierDetails.tsx";
+
+import { BarrierHistory } from "./BarrierHistory.tsx";
+
+import { BarrierHeader } from "./BarrierHeader.tsx";
 
 type Tab = "details" | "history" | "edit";
 

@@ -3,8 +3,10 @@
 // visibility validation, keeping headers, the header filter row, rows and
 // the empty-state colspan in sync.
 import type { SortableColumn } from "../../lib/types.ts";
-import type { CSSProperties } from "preact";
+
 import { AURORA } from "../../lib/aurora.ts";
+
+import type { CSSProperties } from "preact";
 
 // ColumnKey covers every table-capable Barrier field. All keys are sortable
 // (see SORTABLE in lib/server/sql/where.ts); filter availability varies.

@@ -130,10 +130,12 @@ export function BarriersTable(
           >
             <thead>
               <tr>
-                {/* Empty corner cell: the master checkbox lives in the
+                {
+                  /* Empty corner cell: the master checkbox lives in the
                   TableStatusRow above the table, so this column keeps a
                   clean gap here while staying aligned with the per-row
-                  checkboxes in the body. */}
+                  checkboxes in the body. */
+                }
                 <th
                   scope="col"
                   aria-hidden="true"

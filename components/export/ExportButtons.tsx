@@ -21,28 +21,28 @@ export interface FmtDef {
   color: string;
 }
 const FMTS: FmtDef[] = [
-    {
-      key: "xls",
-      Icon: FileSpreadsheetIcon,
-      label: "Excel",
-      ext: ".xls",
-      color: "#34d399",
-    },
-    {
-      key: "pdf",
-      Icon: FilePdfIcon,
-      label: "PDF",
-      ext: ".pdf",
-      color: "#f87171",
-    },
-    {
-      key: "csv",
-      Icon: FileTextIcon,
-      label: "CSV",
-      ext: ".csv",
-      color: "#6366f1",
-    },
-  ];
+  {
+    key: "xls",
+    Icon: FileSpreadsheetIcon,
+    label: "Excel",
+    ext: ".xls",
+    color: "#34d399",
+  },
+  {
+    key: "pdf",
+    Icon: FilePdfIcon,
+    label: "PDF",
+    ext: ".pdf",
+    color: "#f87171",
+  },
+  {
+    key: "csv",
+    Icon: FileTextIcon,
+    label: "CSV",
+    ext: ".csv",
+    color: "#6366f1",
+  },
+];
 export { FMTS };
 // ExportButtons: renders header count plus FMTS buttons; shows spinner on the active format.
 export function ExportButtons(

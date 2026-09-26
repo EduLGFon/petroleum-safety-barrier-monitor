@@ -72,11 +72,7 @@ export function TableStatusRow(
     >
       <span
         role="checkbox"
-        aria-checked={allPageSel
-          ? "true"
-          : somePageSel
-          ? "mixed"
-          : "false"}
+        aria-checked={allPageSel ? "true" : somePageSel ? "mixed" : "false"}
         aria-label={allFilteredSel
           ? `Todas as ${fmt(filteredTotal)} selecionadas`
           : allPageSel

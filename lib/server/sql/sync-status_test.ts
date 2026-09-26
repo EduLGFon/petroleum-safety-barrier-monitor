@@ -8,9 +8,9 @@ import {
   toSyncStatus,
 } from "./sync.ts";
 
-import { queryRows } from "../db.ts";
-
 import { assertStrictEquals } from "jsr:@std/assert@^1";
+
+import { queryRows } from "../db.ts";
 
 function row(over: Partial<SyncStatusRow> = {}): SyncStatusRow {
   return {

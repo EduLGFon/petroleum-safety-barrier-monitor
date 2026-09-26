@@ -5,17 +5,17 @@
 // admin alert rules (per-category enable/disable, critical-only, recovery).
 import { type AlertStore, dedupKey, type NewAlertEvent } from "./store.ts";
 
-import { isUrgent } from "../../dashboard/urgent.ts";
+import { resolveBarrier, type ResolverLabels } from "../../resolve.ts";
 
 import type { AlertRule } from "../sql/alert_rules.ts";
 
 import type { WireBarrier } from "../../wireTypes.ts";
 
-import { isCompliant } from "../../constants.ts";
+import { isUrgent } from "../../dashboard/urgent.ts";
 
 import { fromAvailabilityId } from "../../enums.ts";
 
-import { resolveBarrier, type ResolverLabels } from "../../resolve.ts";
+import { isCompliant } from "../../constants.ts";
 
 import { extractDetail } from "./enrich.ts";
 

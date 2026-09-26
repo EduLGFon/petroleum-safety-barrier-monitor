@@ -1,7 +1,7 @@
 // Unit tests for barrier detail enrichment (premium mail payload).
-import { extractDetail } from "./enrich.ts";
-
 import type { WireBarrier } from "../../wireTypes.ts";
+
+import { extractDetail } from "./enrich.ts";
 
 function wire(over: Partial<WireBarrier> = {}): WireBarrier {
   return {

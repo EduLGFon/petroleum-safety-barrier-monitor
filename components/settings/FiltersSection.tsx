@@ -1,8 +1,11 @@
 // FiltersSection.tsx - default location, filters, and sort form with reset.
 // Why: isolates startup filter defaults so the shell only switches sections.
-import { selSt, SORT_OPTS } from "./settings-options.ts";
 import type { SettingsState } from "../../context/SettingsContext.tsx";
+
 import { FieldLabel, SectTitle } from "./SectionPrimitives.tsx";
+
+import { selSt, SORT_OPTS } from "./settings-options.ts";
+
 import type { FilterState } from "../../lib/types.ts";
 
 interface Props {

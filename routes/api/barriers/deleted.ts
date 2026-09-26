@@ -5,6 +5,13 @@
 // what sync retired. Same filters and shape as /api/barriers; every item
 // in it is deleted by construction.
 import {
+  parseBooleanParam,
+  parseDateParam,
+  parseIntParam,
+  parseQueryParam,
+} from "../_params.ts";
+
+import {
   internal,
   newRequestId,
   rateLimited,
@@ -16,13 +23,6 @@ import {
 } from "../../../lib/server/auth.ts";
 
 import { readThrottle, routeClientKey } from "../../../lib/server/throttle.ts";
-
-import {
-  parseBooleanParam,
-  parseDateParam,
-  parseIntParam,
-  parseQueryParam,
-} from "../_params.ts";
 
 import { listBarriers } from "../../../lib/server/sql/barriers.ts";
 

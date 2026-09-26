@@ -32,6 +32,8 @@ import {
 
 import { maybeSendImmediate } from "../../../../lib/server/alerts/immediate.ts";
 
+import { getResolverLabels } from "../../../../lib/server/sql/vocabularies.ts";
+
 import { listAlertRules } from "../../../../lib/server/sql/alert_rules.ts";
 
 import { smtpAlertMailer } from "../../../../lib/server/alerts/mailer.ts";
@@ -39,8 +41,6 @@ import { smtpAlertMailer } from "../../../../lib/server/alerts/mailer.ts";
 import { listRecipients } from "../../../../lib/server/sql/recipients.ts";
 
 import { getOrCreateAuthor } from "../../../../lib/server/sql/authors.ts";
-
-import { getResolverLabels } from "../../../../lib/server/sql/vocabularies.ts";
 
 import { sqlAlertStore } from "../../../../lib/server/sql/alerts.ts";
 

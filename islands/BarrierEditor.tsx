@@ -2,9 +2,12 @@
 // This is why it exists: admins can edit every barrier field directly from
 // the modal, picking from curated option lists or typing custom text.
 import { type FieldKey, SEED_DEFAULTS } from "../lib/field-options.ts";
-import { AURORA } from "../lib/aurora.ts";
-import type { Barrier } from "../lib/types.ts";
+
 import { useEffect, useState } from "preact/hooks";
+
+import type { Barrier } from "../lib/types.ts";
+
+import { AURORA } from "../lib/aurora.ts";
 
 interface Lookups {
   availabilities?: { id: number; label: string }[];
