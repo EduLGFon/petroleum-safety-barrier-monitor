@@ -30,8 +30,6 @@ import { sanitizeFilterPatch } from "../../lib/utils.ts";
 
 import { Header } from "../../components/Header.tsx";
 
-import { distinctBy } from "../../lib/constants.ts";
-
 import { KpiSections } from "./KpiSections.tsx";
 
 // Either data hook return, plus optional server-only fetch state.
