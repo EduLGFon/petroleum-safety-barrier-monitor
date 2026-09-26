@@ -13,10 +13,13 @@
 - Imports in every file must be organized descending by line length (longest on
   top to shortest on bottom of the imports section).
 - Prefer small, focused files (~150 lines as a soft guide, not a hard budget).
-  Judge each case: splitting a cohesive module across files can hurt readability
-  more than a slightly longer file helps it. Split when a file mixes
-  responsibilities or becomes hard to follow; keep it whole when the logic reads
-  best in one place. Avoid overly large files and complex syntax.
+  The goal is code that is easily readable and understandable. Judge each case:
+  splitting a cohesive module across files can hurt readability more than a
+  slightly longer file helps it. Keep related things in the same file; when a
+  file grows, split it into several small related files. Do not split when it
+  makes understanding poorer; split when it helps understanding. Split when a
+  file mixes responsibilities or becomes hard to follow; keep it whole when the
+  logic reads best in one place. Avoid overly large files and complex syntax.
 - In all files: include a top-of-file comment describing what the file does and
   why it is needed (giving the most important context up front). Always write
   good comments on functions and non-obvious code, adhering to good commenting
