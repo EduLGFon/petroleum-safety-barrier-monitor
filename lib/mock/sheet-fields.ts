@@ -81,7 +81,7 @@ export function genSheetFields(rng: Rng): {
     equipTypology: rng.pick(EQUIP_TYPOLOGIES),
     fieldInstalled: rng.bool(0.95) ? "Sim" : "Não",
     fieldOperational: rng.bool(0.9) ? "Sim" : "Não",
-    opStatus: rng.bool(0.85) ? "Disponível" : "Indisponivel",
+    opStatus: rng.bool(0.85) ? "Disponível" : "Indisponível",
     hasMaintPlan,
     planFollowed: noPlan ? "Verificar" : rng.pick(TRIO),
     failureFree: rng.bool(0.9) ? "Sim" : "Não",

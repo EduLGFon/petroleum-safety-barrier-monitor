@@ -179,7 +179,7 @@ export function SyncDetailsModal({ sync, conn, changes, onClose }: Props) {
           >
             {!run && (
               <div style={{ color: "var(--au-sub)" }}>
-                Nenhuma sync registrada ainda.
+                Nenhuma sincronização registrada ainda.
               </div>
             )}
             {run && end && (
@@ -241,7 +241,7 @@ export function SyncDetailsModal({ sync, conn, changes, onClose }: Props) {
                 )}
                 {changes !== null && changes.length === 0 && (
                   <div style={{ color: "var(--au-sub)", fontSize: 11 }}>
-                    Nenhum item alterado nesta sync.
+                    Nenhum item alterado nesta sincronização.
                   </div>
                 )}
                 {changes !== null && changes.map((c) => {

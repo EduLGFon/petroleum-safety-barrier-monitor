@@ -257,7 +257,7 @@ export function Header(
                   flexShrink: 0,
                 }}
               >
-                {sessionUser.role === "admin" ? "Admin" : "Usuário"}
+                {sessionUser.role === "admin" ? "Administrador" : "Usuário"}
               </span>
               <button
                 type="button"

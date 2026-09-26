@@ -159,7 +159,12 @@ export function SyncHoverCard({ sync, conn, onOpenDetails }: Props) {
             />
           )}
           {run && <Row k="Origem" v={friendlyScope(run.scope)} />}
-          {!run && <Row k="Quando" v="nenhuma sync registrada ainda" />}
+          {!run && (
+            <Row
+              k="Quando"
+              v="nenhuma sincronização registrada ainda"
+            />
+          )}
         </div>
         {run && (
           <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>

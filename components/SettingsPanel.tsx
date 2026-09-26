@@ -213,7 +213,7 @@ export function SettingsPanel(
               ? [{ key: "account", label: "Conta", Icon: UserIcon }]
               : []),
             ...(sessionUser?.role === "admin"
-              ? [{ key: "admin", label: "Admin", Icon: ShieldIcon }]
+              ? [{ key: "admin", label: "Administração", Icon: ShieldIcon }]
               : []),
           ].map((
             { key, label, Icon },

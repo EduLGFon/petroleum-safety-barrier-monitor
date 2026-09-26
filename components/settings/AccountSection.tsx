@@ -175,7 +175,7 @@ export function AccountSection(
           <StatusBadge
             tone={sessionUser.role === "admin" ? "admin" : "neutral"}
           >
-            {sessionUser.role === "admin" ? "Admin" : "Usuário"}
+            {sessionUser.role === "admin" ? "Administrador" : "Usuário"}
           </StatusBadge>
         </div>
       </AdminCard>

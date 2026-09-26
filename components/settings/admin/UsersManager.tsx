@@ -143,7 +143,7 @@ export function UsersManager({ onCount }: { onCount?: (n: number) => void }) {
               style={inputSt}
             >
               <option value="user">Usuário</option>
-              <option value="admin">Admin</option>
+              <option value="admin">Administrador</option>
             </select>
           </Field>
           <div style={{ display: "flex", alignItems: "end", flex: "1 1 100%" }}>
@@ -192,7 +192,7 @@ export function UsersManager({ onCount }: { onCount?: (n: number) => void }) {
                   )}
                 </span>
                 <StatusBadge tone={u.role === "admin" ? "admin" : "neutral"}>
-                  {u.role === "admin" ? "Admin" : "Usuário"}
+                  {u.role === "admin" ? "Administrador" : "Usuário"}
                 </StatusBadge>
                 <StatusBadge tone={u.active ? "active" : "inactive"}>
                   {u.active ? "Ativo" : "Inativo"}
