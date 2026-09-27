@@ -1,177 +1,132 @@
 // Print report export - landscape report DOM plus print-dialog flow for PDF.
 // This is why it exists: printing the whole app page would leak chrome;
 // a dedicated report node with print CSS (see static/styles.css) prints
-// only the data table.
-import { assertBrowser, escHtml, MAX_DOM_ROWS, pill, ts } from "./html.ts";
+// only the data table. Markup lives in pdfHtml.ts so the server streams the
+// same report for the print job of a huge selection.
+import {
+  printDocClose,
+  printDocOpen,
+  printRow,
+} from "./pdfHtml.ts";
 
-import { CONF_COLORS, DISP_COLORS } from "../constants.ts";
+import type { PrintPart } from "./pdfHtml.ts";
 
-import { daysSince, humanDuration } from "../utils.ts";
-
-import { refusalMessage } from "./limits.ts";
-
-import type { Barrier } from "../types.ts";
-
-import { withBrand } from "../company.ts";
-
-import { kpiStats } from "./summary.ts";
+import { assertBrowser } from "./html.ts";
+import { PDF_PART_ROWS } from "./limits.ts";
+import { kpiStats, kpiStatsFrom } from "./summary.ts";
+import { pdfPartCount } from "./parts.ts";
+import type { Barrier, KpiSnapshot } from "../types.ts";
 
 const REPORT_ID = "print-report";
 
-// Returns the landscape print-report HTML string (KPI chips + 11-col table); pure, no DOM side effects.
+// buildPrintReport: the landscape report markup (KPI chips + the export
+// columns); pure, no DOM side effects. part labels a multi-part print run.
 export function buildPrintReport(
   barriers: Barrier[],
   companyName = "",
+  part?: PrintPart,
 ): string {
-  const stats = kpiStats(barriers);
-  const head = [
-    "#",
-    "TAG",
-    "Inst.",
-    "Tipologia",
-    "Categoria",
-    "Agrupamento",
-    "Criticidade",
-    "Dono",
-    "Disponibilidade",
-    "Sem Cont. há",
-    "Conformidade",
-    "Comentários",
-    "Plano",
-    "Origem",
-    "Código Fracttal",
-    "Nome Instalação",
-    "Local Instalação",
-    "Tipologia Equip.",
-    "Elem. em Campo?",
-    "Elem. Operacional?",
-    "Status Operac.",
-    "Possui Plano?",
-    "Plano Cumprido?",
-    "Sem Falha?",
-    "Status Manut.",
-    "Há Conting.?",
-    "Desc. Contingência",
-    "Cód. Evidência",
-    "Desc. Degradação",
-    "Comentários 2",
-  ]
-    .map((h) =>
-      `<th style="background:#1E3A5F;color:#E2E8F0;font-size:8pt;padding:7px 5px;text-align:left;border-bottom:2pt solid #3B82F6;white-space:nowrap;">${
-        escHtml(h)
-      }</th>`
-    ).join("");
-  const chip = (label: string, value: string, bg: string, color: string) =>
-    `<div style="flex:1;background:${bg};border-radius:8px;padding:8px 12px;">` +
-    `<div style="font-size:7pt;color:#64748B;letter-spacing:.08em;">${
-      escHtml(label.toUpperCase())
-    }</div>` +
-    `<div style="font-size:15pt;font-weight:bold;color:${color};">${
-      escHtml(value)
-    }</div></div>`;
-  const chips = `<div style="display:flex;gap:8px;margin:10px 0 2px 0;">` +
-    chip("Total", stats.total, "#EFF6FF", "#1E3A5F") +
-    chip(`Conformes · ${stats.pct}`, stats.compliant, "#ECFDF5", "#15803D") +
-    chip("Não conformes", stats.nonCompliant, "#FEF2F2", "#B91C1C") +
-    chip("Críticas NC", stats.critical, "#FFF7ED", "#C2410C") +
-    `</div>`;
-  const body = barriers.map((b, idx) => {
-    const bg = idx % 2 === 0 ? "#F8FAFC" : "#FFFFFF";
-    const disp = DISP_COLORS[String(b.availability)]?.solid ?? "#94a3b8";
-    const conf = CONF_COLORS[String(b.compliance)]?.solid ?? "#94a3b8";
-    const dur = b.compliance !== "Conforme" && b.statusSince
-      ? humanDuration(daysSince(b.statusSince))
-      : "-";
-    const cell = (v: string, style = "") =>
-      `<td style="font-size:7.5pt;padding:5px;color:#0F172A;border-bottom:1pt solid #E2E8F0;vertical-align:top;${style}">${
-        escHtml(v)
-      }</td>`;
-    return `<tr style="background:${bg};">` +
-      cell(String(b.id), "text-align:right;color:#64748B;") +
-      cell(b.tag, "font-family:Courier,monospace;font-weight:bold;") +
-      cell(b.location) +
-      cell(b.typology) +
-      cell(b.category) +
-      cell(b.grouping) +
-      cell(b.criticality) +
-      cell(b.owner || "Não informado") +
-      `<td style="font-size:7.5pt;padding:5px;border-bottom:1pt solid #E2E8F0;text-align:center;">${
-        pill(b.availability, disp)
-      }</td>` +
-      cell(
-        dur,
-        dur === "-" ? "text-align:center;" : "color:#EA580C;font-style:italic;",
-      ) +
-      `<td style="font-size:7.5pt;padding:5px;border-bottom:1pt solid #E2E8F0;text-align:center;">${
-        pill(b.compliance, conf)
-      }</td>` +
-      cell(b.comments || "-") +
-      cell(b.actionPlan || "-") +
-      cell(b.origin || "-") +
-      cell(b.externalCode || "-") +
-      cell(b.locationName || "-") +
-      cell(b.installLocal || "-") +
-      cell(b.equipTypology || "-") +
-      cell(b.fieldInstalled || "-") +
-      cell(b.fieldOperational || "-") +
-      cell(b.opStatus || "-") +
-      cell(b.hasMaintPlan || "-") +
-      cell(b.planFollowed || "-") +
-      cell(b.failureFree || "-") +
-      cell(b.maintStatus || "-") +
-      cell(b.hasContingency || "-") +
-      cell(b.contingencyDesc || "-") +
-      cell(b.evidenceCode || "-") +
-      cell(b.degradationDesc || "-") +
-      cell(b.extraComments || "-") +
-      `</tr>`;
-  }).join("");
-  const eyebrow = companyName
-    ? `<div style="font-size:10pt;letter-spacing:.18em;color:#93C5FD;">${
-      escHtml(companyName.toUpperCase())
-    }</div>`
-    : "";
-  return `<div style="font-family:'Inter Tight',Manrope,Inter,Helvetica,Arial,sans-serif;color:#0F172A;">` +
-    `<div style="background:linear-gradient(135deg,#0A1628 0%,#1E3A5F 100%);color:#fff;padding:16px 18px 12px 18px;border-bottom:3px solid #3B82F6;">` +
-    eyebrow +
-    `<div style="font-size:16pt;font-weight:bold;margin-top:2px;">Monitor de Barreiras de Segurança</div>` +
-    `<div style="font-size:9pt;color:#CBD5E1;margin-top:4px;">${
-      escHtml(ts())
-    }  |  ${stats.total} registros  ·  ${stats.pct} conformes</div></div>` +
-    chips +
-    `<table style="width:100%;border-collapse:collapse;margin-top:6px;"><thead style="display:table-header-group;"><tr>${head}</tr></thead><tbody>${body}</tbody></table>` +
-    `<div style="font-size:7pt;color:#94A3B8;margin-top:10px;">${
-      escHtml(withBrand(companyName, "Monitor de Barreiras"))
-    } · gerado em ${escHtml(ts())}</div></div>`;
+  return printDocOpen(companyName, kpiStats(barriers), part) +
+    barriers.map((b, idx) => printRow(b, idx)).join("") +
+    printDocClose(companyName);
 }
 
-// Mounts/reuses the #print-report node, swaps title, prints, then clears on afterprint; browser-only.
-// Refuses beyond MAX_DOM_ROWS with an actionable error (filter down or use
-// CSV) instead of mounting tens of thousands of rows into the print DOM.
-export function exportToPDF(
+// buildPrintReportFrom: same report from a server-side KPI snapshot, so a
+// streamed print job shows the totals of the whole export, not of one batch.
+export function buildPrintReportFrom(
   barriers: Barrier[],
-  filename = "barreiras",
+  kpi: KpiSnapshot,
   companyName = "",
-): void {
+  part?: PrintPart,
+): string {
+  return printDocOpen(companyName, kpiStatsFrom(kpi), part) +
+    barriers.map((b, idx) => printRow(b, idx)).join("") +
+    printDocClose(companyName);
+}
+
+// printReportPart: mounts the report in the hidden print node, swaps the
+// title (which is the PDF filename the dialog suggests), prints, and resolves
+// once the dialog is dismissed. The node is emptied on the way out so the
+// next part starts from an empty DOM.
+export function printReportPart(
+  html: string,
+  title: string,
+): Promise<void> {
   assertBrowser();
-  if (barriers.length > MAX_DOM_ROWS) {
-    throw new Error(refusalMessage("PDF", barriers.length));
-  }
   let node = document.getElementById(REPORT_ID);
   if (!node) {
     node = document.createElement("div");
     node.id = REPORT_ID;
     document.body.appendChild(node);
   }
-  node.innerHTML = buildPrintReport(barriers, companyName);
+  node.innerHTML = html;
   const prevTitle = document.title;
-  document.title = filename;
+  document.title = title;
   document.body.classList.add("printing-report");
-  const cleanup = () => {
-    document.body.classList.remove("printing-report");
-    document.title = prevTitle;
-    if (node) node.innerHTML = "";
-  };
-  globalThis.addEventListener("afterprint", cleanup, { once: true });
-  globalThis.print();
+  // afterprint is what advances the part sequence; the timeout only keeps a
+  // browser that never fires it from wedging the export forever (the dialog
+  // is modal, so it cannot expire mid-print in practice).
+  return new Promise<void>((resolve) => {
+    let timer = 0;
+    const done = () => {
+      clearTimeout(timer);
+      globalThis.removeEventListener("afterprint", done);
+      document.body.classList.remove("printing-report");
+      document.title = prevTitle;
+      if (node) node.innerHTML = "";
+      resolve();
+    };
+    globalThis.addEventListener("afterprint", done, { once: true });
+    timer = setTimeout(done, 600_000);
+    globalThis.print();
+  });
+}
+
+// pdfPartTitle: the suggested PDF filename, numbered when the export did not
+// fit one print job.
+export function pdfPartTitle(
+  filename: string,
+  part: number,
+  parts: number,
+): string {
+  return parts > 1 ? `${filename}-parte-${part}-de-${parts}` : filename;
+}
+
+// printPdfParts: prints a whole export as successive print jobs, one per
+// PDF_PART_ROWS rows, in the order loadPart hands them over. The print dialog
+// lays out the full report DOM, so a single 18k-row job would freeze the
+// tab; parts keep every job small and each saved PDF is a separate file.
+export async function printPdfParts(
+  total: number,
+  loadPart: (part: number, parts: number) => Promise<string>,
+  filename: string,
+): Promise<void> {
+  const parts = pdfPartCount(total);
+  for (let part = 1; part <= parts; part++) {
+    const html = await loadPart(part, parts);
+    await printReportPart(html, pdfPartTitle(filename, part, parts));
+  }
+}
+
+// exportToPDF: prints the report for the whole selection; browser-only.
+// Callers in server mode print parts streamed by /api/export instead
+// (printReportPart), so no mode ever has to hold every row in the page.
+export function exportToPDF(
+  barriers: Barrier[],
+  filename = "barreiras",
+  companyName = "",
+): Promise<void> {
+  assertBrowser();
+  return printPdfParts(
+    barriers.length,
+    async (part) => {
+      const at = (part - 1) * PDF_PART_ROWS;
+      return buildPrintReport(
+        barriers.slice(at, at + PDF_PART_ROWS),
+        companyName,
+        { index: part, parts: pdfPartCount(barriers.length), total: barriers.length },
+      );
+    },
+    filename,
+  );
 }

@@ -74,6 +74,30 @@ export async function getBarrierById(id: number): Promise<WireBarrier | null> {
   return found.get(id) ?? null;
 }
 
+// listBarrierWindow: one page of wire rows without the count query, so an
+// export can walk the whole scope in EXPORT_PAGE_ROWS steps and stream each
+// batch out. b.id is appended as a tiebreaker: a single-column sort has ties
+// (same TAG, same owner), and without a unique key Postgres may return them
+// in a different order per page, which would drop or repeat rows mid-export.
+export async function listBarrierWindow(
+  q: BarriersQuery,
+  limit: number,
+  offset: number,
+): Promise<WireBarrier[]> {
+  const where = buildWhere(q);
+  const orderBy = `${resolveOrderBy(q.sortCol, q.sortDir)}, b.id asc`;
+  const rows = await queryRows<BarrierRow>(
+    `select ${SELECT_COLUMNS} from barriers b
+     join locations loc on loc.id = b.location_id
+     ${HISTORY_JOIN} ${where.text}
+     order by ${orderBy} limit $${where.args.length + 1} offset $${
+      where.args.length + 2
+    }`,
+    [...where.args, Math.max(0, limit), Math.max(0, offset)],
+  );
+  return rows.map(toWireBarrier);
+}
+
 // getBarriersByIds: batch version of getBarrierById (the alert detector
 // resolves hundreds of candidates per run - one query each would stall it).
 // Chunked IN lists keep placeholder counts bounded; missing/deleted ids are

@@ -48,8 +48,9 @@ dashboard island, the upstream sync loop and the alert digest loop. There is no
   (critical tiers first), availability, compliance, action plan, date range.
 - Barrier modal with a details tab, a status history timeline, and an admin
   editing tab.
-- Exports: CSV (full filtered set), Excel and PDF (current page subset), with
-  KPI summary blocks and branded headers.
+- Exports: CSV, Excel and PDF over the whole selected set (streamed from the
+  server, split where the format needs it), with KPI summary blocks and
+  branded headers.
 - Header health indicator merging connection state and sync state, with a
   per-run delta line, hover card and a full audit modal listing the rows a run
   touched.
@@ -379,7 +380,7 @@ to the log with the request id.
 | `GET`            | `/api/barriers/deleted`    | admin       | Audit view of soft-deleted rows                                  |
 | `GET`            | `/api/kpi`                 | data        | KPI snapshot for the filter subset (minus paging/sorting)        |
 | `GET`            | `/api/chart`               | data        | Per-category compliant/total                                     |
-| `GET`            | `/api/export`              | data        | Streamed CSV with a `RESUMO` block; 10 000-row cap               |
+| `GET`, `POST`     | `/api/export`              | data        | Streamed CSV / XLS / print report over the whole selection          |
 | `GET`            | `/api/vocabularies`        | data        | Filter vocabularies for the background refresh                   |
 | `GET`            | `/api/lookups`             | any session | Id-bearing lists that feed the admin forms                       |
 | `GET`            | `/api/field-options`       | data        | Curated answer lists per sheet question                          |
@@ -462,9 +463,10 @@ Invariants worth knowing before touching the schema:
   dead credentials get a `401`. Writes fail closed when no credential is
   configured at all.
 - Rate limits per remote address (never `X-Forwarded-For`, which is forgeable):
-  120/min reads, 30/min writes, 10/min exports, 10/min password changes.
+  120/min reads, 30/min writes, 120/min exports, 10/min password changes.
   Exports share a Postgres-backed budget across instances with an in-memory
-  fallback, so limiting never breaks the request path.
+  fallback, so limiting never breaks the request path. The export budget is
+  sized for a whole multi-part export (a PDF is one request per print part).
 - `ADMIN_TOKEN` (constant-time compared) is accepted by admin routes for
   scripts; it is rejected by the password-change route on purpose.
 - Same-origin by design: the dashboard fetches its own `/api/*`, so no CORS
@@ -570,9 +572,9 @@ to filter the table; search inside categories; density-aware geometry;
 viewport-clamped tooltip; preferences persisted.
 
 **Selection and export.** Selection survives paging and filter changes, is
-capped when restored, and is cleared on installation or filter reset. Export
-scope is explicit in the menu: CSV covers the whole filtered selection, Excel
-and PDF only the current page subset.
+capped when restored, and is cleared on installation or filter reset. Every
+format exports the whole selection, not the loaded page, and the export is
+served by the API so the browser never has to hold the rows.
 
 **Header.** One merged health dot (sync state in the core, connection state in
 the halo) with distinct animations, a status line with local time and
@@ -598,15 +600,21 @@ Every key is validated per field on restore, and a stale saved page self-heals.
 
 ## Export formats and limits
 
-| Format | Scope               | Cap                     | Contents                                                                                                                                        |
-| ------ | ------------------- | ----------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
-| CSV    | whole filtered set  | 10 000 rows server-side | 30 columns, UTF-8 BOM, semicolon separated, plus a `RESUMO` KPI block. Byte-identical whether produced in the browser or streamed by the server |
-| XLS    | current page subset | 10 000 rows             | Branded header, KPI strip, styled columns, auto-fitted widths, status chips, summary table                                                      |
-| PDF    | current page subset | 10 000 rows             | Landscape print report with repeating table headers and KPI chips                                                                               |
+Every format covers the whole selection - including a cross-page selection
+that the browser never loaded - and the rows are streamed from the database,
+so the file size never depends on the page size.
 
-The 10 000-row DOM cap exists because the HTML and print paths freeze the tab
-past that; the refusal message tells the user to narrow the filters or use CSV.
-Files are named with the export date.
+| Format | Scope              | Ceiling                | Contents                                                                                                                                        |
+| ------ | ------------------ | ---------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| CSV    | whole selection    | 200 000 rows per export | 30 columns, UTF-8 BOM, semicolon separated, plus a `RESUMO` KPI block. Byte-identical whether produced in the browser or streamed by the server |
+| XLS    | whole selection    | 200 000 rows per export | Branded header, KPI strip, styled columns, auto-fitted widths, status chips, summary table. Split into worksheets past 65 536 rows (Excel's sheet limit) |
+| PDF    | whole selection    | 200 000 rows per export | Landscape print report with repeating table headers and KPI chips, printed in parts of 2 000 rows (one print dialog per part)                |
+
+Past 200 000 rows the export is refused with the real count so the filters can
+be narrowed - nothing is ever cut silently. The selection is intersected with
+the active filters on the server, so a stale selection cannot widen the file.
+Files are named with the export date; a multi-part PDF names each part
+(`...-parte-1-de-9`).
 
 ## Testing and quality gates
 

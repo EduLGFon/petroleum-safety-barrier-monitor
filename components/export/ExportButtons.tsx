@@ -7,9 +7,9 @@ import {
   FileTextIcon,
 } from "../ui/Icons.tsx";
 import type { FunctionComponent } from "preact";
+import type { Fmt } from "../../lib/export/format.ts";
 import { AURORA } from "../../lib/aurora.ts";
 import { fmt } from "../../lib/utils.ts";
-export type Fmt = "xls" | "pdf" | "csv";
 type I = FunctionComponent<
   { size?: number; color?: string; strokeWidth?: number }
 >;

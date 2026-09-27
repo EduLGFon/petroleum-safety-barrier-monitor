@@ -1,6 +1,7 @@
 // CSV export - ;-separated, quote-escaped, BOM for pt-BR Excel.
 // This is why it exists: the lightweight plain-text fallback when styled
 // spreadsheet or print output is overkill. Headers and pt-BR formatting only.
+import { EXPORT_HEADERS } from "./columns.ts";
 import { assertBrowser, download } from "./html.ts";
 
 import type { Barrier } from "../types.ts";
@@ -15,38 +16,7 @@ export function csvCell(v: unknown): string {
 
 // The 30 export columns, single-sourced: the browser CSV and the server
 // /api/export route both build from this, so the files always agree.
-export const CSV_HEADERS = [
-  "ID",
-  "TAG",
-  "Instalação",
-  "Tipologia",
-  "Categoria",
-  "Agrupamento",
-  "Criticidade",
-  "Dono",
-  "Disponibilidade",
-  "Sem Cont. há",
-  "Conformidade",
-  "Comentários",
-  "Plano de Ação",
-  "Origem",
-  "Código Fracttal",
-  "Nome Instalação",
-  "Local Instalação",
-  "Tipologia Equip.",
-  "Elem. em Campo?",
-  "Elem. Operacional?",
-  "Status Operac.",
-  "Possui Plano?",
-  "Plano Cumprido?",
-  "Sem Falha?",
-  "Status Manut.",
-  "Há Conting.?",
-  "Desc. Contingência",
-  "Cód. Evidência",
-  "Desc. Degradação",
-  "Comentários 2",
-];
+export const CSV_HEADERS = EXPORT_HEADERS;
 
 // Builds ;-separated, quote-escaped CSV with BOM for pt-BR Excel; reuses row(); browser-only.
 export function exportToCSV(

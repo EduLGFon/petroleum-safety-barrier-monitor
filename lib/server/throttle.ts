@@ -51,13 +51,16 @@ export function createThrottle(options: ThrottleOptions): Throttle {
 }
 
 // Route buckets: reads are generous, writes and the export (DB-heavy) are
-// tight. Singletons per isolate - Deno serve runs one isolate locally, so
+// tighter. Singletons per isolate - Deno serve runs one isolate locally, so
 // the counters are process-wide without any shared store. Multi-isolate
 // deploys should prefer lib/server/sql/throttle.ts (shared table); the
 // export route already does DB-first with this module as fallback.
 export const readThrottle = createThrottle({ limit: 120, windowMs: 60_000 });
 export const writeThrottle = createThrottle({ limit: 30, windowMs: 60_000 });
-export const exportThrottle = createThrottle({ limit: 10, windowMs: 60_000 });
+// Export: one request per file, but a PDF export is one request per print
+// part, so the bucket has to fit a whole multi-part export (100 parts for a
+// 200k-row selection) without throttling the export it is protecting.
+export const exportThrottle = createThrottle({ limit: 120, windowMs: 60_000 });
 // passwordThrottle: self-service password changes carry a current-password
 // oracle (wrong guesses probe the real password), so they get the tightest
 // write bucket even though the caller is already authenticated.

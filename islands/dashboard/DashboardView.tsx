@@ -142,7 +142,7 @@ function ServerView(
     retry,
     rows,
     liveVocabularies,
-    exportServerCsv,
+    exportServer,
   } = dash;
   // Live vocabulary wins once the cadence refreshes it; the SSR seed covers
   // the first paint so tabs never flash empty.
@@ -193,7 +193,7 @@ function ServerView(
         syncStatus={syncStatus}
         syncChanges={syncChanges}
         apiBaseUrl={baseUrl}
-        onServerCsv={exportServerCsv}
+        onServerExport={exportServer}
       />
     </>
   );

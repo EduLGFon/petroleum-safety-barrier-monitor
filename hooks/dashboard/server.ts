@@ -10,20 +10,15 @@ import type {
 } from "../../lib/types.ts";
 
 import { useCallback, useEffect, useMemo, useState } from "preact/hooks";
-
+import { exportFromServer } from "./export-server.ts";
 import { restoreSelection, useSelection } from "./selection.ts";
-
 import { httpAdapterFactory } from "../../lib/api/http.ts";
-
 import type { BarriersApi } from "../../lib/api/types.ts";
-
 import { useVisibleColumns } from "./visible-columns.ts";
-
+import type { Fmt } from "../../lib/export/format.ts";
+import { filterScope, scopeWireQuery } from "./scope.ts";
 import { isAuthExpired } from "../../lib/api/http.ts";
-
 import { loadDash, saveDash } from "./persistence.ts";
-
-import { toWireQuery } from "../../lib/api/query.ts";
 
 import { useFilterState } from "./filter-state.ts";
 
@@ -44,8 +39,9 @@ export function toLoginWithReturn(): void {
 }
 
 // Server-driven dashboard store; same 22-key contract as useDashboard plus
-// loading/error/retry. CSV export covers the full filtered set via the
-// server endpoint (xls/pdf stay page-local client exports).
+// loading/error/retry. Every export format goes through the server endpoint
+// over the whole selection (see exportServer), so 18k selected barriers
+// export completely even though the browser only holds one page.
 // adapterOverride lets tests inject a fake BarriersApi; callers using the real
 // HTTP path stay untouched (it is just httpAdapterFactory(baseUrl)).
 // vocabularies (server-provided) supply dynamic station/category id maps so
@@ -175,6 +171,13 @@ export function useServerDashboard(
     hiddenPinned,
   ]);
 
+  // Export scope: the same filters the table shows, without paging. Shared by
+  // the data fetch, select-all and the export so all three always agree.
+  const scopeQuery = useMemo(
+    () => scopeWireQuery(location, filters, idMaps?.query),
+    [location, filters, idMaps],
+  );
+
   // Fetch page + KPI + chart on scope change; superseded responses are
   // dropped via cancellation so fast typing never renders stale data. KPI
   // and chart honor the same filters as the table (minus paging/sort).
@@ -183,36 +186,12 @@ export function useServerDashboard(
     let cancelled = false;
     setLoading(true);
     setError(null);
-    const wq = toWireQuery({
-      location,
-      availability: filters.availability || undefined,
-      compliance: filters.compliance || undefined,
-      category: filters.category || undefined,
-      typology: filters.typology || undefined,
-      criticality: filters.criticality || undefined,
-      criticalOnly: filters.criticalOnly,
-      plan: filters.plan || undefined,
-      query: filters.query || undefined,
-      since: filters.since || undefined,
-      until: filters.until || undefined,
+    const wq = {
+      ...scopeQuery,
       page: filters.page,
       pageSize: filters.pageSize,
-      sortCol: filters.sortCol,
-      sortDir: filters.sortDir,
-    }, idMaps?.query);
-    const scope = {
-      locationId: wq.locationId,
-      availabilityId: wq.availabilityId,
-      complianceId: wq.complianceId,
-      categoryId: wq.categoryId,
-      typologyId: wq.typologyId,
-      criticalityId: wq.criticalityId,
-      criticalOnly: wq.criticalOnly,
-      hasActionPlan: wq.hasActionPlan,
-      query: wq.query,
-      since: wq.since,
-      until: wq.until,
     };
+    const scope = filterScope(wq);
     Promise.all([
       adapter.getBarriers(wq),
       adapter.getKpi(scope),
@@ -239,7 +218,7 @@ export function useServerDashboard(
     return () => {
       cancelled = true;
     };
-  }, [adapter, hydrated, location, filters, reloadKey, idMaps]);
+  }, [adapter, hydrated, scopeQuery, filters.page, filters.pageSize, reloadKey]);
 
   // Station metadata comes from the seed list when known; stations added
   // later fall back to their own code so details never render undefined.
@@ -293,24 +272,9 @@ export function useServerDashboard(
   // Page-local selectAll stays for the toolbar contract; the table header
   // prompt calls this to extend a page selection to the full filtered set.
   const selectAllFiltered = useCallback(async () => {
-    const wq = toWireQuery({
-      location,
-      availability: filters.availability || undefined,
-      compliance: filters.compliance || undefined,
-      category: filters.category || undefined,
-      typology: filters.typology || undefined,
-      criticality: filters.criticality || undefined,
-      criticalOnly: filters.criticalOnly,
-      plan: filters.plan || undefined,
-      query: filters.query || undefined,
-      since: filters.since || undefined,
-      until: filters.until || undefined,
-      sortCol: filters.sortCol,
-      sortDir: filters.sortDir,
-    }, idMaps?.query);
-    const all = await adapter.getAllBarriers(wq);
+    const all = await adapter.getAllBarriers(scopeQuery);
     setSelectedIds(new Set(all.map((b) => b.id)));
-  }, [adapter, location, filters, idMaps, setSelectedIds]);
+  }, [adapter, scopeQuery, setSelectedIds]);
 
   // Detail resolves from the current page only; a persisted id from another
   // page re-resolves when the user navigates back to it.
@@ -355,58 +319,21 @@ export function useServerDashboard(
     return () => clearInterval(timer);
   }, [refreshMs, hydrated, baseUrl]);
 
-  // Exports the full filtered set as CSV through the server endpoint (the
-  // 10k cap and over-cap message come from the server, surfaced by the
-  // toolbar). xls/pdf stay client-side page exports.
-  const exportServerCsv = useCallback(async () => {
-    if (!baseUrl) throw new Error("Exportação indisponível (sem baseUrl)");
-    const wq = toWireQuery({
-      location,
-      availability: filters.availability || undefined,
-      compliance: filters.compliance || undefined,
-      category: filters.category || undefined,
-      typology: filters.typology || undefined,
-      criticality: filters.criticality || undefined,
-      criticalOnly: filters.criticalOnly,
-      plan: filters.plan || undefined,
-      query: filters.query || undefined,
-      since: filters.since || undefined,
-      until: filters.until || undefined,
-      page: 1,
-      pageSize: 10000,
-      sortCol: filters.sortCol,
-      sortDir: filters.sortDir,
-    }, idMaps?.query);
-    const qs = new URLSearchParams({ format: "csv" });
-    for (const [k, v] of Object.entries(wq)) {
-      if (v !== undefined && v !== "") qs.set(k, String(v));
-    }
-    const res = await fetch(`${baseUrl}/api/export?${qs.toString()}`, {
-      credentials: "same-origin",
-    });
-    if (res.status === 401 || res.status === 404) {
-      // Extraction on a dead session: re-login first, then retry export.
-      toLoginWithReturn();
-      throw new Error("Sessão expirada - entre novamente para exportar");
-    }
-    if (!res.ok) {
-      let detail = `HTTP ${res.status}`;
-      try {
-        const body = await res.json() as { error?: string };
-        if (body.error) detail = body.error;
-      } catch {
-        // Non-JSON error body; keep the status text.
-      }
-      throw new Error(detail);
-    }
-    const blob = await res.blob();
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `barreiras-${new Date().toISOString().slice(0, 10)}.csv`;
-    a.click();
-    URL.revokeObjectURL(url);
-  }, [baseUrl, location, filters, idMaps]);
+  // Exports the whole selection through /api/export: every format covers
+  // every selected barrier (the server streams the rows, so the browser
+  // never holds them), and an empty selection covers the filtered scope.
+  const exportServer = useCallback(
+    (kind: Fmt, ids: number[], filename: string) =>
+      exportFromServer({
+        baseUrl,
+        kind,
+        ids,
+        filename,
+        query: scopeQuery,
+        onExpired: toLoginWithReturn,
+      }),
+    [baseUrl, scopeQuery],
+  );
 
   return {
     location,
@@ -415,8 +342,8 @@ export function useServerDashboard(
     kpi,
     chartData,
     rows: items,
-    // Export covers the loaded page, except CSV which streams the full
-    // filtered set from the server (see exportServerCsv).
+    // Export does not read this list: it asks the server for the whole
+    // selection (see exportServer), so the loaded page never caps a file.
     allFiltered: items,
     filteredTotal: total,
     totalPages: pages,
@@ -446,7 +373,7 @@ export function useServerDashboard(
     isRefreshing,
     error,
     retry,
-    exportServerCsv,
+    exportServer,
     // Live vocabulary (SSR seed, refreshed on cadence) for tabs and counts.
     liveVocabularies: liveVocab,
   };

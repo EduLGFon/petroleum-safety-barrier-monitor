@@ -145,12 +145,21 @@ Full inventory: `barriers`, `barriers/deleted`,
   (`[Imediato]` subject, single attempt, 10s budget) when the SMTP relay
   is configured - otherwise the digest cron sends. Fan-out failures only
   log; the response stays the updated `WireBarrier`.
-- `GET /api/export?format=csv` (+ the same filters as `/api/barriers`) →
-  CSV with BOM, 14-column header, data rows, `RESUMO` block
-  (byte-identical to the dashboard CSV: `row()` + `csvCell()` + `summaryRows()`).
-  Stream via `ReadableStream` (chunks of 500 rows), cap of 10,000 rows
-  (`400` with the filtered total when exceeded - refine the filters),
-  `Content-Disposition: attachment`, `X-Export-Total` with the filtered total.
+- `GET|POST /api/export?format=csv|xls|pdf` (+ the same filters as
+  `/api/barriers`) → the whole scope as CSV, `.xls` spreadsheet or PDF print
+  report (CSV with BOM, 30-column header, data rows, `RESUMO` block;
+  byte-identical cell mapping to the dashboard exports: `row()` +
+  `csvCell()`/`xlsRow()`/`printRow()` + `summaryRowsFrom()`). Rows stream
+  from the database in 5,000-row batches (`ReadableStream`, so nothing is
+  buffered whole), ceiling `EXPORT_MAX_ROWS` = 200,000 rows (`400` naming the
+  real total when exceeded - refine the filters), `Content-Disposition:
+  attachment`, `X-Export-Total` with the scope total. The `.xls` splits into
+  successive worksheets past Excel's 65,536-row sheet limit. `POST` takes a
+  JSON body `{ format?, ids?, part? }`: `ids` narrows the export to the
+  selected rows (still intersected with the filters, so a stale selection
+  cannot widen the scope) and `part` selects one PDF print part - a scope
+  larger than 2,000 rows reports `X-Export-Parts` and is printed one part per
+  request.
 - `GET /api/barriers/deleted` (+ the same filters) → `BarriersResponse`
   with only deleted rows (soft-delete sync audit). Requires
   `ADMIN_TOKEN`; the `/api/barriers/:id` detail keeps hiding deleted ones.
@@ -320,7 +329,7 @@ toWireQuery({ location: "FAL", availability: "Degradado", page: 1 });
 | `lib/constants/helpers.ts`           | `isCompliant()` + `distinctBy()`                                                                              |
 | `lib/constants/colors.ts`            | Colors per status + `DISP_KNOWN_ORDER`, `shortStatusLabel`                                                    |
 | `lib/server/db.ts`                   | Lazy server-only Postgres pool (`globalThis.__barrierPool`)                                                   |
-| `lib/server/sql/barriers.ts`         | `listBarriers`, `getBarrierById`, `getKpi`, `transitionBarrierStatus`                                         |
+| `lib/server/sql/barriers.ts`         | `listBarriers`, `listBarrierWindow` (export paging), `getBarrierById`, `getKpi`, `transitionBarrierStatus`        |
 | `lib/server/sql/chart.ts`            | `getChartData` (`GROUP BY category_id`)                                                                       |
 | `lib/server/sql/vocabularies.ts`     | `getVocabularies()` (SSR seed + `GET /api/vocabularies` refresh)                                              |
 | `lib/server/sql/where.ts`            | `buildWhere`, `resolveOrderBy` (whitelist), `escapeLike`                                                      |
@@ -330,7 +339,7 @@ toWireQuery({ location: "FAL", availability: "Degradado", page: 1 });
 | `routes/api/barriers/deleted.ts`     | `GET /api/barriers/deleted` (deleted only, requires `ADMIN_TOKEN`)                                            |
 | `routes/api/barriers/[id].ts`        | `GET /api/barriers/:id` (session/token, read throttle)                                                        |
 | `routes/api/barriers/[id]/status.ts` | `PATCH /api/barriers/:id/status` (requires admin, write throttle; author derives from session)                |
-| `routes/api/export.ts`               | `GET /api/export?format=csv` (session/token, export throttle, 10k cap, stream)                                |
+| `routes/api/export.ts`               | `GET/POST /api/export` (csv/xls/pdf; session/token, export throttle, streamed, selection via `ids`)             |
 | `routes/api/kpi.ts`                  | `GET /api/kpi` (session/token, read throttle)                                                                 |
 | `routes/api/chart.ts`                | `GET /api/chart` (session/token, read throttle)                                                               |
 | `routes/api/sync-status.ts`          | `GET /api/sync-status` (session/token, read throttle; dashboard indicator)                                    |
@@ -357,7 +366,11 @@ toWireQuery({ location: "FAL", availability: "Degradado", page: 1 });
 | `lib/server/auth.ts`                 | `checkAdminAuth` (Bearer) + `resolveRequestAuth`/`requireAdminAuth`/`requireAuthenticated` (session or token) |
 | `lib/server/throttle.ts`             | `createThrottle` (fixed window, no deps) + per-route buckets                                                  |
 | `lib/server/sql/throttle.ts`         | Postgres `throttle_buckets` budget shared across isolates (memory fallback)                                   |
-| `lib/server/exportCsv.ts`            | `streamExportCsv` (BOM + `row()` + `summaryRows()`, chunks of 500)                                            |
+| `lib/server/exportRows.ts`           | `resolveExportScope` (scope KPI) + `exportBatches` (5,000-row paged batches)                                    |
+| `lib/server/exportStream.ts`         | `textStream` (head / batch / tail skeleton shared by the three formats)                                          |
+| `lib/server/exportCsv.ts`            | `streamExportCsv` (BOM + `row()` + `summaryRowsFrom()`)                                                         |
+| `lib/server/exportXls.ts`            | `streamExportXls` (worksheet split at `XLS_SHEET_ROWS`)                                                          |
+| `lib/server/exportPdf.ts`            | `streamPrintReport` (one print part)                                                                             |
 | `lib/server/sql/recipients.ts`       | CRUD `alert_recipients` (pure validation + thin store)                                                        |
 | `lib/server/sql/users.ts`            | CRUD `users` (roles, last-admin guard, no hashes in JSON)                                                     |
 | `lib/server/sql/sessions.ts`         | Opaque `sessions` (hash lookup, revoke, expiry sweep)                                                         |

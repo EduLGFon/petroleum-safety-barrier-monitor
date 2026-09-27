@@ -301,7 +301,7 @@ opens a Postgres connection on 5432. None of them contact Fracttal.
 | `/api/barriers/deleted` | GET | yes | no |
 | `/api/barriers/:id` | GET, PATCH | yes | **PATCH only** |
 | `/api/barriers/:id/status` | PATCH | yes | **yes** |
-| `/api/export` | GET | yes | no |
+| `/api/export` | GET, POST | yes | no |
 | `/api/kpi` | GET | yes | no |
 | `/api/chart` | GET | yes | no |
 | `/api/vocabularies` | GET | yes | no |
@@ -340,10 +340,11 @@ There is **no SSE, no `EventSource`, no `text/event-stream`, and no WebSocket**
 in the application. The only two WebSocket clients are the CDP connections in
 `scripts/browser-capture.ts:52` and `scripts/browser-smoke.ts:70`.
 
-One server-to-client stream exists: `GET /api/export` returns a
-`ReadableStream<Uint8Array>` of chunked CSV (`routes/api/export.ts:104`,
-`lib/server/exportCsv.ts:33`, 500 rows per chunk). That is chunked transfer
-encoding on 8000/5173, not a separate port or protocol.
+One server-to-client stream exists: `GET|POST /api/export` returns a
+`ReadableStream<Uint8Array>` of chunked CSV, `.xls` or print-report markup
+(`routes/api/export.ts`, `lib/server/exportStream.ts`, one chunk per
+5,000-row database batch). That is chunked transfer encoding on 8000/5173,
+not a separate port or protocol.
 
 ### Client polling cadence
 

@@ -114,6 +114,10 @@ export interface BarriersQuery {
   pageSize?: number;
   sortCol?: string;
   sortDir?: "asc" | "desc";
+  // Explicit row whitelist: export only the ids the user selected. Combined
+  // with the filters above (an id outside the filter is dropped), so a stale
+  // selection can never widen the scope. Absent = every matching row.
+  ids?: number[];
   // Admin deleted listing only (GET /api/barriers/deleted): flips the
   // soft-delete filter to deleted-only. The dashboard never sets this.
   includeDeleted?: boolean;

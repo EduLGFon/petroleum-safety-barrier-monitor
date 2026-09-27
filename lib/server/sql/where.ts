@@ -61,6 +61,11 @@ export function buildWhere(
   if (q.criticalityId !== undefined) {
     push("and b.criticality_id = ", q.criticalityId);
   }
+  // Row whitelist (export selection). Passed as one array parameter so an
+  // 18k-row selection costs a single bind instead of 18k placeholders.
+  if (q.ids && q.ids.length > 0) {
+    push("and b.id = any(", q.ids);
+  }
   if (q.hasActionPlan === true) {
     conds.push("and b.action_plan is not null and b.action_plan <> ''");
   } else if (q.hasActionPlan === false) {

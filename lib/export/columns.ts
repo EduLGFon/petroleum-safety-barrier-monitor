@@ -1,0 +1,36 @@
+// Export columns - the single ordered list of the 30 export columns.
+// This is why it exists: CSV, the .xls spreadsheet and the print report emit
+// the same fields in the same order, so one list (shared with row() in
+// rows.ts) keeps the three files comparable column by column.
+export const EXPORT_HEADERS: string[] = [
+  "ID",
+  "TAG",
+  "Instalação",
+  "Tipologia",
+  "Categoria",
+  "Agrupamento",
+  "Criticidade",
+  "Dono",
+  "Disponibilidade",
+  "Sem Cont. há",
+  "Conformidade",
+  "Comentários",
+  "Plano de Ação",
+  "Origem",
+  "Código Fracttal",
+  "Nome Instalação",
+  "Local Instalação",
+  "Tipologia Equip.",
+  "Elem. em Campo?",
+  "Elem. Operacional?",
+  "Status Operac.",
+  "Possui Plano?",
+  "Plano Cumprido?",
+  "Sem Falha?",
+  "Status Manut.",
+  "Há Conting.?",
+  "Desc. Contingência",
+  "Cód. Evidência",
+  "Desc. Degradação",
+  "Comentários 2",
+];

@@ -28,6 +28,8 @@ import { FilterBar } from "../../components/FilterBar.tsx";
 
 import { sanitizeFilterPatch } from "../../lib/utils.ts";
 
+import type { Fmt } from "../../lib/export/format.ts";
+
 import { Header } from "../../components/Header.tsx";
 
 import { KpiSections } from "./KpiSections.tsx";
@@ -71,9 +73,13 @@ interface SectionsProps {
   sessionUser?: AuthUser | null;
   // Origin of the API for the header health probe. Empty = same origin.
   apiBaseUrl?: string;
-  // Server mode only: streams the full filtered set as CSV. Absent in mock
-  // mode, where the toolbar exports the client-side rows instead.
-  onServerCsv?: () => Promise<void>;
+  // Server mode only: exports the whole selection through /api/export. Absent
+  // in mock mode, where the toolbar exports the client-side rows instead.
+  onServerExport?: (
+    kind: Fmt,
+    ids: number[],
+    filename: string,
+  ) => Promise<void>;
 }
 
 // DashboardSections: header, tabs, band, KPI, chart, alert, exports, table,
@@ -97,7 +103,7 @@ export function DashboardSections(
     syncStatus = null,
     syncChanges = null,
     apiBaseUrl = "",
-    onServerCsv,
+    onServerExport,
   }: SectionsProps,
 ) {
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -262,10 +268,9 @@ export function DashboardSections(
               <ExportMenu
                 selectedIds={selectedIds}
                 allFiltered={allFiltered}
-                pageRows={rows}
                 companyName={companyName}
                 serverMode={serverMode}
-                onServerCsv={onServerCsv}
+                onServerExport={onServerExport}
               />
             }
           />

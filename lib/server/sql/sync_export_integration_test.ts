@@ -3,13 +3,12 @@
 // so `deno task test` stays green without a database. When set, it inserts
 // two uniquely-coded rows, reads them back through the same functions the
 // routes call, checks the export totals, then removes its own rows.
+import { exportBatches, resolveExportScope } from "../exportRows.ts";
 import { streamExportCsv, streamToText } from "../exportCsv.ts";
 
 import { assertStrictEquals } from "jsr:@std/assert@^1";
 
 import { getKpi, listBarriers } from "./barriers.ts";
-
-import { resolveBarriers } from "../../resolve.ts";
 
 import { runSync } from "../fracttal/sync.ts";
 
@@ -87,8 +86,12 @@ Deno.test("fixture rows land, read back, export totals match", async () => {
     const chart = await getChartData(undefined);
     assertStrictEquals(Array.isArray(chart), true);
 
+    // Export through the real streaming stack: scope aggregate + paged
+    // batches, which is exactly what /api/export wires together.
+    const exported = await resolveExportScope({ query: "P4T-EQ" });
+    assertStrictEquals(exported.kpi.total, 2);
     const csv = await streamToText(
-      streamExportCsv(resolveBarriers(list.items)),
+      streamExportCsv(exportBatches(exported), exported.kpi),
     );
     const lines = csv.split("\r\n");
     const resumoIdx = lines.indexOf("RESUMO");
@@ -97,6 +100,23 @@ Deno.test("fixture rows land, read back, export totals match", async () => {
       l.includes("Total")
     );
     assertStrictEquals(totalLine?.includes('"2"'), true);
+
+    // Selection: ids narrow the scope to the chosen rows only, and they are
+    // still intersected with the filters (a filtered-out id cannot sneak in).
+    const one = list.items[0]!.id;
+    const picked = await resolveExportScope({ query: "P4T-EQ", ids: [one] });
+    assertStrictEquals(picked.kpi.total, 1);
+    const pickedCsv = await streamToText(
+      streamExportCsv(exportBatches(picked), picked.kpi),
+    );
+    assertStrictEquals(pickedCsv.includes(`"${one}"`), true);
+    assertStrictEquals(
+      pickedCsv.includes(`"${list.items[1]!.id}"`),
+      false,
+    );
+    // An id outside the filter is dropped, not exported.
+    const stale = await resolveExportScope({ query: "P4T-EQ", ids: [0] });
+    assertStrictEquals(stale.kpi.total, 0);
   } finally {
     if (retiredIds.length > 0) {
       await queryRows(

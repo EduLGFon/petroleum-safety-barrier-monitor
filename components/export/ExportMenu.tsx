@@ -1,19 +1,22 @@
 // ExportMenu - icon-only export button with a format dropdown.
 // This is why it exists: the toolbar keeps two side-by-side icon buttons
 // (columns + export) with no text labels; this one opens a small menu with
-// the existing Excel / PDF / CSV actions. Export scope is unchanged: CSV
-// covers the full filtered selection (server-streamed in server mode),
-// XLS/PDF stay page-local. The menu closes on outside click or Escape,
-// matching the dialog/menu dismissal used elsewhere in the app.
+// the existing Excel / PDF / CSV actions. Every format covers the whole
+// selection and never just the loaded page: in server mode the rows come
+// from /api/export (streamed, so a cross-page selection of 18k barriers
+// exports completely), in client mode from the in-memory list. The menu
+// closes on outside click or Escape, matching the dismissal used elsewhere.
 import { exportToCSV, exportToExcel, exportToPDF } from "../../lib/export.ts";
 
 import { useEffect, useMemo, useRef, useState } from "preact/hooks";
 
-import { type Fmt, FMTS } from "./ExportButtons.tsx";
+import { FMTS } from "./ExportButtons.tsx";
 
 import type { Barrier } from "../../lib/types.ts";
 
 import { DownloadIcon } from "../ui/Icons.tsx";
+
+import type { Fmt } from "../../lib/export/format.ts";
 
 import { AURORA } from "../../lib/aurora.ts";
 
@@ -22,27 +25,26 @@ import { fmt } from "../../lib/utils.ts";
 interface Props {
   selectedIds: Set<number>;
   allFiltered: Barrier[];
-  // Current page slice: XLS/PDF export only the selected rows on this
-  // page, while CSV covers the full filtered selection. Defaults to
-  // allFiltered when the caller has no separate page (server mode).
-  pageRows?: Barrier[];
   companyName: string;
-  // Server mode pages from the API: xls/pdf cover only the current page,
-  // while CSV streams the full filtered set from the server (onServerCsv).
+  // Server mode pages from the API: every format is served by
+  // /api/export over the whole selection (onServerExport).
   serverMode?: boolean;
-  onServerCsv?: () => Promise<void>;
+  onServerExport?: (
+    kind: Fmt,
+    ids: number[],
+    filename: string,
+  ) => Promise<void>;
 }
 
-// ExportMenu: icon-only button + independent format menu; owns the same
-// export actions (and loading/error handling) the inline buttons had.
+// ExportMenu: icon-only button + independent format menu; owns the export
+// actions (and loading/error handling) the inline buttons had.
 export function ExportMenu(
   {
     selectedIds,
     allFiltered,
-    pageRows,
     companyName,
     serverMode,
-    onServerCsv,
+    onServerExport,
   }: Props,
 ) {
   const [open, setOpen] = useState(false);
@@ -50,19 +52,15 @@ export function ExportMenu(
   const [error, setError] = useState<string | null>(null);
   const wrapRef = useRef<HTMLDivElement>(null);
 
-  // Full filtered selection (CSV scope) vs page-local selection (XLS/PDF
-  // scope). Stale ids outside the filter are ignored, as before.
-  const fullExportable = useMemo(
+  // Client mode: the selected rows of the in-memory filtered list, which is
+  // the whole scope there. Server mode: the selection itself, because it can
+  // span pages this browser never loaded - the server resolves the ids.
+  const exportable = useMemo(
     () => allFiltered.filter((b) => selectedIds.has(b.id)),
     [allFiltered, selectedIds],
   );
-  const pageList = pageRows ?? allFiltered;
-  const pageExportable = useMemo(
-    () => pageList.filter((b) => selectedIds.has(b.id)),
-    [pageList, selectedIds],
-  );
-  const count = fullExportable.length;
-  const pageCount = pageExportable.length;
+  const ids = useMemo(() => [...selectedIds], [selectedIds]);
+  const count = serverMode ? ids.length : exportable.length;
   const empty = count === 0;
 
   // Outside click or Escape closes while open.
@@ -84,22 +82,25 @@ export function ExportMenu(
     };
   }, [open]);
 
-  // doExport: same scope contract as before (CSV full, xls/pdf page-local;
-  // server CSV streams from the endpoint). Returns success so the menu can
-  // close on completion while staying open to surface failures inline.
+  // doExport: every format exports the whole selection, either from the
+  // server (streamed) or from the in-memory list. Returns success so the menu
+  // closes on completion while staying open to surface failures inline.
   async function doExport(kind: Fmt): Promise<boolean> {
     if (empty || loading) return false;
     const name = `barreiras-${new Date().toISOString().slice(0, 10)}`;
     setLoading(kind);
     setError(null);
     try {
-      if (kind === "xls") {
-        await exportToExcel(pageExportable, name, companyName);
-      }
-      if (kind === "pdf") await exportToPDF(pageExportable, name, companyName);
-      if (kind === "csv") {
-        if (serverMode && onServerCsv) await onServerCsv();
-        else exportToCSV(fullExportable, name);
+      if (serverMode && onServerExport) {
+        await onServerExport(kind, ids, name);
+      } else {
+        if (kind === "xls") {
+          await exportToExcel(exportable, name, companyName);
+        }
+        if (kind === "pdf") {
+          await exportToPDF(exportable, name, companyName);
+        }
+        if (kind === "csv") exportToCSV(exportable, name);
       }
       return true;
     } catch (err) {
@@ -237,7 +238,7 @@ export function ExportMenu(
           )}
           <div
             role="note"
-            data-page-export-note
+            data-export-scope-note
             className="tnum"
             style={{
               padding: "6px 10px 4px",
@@ -246,8 +247,7 @@ export function ExportMenu(
               whiteSpace: "normal",
             }}
           >
-            CSV abrange o conjunto filtrado ({fmt(count)}); XLS/PDF somente a
-            página atual ({fmt(pageCount)})
+            Todos os formatos exportam as {fmt(count)} barreiras selecionadas
           </div>
         </div>
       )}

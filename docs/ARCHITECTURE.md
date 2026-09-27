@@ -69,7 +69,8 @@ theme/accent/density/motion from `barrier-settings` before hydration.
   island root because server route context does not reach hydrated islands.
 - `lib/server/` - server-only Postgres pool (`db.ts`) + SQL repositories
   - edge helpers (`errors.ts`, `throttle.ts`, `config.ts`, `page-auth.ts`,
-    `exportCsv.ts`).
+    `exportRows.ts`, `exportStream.ts`, `exportCsv.ts`, `exportXls.ts`,
+    `exportPdf.ts`).
     Only `routes/index.tsx` and `routes/api/*` may import it.
 
 Server-only boundary is enforced by convention: `lib/server/db.ts` holds a
@@ -108,13 +109,29 @@ DashboardView ServerView --> useServerDashboard(baseUrl)
 ```
 
 Table pages use full filters; KPI/chart honor the same filter subset
-(minus paging/sort) (`hooks/dashboard/server.ts`). Requests cancel on
-supersede; first load shows the splash, later refetches keep stale rows.
-`error + rows == 0` renders `ServerErrorCard`, otherwise `ServerErrorBanner`
-with retry. A 5-minute cadence (hidden tabs skip) refreshes data plus
-vocabularies via `GET /api/vocabularies`. CSV export streams the full
-filtered set from `GET /api/export` (10k cap); xls/pdf and detail
-resolution cover the loaded page only.
+(minus paging/sort) (`hooks/dashboard/server.ts`, one shared scope builder
+in `hooks/dashboard/scope.ts`). Requests cancel on supersede; first load
+shows the splash, later refetches keep stale rows. `error + rows == 0`
+renders `ServerErrorCard`, otherwise `ServerErrorBanner` with retry. A
+5-minute cadence (hidden tabs skip) refreshes data plus vocabularies via
+`GET /api/vocabularies`. Every export format goes through
+`GET|POST /api/export` over the whole selection (ids in the body, filters
+in the query), streamed from the database in batches, so a cross-page
+selection of 18k barriers exports completely; only detail resolution is
+page-local.
+
+## Export pipeline
+
+`lib/export/` holds one markup builder per format, split into
+head/row/tail pieces (`csv.ts`, `excelHtml.ts`, `pdfHtml.ts`, sharing
+`columns.ts` and `rows.ts`) so the browser and the server emit identical
+cells. `lib/server/exportStream.ts` turns paged batches into a byte stream
+and `lib/server/export{csv,xls,pdf}.ts` render each format. Ceilings come
+from the formats themselves (`lib/export/limits.ts`): the export ceiling is
+200,000 rows, the `.xls` splits into worksheets past Excel's 65,536-row
+sheet limit, and the print report is printed in parts of `PDF_PART_ROWS`
+(one print dialog per part, the part number in the suggested filename)
+because the print dialog lays out the whole report at once.
 
 ## Island bridge topology
 
@@ -154,7 +171,8 @@ Full contract lives in `docs/API.md`. Summary:
 - Routes: `GET /api/barriers`, `GET /api/barriers/:id`,
   `PATCH /api/barriers/:id/status` (admin write via `record_status_change()`,
   author derives from session), `GET /api/barriers/deleted` (admin),
-  `GET /api/kpi`, `GET /api/chart`, `GET /api/export` (CSV, 10k cap),
+  `GET /api/kpi`, `GET /api/chart`, `GET|POST /api/export` (csv/xls/pdf over
+  the whole selection, streamed in batches),
   `GET /api/health` (DB-free liveness), `GET /api/vocabularies`
   (refresh cadence; SSR still seeds the first paint), `GET /api/sync-status`
   - `GET /api/sync-changes` (header health indicator, 1-minute cadence with
@@ -234,5 +252,6 @@ adapter. `DATABASE_URL` feeds `lib/server/db.ts` and both `db:*` tasks.
   `by*` `GROUP BY` buckets, `resolveKpi` translates numeric-id keys, chart
   derives NC as `total - compliant` fail-closed, so novel values never vanish.
   Fixed fields + `other` always equal `total`.
-- Layouts survive scale: paginated/server-paged regions, capped export rows
-  (`MAX_DOM_ROWS`), debounced search, precomputed sort keys.
+- Layouts survive scale: paginated/server-paged regions, exports streamed in
+  database-sized batches and split at the format ceilings (`EXPORT_MAX_ROWS`,
+  `XLS_SHEET_ROWS`, `PDF_PART_ROWS`), debounced search, precomputed sort keys.

@@ -1,9 +1,11 @@
 // Export summary - KPI strip stats and summary table from one computeKpi pass.
 // This is why it exists: spreadsheet and print report share the same
-// formatted totals, so exports always match the dashboard KPI cards.
+// formatted totals, so exports always match the dashboard KPI cards. Both
+// builders take a KpiSnapshot so the server can reuse an aggregate it
+// already computed instead of buffering every row just to count them.
 import { DISP_KNOWN_ORDER } from "../constants.ts";
 
-import type { Barrier } from "../types.ts";
+import type { Barrier, KpiSnapshot } from "../types.ts";
 
 import { computeKpi } from "../utils.ts";
 
@@ -17,11 +19,10 @@ export interface KpiStats {
   critical: string;
 }
 
-// Derives pt-BR formatted KPI totals from one computeKpi pass; empty input
-// yields zeros and 0% (no div-by-zero/NaN). Matches dashboard KPI exactly,
-// including fail-closed novel values.
-export function kpiStats(barriers: Barrier[]): KpiStats {
-  const k = computeKpi(barriers);
+// Derives pt-BR formatted KPI totals from a snapshot; zeros and 0% (no
+// div-by-zero/NaN). Matches dashboard KPI exactly, including fail-closed
+// novel values.
+export function kpiStatsFrom(k: KpiSnapshot): KpiStats {
   const n = fmt;
   return {
     total: n(k.total),
@@ -32,12 +33,16 @@ export function kpiStats(barriers: Barrier[]): KpiStats {
   };
 }
 
-// Builds the [label, value] summary table from one computeKpi pass.
+// kpiStats: snapshot flavour for callers that hold the rows (browser).
+export function kpiStats(barriers: Barrier[]): KpiStats {
+  return kpiStatsFrom(computeKpi(barriers));
+}
+
+// Builds the [label, value] summary table from a snapshot.
 // Availability rows come from the dynamic bucket (known first in canonical
 // order, novel values after by volume), so a new status can never go missing
 // while the total still reconciles.
-export function summaryRows(barriers: Barrier[]): Array<[string, string]> {
-  const k = computeKpi(barriers);
+export function summaryRowsFrom(k: KpiSnapshot): Array<[string, string]> {
   const n = fmt;
   const byAvailability = k.byAvailability ?? {};
   const keys = Object.keys(byAvailability).sort((a, b) => {
@@ -55,4 +60,9 @@ export function summaryRows(barriers: Barrier[]): Array<[string, string]> {
     ["Críticas NC", n(k.criticalNonCompliant)],
     ["% Conformidade", `${k.pctCompliant}%`],
   ];
+}
+
+// summaryRows: row flavour for callers that hold the rows (browser).
+export function summaryRows(barriers: Barrier[]): Array<[string, string]> {
+  return summaryRowsFrom(computeKpi(barriers));
 }

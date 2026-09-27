@@ -209,7 +209,7 @@ function httpScenario(mode: "http-ok" | "http-err") {
       }
       await wait(500);
       const dash = await evalJs(`(() => {
-        const note = document.querySelector('[data-page-export-note]');
+        const note = document.querySelector('[data-export-scope-note]');
         const tabs = document.querySelectorAll(
           'nav[aria-label="Filtro por instalação"] button');
         const chart = document.querySelector(
@@ -243,8 +243,8 @@ function httpScenario(mode: "http-ok" | "http-err") {
         d.alerts.length === 0,
       );
       check(
-        "page-only export note shown",
-        !!d.note?.includes("página atual"),
+        "export note promises the whole selection",
+        !!d.note?.includes("selecionadas"),
       );
       check("location tabs come from vocabularies", d.tabCount > 1);
       check("total count comes from the API", /^[\d.]+$/.test(d.total ?? ""));

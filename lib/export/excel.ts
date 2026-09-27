@@ -1,219 +1,74 @@
 // Spreadsheet export - barriers as .xls (HTML table for Excel/LibreOffice).
 // This is why it exists: zero-dependency spreadsheet with brand header, KPI
-// strip, auto-fitted columns, styled rows, and a summary table.
+// strip, auto-fitted columns, styled rows, and a summary table. Markup lives
+// in excelHtml.ts so the server can stream the same file for big selections.
 import {
-  assertBrowser,
-  download,
-  escHtml,
-  MAX_DOM_ROWS,
-  pill,
-  ts,
-} from "./html.ts";
+  fitColWidths,
+  xlsDocClose,
+  xlsDocOpen,
+  xlsRow,
+  xlsSheetClose,
+  xlsSheetOpen,
+  xlsSummary,
+} from "./excelHtml.ts";
 
-import { CONF_COLORS, CRIT_COLORS, DISP_COLORS } from "../constants.ts";
-
-import { isCriticalRankLabel } from "../enums/codes.ts";
-
-import { kpiStats, summaryRows } from "./summary.ts";
-
-import { refusalMessage } from "./limits.ts";
+import { EXPORT_MAX_ROWS, refusalMessage, XLS_SHEET_ROWS } from "./limits.ts";
+import { assertBrowser, download } from "./html.ts";
 
 import type { Barrier } from "../types.ts";
 
-import { withBrand } from "../company.ts";
+import { kpiStats, summaryRows } from "./summary.ts";
+
+import { FMT_EXT, FMT_MIME } from "./format.ts";
 
 import { row } from "./rows.ts";
 
-const HEADERS = [
-  "#",
-  "TAG",
-  "Inst.",
-  "Tipologia",
-  "Categoria",
-  "Agrupamento",
-  "Criticidade",
-  "Dono",
-  "Disponibilidade",
-  "Sem Conting. há",
-  "Conformidade",
-  "Comentários",
-  "Plano de Ação",
-  "Origem",
-  "Código Fracttal",
-  "Nome Instalação",
-  "Local Instalação",
-  "Tipologia Equip.",
-  "Elem. em Campo?",
-  "Elem. Operacional?",
-  "Status Operac.",
-  "Possui Plano?",
-  "Plano Cumprido?",
-  "Sem Falha?",
-  "Status Manut.",
-  "Há Conting.?",
-  "Desc. Contingência",
-  "Cód. Evidência",
-  "Desc. Degradação",
-  "Comentários 2",
-];
-
-// Brand/KPI/footer rows span the whole table; derived so columns stay in sync.
-const SPAN = HEADERS.length;
-
-// Approx width per character in points at 9pt, plus cell padding.
-const PT_PER_CHAR = 5.5;
-const CELL_PAD_PT = 12;
-// Columns that may hold long free text wrap at this width instead of
-// stretching the table.
-const WRAP_COLS = new Set([11, 12, 16, 26, 28, 29]);
-const MAX_WRAP_CHARS = 55;
-const MIN_COL_PT = 40;
-const MAX_COL_PT = 320;
-
-// Measures content and returns one width per column so every cell fits.
-// Long free-text columns are capped and wrap onto multiple lines.
-function fitColWidths(headers: string[], rows: string[][]): number[] {
-  return headers.map((h, ci) => {
-    let max = h.length;
-    for (const r of rows) max = Math.max(max, (r[ci] ?? "").length);
-    if (WRAP_COLS.has(ci)) max = Math.min(max, MAX_WRAP_CHARS);
-    return Math.min(
-      MAX_COL_PT,
-      Math.max(MIN_COL_PT, Math.round(max * PT_PER_CHAR + CELL_PAD_PT)),
+// buildExcelHtml: the whole .xls document as one string, split into
+// Excel-sized worksheets (one <table> each) so a file wider than
+// XLS_SHEET_ROWS still opens. Server exports stream the same builders from
+// excelHtml.ts instead, so an 18k selection never has to exist as a single
+// string in the browser.
+export function buildExcelHtml(
+  barriers: Barrier[],
+  companyName = "",
+): string {
+  const stats = kpiStats(barriers);
+  const data = barriers.map(row);
+  const widths = fitColWidths(data);
+  const sheets = Math.max(1, Math.ceil(barriers.length / XLS_SHEET_ROWS));
+  const out: string[] = [xlsDocOpen()];
+  for (let sheet = 1; sheet <= sheets; sheet++) {
+    const at = (sheet - 1) * XLS_SHEET_ROWS;
+    const end = Math.min(at + XLS_SHEET_ROWS, barriers.length);
+    out.push(
+      xlsSheetOpen({ companyName, stats, widths, sheet, sheets }),
+      ...barriers
+        .slice(at, end)
+        .map((b, i) => xlsRow(b, at + i, data[at + i])),
+      xlsSheetClose(companyName),
     );
-  });
+  }
+  out.push(xlsSummary(summaryRows(barriers), companyName), xlsDocClose());
+  return out.join("");
 }
 
-// Exports barriers as .xls (HTML table) with brand header, KPI strip, styled
-// columns, and summary table; browser-only. Refuses beyond MAX_DOM_ROWS with
-// an actionable error (filter down or use CSV) instead of freezing the tab.
+// exportToExcel: downloads the spreadsheet for the whole selection; browser
+// only. Refuses beyond EXPORT_MAX_ROWS with an actionable error (the server
+// path handles larger exports by streaming and splitting worksheets).
 export function exportToExcel(
   barriers: Barrier[],
   filename = "barreiras",
   companyName = "",
 ): void {
   assertBrowser();
-  if (barriers.length > MAX_DOM_ROWS) {
+  if (barriers.length > EXPORT_MAX_ROWS) {
     throw new Error(refusalMessage("Excel", barriers.length));
   }
-  const brand = companyName.toUpperCase() ||
-    "MONITOR DE BARREIRAS DE SEGURANÇA";
-  const stats = kpiStats(barriers);
-  const subtitle = `Exportado em ${ts()}  |  ${stats.total} registros`;
-  const data = barriers.map(row);
-  const widths = fitColWidths(HEADERS, data);
-  const cols = widths.map((w) => `<col style="width:${w}pt;">`).join("");
-  const head = HEADERS.map((h) =>
-    `<th style="background:#1E3A5F;color:#fff;font-size:9pt;font-weight:bold;text-align:center;padding:6px 4px;white-space:normal;vertical-align:middle;border-bottom:2pt solid #3B82F6;">${
-      escHtml(h)
-    }</th>`
-  ).join("");
-  const kpiCell = (
-    label: string,
-    value: string,
-    bg: string,
-    color: string,
-    span: number,
-  ) =>
-    `<td colspan="${span}" style="background:${bg};padding:7px 10px;vertical-align:middle;">` +
-    `<div style="font-size:8pt;color:#64748B;letter-spacing:.06em;">${
-      escHtml(label.toUpperCase())
-    }</div>` +
-    `<div style="font-size:13pt;font-weight:bold;color:${color};">${
-      escHtml(value)
-    }</div></td>`;
-  const kpiStrip = `<tr>` +
-    kpiCell("Total", stats.total, "#EFF6FF", "#1E3A5F", 4) +
-    kpiCell(
-      "Conformes",
-      `${stats.compliant} · ${stats.pct}`,
-      "#ECFDF5",
-      "#15803D",
-      3,
-    ) +
-    kpiCell("Não conformes", stats.nonCompliant, "#FEF2F2", "#B91C1C", 3) +
-    kpiCell("Críticas NC", stats.critical, "#FFF7ED", "#C2410C", 3) +
-    `</tr>`;
-  const body = barriers.map((b, idx) => {
-    const bg = idx % 2 === 0 ? "#F8FAFC" : "#FFFFFF";
-    const disp = DISP_COLORS[String(b.availability)]?.solid ?? "#64748b";
-    const conf = CONF_COLORS[String(b.compliance)]?.solid ?? "#64748b";
-    const isCrit = isCriticalRankLabel(String(b.criticality));
-    const cells = data[idx].map((v, ci) => {
-      const base =
-        "font-size:9pt;color:#1E293B;padding:3px 5px;white-space:normal;word-wrap:break-word;vertical-align:top;border:1pt solid #E2E8F0;";
-      if (ci === 0) {
-        return `<td style="${base}text-align:right;color:#64748B;">${
-          escHtml(v)
-        }</td>`;
-      }
-      if (ci === 1) {
-        return `<td style="${base}font-family:'Courier New';font-size:8pt;font-weight:bold;color:#1D4ED8;">${
-          escHtml(v)
-        }</td>`;
-      }
-      if (ci === 8) {
-        return `<td style="${base}text-align:center;">${pill(v, disp)}</td>`;
-      }
-      if (ci === 10) {
-        return `<td style="${base}text-align:center;">${pill(v, conf)}</td>`;
-      }
-      if (ci === 6) {
-        const rank = String(b.criticality);
-        const c = CRIT_COLORS[rank]?.solid ?? "#64748B";
-        const extra = isCrit ? `background:${c}1F;font-weight:bold;` : "";
-        return `<td style="${base}text-align:center;color:${c};${extra}">${
-          escHtml(v)
-        }</td>`;
-      }
-      if (ci === 9 && v) {
-        return `<td style="${base}font-style:italic;color:#EA580C;">${
-          escHtml(v)
-        }</td>`;
-      }
-      return `<td style="${base}">${escHtml(v)}</td>`;
-    }).join("");
-    return `<tr style="background:${bg};">${cells}</tr>`;
-  }).join("");
-  const summary = summaryRows(barriers).map(([k, v], i) => {
-    const hl = k === "% Conformidade";
-    const bg = hl ? "#EFF6FF" : i % 2 === 0 ? "#F8FAFC" : "#FFFFFF";
-    return `<tr style="background:${bg};"><td style="font-size:10pt;padding:4px 10px;white-space:normal;vertical-align:top;${
-      hl ? "font-weight:bold;color:#1E3A5F;" : ""
-    }">${
-      escHtml(k)
-    }</td><td style="font-size:10pt;font-weight:bold;text-align:right;padding:4px 10px;${
-      hl ? "color:#1D4ED8;font-size:11pt;" : ""
-    }">${escHtml(v)}</td></tr>`;
-  }).join("");
-  const productRow = companyName
-    ? `<tr><td colspan="${SPAN}" style="background:#0A1628;color:#93C5FD;font-size:10pt;letter-spacing:.14em;padding:0 12px 4px 12px;">MONITOR DE BARREIRAS DE SEGURANÇA</td></tr>`
-    : "";
-  const html =
-    `<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel"><head><meta charset="UTF-8"></head><body>` +
-    `<table border="0" cellpadding="0" cellspacing="0" style="border-collapse:collapse;table-layout:auto;font-family:Calibri,Arial,sans-serif;"><colgroup>${cols}</colgroup>` +
-    `<tr><td colspan="${SPAN}" style="background:#0A1628;color:#fff;font-size:16pt;font-weight:bold;padding:12px 12px 2px 12px;white-space:normal;vertical-align:middle;">${
-      escHtml(brand)
-    }</td></tr>` +
-    productRow +
-    `<tr><td colspan="${SPAN}" style="background:#0E2036;color:#94A3B8;font-size:9pt;font-style:italic;padding:5px 12px;white-space:normal;vertical-align:middle;">${
-      escHtml(subtitle)
-    }</td></tr>` +
-    `<tr><td colspan="${SPAN}" style="background:#3B82F6;font-size:2pt;padding:0;">&nbsp;</td></tr>` +
-    kpiStrip +
-    `<tr>${head}</tr>${body}` +
-    `<tr><td colspan="${SPAN}" style="color:#94A3B8;font-size:8pt;font-style:italic;padding:6px 4px;">${
-      escHtml(
-        withBrand(companyName, "Gerado pelo Monitor de Barreiras de Segurança"),
-      )
-    }</td></tr></table>` +
-    `<h3 style="font-family:Calibri,Arial,sans-serif;color:#0A1628;">${
-      escHtml(withBrand(companyName, "Resumo Monitor de Barreiras"))
-    }</h3>` +
-    `<table border="1" cellpadding="0" cellspacing="0" style="border-collapse:collapse;font-family:Calibri,Arial,sans-serif;"><tr><th style="background:#1E3A5F;color:#fff;padding:5px 12px;text-align:left;border-bottom:2pt solid #3B82F6;">Indicador</th><th style="background:#1E3A5F;color:#fff;padding:5px 12px;text-align:right;border-bottom:2pt solid #3B82F6;">Qtd.</th></tr>${summary}</table>` +
-    `</body></html>`;
+  // Leading BOM so Excel on Windows reads the file as pt-BR.
   download(
-    new Blob(["\uFEFF" + html], { type: "application/vnd.ms-excel" }),
-    `${filename}.xls`,
+    new Blob(["\uFEFF" + buildExcelHtml(barriers, companyName)], {
+      type: FMT_MIME.xls,
+    }),
+    `${filename}${FMT_EXT.xls}`,
   );
 }
