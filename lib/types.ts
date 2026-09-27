@@ -35,7 +35,7 @@ export type Availability =
 // deno-lint-ignore ban-types
 export type Compliance = "Conforme" | "Não Conforme" | (string & {});
 // deno-lint-ignore ban-types
-export type Criticality = "Crítica" | "Não Crítica" | (string & {});
+export type Criticality = "ESO" | "A" | "B" | "C" | "D" | (string & {});
 
 export interface StatusHistoryEntry {
   date: string;
@@ -196,6 +196,10 @@ export interface FilterState {
   typology: string;
   // Sheet GERAL Criticidade (all critical in the managed scope).
   criticality: string;
+  // Rank gate: true restricts to the critical tiers (ESO/A); false or
+  // absent lists every rank. Defaults true so the full-equipment catalog
+  // still opens on the safety-relevant subset.
+  criticalOnly: boolean;
   // Action-plan presence: "" (all), "Com plano", "Sem plano".
   plan: string;
   since: string;

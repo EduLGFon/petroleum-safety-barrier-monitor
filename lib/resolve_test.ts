@@ -42,7 +42,7 @@ Deno.test("resolveKpi translates numeric buckets to labels", () => {
   }));
   assertEquals(k.byAvailability, { "Disponível": 1, "Degradado": 2 });
   assertEquals(k.byCompliance, { "Conforme": 1, "Não Conforme": 2 });
-  assertEquals(k.byCriticality, { "Crítica": 2 });
+  assertEquals(k.byCriticality, { "A": 2 });
   assertStrictEquals(k.syncedAt, "2026-09-10T00:00:00.000Z");
 });
 
@@ -110,7 +110,7 @@ Deno.test("resolveBarrier maps known ids; compliance is derived, never trusted f
   assertStrictEquals(b.tag, "PSV-071");
   assertStrictEquals(b.typology, "Estação Coletora");
   assertStrictEquals(b.location, "FAL");
-  assertStrictEquals(b.criticality, "Crítica");
+  assertStrictEquals(b.criticality, "A");
   assertStrictEquals(b.category, "Válvula de Alívio de Pressão");
   assertStrictEquals(b.grouping, "Sistemas de Alívio");
   assertStrictEquals(b.owner, "Operação");

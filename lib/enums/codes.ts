@@ -76,12 +76,30 @@ export function fromComplianceId(id: number): Compliance {
 }
 
 // ─── Criticality ──────────────────────────────────────────────────────────
+// Ranked levels ESO > A > B > C > D (ids mirror db/seed_lookups.sql and
+// lib/server/fracttal/barrier-rules.ts rank constants). ESO and A are the
+// critical tiers driving criticalNonCompliant counts and alert urgency.
 
 export const CRITICALITY_CODES: Record<number, Criticality> = {
-  0: "Não Crítica",
-  1: "Crítica",
+  0: "ESO",
+  1: "A",
+  2: "B",
+  3: "C",
+  4: "D",
 };
 export const CRITICALITY_IDS = buildReverse(CRITICALITY_CODES);
+
+// Critical tiers: ESO plus A. Shared by server KPI/alerts and client KPI so
+// both sides count the same rows as critical.
+export const CRITICAL_RANK_IDS: readonly number[] = [0, 1];
+
+export function isCriticalRankId(id: number): boolean {
+  return CRITICAL_RANK_IDS.includes(id);
+}
+
+export function isCriticalRankLabel(label: string): boolean {
+  return label === "ESO" || label === "A";
+}
 
 export function toCriticalityId(v: Criticality): number | undefined {
   return CRITICALITY_IDS[v];

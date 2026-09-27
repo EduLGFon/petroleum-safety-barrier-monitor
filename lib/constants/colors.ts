@@ -61,12 +61,27 @@ export const CRIT_COLORS: Record<
   string,
   { solid: string; bg: string; border: string }
 > = {
-  "Crítica": {
+  "ESO": {
+    solid: "#dc2626",
+    bg: "rgba(220,38,38,.12)",
+    border: "rgba(220,38,38,.35)",
+  },
+  "A": {
     solid: "#f97316",
     bg: "rgba(249,115,22,.1)",
     border: "rgba(249,115,22,.28)",
   },
-  "Não Crítica": {
+  "B": {
+    solid: "#eab308",
+    bg: "rgba(234,179,8,.12)",
+    border: "rgba(234,179,8,.35)",
+  },
+  "C": {
+    solid: "#38bdf8",
+    bg: "rgba(56,189,248,.1)",
+    border: "rgba(56,189,248,.28)",
+  },
+  "D": {
     solid: "#94a3b8",
     bg: "rgba(148,163,184,.1)",
     border: "rgba(148,163,184,.28)",
