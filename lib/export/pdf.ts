@@ -9,9 +9,10 @@ import type { PrintPart } from "./pdfHtml.ts";
 
 import { assertBrowser } from "./html.ts";
 import { PDF_PART_ROWS } from "./limits.ts";
-import { kpiStats, kpiStatsFrom } from "./summary.ts";
+import { kpiStats } from "./summary.ts";
 import { pdfPartCount } from "./parts.ts";
-import type { Barrier, KpiSnapshot } from "../types.ts";
+
+import type { Barrier } from "../types.ts";
 
 const REPORT_ID = "print-report";
 
@@ -23,19 +24,6 @@ export function buildPrintReport(
   part?: PrintPart,
 ): string {
   return printDocOpen(companyName, kpiStats(barriers), part) +
-    barriers.map((b, idx) => printRow(b, idx)).join("") +
-    printDocClose(companyName);
-}
-
-// buildPrintReportFrom: same report from a server-side KPI snapshot, so a
-// streamed print job shows the totals of the whole export, not of one batch.
-export function buildPrintReportFrom(
-  barriers: Barrier[],
-  kpi: KpiSnapshot,
-  companyName = "",
-  part?: PrintPart,
-): string {
-  return printDocOpen(companyName, kpiStatsFrom(kpi), part) +
     barriers.map((b, idx) => printRow(b, idx)).join("") +
     printDocClose(companyName);
 }

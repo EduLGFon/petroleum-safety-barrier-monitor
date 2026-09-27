@@ -64,7 +64,8 @@ export function buildWhere(
   // Row whitelist (export selection). Passed as one array parameter so an
   // 18k-row selection costs a single bind instead of 18k placeholders.
   if (q.ids && q.ids.length > 0) {
-    push("and b.id = any(", q.ids);
+    args.push(q.ids);
+    conds.push(`and b.id = any($${args.length})`);
   }
   if (q.hasActionPlan === true) {
     conds.push("and b.action_plan is not null and b.action_plan <> ''");

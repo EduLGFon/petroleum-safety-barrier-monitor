@@ -36,6 +36,20 @@ Deno.test("buildWhere binds ids as numbered args", () => {
   assert(text.includes("b.deleted_at is null"));
 });
 
+Deno.test("buildWhere binds the row whitelist as one array arg", () => {
+  const { text, args } = buildWhere({ locationId: 1, ids: [7, 8, 9] });
+  // One bind for the whole selection: 18k ids must not become 18k placeholders.
+  assertEquals(args, [1, [7, 8, 9]]);
+  assert(text.includes("b.location_id = $1"));
+  assert(text.includes("b.id = any($2)"), `unbalanced array bind: ${text}`);
+});
+
+Deno.test("buildWhere ignores an empty row whitelist", () => {
+  const { text, args } = buildWhere({ ids: [] });
+  assertEquals(args, []);
+  assert(!text.includes("any("));
+});
+
 Deno.test("buildWhere escapes LIKE wildcards", () => {
   const { text, args } = buildWhere({ query: "100%_x" });
   assertEquals(args, ["%100\\%\\_x%", "%100\\%\\_x%"]);

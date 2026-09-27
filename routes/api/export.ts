@@ -20,9 +20,14 @@ import {
   resolveExportScope,
 } from "../../lib/server/exportRows.ts";
 
-import { PDF_PART_ROWS, refusalMessage } from "../../lib/export/limits.ts";
+import {
+  EXPORT_MAX_ROWS,
+  PDF_PART_ROWS,
+  refusalMessage,
+  XLS_SHEET_ROWS,
+} from "../../lib/export/limits.ts";
+
 import { exportThrottle, routeClientKey } from "../../lib/server/throttle.ts";
-import { EXPORT_MAX_ROWS, XLS_SHEET_ROWS } from "../../lib/export/limits.ts";
 import { checkDbThrottle } from "../../lib/server/sql/throttle.ts";
 import { FMT_EXT, FMT_MIME, isFmt } from "../../lib/export/format.ts";
 import { loadServerConfig } from "../../lib/server/config.ts";
@@ -71,6 +76,8 @@ function parsePart(raw: unknown): number {
   return n > 0 ? n : 1;
 }
 
+// readBody: the optional JSON payload. A missing or non-JSON body is a valid
+// request (full filtered scope, first print part), so GET works unchanged.
 async function readBody(req: Request): Promise<Record<string, unknown>> {
   try {
     const parsed = await req.json();
@@ -99,6 +106,8 @@ async function stream(
   sp: URLSearchParams,
 ): Promise<Response> {
   const requestId = newRequestId();
+  // Errors name the verb that actually arrived (GET or POST).
+  const where = `${ctx.req.method} /api/export`;
   // Shared DB budget first so multi-isolate deploys enforce one limit;
   // falls back to the in-memory bucket when the DB is unreachable.
   const clientKey = routeClientKey(ctx);
@@ -121,12 +130,7 @@ async function stream(
   try {
     loadServerConfig();
   } catch (err) {
-    return internal(
-      "GET /api/export",
-      err,
-      requestId,
-      "Server misconfigured",
-    );
+    return internal(where, err, requestId, "Server misconfigured");
   }
   const dataAuth = await requireDataAuth(ctx.req);
   if (!dataAuth.ok) {
@@ -164,12 +168,7 @@ async function stream(
     }
     return respond(req, scope, getCompanyName(), requestId);
   } catch (err) {
-    return internal(
-      "GET /api/export",
-      err,
-      requestId,
-      "Failed to build export",
-    );
+    return internal(where, err, requestId, "Failed to build export");
   }
 }
 
@@ -200,7 +199,8 @@ function respond(
   if (req.format === "pdf") {
     const parts = pdfPartCount(total);
     const part = Math.min(req.part, parts);
-    headers["x-export-parts"] = String(parts);
+    // A print fragment, not a file: no download disposition, the caller
+    // injects it into the print node and prints it.
     return new Response(
       streamPrintReport(
         exportBatches(scope, {
@@ -213,7 +213,14 @@ function respond(
           part: { index: part, parts, total },
         },
       ),
-      { status: 200, headers: fileHeaders(headers, "pdf", "inline") },
+      {
+        status: 200,
+        headers: {
+          ...headers,
+          "x-export-parts": String(parts),
+          "content-type": FMT_MIME.pdf,
+        },
+      },
     );
   }
   return new Response(streamExportCsv(exportBatches(scope), scope.kpi), {
@@ -222,17 +229,14 @@ function respond(
   });
 }
 
-// fileHeaders: content type plus the download disposition for one format.
+// fileHeaders: content type plus the download disposition for a file format.
 function fileHeaders(
   base: Record<string, string>,
-  format: Fmt,
-  disposition: "attachment" | "inline" = "attachment",
+  format: "csv" | "xls",
 ): Record<string, string> {
   return {
     ...base,
     "content-type": FMT_MIME[format],
-    "content-disposition": `${disposition}; filename="barreiras${
-      FMT_EXT[format]
-    }"`,
+    "content-disposition": `attachment; filename="barreiras${FMT_EXT[format]}"`,
   };
 }
