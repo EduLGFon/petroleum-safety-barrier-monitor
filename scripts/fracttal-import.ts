@@ -16,15 +16,16 @@ import {
   categoryFor,
   classifyCorrective,
   classifyRequest,
+  criticalityLabelFor,
   earliestDate,
   exclusionReason,
   IMPORT_NOTE,
-  isBarrierCandidate,
   isClosedRequestStatus,
   isoDate,
   locationTypeOf,
   mergeEvent,
   resolveAvailability,
+  scopeSources,
   stationCodeOf,
   stationNameOf,
   type StatusEvent,
@@ -53,6 +54,7 @@ const BARRIER_COLS = [
   "action_plan",
   "status_since",
   "external_code",
+  "scope_source",
   "origin",
   "install_local",
   "equip_typology",
@@ -163,6 +165,8 @@ interface EquipmentRow {
   description: string;
   parentDescription: string;
   groupsDescription: string;
+  groups2Description: string;
+  prioritiesDescription: string;
   outOfServiceDate: string | null;
 }
 
@@ -171,6 +175,7 @@ interface EquipmentRow {
 interface BarrierAcc extends EquipmentRow {
   station: string;
   category: string;
+  scope: string;
   planned: StatusEvent | null;
   urgent: StatusEvent | null;
   stopAssets: boolean;
@@ -288,8 +293,9 @@ async function main() {
   );
 
   // ── Pass A: equipment ────────────────────────────────────────────────────
-  // Builds the barrier set, the station set and the category set. Only the
-  // barrier-scope rows are kept; everything else is reported and dropped.
+  // Builds the barrier set, the station set and the category set. Scope is
+  // fully open: every equipment row enters (empty codes and documented
+  // exclusions still drop with a report count).
   const barriers = new Map<string, BarrierAcc>();
   // stations maps code -> display name (first canonical segment wins;
   // override segments yield null and never overwrite - the catalog row
@@ -304,7 +310,13 @@ async function main() {
     const code = str(row.code);
     if (code === "") continue;
     const groupsDescription = str(row.groups_description);
-    if (!isBarrierCandidate(groupsDescription)) continue;
+    // Scope is fully open: every equipment row enters the monitor and the
+    // admitting gates ride along as scope (keyword / eso / keyword+eso /
+    // all) for reversibility.
+    const sources = scopeSources(
+      groupsDescription,
+      str(row.groups_2_description),
+    );
     // Known non-barriers match the scope by mislabel: skip with a report
     // count, never silently (shared EXCLUDED_EXTERNAL_CODES).
     if (exclusionReason(code) !== null) {
@@ -326,9 +338,12 @@ async function main() {
       description,
       parentDescription,
       groupsDescription,
+      groups2Description: str(row.groups_2_description),
+      prioritiesDescription: str(row.priorities_description),
       outOfServiceDate: isoDate(row.initial_date_out_of_service),
       station,
       category,
+      scope: sources.join("+") || "all",
       planned: null,
       urgent: null,
       stopAssets: false,
@@ -430,6 +445,27 @@ async function main() {
   );
   await exec(locInsert.text, locInsert.args);
   const catRows = categoryList.map((label, i) => ({ id: i, label }));
+  // Criticality ranks are static (db/seed_lookups.sql owns them); resolve
+  // each barrier's rank label to its id here and fail loudly when a rank is
+  // missing instead of writing a wrong id.
+  const critRows = await queryRows<{ id: number; label: string }>(
+    "select id, label from criticality_levels",
+  );
+  const criticalityIds = new Map(critRows.map((r) => [r.label, r.id]));
+  const rankIdOf = (acc: BarrierAcc): number => {
+    const rank = criticalityLabelFor(
+      acc.description,
+      acc.groups2Description,
+      acc.prioritiesDescription,
+    );
+    const id = criticalityIds.get(rank.label);
+    if (id === undefined) {
+      throw new Error(
+        `criticality rank '${rank.label}' missing from criticality_levels - run db:migrate first`,
+      );
+    }
+    return id;
+  };
   const catInsert = buildInsert(
     "categories",
     ["id", "label"] as const,
@@ -453,9 +489,10 @@ async function main() {
         typology_id: typologyIdOf(acc.parentDescription),
         location_id: stationIds.get(acc.station) ?? 1,
         loc_desc_id: 0,
-        // Sheet inventory is 100% critical barriers; upstream carries no
-        // usable criticality signal (priorities almost all null in the dump).
-        criticality_id: 1,
+        // Criticality rank from the TAG suffix letter plus the ESO flag
+        // (shared criticalityLabelFor); upstream priorities are almost all
+        // null, so the suffix is the signal.
+        criticality_id: rankIdOf(acc),
         category_id: categoryIds.get(acc.category) ?? 0,
         grouping_id: 0,
         owner_id: null,
@@ -464,6 +501,7 @@ async function main() {
         action_plan: "",
         status_since: s.statusSince,
         external_code: acc.code,
+        scope_source: acc.scope,
       };
     });
     const insert = buildInsert(
