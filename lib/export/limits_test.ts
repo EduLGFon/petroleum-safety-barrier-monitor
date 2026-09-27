@@ -1,11 +1,7 @@
 // Unit tests for the shared export limits and the refusal wording.
 import { assert, assertStrictEquals } from "jsr:@std/assert@^1";
 
-import {
-  EXPORT_MAX_ROWS,
-  PDF_PART_ROWS,
-  XLS_SHEET_ROWS,
-} from "./limits.ts";
+import { EXPORT_MAX_ROWS, PDF_PART_ROWS, XLS_SHEET_ROWS } from "./limits.ts";
 
 import { refusalMessage } from "./limits.ts";
 

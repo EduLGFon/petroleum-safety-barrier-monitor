@@ -13,16 +13,16 @@ runtime state of the running stack. Excludes `.git/`, `node_modules/`, the
 
 ## 1. Quick reference
 
-| Port | Proto | Direction | What it is | Where it's bound |
-|------|-------|-----------|------------|------------------|
-| **8000** | TCP | **Inbound** | App HTTP server (production) | `deno serve` default, all interfaces |
-| **5173** | TCP | **Inbound** | App HTTP server (dev / HMR) | Vite, `--host` → `0.0.0.0` in Docker |
-| **5432** | TCP | Outbound | PostgreSQL | `DATABASE_URL` host |
-| **587** | TCP | Outbound | SMTP submission (STARTTLS) | `OPS_SMTP_PORT` default |
-| **465** | TCP | Outbound | SMTP implicit TLS | Selected when `OPS_SMTP_PORT=465` |
-| **443** | TCP | Outbound | Fracttal API + Google Fonts | Implicit, no port in any URL |
-| **9333** | TCP | Inbound (loopback) | Chrome DevTools Protocol — `browser-smoke.ts` | Chrome, `127.0.0.1` |
-| **9336** | TCP | Inbound (loopback) | Chrome DevTools Protocol — `browser-capture.ts` | Chrome, `127.0.0.1` |
+| Port     | Proto | Direction          | What it is                                      | Where it's bound                     |
+| -------- | ----- | ------------------ | ----------------------------------------------- | ------------------------------------ |
+| **8000** | TCP   | **Inbound**        | App HTTP server (production)                    | `deno serve` default, all interfaces |
+| **5173** | TCP   | **Inbound**        | App HTTP server (dev / HMR)                     | Vite, `--host` → `0.0.0.0` in Docker |
+| **5432** | TCP   | Outbound           | PostgreSQL                                      | `DATABASE_URL` host                  |
+| **587**  | TCP   | Outbound           | SMTP submission (STARTTLS)                      | `OPS_SMTP_PORT` default              |
+| **465**  | TCP   | Outbound           | SMTP implicit TLS                               | Selected when `OPS_SMTP_PORT=465`    |
+| **443**  | TCP   | Outbound           | Fracttal API + Google Fonts                     | Implicit, no port in any URL         |
+| **9333** | TCP   | Inbound (loopback) | Chrome DevTools Protocol — `browser-smoke.ts`   | Chrome, `127.0.0.1`                  |
+| **9336** | TCP   | Inbound (loopback) | Chrome DevTools Protocol — `browser-capture.ts` | Chrome, `127.0.0.1`                  |
 
 **Only two ports are ever published to the host: 8000 (prod) and 5173 (dev).**
 Everything else is outbound or loopback-only dev tooling.
@@ -34,13 +34,13 @@ Everything else is outbound or loopback-only dev tooling.
 Five ways to boot. The port is **never written in TypeScript** — it is decided
 entirely by which runner starts the process.
 
-| Run mode | Command | Server | Port | Bind |
-|----------|---------|--------|------|------|
-| Local dev | `deno task dev` | Vite HMR | **5173** | loopback (host) / `0.0.0.0` (Docker) |
-| Local prod-like | `deno task preview` | `deno serve` | **8000** | all interfaces |
-| Local prod | `deno task start` | `deno serve --env-file=.env` | **8000** | all interfaces |
-| Docker prod | `deno task docker:up` | `deno serve` in container | **8000** | published `0.0.0.0:8000` |
-| Docker dev | `deno task docker:dev` | Vite HMR in container | **5173** | published `0.0.0.0:5173` (+ inert 8000) |
+| Run mode        | Command                | Server                       | Port     | Bind                                    |
+| --------------- | ---------------------- | ---------------------------- | -------- | --------------------------------------- |
+| Local dev       | `deno task dev`        | Vite HMR                     | **5173** | loopback (host) / `0.0.0.0` (Docker)    |
+| Local prod-like | `deno task preview`    | `deno serve`                 | **8000** | all interfaces                          |
+| Local prod      | `deno task start`      | `deno serve --env-file=.env` | **8000** | all interfaces                          |
+| Docker prod     | `deno task docker:up`  | `deno serve` in container    | **8000** | published `0.0.0.0:8000`                |
+| Docker dev      | `deno task docker:dev` | Vite HMR in container        | **5173** | published `0.0.0.0:5173` (+ inert 8000) |
 
 Evidence that the port is implicit:
 
@@ -60,7 +60,7 @@ Evidence that the port is implicit:
 
 - **There is no `PORT` env var.** Neither `PORT`, `SERVER_PORT`, `APP_PORT`,
   `VITE_PORT`, nor `PGPORT` exists anywhere in the repo. `OPS_SMTP_PORT` is
-  the *only* env var whose name contains "PORT".
+  the _only_ env var whose name contains "PORT".
 - To change the app port you must edit the runner, not the app.
 - The client is port-agnostic: `PUBLIC_API_BASE_URL` is empty in `.env`, and
   `routes/index.tsx:48` falls back to `url.origin`, so the browser always
@@ -73,27 +73,27 @@ Evidence that the port is implicit:
 
 ### 3.1 Port 8000 — production app
 
-| Item | Value | Source |
-|------|-------|--------|
-| Server | `deno serve` (Fresh 2 production bundle) | `deno.jsonc:15` |
-| Bind | `deno serve` default — all interfaces | implicit |
-| `EXPOSE` | `EXPOSE 8000` | `Dockerfile:19` |
-| Docker publish | `"8000:8000"` | `compose.yml:24` |
-| Healthcheck target | `http://localhost:8000/api/health` | `compose.yml:31` |
-| Docs | `curl -s localhost:8000/api/health` | `compose.yml:12`, `readme.md:141`, `docs/API.md:393` |
+| Item               | Value                                    | Source                                               |
+| ------------------ | ---------------------------------------- | ---------------------------------------------------- |
+| Server             | `deno serve` (Fresh 2 production bundle) | `deno.jsonc:15`                                      |
+| Bind               | `deno serve` default — all interfaces    | implicit                                             |
+| `EXPOSE`           | `EXPOSE 8000`                            | `Dockerfile:19`                                      |
+| Docker publish     | `"8000:8000"`                            | `compose.yml:24`                                     |
+| Healthcheck target | `http://localhost:8000/api/health`       | `compose.yml:31`                                     |
+| Docs               | `curl -s localhost:8000/api/health`      | `compose.yml:12`, `readme.md:141`, `docs/API.md:393` |
 
 `deno serve` is started with full permissions (`-A`). `EXPOSE 8000` matches
 the publish and the `deno serve` default.
 
 ### 3.2 Port 5173 — dev app with HMR
 
-| Item | Value | Source |
-|------|-------|--------|
-| Server | Vite + `@fresh/plugin-vite` | `deno.jsonc:12`, `vite.config.ts:6` |
-| Bind | Vite default = loopback on bare `deno task dev`; `0.0.0.0` in Docker via `--host` | `compose.dev.yml:16,18` |
-| Docker publish | `"5173:5173"` | `compose.dev.yml:27` |
-| Browser tool default target | `http://localhost:5173/` | `scripts/browser-capture.ts:9`, `scripts/browser-smoke.ts:6,11` |
-| Docs | `http://localhost:5173/login` | `readme.md:121,124,148`, `docs/ARCHITECTURE.md:31` |
+| Item                        | Value                                                                             | Source                                                          |
+| --------------------------- | --------------------------------------------------------------------------------- | --------------------------------------------------------------- |
+| Server                      | Vite + `@fresh/plugin-vite`                                                       | `deno.jsonc:12`, `vite.config.ts:6`                             |
+| Bind                        | Vite default = loopback on bare `deno task dev`; `0.0.0.0` in Docker via `--host` | `compose.dev.yml:16,18`                                         |
+| Docker publish              | `"5173:5173"`                                                                     | `compose.dev.yml:27`                                            |
+| Browser tool default target | `http://localhost:5173/`                                                          | `scripts/browser-capture.ts:9`, `scripts/browser-smoke.ts:6,11` |
+| Docs                        | `http://localhost:5173/login`                                                     | `readme.md:121,124,148`, `docs/ARCHITECTURE.md:31`              |
 
 `5173` is the **most duplicated port in the repo** (11 locations) and the most
 likely to drift — see the change checklist in §10.
@@ -104,9 +104,9 @@ Both dev-only. Each script spawns its own headless Chrome and polls
 `/json/list` before opening a CDP WebSocket. The two ports are deliberately
 distinct so capture and smoke can run concurrently.
 
-| Script | CDP port | Spawn flag | Probe | Profile dir |
-|--------|----------|-----------|-------|--------------|
-| `scripts/browser-smoke.ts` | **9333** | `--remote-debugging-port=9333` (`:51`) | `http://127.0.0.1:9333/json/list` (`:63`) | `/tmp/opencode/chrome-profile` (`:13`) |
+| Script                       | CDP port | Spawn flag                             | Probe                                     | Profile dir                            |
+| ---------------------------- | -------- | -------------------------------------- | ----------------------------------------- | -------------------------------------- |
+| `scripts/browser-smoke.ts`   | **9333** | `--remote-debugging-port=9333` (`:51`) | `http://127.0.0.1:9333/json/list` (`:63`) | `/tmp/opencode/chrome-profile` (`:13`) |
 | `scripts/browser-capture.ts` | **9336** | `--remote-debugging-port=9336` (`:33`) | `http://127.0.0.1:9336/json/list` (`:45`) | `/tmp/opencode/chrome-capture` (`:34`) |
 
 Both poll 50 × 200 ms (10 s max) waiting for Chrome to come up, then kill the
@@ -127,13 +127,13 @@ Postgres, Fracttal, and SMTP and never accept any. Note that `docker ps` shows
 
 ### 4.1 Port 5432 — PostgreSQL
 
-| Item | Value | Source |
-|------|-------|--------|
-| Driver | `@db/postgres@^0.19.5` (`Pool`, no ORM) | `deno.jsonc:48`, `lib/server/db.ts:5` |
-| Code default | `port: url.port === "" ? 5432 : Number(url.port)` | `lib/server/db.ts:33` |
-| Live `.env` | `postgres://seacrest:****@167.234.249.7:5432/automation` | `.env:44` |
-| `.env.example` | `postgres://user:password@localhost:5432/barreiras` | `.env.example:35` |
-| Pool size | 10 (lazy), 1 for scripts | `lib/server/db.ts:39,44`; `scripts/migrate.ts:115` |
+| Item           | Value                                                    | Source                                             |
+| -------------- | -------------------------------------------------------- | -------------------------------------------------- |
+| Driver         | `@db/postgres@^0.19.5` (`Pool`, no ORM)                  | `deno.jsonc:48`, `lib/server/db.ts:5`              |
+| Code default   | `port: url.port === "" ? 5432 : Number(url.port)`        | `lib/server/db.ts:33`                              |
+| Live `.env`    | `postgres://seacrest:****@167.234.249.7:5432/automation` | `.env:44`                                          |
+| `.env.example` | `postgres://user:password@localhost:5432/barreiras`      | `.env.example:35`                                  |
+| Pool size      | 10 (lazy), 1 for scripts                                 | `lib/server/db.ts:39,44`; `scripts/migrate.ts:115` |
 
 **No PostgreSQL service exists in this repository.** There is no `postgres`
 image, no DB `depends_on`, and no DB volume in either compose file. The DB is
@@ -147,7 +147,7 @@ that is not `localhost` / `127.0.0.1` / `::1` / `[::1]` and has no
 with no `sslmode`, so **every connection attempts a TLS handshake first**.
 
 **Is `DATABASE_URL` required to boot?** No — the pool is lazy
-(`lib/server/db.ts:83-91`) and `loadServerConfig()` runs *per API request*,
+(`lib/server/db.ts:83-91`) and `loadServerConfig()` runs _per API request_,
 not at process start. But with `PUBLIC_API_MODE=http` and no
 `DATABASE_URL`, `loadServerConfig` throws (`lib/server/config.ts:31-36`) and
 every `/api/*` route returns a 500 naming the variable. `/api/health` never
@@ -156,16 +156,16 @@ completely broken or unreachable database.**
 
 ### 4.2 Ports 587 / 465 — SMTP relay
 
-| Item | Value | Source |
-|------|-------|--------|
-| Client | Raw socket, hand-rolled SMTP (not `fetch`) | `lib/server/fracttal/smtp.ts` |
-| Implicit TLS | `Deno.connectTls({ hostname, port })` | `smtp.ts:35` |
-| Plain + STARTTLS | `Deno.connect({ hostname, port })` → `Deno.startTls(...)` | `smtp.ts:36,39` |
-| Port default (alerts) | `Number(get("OPS_SMTP_PORT")) \|\| 587` | `lib/server/alerts/mailer.ts:64` |
-| Port default (ops mail) | `Number(get("OPS_SMTP_PORT") ?? 587)` | `lib/server/fracttal/notify.ts:80` |
-| 465 rule | `secure: port === 465` / `config.port === 465` | `mailer.ts:68`, `notify.ts:85`, `smtp.ts:328` |
-| Live `.env` | `OPS_SMTP_HOST=smtp.gmail.com`, `OPS_SMTP_PORT=587` | `.env:88-89` |
-| Defaults in template | 587; presets for Gmail and Office365 | `.env.example:81,88-89,95-96` |
+| Item                    | Value                                                     | Source                                        |
+| ----------------------- | --------------------------------------------------------- | --------------------------------------------- |
+| Client                  | Raw socket, hand-rolled SMTP (not `fetch`)                | `lib/server/fracttal/smtp.ts`                 |
+| Implicit TLS            | `Deno.connectTls({ hostname, port })`                     | `smtp.ts:35`                                  |
+| Plain + STARTTLS        | `Deno.connect({ hostname, port })` → `Deno.startTls(...)` | `smtp.ts:36,39`                               |
+| Port default (alerts)   | `Number(get("OPS_SMTP_PORT")) \|\| 587`                   | `lib/server/alerts/mailer.ts:64`              |
+| Port default (ops mail) | `Number(get("OPS_SMTP_PORT") ?? 587)`                     | `lib/server/fracttal/notify.ts:80`            |
+| 465 rule                | `secure: port === 465` / `config.port === 465`            | `mailer.ts:68`, `notify.ts:85`, `smtp.ts:328` |
+| Live `.env`             | `OPS_SMTP_HOST=smtp.gmail.com`, `OPS_SMTP_PORT=587`       | `.env:88-89`                                  |
+| Defaults in template    | 587; presets for Gmail and Office365                      | `.env.example:81,88-89,95-96`                 |
 
 **465 is a sentinel, not a normal port.** The value is never used to decide
 "implicit TLS vs STARTTLS" by convention — it is a hard-coded equality check
@@ -187,12 +187,12 @@ Outbound SMTP is triggered from exactly two places, both best-effort inside
 
 All HTTPS; **no port appears in any URL**, so all of these are implicit 443.
 
-| Target | Purpose | Source |
-|--------|---------|--------|
-| `https://app.fracttal.com/api` | Fracttal data API (items, work orders, work requests) | `lib/server/config.ts:60`; `scripts/fracttal-poll.ts:69`, `fracttal-sync.ts:45`, `fracttal-force-sync.ts:38`, `fracttal-audit-stations.ts:32`, `fracttal-capture.ts:20` |
-| `https://one.fracttal.com/oauth/token` | OAuth2 client-credentials token | `lib/server/fracttal/client.ts:28` |
-| `https://fonts.googleapis.com` | Inter Tight / JetBrains Mono / Inter CSS | `routes/_app.tsx:49,62` |
-| `https://fonts.gstatic.com` | Font files | `routes/_app.tsx:52` |
+| Target                                 | Purpose                                               | Source                                                                                                                                                                  |
+| -------------------------------------- | ----------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `https://app.fracttal.com/api`         | Fracttal data API (items, work orders, work requests) | `lib/server/config.ts:60`; `scripts/fracttal-poll.ts:69`, `fracttal-sync.ts:45`, `fracttal-force-sync.ts:38`, `fracttal-audit-stations.ts:32`, `fracttal-capture.ts:20` |
+| `https://one.fracttal.com/oauth/token` | OAuth2 client-credentials token                       | `lib/server/fracttal/client.ts:28`                                                                                                                                      |
+| `https://fonts.googleapis.com`         | Inter Tight / JetBrains Mono / Inter CSS              | `routes/_app.tsx:49,62`                                                                                                                                                 |
+| `https://fonts.gstatic.com`            | Font files                                            | `routes/_app.tsx:52`                                                                                                                                                    |
 
 The Fracttal client applies a 15 s `AbortController` timeout, 3 retries,
 one-shot 401 refresh, 406/429 backoff honouring `ratelimit-reset`, and a
@@ -208,12 +208,12 @@ from the `poller` service and the `tools` one-offs.
 
 ### 5.1 `compose.yml` (production)
 
-| Service | Image | Command | Published ports | Healthcheck |
-|---------|-------|---------|-----------------|-------------|
-| `app` | `barrier-monitor:latest` (build `.`) | image `CMD` → `deno task start` | **`8000:8000`** (`:24`) | yes, `localhost:8000` (`:26-36`) |
-| `poller` | same | `run -A scripts/fracttal-poll.ts` | **none** | no |
-| `alerts` | same | `run -A scripts/alerts-poll.ts` | **none** | no |
-| `tools` | same | image `CMD`, invoked explicitly | **none** | no |
+| Service  | Image                                | Command                           | Published ports         | Healthcheck                      |
+| -------- | ------------------------------------ | --------------------------------- | ----------------------- | -------------------------------- |
+| `app`    | `barrier-monitor:latest` (build `.`) | image `CMD` → `deno task start`   | **`8000:8000`** (`:24`) | yes, `localhost:8000` (`:26-36`) |
+| `poller` | same                                 | `run -A scripts/fracttal-poll.ts` | **none**                | no                               |
+| `alerts` | same                                 | `run -A scripts/alerts-poll.ts`   | **none**                | no                               |
+| `tools`  | same                                 | image `CMD`, invoked explicitly   | **none**                | no                               |
 
 - Project name `barrier-monitor` (`compose.yml:13`) → network
   `barrier-monitor_default`, containers `barrier-monitor-app-1`,
@@ -228,11 +228,11 @@ from the `poller` service and the `tools` one-offs.
 
 ### 5.2 `compose.dev.yml` (dev override)
 
-| Service | Command | Published ports | Volumes | Healthcheck |
-|---------|---------|-----------------|---------|-------------|
-| `app` | `task dev --host --port 5173` | **`5173:5173`** (`:27`) | `./:/app`, `/app/node_modules`, `/app/_fresh`, `deno-dir:/deno-dir` | **disabled** (`:28-29`) |
-| `poller` | `run --watch -A scripts/fracttal-poll.ts` | **none** | same 4 | no |
-| `alerts` | `run --watch -A scripts/alerts-poll.ts` | **none** | same 4 | no |
+| Service  | Command                                   | Published ports         | Volumes                                                             | Healthcheck             |
+| -------- | ----------------------------------------- | ----------------------- | ------------------------------------------------------------------- | ----------------------- |
+| `app`    | `task dev --host --port 5173`             | **`5173:5173`** (`:27`) | `./:/app`, `/app/node_modules`, `/app/_fresh`, `deno-dir:/deno-dir` | **disabled** (`:28-29`) |
+| `poller` | `run --watch -A scripts/fracttal-poll.ts` | **none**                | same 4                                                              | no                      |
+| `alerts` | `run --watch -A scripts/alerts-poll.ts`   | **none**                | same 4                                                              | no                      |
 
 - Only the dev file declares a named volume: `deno-dir` (`:53-54`), real name
   `barrier-monitor_deno-dir`, mounted at `DENO_DIR: /deno-dir`. Keeps the Deno
@@ -294,33 +294,33 @@ listener.
 23 API routes plus 2 page routes. Every `/api/*` route except `/api/health`
 opens a Postgres connection on 5432. None of them contact Fracttal.
 
-| Route | Method(s) | Postgres | SMTP |
-|-------|-----------|----------|------|
-| `/api/health` | GET | no | no |
-| `/api/barriers` | GET | yes | no |
-| `/api/barriers/deleted` | GET | yes | no |
-| `/api/barriers/:id` | GET, PATCH | yes | **PATCH only** |
-| `/api/barriers/:id/status` | PATCH | yes | **yes** |
-| `/api/export` | GET, POST | yes | no |
-| `/api/kpi` | GET | yes | no |
-| `/api/chart` | GET | yes | no |
-| `/api/vocabularies` | GET | yes | no |
-| `/api/lookups` | GET | yes | no |
-| `/api/field-options` | GET, PUT | yes | no |
-| `/api/sync-status` | GET | yes | no |
-| `/api/sync-changes` | GET | yes | no |
-| `/api/users` | GET, POST | yes | no |
-| `/api/users/:id` | PATCH, DELETE | yes | no |
-| `/api/recipients` | GET, POST | yes | no |
-| `/api/recipients/:id` | PATCH, DELETE | yes | no |
-| `/api/alert-rules` | GET, POST | yes | no |
-| `/api/alert-rules/:id` | PATCH, DELETE | yes | no |
-| `/api/auth/login` | POST | yes | no |
-| `/api/auth/logout` | POST | yes | no |
-| `/api/auth/me` | GET | yes | no |
-| `/api/auth/password` | POST | yes | no |
-| `/` (page) | GET | yes | no |
-| `/login` (page) | GET | yes | no |
+| Route                      | Method(s)     | Postgres | SMTP           |
+| -------------------------- | ------------- | -------- | -------------- |
+| `/api/health`              | GET           | no       | no             |
+| `/api/barriers`            | GET           | yes      | no             |
+| `/api/barriers/deleted`    | GET           | yes      | no             |
+| `/api/barriers/:id`        | GET, PATCH    | yes      | **PATCH only** |
+| `/api/barriers/:id/status` | PATCH         | yes      | **yes**        |
+| `/api/export`              | GET, POST     | yes      | no             |
+| `/api/kpi`                 | GET           | yes      | no             |
+| `/api/chart`               | GET           | yes      | no             |
+| `/api/vocabularies`        | GET           | yes      | no             |
+| `/api/lookups`             | GET           | yes      | no             |
+| `/api/field-options`       | GET, PUT      | yes      | no             |
+| `/api/sync-status`         | GET           | yes      | no             |
+| `/api/sync-changes`        | GET           | yes      | no             |
+| `/api/users`               | GET, POST     | yes      | no             |
+| `/api/users/:id`           | PATCH, DELETE | yes      | no             |
+| `/api/recipients`          | GET, POST     | yes      | no             |
+| `/api/recipients/:id`      | PATCH, DELETE | yes      | no             |
+| `/api/alert-rules`         | GET, POST     | yes      | no             |
+| `/api/alert-rules/:id`     | PATCH, DELETE | yes      | no             |
+| `/api/auth/login`          | POST          | yes      | no             |
+| `/api/auth/logout`         | POST          | yes      | no             |
+| `/api/auth/me`             | GET           | yes      | no             |
+| `/api/auth/password`       | POST          | yes      | no             |
+| `/` (page)                 | GET           | yes      | no             |
+| `/login` (page)            | GET           | yes      | no             |
 
 There is **no `_middleware.ts`** in the repo; auth is enforced per route.
 `GET /api/health` (`routes/api/health.ts:6-11`) imports nothing from
@@ -348,55 +348,55 @@ not a separate port or protocol.
 
 ### Client polling cadence
 
-| Consumer | Interval | Endpoint | Source |
-|----------|----------|----------|--------|
-| Header connection dot | 5 s | `/api/health` | `hooks/useConnection.ts:17,106-108` |
-| Dashboard data refresh | 300 s (5 min) | data + `/api/vocabularies` | `hooks/dashboard/server.ts:335-354` |
-| Sync pill (idle) | 60 s | `/api/sync-status` | `hooks/dashboard/sync-status.ts:50-53` |
-| Sync pill (syncing) | 15 s | `/api/sync-status` | `islands/dashboard/DashboardView.tsx:152` |
-| Sync hover card | 60 s | `/api/sync-changes?limit=8` | `hooks/dashboard/sync-changes.ts:44-47` |
+| Consumer               | Interval      | Endpoint                    | Source                                    |
+| ---------------------- | ------------- | --------------------------- | ----------------------------------------- |
+| Header connection dot  | 5 s           | `/api/health`               | `hooks/useConnection.ts:17,106-108`       |
+| Dashboard data refresh | 300 s (5 min) | data + `/api/vocabularies`  | `hooks/dashboard/server.ts:335-354`       |
+| Sync pill (idle)       | 60 s          | `/api/sync-status`          | `hooks/dashboard/sync-status.ts:50-53`    |
+| Sync pill (syncing)    | 15 s          | `/api/sync-status`          | `islands/dashboard/DashboardView.tsx:152` |
+| Sync hover card        | 60 s          | `/api/sync-changes?limit=8` | `hooks/dashboard/sync-changes.ts:44-47`   |
 
 All of these are same-origin and pause on hidden tabs.
 
 ### Background loop cadence (not ports, but the outbound consumers)
 
-| Loop | Default | Min | Env var |
-|------|---------|-----|---------|
-| Fracttal poller | 300 s | 5 s | `FRACTTAL_POLL_SECONDS` (`scripts/fracttal-poll.ts:87`) |
-| Alert digest | 900 s | 60 s | `ALERTS_POLL_SECONDS` (`scripts/alerts-poll.ts:52`) |
+| Loop            | Default | Min  | Env var                                                 |
+| --------------- | ------- | ---- | ------------------------------------------------------- |
+| Fracttal poller | 300 s   | 5 s  | `FRACTTAL_POLL_SECONDS` (`scripts/fracttal-poll.ts:87`) |
+| Alert digest    | 900 s   | 60 s | `ALERTS_POLL_SECONDS` (`scripts/alerts-poll.ts:52`)     |
 
 ---
 
 ## 8. Per-service network summary
 
-| Component | Listens | → Postgres 5432 | → Fracttal 443 | → SMTP 587 | → Fonts 443 |
-|-----------|---------|-----------------|----------------|------------|-------------|
-| `app` (8000 / 5173) | **8000 / 5173** | yes, all routes but `/api/health` | no | yes, on immediate rule match | yes (browser) |
-| `poller` | nothing | yes | yes | yes, on failure only | no |
-| `alerts` | nothing | yes | no | yes, digests | no |
-| `tools` | nothing | yes | yes (sync/audit/import) | no | no |
-| `browser-capture.ts` | 9336 (Chrome) | no | no | no | no |
-| `browser-smoke.ts` | 9333 (Chrome) | no | no | no | no |
+| Component            | Listens         | → Postgres 5432                   | → Fracttal 443          | → SMTP 587                   | → Fonts 443   |
+| -------------------- | --------------- | --------------------------------- | ----------------------- | ---------------------------- | ------------- |
+| `app` (8000 / 5173)  | **8000 / 5173** | yes, all routes but `/api/health` | no                      | yes, on immediate rule match | yes (browser) |
+| `poller`             | nothing         | yes                               | yes                     | yes, on failure only         | no            |
+| `alerts`             | nothing         | yes                               | no                      | yes, digests                 | no            |
+| `tools`              | nothing         | yes                               | yes (sync/audit/import) | no                           | no            |
+| `browser-capture.ts` | 9336 (Chrome)   | no                                | no                      | no                           | no            |
+| `browser-smoke.ts`   | 9333 (Chrome)   | no                                | no                      | no                           | no            |
 
 ---
 
 ## 9. Env vars that affect networking
 
-| Variable | Default | Affects | Source |
-|----------|---------|---------|--------|
-| `DATABASE_URL` | none (throws in `http` mode) | Postgres host + port (default 5432) | `lib/server/config.ts:30`, `lib/server/db.ts:19,33` |
-| `PUBLIC_API_MODE` | `mock` | `mock` vs `http` adapter | `lib/server/config.ts:29` |
-| `PUBLIC_API_BASE_URL` | `""` = same-origin | browser → API origin (port-agnostic) | `lib/api.ts:35`, `routes/index.tsx:48` |
-| `FRACTTAL_BASE_URL` | `https://app.fracttal.com/api` | Fracttal data host | `lib/server/config.ts:59-60` |
-| `FRACTTAL_KEY` / `FRACTTAL_SECRET` | none (throws) | OAuth2 client credentials | `lib/server/config.ts:48-49,50-54` |
-| `OPS_SMTP_HOST` / `MAIL_HOST` | none (throws) | SMTP host | `mailer.ts:57`, `notify.ts:77` |
-| `OPS_SMTP_PORT` | `587` | **SMTP port; 465 = implicit TLS** | `mailer.ts:64`, `notify.ts:80` |
-| `OPS_SMTP_USER` / `MAIL_USER` | — | SMTP AUTH | `mailer.ts:63`, `notify.ts:81` |
-| `OPS_SMTP_PASS` / `MAIL_PASS` | — | SMTP AUTH | `mailer.ts:70`, `notify.ts:87` |
-| `OPS_EMAIL_TO` | none (null config) | required for ops-failure mail | `notify.ts:78-79` |
-| `OPS_EMAIL_FROM` | falls back to user | `MAIL FROM` | `mailer.ts:71`, `notify.ts:88` |
-| `DENO_DIR` | `/deno-dir` (image default) | cache volume, dev only | `compose.dev.yml:24,39,50` |
-| `CHROME_BIN` | `/tmp/opencode/.../chrome-headless-shell` | Chrome binary (not a port) | `browser-capture.ts:17` |
+| Variable                           | Default                                   | Affects                              | Source                                              |
+| ---------------------------------- | ----------------------------------------- | ------------------------------------ | --------------------------------------------------- |
+| `DATABASE_URL`                     | none (throws in `http` mode)              | Postgres host + port (default 5432)  | `lib/server/config.ts:30`, `lib/server/db.ts:19,33` |
+| `PUBLIC_API_MODE`                  | `mock`                                    | `mock` vs `http` adapter             | `lib/server/config.ts:29`                           |
+| `PUBLIC_API_BASE_URL`              | `""` = same-origin                        | browser → API origin (port-agnostic) | `lib/api.ts:35`, `routes/index.tsx:48`              |
+| `FRACTTAL_BASE_URL`                | `https://app.fracttal.com/api`            | Fracttal data host                   | `lib/server/config.ts:59-60`                        |
+| `FRACTTAL_KEY` / `FRACTTAL_SECRET` | none (throws)                             | OAuth2 client credentials            | `lib/server/config.ts:48-49,50-54`                  |
+| `OPS_SMTP_HOST` / `MAIL_HOST`      | none (throws)                             | SMTP host                            | `mailer.ts:57`, `notify.ts:77`                      |
+| `OPS_SMTP_PORT`                    | `587`                                     | **SMTP port; 465 = implicit TLS**    | `mailer.ts:64`, `notify.ts:80`                      |
+| `OPS_SMTP_USER` / `MAIL_USER`      | —                                         | SMTP AUTH                            | `mailer.ts:63`, `notify.ts:81`                      |
+| `OPS_SMTP_PASS` / `MAIL_PASS`      | —                                         | SMTP AUTH                            | `mailer.ts:70`, `notify.ts:87`                      |
+| `OPS_EMAIL_TO`                     | none (null config)                        | required for ops-failure mail        | `notify.ts:78-79`                                   |
+| `OPS_EMAIL_FROM`                   | falls back to user                        | `MAIL FROM`                          | `mailer.ts:71`, `notify.ts:88`                      |
+| `DENO_DIR`                         | `/deno-dir` (image default)               | cache volume, dev only               | `compose.dev.yml:24,39,50`                          |
+| `CHROME_BIN`                       | `/tmp/opencode/.../chrome-headless-shell` | Chrome binary (not a port)           | `browser-capture.ts:17`                             |
 
 `deno task test` is the only task with scoped net permission:
 `--allow-net=127.0.0.1,localhost` (`deno.jsonc:11`), so integration tests

@@ -24,7 +24,7 @@ import { PDF_PART_ROWS, refusalMessage } from "../../lib/export/limits.ts";
 import { exportThrottle, routeClientKey } from "../../lib/server/throttle.ts";
 import { EXPORT_MAX_ROWS, XLS_SHEET_ROWS } from "../../lib/export/limits.ts";
 import { checkDbThrottle } from "../../lib/server/sql/throttle.ts";
-import { isFmt, FMT_EXT, FMT_MIME } from "../../lib/export/format.ts";
+import { FMT_EXT, FMT_MIME, isFmt } from "../../lib/export/format.ts";
 import { loadServerConfig } from "../../lib/server/config.ts";
 import { streamExportCsv } from "../../lib/server/exportCsv.ts";
 import { streamExportXls } from "../../lib/server/exportXls.ts";
@@ -54,11 +54,13 @@ interface ExportRequest {
 // filtered scope, so a bad body can never widen or narrow it silently.
 function parseIds(raw: unknown): number[] | undefined {
   if (!Array.isArray(raw)) return undefined;
-  const ids = [...new Set(
-    raw.filter((n): n is number =>
-      typeof n === "number" && Number.isSafeInteger(n) && n > 0
+  const ids = [
+    ...new Set(
+      raw.filter((n): n is number =>
+        typeof n === "number" && Number.isSafeInteger(n) && n > 0
+      ),
     ),
-  )];
+  ];
   if (ids.length === 0) return undefined;
   return ids.slice(0, EXPORT_MAX_ROWS);
 }
@@ -155,7 +157,10 @@ async function stream(
     // Past the ceiling the file stops being a download: say so with the real
     // count instead of silently cutting rows.
     if (scope.kpi.total > EXPORT_MAX_ROWS) {
-      return badRequest(refusalMessage("Exportação", scope.kpi.total), requestId);
+      return badRequest(
+        refusalMessage("Exportação", scope.kpi.total),
+        requestId,
+      );
     }
     return respond(req, scope, getCompanyName(), requestId);
   } catch (err) {
@@ -198,7 +203,10 @@ function respond(
     headers["x-export-parts"] = String(parts);
     return new Response(
       streamPrintReport(
-        exportBatches(scope, { offset: (part - 1) * PDF_PART_ROWS, limit: PDF_PART_ROWS }),
+        exportBatches(scope, {
+          offset: (part - 1) * PDF_PART_ROWS,
+          limit: PDF_PART_ROWS,
+        }),
         {
           companyName,
           kpi: scope.kpi,
@@ -223,7 +231,8 @@ function fileHeaders(
   return {
     ...base,
     "content-type": FMT_MIME[format],
-    "content-disposition":
-      `${disposition}; filename="barreiras${FMT_EXT[format]}"`,
+    "content-disposition": `${disposition}; filename="barreiras${
+      FMT_EXT[format]
+    }"`,
   };
 }

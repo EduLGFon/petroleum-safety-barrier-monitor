@@ -12,7 +12,7 @@ import {
   xlsSheetOpen,
   xlsSummary,
 } from "../export/excelHtml.ts";
-import { summaryRowsFrom, kpiStatsFrom } from "../export/summary.ts";
+import { kpiStatsFrom, summaryRowsFrom } from "../export/summary.ts";
 import { textStream } from "./exportStream.ts";
 import { XLS_SHEET_ROWS } from "../export/limits.ts";
 import type { Barrier, KpiSnapshot } from "../types.ts";

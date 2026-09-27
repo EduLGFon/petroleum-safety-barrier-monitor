@@ -329,7 +329,7 @@ toWireQuery({ location: "FAL", availability: "Degradado", page: 1 });
 | `lib/constants/helpers.ts`           | `isCompliant()` + `distinctBy()`                                                                              |
 | `lib/constants/colors.ts`            | Colors per status + `DISP_KNOWN_ORDER`, `shortStatusLabel`                                                    |
 | `lib/server/db.ts`                   | Lazy server-only Postgres pool (`globalThis.__barrierPool`)                                                   |
-| `lib/server/sql/barriers.ts`         | `listBarriers`, `listBarrierWindow` (export paging), `getBarrierById`, `getKpi`, `transitionBarrierStatus`        |
+| `lib/server/sql/barriers.ts`         | `listBarriers`, `listBarrierWindow` (export paging), `getBarrierById`, `getKpi`, `transitionBarrierStatus`    |
 | `lib/server/sql/chart.ts`            | `getChartData` (`GROUP BY category_id`)                                                                       |
 | `lib/server/sql/vocabularies.ts`     | `getVocabularies()` (SSR seed + `GET /api/vocabularies` refresh)                                              |
 | `lib/server/sql/where.ts`            | `buildWhere`, `resolveOrderBy` (whitelist), `escapeLike`                                                      |
@@ -339,7 +339,7 @@ toWireQuery({ location: "FAL", availability: "Degradado", page: 1 });
 | `routes/api/barriers/deleted.ts`     | `GET /api/barriers/deleted` (deleted only, requires `ADMIN_TOKEN`)                                            |
 | `routes/api/barriers/[id].ts`        | `GET /api/barriers/:id` (session/token, read throttle)                                                        |
 | `routes/api/barriers/[id]/status.ts` | `PATCH /api/barriers/:id/status` (requires admin, write throttle; author derives from session)                |
-| `routes/api/export.ts`               | `GET/POST /api/export` (csv/xls/pdf; session/token, export throttle, streamed, selection via `ids`)             |
+| `routes/api/export.ts`               | `GET/POST /api/export` (csv/xls/pdf; session/token, export throttle, streamed, selection via `ids`)           |
 | `routes/api/kpi.ts`                  | `GET /api/kpi` (session/token, read throttle)                                                                 |
 | `routes/api/chart.ts`                | `GET /api/chart` (session/token, read throttle)                                                               |
 | `routes/api/sync-status.ts`          | `GET /api/sync-status` (session/token, read throttle; dashboard indicator)                                    |
@@ -366,11 +366,11 @@ toWireQuery({ location: "FAL", availability: "Degradado", page: 1 });
 | `lib/server/auth.ts`                 | `checkAdminAuth` (Bearer) + `resolveRequestAuth`/`requireAdminAuth`/`requireAuthenticated` (session or token) |
 | `lib/server/throttle.ts`             | `createThrottle` (fixed window, no deps) + per-route buckets                                                  |
 | `lib/server/sql/throttle.ts`         | Postgres `throttle_buckets` budget shared across isolates (memory fallback)                                   |
-| `lib/server/exportRows.ts`           | `resolveExportScope` (scope KPI) + `exportBatches` (5,000-row paged batches)                                    |
-| `lib/server/exportStream.ts`         | `textStream` (head / batch / tail skeleton shared by the three formats)                                          |
-| `lib/server/exportCsv.ts`            | `streamExportCsv` (BOM + `row()` + `summaryRowsFrom()`)                                                         |
-| `lib/server/exportXls.ts`            | `streamExportXls` (worksheet split at `XLS_SHEET_ROWS`)                                                          |
-| `lib/server/exportPdf.ts`            | `streamPrintReport` (one print part)                                                                             |
+| `lib/server/exportRows.ts`           | `resolveExportScope` (scope KPI) + `exportBatches` (5,000-row paged batches)                                  |
+| `lib/server/exportStream.ts`         | `textStream` (head / batch / tail skeleton shared by the three formats)                                       |
+| `lib/server/exportCsv.ts`            | `streamExportCsv` (BOM + `row()` + `summaryRowsFrom()`)                                                       |
+| `lib/server/exportXls.ts`            | `streamExportXls` (worksheet split at `XLS_SHEET_ROWS`)                                                       |
+| `lib/server/exportPdf.ts`            | `streamPrintReport` (one print part)                                                                          |
 | `lib/server/sql/recipients.ts`       | CRUD `alert_recipients` (pure validation + thin store)                                                        |
 | `lib/server/sql/users.ts`            | CRUD `users` (roles, last-admin guard, no hashes in JSON)                                                     |
 | `lib/server/sql/sessions.ts`         | Opaque `sessions` (hash lookup, revoke, expiry sweep)                                                         |

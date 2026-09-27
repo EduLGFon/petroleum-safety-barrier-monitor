@@ -218,7 +218,14 @@ export function useServerDashboard(
     return () => {
       cancelled = true;
     };
-  }, [adapter, hydrated, scopeQuery, filters.page, filters.pageSize, reloadKey]);
+  }, [
+    adapter,
+    hydrated,
+    scopeQuery,
+    filters.page,
+    filters.pageSize,
+    reloadKey,
+  ]);
 
   // Station metadata comes from the seed list when known; stations added
   // later fall back to their own code so details never render undefined.

@@ -380,7 +380,7 @@ to the log with the request id.
 | `GET`            | `/api/barriers/deleted`    | admin       | Audit view of soft-deleted rows                                  |
 | `GET`            | `/api/kpi`                 | data        | KPI snapshot for the filter subset (minus paging/sorting)        |
 | `GET`            | `/api/chart`               | data        | Per-category compliant/total                                     |
-| `GET`, `POST`     | `/api/export`              | data        | Streamed CSV / XLS / print report over the whole selection          |
+| `GET`, `POST`    | `/api/export`              | data        | Streamed CSV / XLS / print report over the whole selection       |
 | `GET`            | `/api/vocabularies`        | data        | Filter vocabularies for the background refresh                   |
 | `GET`            | `/api/lookups`             | any session | Id-bearing lists that feed the admin forms                       |
 | `GET`            | `/api/field-options`       | data        | Curated answer lists per sheet question                          |
@@ -604,11 +604,11 @@ Every format covers the whole selection - including a cross-page selection
 that the browser never loaded - and the rows are streamed from the database,
 so the file size never depends on the page size.
 
-| Format | Scope              | Ceiling                | Contents                                                                                                                                        |
-| ------ | ------------------ | ---------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
-| CSV    | whole selection    | 200 000 rows per export | 30 columns, UTF-8 BOM, semicolon separated, plus a `RESUMO` KPI block. Byte-identical whether produced in the browser or streamed by the server |
-| XLS    | whole selection    | 200 000 rows per export | Branded header, KPI strip, styled columns, auto-fitted widths, status chips, summary table. Split into worksheets past 65 536 rows (Excel's sheet limit) |
-| PDF    | whole selection    | 200 000 rows per export | Landscape print report with repeating table headers and KPI chips, printed in parts of 2 000 rows (one print dialog per part)                |
+| Format | Scope           | Ceiling                 | Contents                                                                                                                                                 |
+| ------ | --------------- | ----------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| CSV    | whole selection | 200 000 rows per export | 30 columns, UTF-8 BOM, semicolon separated, plus a `RESUMO` KPI block. Byte-identical whether produced in the browser or streamed by the server          |
+| XLS    | whole selection | 200 000 rows per export | Branded header, KPI strip, styled columns, auto-fitted widths, status chips, summary table. Split into worksheets past 65 536 rows (Excel's sheet limit) |
+| PDF    | whole selection | 200 000 rows per export | Landscape print report with repeating table headers and KPI chips, printed in parts of 2 000 rows (one print dialog per part)                            |
 
 Past 200 000 rows the export is refused with the real count so the filters can
 be narrowed - nothing is ever cut silently. The selection is intersected with

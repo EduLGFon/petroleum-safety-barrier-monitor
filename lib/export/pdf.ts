@@ -3,11 +3,7 @@
 // a dedicated report node with print CSS (see static/styles.css) prints
 // only the data table. Markup lives in pdfHtml.ts so the server streams the
 // same report for the print job of a huge selection.
-import {
-  printDocClose,
-  printDocOpen,
-  printRow,
-} from "./pdfHtml.ts";
+import { printDocClose, printDocOpen, printRow } from "./pdfHtml.ts";
 
 import type { PrintPart } from "./pdfHtml.ts";
 
@@ -119,14 +115,14 @@ export function exportToPDF(
   assertBrowser();
   return printPdfParts(
     barriers.length,
-    async (part) => {
-      const at = (part - 1) * PDF_PART_ROWS;
-      return buildPrintReport(
-        barriers.slice(at, at + PDF_PART_ROWS),
-        companyName,
-        { index: part, parts: pdfPartCount(barriers.length), total: barriers.length },
-      );
-    },
+    (part, parts) =>
+      Promise.resolve(
+        buildPrintReport(
+          barriers.slice((part - 1) * PDF_PART_ROWS, part * PDF_PART_ROWS),
+          companyName,
+          { index: part, parts, total: barriers.length },
+        ),
+      ),
     filename,
   );
 }

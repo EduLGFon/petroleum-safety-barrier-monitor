@@ -152,8 +152,12 @@ export function xlsRow(b: Barrier, idx: number, cells: string[]): string {
         escHtml(v)
       }</td>`;
     }
-    if (ci === 8) return `<td style="${base}text-align:center;">${pill(v, disp)}</td>`;
-    if (ci === 10) return `<td style="${base}text-align:center;">${pill(v, conf)}</td>`;
+    if (ci === 8) {
+      return `<td style="${base}text-align:center;">${pill(v, disp)}</td>`;
+    }
+    if (ci === 10) {
+      return `<td style="${base}text-align:center;">${pill(v, conf)}</td>`;
+    }
     if (ci === 6) {
       const c = CRIT_COLORS[String(b.criticality)]?.solid ?? "#64748B";
       const extra = isCrit ? `background:${c}1F;font-weight:bold;` : "";

@@ -72,7 +72,9 @@ async function requestPart(
 // exportFromServer: runs the export for the whole selection. csv/xls come
 // back as one file; pdf is fetched part by part and printed in order, so a
 // selection too large for one print job still comes out complete.
-export async function exportFromServer(req: ServerExportRequest): Promise<void> {
+export async function exportFromServer(
+  req: ServerExportRequest,
+): Promise<void> {
   if (!req.baseUrl) throw new Error("Exportação indisponível (sem baseUrl)");
   if (req.kind === "pdf") return printServerParts(req);
   const { res } = await requestPart(req, 1);

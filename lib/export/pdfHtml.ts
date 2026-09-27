@@ -70,9 +70,7 @@ export function printDocOpen(
     chip("Não conformes", stats.nonCompliant, "#FEF2F2", "#B91C1C") +
     chip("Críticas NC", stats.critical, "#FFF7ED", "#C2410C") +
     `</div>` +
-    `<table style="width:100%;border-collapse:collapse;margin-top:6px;"><thead style="display:table-header-group;"><tr>${
-      printTableHead()
-    }</tr></thead><tbody>`;
+    `<table style="width:100%;border-collapse:collapse;margin-top:6px;"><thead style="display:table-header-group;"><tr>${printTableHead()}</tr></thead><tbody>`;
 }
 
 export function printDocClose(companyName: string): string {

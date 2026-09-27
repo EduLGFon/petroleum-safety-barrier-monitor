@@ -8,7 +8,7 @@ import { getResolverLabels } from "./sql/vocabularies.ts";
 import { getKpi, listBarrierWindow } from "./sql/barriers.ts";
 import { resolveBarriers, resolveKpi } from "../resolve.ts";
 import type { ResolverLabels } from "../resolve.ts";
-import type { KpiSnapshot, Barrier } from "../types.ts";
+import type { Barrier, KpiSnapshot } from "../types.ts";
 import type { BarriersQuery } from "../wireTypes.ts";
 
 export interface ExportScope {
