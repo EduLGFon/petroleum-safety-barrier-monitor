@@ -2,6 +2,7 @@
 // This is why it exists: one home for the client-side query pipeline plus
 // the sanitizers that keep corrupt persisted state from wedging the grid.
 import type { Barrier, FilterState, SortableColumn } from "../types.ts";
+import { isCriticalRankLabel } from "../enums/codes.ts";
 import { PAGE_SIZE_OPTS } from "../constants.ts";
 
 // Applies case-insensitive query (tag/location/category) plus exact filters; empty strings mean no filter.
@@ -22,6 +23,9 @@ export function applyFilters(b: Barrier[], f: FilterState): Barrier[] {
   if (f.category) d = d.filter((x) => x.category === f.category);
   if (f.typology) d = d.filter((x) => x.typology === f.typology);
   if (f.criticality) d = d.filter((x) => x.criticality === f.criticality);
+  if (f.criticalOnly === true) {
+    d = d.filter((x) => isCriticalRankLabel(x.criticality));
+  }
   if (f.plan === "Com plano") d = d.filter((x) => x.actionPlan.trim() !== "");
   else if (f.plan === "Sem plano") {
     d = d.filter((x) => x.actionPlan.trim() === "");
@@ -72,7 +76,8 @@ export function paginate<T>(a: T[], p: number, s: number): T[] {
   return a.slice((p - 1) * s, p * s);
 }
 
-// Returns a fresh default FilterState (page 1, 25 rows, sort by id asc); new object each call.
+// Returns a fresh default FilterState (page 1, 25 rows, sort by id asc,
+// critical tiers only); new object each call.
 export function defaultFilters(): FilterState {
   return {
     query: "",
@@ -81,6 +86,7 @@ export function defaultFilters(): FilterState {
     category: "",
     typology: "",
     criticality: "",
+    criticalOnly: true,
     plan: "",
     since: "",
     until: "",
@@ -126,6 +132,10 @@ export function sanitizeFilterPatch(raw: unknown): Partial<FilterState> {
   if (typo !== undefined) patch.typology = typo;
   const crit = text(r.criticality);
   if (crit !== undefined) patch.criticality = crit;
+  if (typeof r.criticalOnly === "boolean") patch.criticalOnly = r.criticalOnly;
+  // Conflict from the old checkbox UI (explicit rank + gate on): the rank
+  // wins, otherwise B/C/D rows would self-empty with no way to see why.
+  if (patch.criticality && patch.criticalOnly) patch.criticalOnly = false;
   const plan = text(r.plan);
   if (plan === "Com plano" || plan === "Sem plano" || plan === "") {
     patch.plan = plan;

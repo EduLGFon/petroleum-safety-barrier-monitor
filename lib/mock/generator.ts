@@ -36,6 +36,26 @@ export function pickStatusId(r: number): number {
   return 0;
 }
 
+// ─── Criticality rank distribution (id-keyed, ESO > A > B > C > D) ───────
+
+const RANK_DIST: [number, number][] = [
+  [0, 0.12],
+  [1, 0.38],
+  [2, 0.2],
+  [3, 0.2],
+  [4, 0.1],
+];
+
+// Picks a rank id from RANK_DIST cumulative probabilities.
+export function pickRankId(r: number): number {
+  let cum = 0;
+  for (const [id, p] of RANK_DIST) {
+    cum += p;
+    if (r < cum) return id;
+  }
+  return 1;
+}
+
 // ─── Generator ────────────────────────────────────────────────────────────
 
 let _cache: WireBarrier[] | null = null;
@@ -76,8 +96,9 @@ export function getWireBarriers(): WireBarrier[] {
         typologyId: rng.int(0, typCount),
         locationId: loc.id,
         locDescId: rng.int(0, locDescCount),
-        // Sheet inventory is 100% critical barriers - mock mirrors that.
-        criticalityId: 1,
+        // Criticality rank spread across the ESO > A > B > C > D tiers so
+        // mock surfaces exercise every rank color and filter bucket.
+        criticalityId: pickRankId(rng.next()),
         categoryId,
         groupingId: rng.int(0, grpCount),
         ownerId: hasOwner ? rng.int(0, ownerCount) : -1,

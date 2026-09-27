@@ -4,16 +4,18 @@
 // fail-closed). One predicate keeps the dashboard count, the email digest
 // and the detector in agreement by construction - not a new rules engine,
 // just the existing rule extracted, tiered and ordered.
+import { isCriticalRankLabel } from "../enums/codes.ts";
+
 import type { Barrier } from "../types.ts";
 
 export type Urgency = "critical" | "urgent" | "none";
 
-// urgencyOf: tiers a barrier. Critical is non-compliant AND critical;
+// urgencyOf: tiers a barrier. Critical is non-compliant AND rank ESO/A;
 // urgent is any other non-compliant (fail-closed: novel statuses count,
 // same as computeKpi and the NcAlert card); compliant is none.
 export function urgencyOf(b: Barrier): Urgency {
   if (b.compliance === "Conforme") return "none";
-  return b.criticality === "Crítica" ? "critical" : "urgent";
+  return isCriticalRankLabel(b.criticality) ? "critical" : "urgent";
 }
 
 // isUrgent: the detector and digest gate. Matches the NcAlert card count

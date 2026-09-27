@@ -19,7 +19,7 @@ function barrier(over: Partial<Barrier> = {}): Barrier {
     typology: "Tip",
     location: "FAL",
     locDesc: "Rig",
-    criticality: "Não Crítica",
+    criticality: "A",
     category: "Cat",
     grouping: "Ag",
     owner: "",
@@ -152,19 +152,47 @@ Deno.test("sanitizeFilterPatch keeps plan values, drops unknown ones", () => {
   assertEquals(sanitizeFilterPatch({ plan: "Talvez" }), {});
 });
 
+Deno.test("sanitizeFilterPatch lets an explicit rank win over the gate", () => {
+  assertEquals(
+    sanitizeFilterPatch({ criticality: "B", criticalOnly: true }),
+    { criticality: "B", criticalOnly: false },
+  );
+  assertEquals(
+    sanitizeFilterPatch({ criticality: "", criticalOnly: true }),
+    { criticality: "", criticalOnly: true },
+  );
+});
+
 Deno.test("applyFilters matches criticality exactly", () => {
   const rows = [
-    barrier({ id: 1, criticality: "Crítica" }),
-    barrier({ id: 2, criticality: "Não Crítica" }),
+    barrier({ id: 1, criticality: "ESO" }),
+    barrier({ id: 2, criticality: "B" }),
   ];
+  const all = { ...defaultFilters(), criticalOnly: false };
   assertStrictEquals(
-    applyFilters(rows, { ...defaultFilters(), criticality: "Crítica" }).length,
+    applyFilters(rows, { ...all, criticality: "ESO" }).length,
     1,
   );
   assertStrictEquals(
-    applyFilters(rows, { ...defaultFilters(), criticality: "Não Crítica" })
-      .length,
+    applyFilters(rows, { ...all, criticality: "B" }).length,
     1,
+  );
+});
+
+Deno.test("applyFilters gates non-critical ranks when criticalOnly", () => {
+  const rows = [
+    barrier({ id: 1, criticality: "ESO" }),
+    barrier({ id: 2, criticality: "A" }),
+    barrier({ id: 3, criticality: "B" }),
+    barrier({ id: 4, criticality: "D" }),
+  ];
+  assertStrictEquals(
+    applyFilters(rows, defaultFilters()).map((b) => b.id).join(","),
+    "1,2",
+  );
+  assertStrictEquals(
+    applyFilters(rows, { ...defaultFilters(), criticalOnly: false }).length,
+    4,
   );
 });
 

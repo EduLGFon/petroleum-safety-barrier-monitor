@@ -1,6 +1,8 @@
 // Dashboard KPI - single-pass aggregation over Barrier[].
 // This is why it exists: every KPI surface (cards, band, exports) shares one
 // counting policy, so fixed fields, dynamic buckets, and totals reconcile.
+import { isCriticalRankLabel } from "../enums/codes.ts";
+
 import type { Barrier, KpiSnapshot } from "../types.ts";
 
 // Aggregates KPI totals in one O(N) pass; empty input yields zeros, 0% and empty buckets.
@@ -57,7 +59,7 @@ export function computeKpi(b: Barrier[]): KpiSnapshot {
       // fixed fields always reconcile (compliant + nonCompliant === total) and
       // match computeChartData, which already buckets non-Conforme as NC.
       nonCompliant++;
-      if (x.criticality === "Crítica") criticalNonCompliant++;
+      if (isCriticalRankLabel(x.criticality)) criticalNonCompliant++;
     }
     if (x.actionPlan.trim() === "") withoutActionPlan++;
   }

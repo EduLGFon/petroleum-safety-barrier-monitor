@@ -155,6 +155,7 @@ const newStatusRows = applyFilters(data, {
   category: "",
   typology: "",
   criticality: "",
+  criticalOnly: false,
   plan: "",
   since: "",
   until: "",

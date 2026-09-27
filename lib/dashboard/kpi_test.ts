@@ -10,7 +10,7 @@ function barrier(over: Partial<Barrier> = {}): Barrier {
     typology: "Estação Coletora",
     location: "FAL",
     locDesc: "Rig",
-    criticality: "Não Crítica",
+    criticality: "D",
     category: "Cat",
     grouping: "Ag",
     owner: "",
@@ -55,7 +55,7 @@ Deno.test("computeKpi splits known values and reconciles", () => {
       id: 2,
       availability: "Degradado",
       compliance: "Não Conforme",
-      criticality: "Crítica",
+      criticality: "A",
     }),
   ]);
   assertStrictEquals(k.total, 2);
@@ -65,6 +65,18 @@ Deno.test("computeKpi splits known values and reconciles", () => {
   assertStrictEquals(k.nonCompliant, 1);
   assertStrictEquals(k.criticalNonCompliant, 1);
   assertStrictEquals(k.pctCompliant, 50);
+});
+
+Deno.test("computeKpi counts ESO and A as critical, B and below as not", () => {
+  const k = computeKpi([
+    barrier({ compliance: "Não Conforme", criticality: "ESO" }),
+    barrier({ compliance: "Não Conforme", criticality: "A" }),
+    barrier({ compliance: "Não Conforme", criticality: "B" }),
+    barrier({ compliance: "Não Conforme", criticality: "D" }),
+  ]);
+  assertStrictEquals(k.total, 4);
+  assertStrictEquals(k.nonCompliant, 4);
+  assertStrictEquals(k.criticalNonCompliant, 2);
 });
 
 Deno.test("computeKpi fails novel compliance closed into NC", () => {

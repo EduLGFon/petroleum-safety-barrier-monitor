@@ -17,7 +17,7 @@ function barrier(over: Partial<Barrier> = {}): Barrier {
     typology: "Estação Coletora",
     location: "FAL",
     locDesc: "Rig",
-    criticality: "Não Crítica",
+    criticality: "D",
     category: "Cat",
     grouping: "Ag",
     owner: "",
@@ -56,9 +56,21 @@ Deno.test("urgencyOf tiers critical / urgent / none", () => {
   );
   assertStrictEquals(
     urgencyOf(
-      barrier({ compliance: "Não Conforme", criticality: "Crítica" }),
+      barrier({ compliance: "Não Conforme", criticality: "A" }),
     ),
     "critical",
+  );
+  assertStrictEquals(
+    urgencyOf(
+      barrier({ compliance: "Não Conforme", criticality: "ESO" }),
+    ),
+    "critical",
+  );
+  assertStrictEquals(
+    urgencyOf(
+      barrier({ compliance: "Não Conforme", criticality: "B" }),
+    ),
+    "urgent",
   );
 });
 
@@ -69,7 +81,7 @@ Deno.test("urgencyOf is fail-closed on novel values", () => {
   );
   assertStrictEquals(
     urgencyOf(
-      barrier({ compliance: "Em Auditoria", criticality: "Crítica" }),
+      barrier({ compliance: "Em Auditoria", criticality: "A" }),
     ),
     "critical",
   );
@@ -88,7 +100,7 @@ Deno.test("compareUrgency orders critical, then oldest, then id", () => {
   const criticalNew = barrier({
     id: 3,
     compliance: "Não Conforme",
-    criticality: "Crítica",
+    criticality: "A",
     statusSince: "2026-06-01",
   });
   const urgentOld = barrier({
@@ -127,7 +139,7 @@ Deno.test("urgentBarriers filters and orders in one pass", () => {
     barrier({
       id: 3,
       compliance: "Não Conforme",
-      criticality: "Crítica",
+      criticality: "A",
       statusSince: "2026-04-01",
     }),
   ]);
