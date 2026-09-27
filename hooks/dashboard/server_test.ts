@@ -39,7 +39,9 @@ Deno.test("useServerDashboard loads page/kpi/chart after hydration", async () =>
   assertStrictEquals(d.loading, false);
   assertStrictEquals(d.error, null);
   assertStrictEquals(d.rows.length, 25); // one page
-  assertStrictEquals(d.filteredTotal, 6800);
+  // Default rank gate (critical tiers ESO/A only): deterministic mock rank
+  // mass lands 3411 of 6800 rows inside the gate.
+  assertStrictEquals(d.filteredTotal, 3411);
   assertStrictEquals(d.kpi.total, d.filteredTotal);
   assertEquals(calls, ["barriers:0", "kpi:0", "chart:0"]);
 });
@@ -97,6 +99,7 @@ Deno.test("useServerDashboard sends full filters to kpi and chart", async () => 
   const expected = await mockAdapter.getKpi({
     availabilityId: 4,
     since: "2026-01-01",
+    criticalOnly: true,
   });
   assertStrictEquals(kpi.total, expected.total);
 });

@@ -62,6 +62,7 @@ export function useFilterState(defaultLocation = "ALL") {
         category: "",
         typology: "",
         criticality: "",
+        criticalOnly: false,
         plan: "",
         since: "",
         until: "",

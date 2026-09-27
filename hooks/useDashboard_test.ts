@@ -21,7 +21,7 @@ function mk(
     typology: "Estação Coletora",
     location,
     locDesc: `${location} - Local`,
-    criticality: "Não Crítica",
+    criticality: "A",
     category: "Detector de Gás",
     grouping: "Detecção e Monitoramento",
     owner: "Equipe de Manutenção",
