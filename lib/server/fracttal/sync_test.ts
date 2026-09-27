@@ -19,7 +19,7 @@ import type { MapContext, SyncBarrierInput } from "./map.ts";
 const ctx: MapContext = {
   locationIds: { FAL: 1, SM: 2 },
   categoryIds: { "Sistema de Combate a Incêndio": 7 },
-  criticalityIds: { "Crítico": 1 },
+  criticalityIds: { ESO: 0, A: 1, B: 2, C: 3, D: 4 },
 };
 
 function baseInput(over: Partial<SyncBarrierInput> = {}): SyncBarrierInput {
@@ -37,6 +37,7 @@ function baseInput(over: Partial<SyncBarrierInput> = {}): SyncBarrierInput {
     comments: "",
     actionPlan: "",
     sourceUpdatedAt: null,
+    scopeSource: "keyword",
     ...over,
   };
 }
@@ -218,7 +219,7 @@ function rawRow(over: Record<string, unknown> = {}): unknown {
     active: true,
     available: true,
     id_type_item: 2,
-    description: "teste",
+    description: "Casa de Bombas { FAL-EQ-001 } A",
     location_code: "FAL",
     items_types_description: "Equipment",
     groups_1_description: "Polo Cricaré",

@@ -16,7 +16,7 @@ import type { FracttalAsset } from "./types.ts";
 const ctx: MapContext = {
   locationIds: { FAL: 1, "SANTA-MONICA": 2 },
   categoryIds: { "Sistema de Combate a Incêndio": 7 },
-  criticalityIds: { "Crítico": 1, "Não Crítica": 2 },
+  criticalityIds: { ESO: 0, A: 1, B: 2, C: 3, D: 4 },
 };
 
 function asset(over: Partial<FracttalAsset> = {}): FracttalAsset {
@@ -26,7 +26,7 @@ function asset(over: Partial<FracttalAsset> = {}): FracttalAsset {
     active: true,
     available: true,
     id_type_item: 2,
-    description: "teste",
+    description: "Casa de Bombas { FAL-EQ-001 } A",
     location_code: "fal",
     id_parent: null,
     items_types_description: "Equipment",
@@ -62,7 +62,7 @@ Deno.test("mapAsset resolves labels case-insensitively and applies defaults", ()
   const mapped = mapAsset(asset(), ctx);
   if (!mapped.ok) throw new Error("expected ok");
   assertStrictEquals(mapped.input.externalCode, "FAL-EQ-001");
-  assertStrictEquals(mapped.input.tag, "teste");
+  assertStrictEquals(mapped.input.tag, "Casa de Bombas { FAL-EQ-001 } A");
   assertStrictEquals(mapped.input.locationId, 1);
   assertStrictEquals(mapped.input.categoryId, 7);
   assertStrictEquals(mapped.input.criticalityId, 1);
@@ -122,14 +122,54 @@ Deno.test("mapAsset skips unmapped category labels", () => {
   );
 });
 
-Deno.test("mapAsset defaults unknown criticality with a warning", () => {
+Deno.test("mapAsset defaults unparseable criticality to rank D with a warning", () => {
   const mapped = mapAsset(
-    asset({ priorities_description: "Sem Prioridade" }),
+    asset({
+      description: "Bomba sem sufixo de criticidade",
+      priorities_description: "Sem Prioridade",
+    }),
     ctx,
   );
   if (!mapped.ok) throw new Error("expected ok");
-  assertStrictEquals(mapped.input.criticalityId, 1);
+  assertStrictEquals(mapped.input.criticalityId, 4);
   assertStrictEquals(mapped.warnings.length, 1);
+});
+
+Deno.test("mapAsset ranks ESO above the TAG suffix letter", () => {
+  const mapped = mapAsset(
+    asset({
+      description: "Painel { 1558786 } B",
+      groups_2_description: "ESO",
+    }),
+    ctx,
+  );
+  if (!mapped.ok) throw new Error("expected ok");
+  assertStrictEquals(mapped.input.criticalityId, 0);
+  assertStrictEquals(mapped.warnings.length, 0);
+});
+
+Deno.test("mapAsset ranks TAG suffix letters B/C/D", () => {
+  for (const [suffix, id] of [["B", 2], ["C", 3], ["D", 4]] as const) {
+    const mapped = mapAsset(
+      asset({ description: `Ativo { FAL-EQ-001 } ${suffix}` }),
+      ctx,
+    );
+    if (!mapped.ok) throw new Error("expected ok");
+    assertStrictEquals(mapped.input.criticalityId, id);
+  }
+});
+
+Deno.test("mapAsset falls back to a rank priorities label", () => {
+  const mapped = mapAsset(
+    asset({
+      description: "Ativo sem sufixo",
+      priorities_description: "C",
+    }),
+    ctx,
+  );
+  if (!mapped.ok) throw new Error("expected ok");
+  assertStrictEquals(mapped.input.criticalityId, 3);
+  assertStrictEquals(mapped.warnings.length, 0);
 });
 
 Deno.test("mapAsset derives typology from the parent chain", () => {
@@ -185,16 +225,51 @@ Deno.test("mapAsset stamps sourceUpdatedAt from the winning event", () => {
   assertStrictEquals(mapped.input.sourceUpdatedAt, "2026-09-11");
 });
 
-Deno.test("mapAsset skips rows outside the barrier scope", () => {
-  // Scope reports first even with an unknown station (import order), so
-  // non-barriers never inflate the station-triage list.
+Deno.test("mapAsset admits out-of-scope families with scope 'all'", () => {
+  const allCtx: MapContext = {
+    ...ctx,
+    categoryIds: { ...ctx.categoryIds, "Bomba": 12 },
+  };
+  const mapped = mapAsset(
+    asset({
+      description: "Bomba { FAL-EQ-010 } C",
+      groups_description: "Bomba",
+      location_code: "FAL",
+    }),
+    allCtx,
+  );
+  if (!mapped.ok) throw new Error("expected ok: " + JSON.stringify(mapped));
+  assertStrictEquals(mapped.input.scopeSource, "all");
+  assertStrictEquals(mapped.input.criticalityId, 3);
+});
+
+Deno.test("mapAsset still skips unknown stations under open scope", () => {
+  // Station resolution still gates: open scope never invents a location.
   expectSkip(
     mapAsset(
       asset({ groups_description: "Bomba", location_code: "ZZZ" }),
       ctx,
     ),
-    "not barrier scope",
+    "unknown station",
   );
+});
+
+Deno.test("mapAsset admits ESO-flagged rows outside the keyword scope", () => {
+  const esoCtx: MapContext = {
+    ...ctx,
+    categoryIds: { ...ctx.categoryIds, "Transmissor": 11 },
+  };
+  const mapped = mapAsset(
+    asset({
+      description: "Transmissor { FAL-EQ-009 } A",
+      groups_description: "Transmissor",
+      groups_2_description: "ESO",
+    }),
+    esoCtx,
+  );
+  if (!mapped.ok) throw new Error("expected ok: " + JSON.stringify(mapped));
+  assertStrictEquals(mapped.input.scopeSource, "eso");
+  assertStrictEquals(mapped.input.criticalityId, 0);
 });
 
 Deno.test("mapAsset skips excluded source rows with the reason", () => {

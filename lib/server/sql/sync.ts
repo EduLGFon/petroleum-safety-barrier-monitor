@@ -114,10 +114,12 @@ export const defaultSyncIo: SyncIo = {
       owner_id: number | null;
       comments: string;
       action_plan: string;
+      scope_source: string | null;
     }>(
       `select id, external_code, location_id, availability_id, deleted_at,
          tag, typology_id, loc_desc_id, criticality_id, category_id,
-         grouping_id, owner_id, comments, action_plan
+         grouping_id, owner_id, comments, action_plan,
+         coalesce(scope_source, '') as scope_source
         from barriers
         where external_code is not null
           and (location_id = any($1) or external_code = any($2))
@@ -140,6 +142,7 @@ export const defaultSyncIo: SyncIo = {
         ownerId: r.owner_id,
         comments: r.comments,
         actionPlan: r.action_plan,
+        scopeSource: r.scope_source ?? "",
       }),
     }));
   },
@@ -214,8 +217,8 @@ export const defaultSyncIo: SyncIo = {
            tag = $2, location_id = $3, typology_id = $4, loc_desc_id = $5,
            criticality_id = $6, category_id = $7, grouping_id = $8,
            owner_id = $9, comments = $10, action_plan = $11,
-           source_updated_at = $12,
-           deleted_at = case when $13 then null else deleted_at end
+           source_updated_at = $12, scope_source = $13,
+           deleted_at = case when $14 then null else deleted_at end
          where id = $1`,
         [
           entry.local.id,
@@ -230,6 +233,7 @@ export const defaultSyncIo: SyncIo = {
           input.comments,
           input.actionPlan,
           input.sourceUpdatedAt,
+          input.scopeSource,
           entry.kind === "restore",
         ],
       );
@@ -294,6 +298,7 @@ async function insertBarrier(input: {
   groupingId: number;
   ownerId: number | null;
   availabilityId: number;
+  scopeSource: string;
   comments: string;
   actionPlan: string;
   sourceUpdatedAt: string | null;
@@ -303,8 +308,8 @@ async function insertBarrier(input: {
        (external_code, tag, location_id, typology_id, loc_desc_id,
         criticality_id, category_id, grouping_id, owner_id,
         availability_id, comments, action_plan, status_since,
-        source_updated_at)
-     values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, current_date, $13)
+        source_updated_at, scope_source)
+     values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, current_date, $13, $14)
      on conflict (external_code) do nothing
      returning id`,
     [
@@ -321,6 +326,7 @@ async function insertBarrier(input: {
       input.comments,
       input.actionPlan,
       input.sourceUpdatedAt,
+      input.scopeSource,
     ],
   );
   return rows[0]?.id ?? null;

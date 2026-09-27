@@ -27,11 +27,25 @@ export const TYPOLOGY_SUBSTATION = 5;
 export const AUTHOR_IMPORT = 10;
 export const IMPORT_NOTE = "Importado do Fracttal";
 
-// Category fallback for empty taxonomy labels; criticality default applied
-// with a warning when the upstream label is unknown (listed, not silent).
-// The sheet inventory is 100% critical barriers, so the default is Crítica.
+// Category fallback for empty taxonomy labels; criticality rank derives
+// from the TAG suffix letter plus the ESO flag (verified 2026-09-27: every
+// dump description matches `{code} [letter]`, letter in A/B/C/D, and ESO
+// rows carry suffix A). Unparseable ranks fall back to D with a warning
+// (listed, not silent). Rank ids are a hard contract with
+// db/seed_lookups.sql and lib/enums/codes.ts CRITICALITY_CODES.
 export const CATEGORY_FALLBACK = "(sem categoria)";
-export const CRITICALITY_DEFAULT = 1;
+export const CRITICALITY_ESO = 0;
+export const CRITICALITY_A = 1;
+export const CRITICALITY_B = 2;
+export const CRITICALITY_C = 3;
+export const CRITICALITY_D = 4;
+export const CRITICALITY_RANK_LABELS: readonly string[] = [
+  "ESO",
+  "A",
+  "B",
+  "C",
+  "D",
+];
 
 // Barrier scope: case/accent-insensitive keywords from
 // docs/FRACTTAL-DATA.md section 3, matched against the asset-type taxonomy
@@ -72,6 +86,26 @@ export function isBarrierCandidate(
   return new RegExp(BARRIER_KEYWORDS.join("|")).test(
     foldText(groupsDescription),
   );
+}
+
+// ScopeSource names which scope gate admitted a row: the taxonomy keyword,
+// the upstream ESO flag, or both. Stored per barrier (scope_source) so scope
+// changes stay reversible and auditable - narrowing the scope later
+// soft-deletes rows admitted only by the removed gate instead of dropping
+// them silently.
+export type ScopeSource = "keyword" | "eso";
+
+// scopeSources lists every gate admitting one upstream row. Empty means the
+// row is outside every scope (the sync skips it with the reason, the import
+// drops it from the catalog).
+export function scopeSources(
+  groupsDescription: string | null | undefined,
+  groups2Description: string | null | undefined,
+): ScopeSource[] {
+  const sources: ScopeSource[] = [];
+  if (isBarrierCandidate(groupsDescription)) sources.push("keyword");
+  if (foldText(groups2Description) === "eso") sources.push("eso");
+  return sources;
 }
 
 // STATION_OVERRIDES corrects L2 segments whose trailing " - CODE" token is
@@ -189,6 +223,33 @@ export function categoryFor(
   groupsDescription: string | null | undefined,
 ): string {
   return (groupsDescription ?? "").trim() || CATEGORY_FALLBACK;
+}
+
+// criticalityLabelFor derives the rank label from the TAG suffix letter
+// ("... { 1014224 } A" gives "A") with the ESO flag winning: ESO rows are A
+// tier and rank above plain A. priorities_description is almost always null
+// upstream, so it only serves as a last resort before the D fallback. The
+// guessed flag tells callers to list a warning instead of staying silent.
+export function criticalityLabelFor(
+  description: string | null | undefined,
+  groups2Description: string | null | undefined,
+  prioritiesDescription: string | null | undefined,
+): { label: string; guessed: boolean } {
+  if (foldText(groups2Description) === "eso") {
+    return { label: "ESO", guessed: false };
+  }
+  const text = (description ?? "").trim();
+  const suffix = text.match(/\}\s*([A-Za-z]+)?\s*$/)?.[1]?.toUpperCase() ??
+    "";
+  if (suffix === "ESO") return { label: "ESO", guessed: false };
+  if (
+    suffix === "A" || suffix === "B" || suffix === "C" || suffix === "D"
+  ) return { label: suffix, guessed: false };
+  const priority = (prioritiesDescription ?? "").trim().toUpperCase();
+  if (CRITICALITY_RANK_LABELS.includes(priority)) {
+    return { label: priority, guessed: false };
+  }
+  return { label: "D", guessed: true };
 }
 
 // classifyCorrective sorts one work order into an event slot: emergency

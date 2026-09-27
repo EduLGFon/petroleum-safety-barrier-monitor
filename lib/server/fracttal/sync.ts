@@ -73,7 +73,7 @@ export interface SyncIo {
   ): Promise<void>;
 }
 
-// SignatureSource: the ten fields that drive change detection (shared with
+// SignatureSource: the fields that drive change detection (shared with
 // the SQL repo so stored-row signatures and planner signatures never drift).
 export type SignatureSource = Pick<
   SyncBarrierInput,
@@ -87,6 +87,7 @@ export type SignatureSource = Pick<
   | "ownerId"
   | "comments"
   | "actionPlan"
+  | "scopeSource"
 >;
 
 // fieldsSignature: two rows with the same signature and status are identical
@@ -104,6 +105,7 @@ export function fieldsSignature(input: SignatureSource): string {
     input.ownerId,
     input.comments,
     input.actionPlan,
+    input.scopeSource,
   ]);
 }
 

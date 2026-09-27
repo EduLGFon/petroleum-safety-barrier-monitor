@@ -11,7 +11,7 @@ import {
   categoryFor,
   classifyCorrective,
   classifyRequest,
-  CRITICALITY_DEFAULT,
+  criticalityLabelFor,
   earliestDate,
   exclusionReason,
   foldText,
@@ -22,6 +22,7 @@ import {
   mergeEvent,
   OPEN_WORK_ORDER_STATUSES,
   resolveAvailability,
+  scopeSources,
   stationCodeOf,
   stationNameOf,
   tagFor,
@@ -35,7 +36,7 @@ import {
   typologyIdOf,
 } from "./barrier-rules.ts";
 
-import { assertStrictEquals } from "jsr:@std/assert@^1";
+import { assertEquals, assertStrictEquals } from "jsr:@std/assert@^1";
 
 Deno.test("foldText lowercases and strips accents", () => {
   assertStrictEquals(foldText("Válvula de GÁS"), "valvula de gas");
@@ -271,5 +272,46 @@ Deno.test("resolveAvailability follows urgent, planned, stopped, flag, open", ()
 Deno.test("exclusion list documents the known mislabeled row", () => {
   assertStrictEquals(exclusionReason("1013971") !== null, true);
   assertStrictEquals(exclusionReason("1013959"), null);
-  assertStrictEquals(CRITICALITY_DEFAULT, 1);
+});
+
+Deno.test("criticalityLabelFor ranks the TAG suffix letter", () => {
+  assertStrictEquals(
+    criticalityLabelFor("Bomba { 491481 } A", null, null).label,
+    "A",
+  );
+  assertStrictEquals(
+    criticalityLabelFor("Motor { 1012274 } C", null, null).label,
+    "C",
+  );
+  assertEquals(criticalityLabelFor("Sem sufixo", null, null), {
+    label: "D",
+    guessed: true,
+  });
+});
+
+Deno.test("criticalityLabelFor ranks ESO above the suffix", () => {
+  assertStrictEquals(
+    criticalityLabelFor("Conversor { 1558786 } B", "ESO", null).label,
+    "ESO",
+  );
+  assertStrictEquals(
+    criticalityLabelFor("Ativo", "eso", null).label,
+    "ESO",
+  );
+  assertStrictEquals(
+    criticalityLabelFor("Ativo sem sufixo", null, "B").label,
+    "B",
+  );
+});
+
+Deno.test("scopeSources admits keyword hits, ESO flags, or both", () => {
+  assertEquals(scopeSources("Válvula de Segurança", null), ["keyword"]);
+  assertEquals(scopeSources("Válvula de Segurança", "ESO"), [
+    "keyword",
+    "eso",
+  ]);
+  assertEquals(scopeSources("Transmissor", "ESO"), ["eso"]);
+  assertEquals(scopeSources("Bomba", "ESO"), ["eso"]);
+  assertEquals(scopeSources("Bomba", null), []);
+  assertEquals(scopeSources(null, null), []);
 });

@@ -16,7 +16,7 @@ const ctx: MapContext = {
     "Sistema de Detecção de Gás": 8,
     "Válvula de Alívio de Pressão": 9,
   },
-  criticalityIds: { "Crítica": 1, "Não Crítica": 2 },
+  criticalityIds: { ESO: 0, A: 1, B: 2, C: 3, D: 4 },
 };
 
 async function loadFixture(): Promise<unknown[]> {

@@ -16,11 +16,11 @@ import {
   AVAILABILITY_AVAILABLE,
   AVAILABILITY_UNAVAILABLE,
   categoryFor,
-  CRITICALITY_DEFAULT,
+  criticalityLabelFor,
   exclusionReason,
-  isBarrierCandidate,
   isoDate,
   resolveAvailability,
+  scopeSources,
   stationCodeOf,
   type StatusEvent,
   tagFor,
@@ -65,6 +65,9 @@ export interface SyncBarrierInput {
   comments: string;
   actionPlan: string;
   sourceUpdatedAt: string | null;
+  // Scope provenance (keyword / eso / keyword+eso): which gate admitted the
+  // row. Rides the sync signature so scope edits rewrite every touched row.
+  scopeSource: string;
 }
 
 export type MappedRow =
@@ -118,14 +121,13 @@ export function mapAsset(
     return { ok: false, reason: `excluded asset (${excluded})` };
   }
 
-  // Scope and category read groups_description only, mirroring the import's
-  // keyword scope on the same label family (the import checks scope before
-  // station too, so skip reasons agree). groups_1_description is the polo
-  // and is never consulted: preferring it scoped every live row out.
+  // Scope is fully open: every equipment row enters the monitor and the
+  // admitting gates ride along as scope_source (keyword / eso /
+  // keyword+eso / all) for reversibility. groups_1_description is the polo
+  // and is never consulted.
   const categoryLabel = categoryFor(asset.groups_description);
-  if (!isBarrierCandidate(categoryLabel)) {
-    return { ok: false, reason: `not barrier scope ('${categoryLabel}')` };
-  }
+  const sources = scopeSources(categoryLabel, asset.groups_2_description);
+  const scopeSource = sources.join("+") || "all";
 
   const stationLabel = stationCodeOf(asset.parent_description);
   const locationCode = (asset.location_code ?? "").trim().toUpperCase();
@@ -147,18 +149,28 @@ export function mapAsset(
     return { ok: false, reason: `unmapped category '${categoryLabel}'` };
   }
 
+  // Criticality rank derives from the TAG suffix letter plus the ESO flag
+  // (shared criticalityLabelFor); the sync never invents levels, so a rank
+  // missing from the lookup table skips loudly instead of guessing an id.
+  // Deploy order matters: db:migrate must seed the ranks before this runs,
+  // or every row skips at once (skips never delete, but the run is empty).
   const prioridadeLabel = (asset.priorities_description ?? "").trim();
   const warnings: string[] = [];
-  let criticalityId = prioridadeLabel !== ""
-    ? ctx.criticalityIds[prioridadeLabel]
-    : undefined;
-  if (criticalityId === undefined) {
-    criticalityId = CRITICALITY_DEFAULT;
+  const rank = criticalityLabelFor(
+    asset.description,
+    asset.groups_2_description,
+    asset.priorities_description,
+  );
+  if (rank.guessed) {
     warnings.push(
       `defaulted criticality '${
         prioridadeLabel || "<none>"
-      }' to id 1 (critical)`,
+      }' to rank D (unparseable TAG suffix)`,
     );
+  }
+  const criticalityId = ctx.criticalityIds[rank.label];
+  if (criticalityId === undefined) {
+    return { ok: false, reason: `unmapped criticality '${rank.label}'` };
   }
 
   const today = options.today ?? new Date().toISOString().slice(0, 10);
@@ -197,6 +209,7 @@ export function mapAsset(
       // event date, else the out-of-service date, else unknown (null).
       sourceUpdatedAt: work?.urgent?.date ?? work?.planned?.date ??
         outOfServiceDate,
+      scopeSource,
     },
   };
 }
