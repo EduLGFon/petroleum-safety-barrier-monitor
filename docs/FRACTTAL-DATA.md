@@ -63,8 +63,10 @@ the join / `external_code` key. Data quality:
   alone is almost always `true`; the signal comes from work orders, not this
   field.
 - `priorities_description` is null / `None` on 18,267 of 18,272 equipment
-  rows. Only 5 rows set: VERY_HIGH 1, HIGH 1, MEDIUM 3. Criticality is
-  **unmapped** in this dump.
+  rows. Only 5 rows set: VERY_HIGH 1, HIGH 1, MEDIUM 3. Criticality does
+  **not** come from this field: it derives from the TAG suffix letter
+  (`... { code } A/B/C/D`, 100% match in this dump) with the
+  `groups_2_description = 'ESO'` flag outranking to ESO (see section 10).
 - `groups_1_description`: Polo Norte Capixaba 12,602 / Polo Cricare 5,645 /
   Polo Cricare 18 (whitespace typo) / None 7. This is polo (area), not
   category.
@@ -78,12 +80,22 @@ the join / `external_code` key. Data quality:
   `CRI-SM-POCOS` 94 / `PNC-IBU-POCOS` 90. Code format: `family-target-group`
   and directly joinable to work orders.
 
-### Safety barrier keyword filter (groups_description only)
+### Safety barrier scope (all equipment)
+
+Every `item_type = 2` row enters the monitor (minus the documented
+exclusion); the admitting gates ride per row in `scope_source` (`keyword` /
+`eso` / `keyword+eso` / `all`) so scope stays reversible. The dashboard
+opens on the critical tiers only (`criticalOnly`, ESO/A) with a one-tap
+toggle to every rank. GERAL manual-barrier coverage measured by
+`scripts/geral-coverage.ts`: 49.8% (keyword scope) → 89.8% (ESO-OR-keyword)
+→ 94.5% (all equipment; the 123 residual codes exist neither in the dump nor
+live).
 
 Count of equipment whose `groups_description` taxonomy label hits the
 keyword list (full pass, 18,272 rows): **3,523 rows** (~19%), minus 1
 documented exclusion (a pressure transmitter mislabeled `Válvula`, see
-`EXCLUDED_EXTERNAL_CODES`) for **3,522 imported barriers**.
+`EXCLUDED_EXTERNAL_CODES`). The keyword list is kept only as scope
+provenance, not as a gate.
 
 The filter runs on `groups_description` only (the asset-type taxonomy).
 Free-text `description` is NOT matched: it pulls in non-barrier types
@@ -289,17 +301,17 @@ signal. Do not use for status derivation.
 
 ## 10. Maturity summary for status derivation
 
-| Signal                      | Source                                                         | Ready?                        |
-| --------------------------- | -------------------------------------------------------------- | ----------------------------- |
-| Degradada                   | `tasks_log_types_description` = `CORR - Corretiva Planejada`   | yes                           |
-| Indisponível                | `tasks_log_types_description` = `CORR - Corretiva Emergencial` | yes                           |
-| Fora de Operação            | `stop_assets = true` or `initial_date_out_of_service` on item  | yes                           |
-| Disponível                  | default (no open corrective WO, not out of service)            | yes                           |
-| Degradada Contingenciada    | GM / CEC in labels or custom status                            | **no** - not in dump          |
-| Indisponível Contingenciada | GM / CEC in labels or custom status                            | **no** - not in dump          |
-| Criticality                 | `priorities_description` on equipment                          | **no** - 18,267 null / 5 rows |
-| Category                    | `groups_description` on equipment                              | available, ~200 unique labels |
-| Polo / Area                 | `groups_1_description` on equipment                            | available, 2 polo families    |
+| Signal                      | Source                                                         | Ready?                                          |
+| --------------------------- | -------------------------------------------------------------- | ----------------------------------------------- |
+| Degradada                   | `tasks_log_types_description` = `CORR - Corretiva Planejada`   | yes                                             |
+| Indisponível                | `tasks_log_types_description` = `CORR - Corretiva Emergencial` | yes                                             |
+| Fora de Operação            | `stop_assets = true` or `initial_date_out_of_service` on item  | yes                                             |
+| Disponível                  | default (no open corrective WO, not out of service)            | yes                                             |
+| Degradada Contingenciada    | GM / CEC in labels or custom status                            | **no** - not in dump                            |
+| Indisponível Contingenciada | GM / CEC in labels or custom status                            | **no** - not in dump                            |
+| Criticality                 | TAG suffix letter + `groups_2 = 'ESO'` flag                    | yes - ESO > A > B > C > D ranks, ESO/A critical |
+| Category                    | `groups_description` on equipment                              | available, ~200 unique labels                   |
+| Polo / Area                 | `groups_1_description` on equipment                            | available, 2 polo families                      |
 
 ## 11. Seed replacement decision (done)
 
@@ -308,21 +320,25 @@ locations/categories with real data. It streams the 480 MB dump (no
 in-memory load), truncates `locations`, `categories`, and `barriers`,
 and rebuilds from the dump in ~37 seconds.
 
-Actual imported catalog from `test/fracttal-dump-2026-09-14-04-34-49/`:
+Actual imported catalog from `test/fracttal-dump-2026-09-14-04-34-49/`
+(full equipment scope, 2026-09-27):
 
-- **barriers**: 3,522 (every `groups_description` keyword hit minus the
-  documented transmitter mislabel exclusion)
-- **locations**: 35 stations (codes extracted from L2 segment of
-  `parent_description`, ids 1-35 sorted by code, type derived)
-- **categories**: 67 labels (from distinct `groups_description` in the
-  barrier subset, ids 0-66 sorted alphabetically)
+- **barriers**: 18,271 (every equipment row minus the documented
+  transmitter mislabel exclusion; admitting gates ride per row in
+  `scope_source`: keyword / eso / keyword+eso / all)
+- **locations**: 38 stations (codes extracted from L2 segment of
+  `parent_description`, type derived)
+- **categories**: 528 labels (every distinct `groups_description` in the
+  full set; upstream typo fixes flow in on the next rebuild)
 - **availability_statuses**: unchanged, matches `docs/STATUSES.md`
-- **criticality_levels**: unchanged, `Não Crítica` default until upstream
-  signal is populated
+- **criticality_levels**: ranked ESO > A > B > C > D, derived per barrier
+  from the TAG suffix letter plus the ESO flag (shared
+  `criticalityLabelFor`); ESO and A are the critical tiers
 
-The old fake 6-location/10-category seed rows in `db/seed_lookups.sql`
-have been replaced with the real 35/67 rows so the seed task remains
-approximate but close to reality. The id contract in
+The static location/category rows in `db/seed_lookups.sql` are only a
+stale fallback for fresh databases before the first import runs; the import
+owns the real catalog (38 stations / 528 categories from the full dump).
+The id contract in
 `lib/enums.ts` is now only used for the static lookup tables
 (availability, compliance, groupings, typologies, owners, loc_descs,
 authors). Locations and categories are fully dynamic: the server
@@ -338,11 +354,11 @@ deno run -A --env-file=.env scripts/fracttal-import.ts \
   --dir test/fracttal-dump-2026-09-14-04-34-49 --apply
 ```
 
-| Pass | Input                    | Scanned | Matched | Notes                                  |
-| ---- | ------------------------ | ------- | ------- | -------------------------------------- |
-| A    | `items-2-equipment.json` | 18,272  | 3,522   | `groups_description` only, 1 exclusion |
-| B    | `work-orders.json`       | 120,600 | 1,206   | all `CORR - Corretiva Planejada`       |
-| C    | `work-requests.json`     | 38,500  | 0       | all in closed statuses                 |
+| Pass | Input                    | Scanned | Matched | Notes                                                                   |
+| ---- | ------------------------ | ------- | ------- | ----------------------------------------------------------------------- |
+| A    | `items-2-equipment.json` | 18,272  | 18,271  | all equipment, 1 exclusion (`scope_source` records keyword / eso / all) |
+| B    | `work-orders.json`       | 120,600 | 1,206   | all `CORR - Corretiva Planejada`                                        |
+| C    | `work-requests.json`     | 38,500  | 0       | all in closed statuses                                                  |
 
 **Derived availability:** Disponível 3,521 / Degradado 1.
 The single degraded barrier (`SSV-BRA01-001`, code `1013959`) carries a

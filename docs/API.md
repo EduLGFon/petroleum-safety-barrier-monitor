@@ -64,8 +64,9 @@ AVAILABILITY_CODES = {
 // Compliance
 COMPLIANCE_CODES = { 0: "Conforme", 1: "Não Conforme" };
 
-// Criticality
-CRITICALITY_CODES = { 0: "Não Crítica", 1: "Crítica" };
+// Criticality (ranked ESO > A > B > C > D; ESO and A are the critical tiers
+// driving criticalNonCompliant counts and alert urgency)
+CRITICALITY_CODES = { 0: "ESO", 1: "A", 2: "B", 3: "C", 4: "D" };
 
 // Barrier category, grouping, typology, owner, descriptive location, and
 // history author - all follow the same pattern (see lib/enums/).
