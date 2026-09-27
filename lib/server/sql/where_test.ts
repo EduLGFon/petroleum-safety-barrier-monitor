@@ -51,3 +51,12 @@ Deno.test("buildWhere adds ISO date bounds", () => {
   assert(text.includes("b.status_since >="));
   assert(text.includes("b.status_since <="));
 });
+
+Deno.test("buildWhere gates critical tiers only when criticalOnly", () => {
+  const gated = buildWhere({ criticalOnly: true });
+  assertEquals(gated.args, [0, 1]);
+  assert(gated.text.includes("b.criticality_id in ($1, $2)"));
+  const open = buildWhere({ criticalOnly: false });
+  assertEquals(open.args, []);
+  assert(!open.text.includes("b.criticality_id in"));
+});

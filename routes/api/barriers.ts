@@ -11,12 +11,7 @@ import {
   unauthorized,
 } from "../../lib/server/errors.ts";
 
-import {
-  parseBooleanParam,
-  parseDateParam,
-  parseIntParam,
-  parseQueryParam,
-} from "./_params.ts";
+import { parseFilterQuery, parseIntParam } from "./_params.ts";
 
 import { readThrottle, routeClientKey } from "../../lib/server/throttle.ts";
 
@@ -61,16 +56,7 @@ export const handler = define.handlers({
 
     const sp = ctx.url.searchParams;
     const query: BarriersQuery = {
-      locationId: parseIntParam(sp.get("locationId")),
-      availabilityId: parseIntParam(sp.get("availabilityId")),
-      complianceId: parseIntParam(sp.get("complianceId")),
-      categoryId: parseIntParam(sp.get("categoryId")),
-      typologyId: parseIntParam(sp.get("typologyId")),
-      criticalityId: parseIntParam(sp.get("criticalityId")),
-      hasActionPlan: parseBooleanParam(sp.get("hasActionPlan")),
-      query: parseQueryParam(sp.get("query")),
-      since: parseDateParam(sp.get("since")),
-      until: parseDateParam(sp.get("until")),
+      ...parseFilterQuery(sp),
       page: parseIntParam(sp.get("page")),
       pageSize: parseIntParam(sp.get("pageSize")),
       sortCol: sp.get("sortCol") ?? undefined,

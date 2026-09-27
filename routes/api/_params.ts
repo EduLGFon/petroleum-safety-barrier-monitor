@@ -34,9 +34,9 @@ export function parseBooleanParam(v: string | null): boolean | undefined {
 }
 
 // Reads the shared barrier filter subset (location, availability,
-// compliance, category, criticality, action-plan presence, text, dates)
-// that list, KPI, chart, and export all honor; paging/sort stay per-route
-// so caps differ honestly.
+// compliance, category, criticality, critical-tiers gate, action-plan
+// presence, text, dates) that list, KPI, chart, and export all honor;
+// paging/sort stay per-route so caps differ honestly.
 export function parseFilterQuery(sp: URLSearchParams): {
   locationId?: number;
   availabilityId?: number;
@@ -44,6 +44,7 @@ export function parseFilterQuery(sp: URLSearchParams): {
   categoryId?: number;
   typologyId?: number;
   criticalityId?: number;
+  criticalOnly?: boolean;
   hasActionPlan?: boolean;
   query?: string;
   since?: string;
@@ -56,6 +57,7 @@ export function parseFilterQuery(sp: URLSearchParams): {
     categoryId: parseIntParam(sp.get("categoryId")),
     typologyId: parseIntParam(sp.get("typologyId")),
     criticalityId: parseIntParam(sp.get("criticalityId")),
+    criticalOnly: parseBooleanParam(sp.get("criticalOnly")),
     hasActionPlan: parseBooleanParam(sp.get("hasActionPlan")),
     query: parseQueryParam(sp.get("query")),
     since: parseDateParam(sp.get("since")),

@@ -3,6 +3,8 @@
 // by centralizing the fixed column map and bound-arg WHERE construction.
 import type { BarriersQuery } from "../../wireTypes.ts";
 
+import { CRITICALITY_A, CRITICALITY_ESO } from "../fracttal/barrier-rules.ts";
+
 // Maps frontend SortableColumn values (lib/types.ts) to fixed SQL.
 // Never derive this from user input.
 export const SORTABLE: Record<string, string> = {
@@ -63,6 +65,14 @@ export function buildWhere(
     conds.push("and b.action_plan is not null and b.action_plan <> ''");
   } else if (q.hasActionPlan === false) {
     conds.push("and (b.action_plan is null or b.action_plan = '')");
+  }
+  // Rank gate: critical tiers only (ESO/A). Absent means every rank, so old
+  // clients without the toggle keep the unfiltered behavior.
+  if (q.criticalOnly === true) {
+    args.push(CRITICALITY_ESO, CRITICALITY_A);
+    const a = args.length - 1;
+    const b = args.length;
+    conds.push(`and b.criticality_id in ($${a}, $${b})`);
   }
   if (q.query) {
     const lit = `%${escapeLike(q.query)}%`;
