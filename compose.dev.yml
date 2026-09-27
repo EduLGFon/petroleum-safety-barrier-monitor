@@ -1,0 +1,54 @@
+# Barrier Monitor dev override - live sources, no rebuild per edit.
+# This is why it exists: the prod image bakes sources + the Fresh bundle at
+# build time, so every edit costs `compose build` + recreate. This file keeps
+# prod `compose.yml` untouched and instead bind-mounts the tree over /app:
+# the dashboard runs vite HMR, the loops restart via `deno --watch`.
+# Anonymous volumes keep image-installed deps (/app/node_modules) and build
+# output (/app/_fresh) intact; the named volume keeps the Deno cache warm.
+#
+# Usage:
+#   docker compose -f compose.yml -f compose.dev.yml up --build
+#   (or `deno task docker:dev`; dashboard at http://localhost:5173)
+# Env still comes from the host .env via env_file (same as prod); `dev`
+# reads process env, so no --env-file flag is needed inside the container.
+
+services:
+  # Dashboard via vite HMR (default port 5173, listens on 0.0.0.0 in Docker).
+  app:
+    command: ["task", "dev", "--host", "--port", "5173"]
+    volumes:
+      - ./:/app
+      - /app/node_modules
+      - /app/_fresh
+      - deno-dir:/deno-dir
+    environment:
+      DENO_DIR: /deno-dir
+    ports:
+      - "5173:5173"
+    healthcheck:
+      disable: true
+
+  # Live poll loop, restarted on every watched-file change (scripts + lib).
+  poller:
+    command: ["run", "--watch", "-A", "scripts/fracttal-poll.ts"]
+    volumes:
+      - ./:/app
+      - /app/node_modules
+      - /app/_fresh
+      - deno-dir:/deno-dir
+    environment:
+      DENO_DIR: /deno-dir
+
+  # Alert digest loop, same watch treatment as the poller.
+  alerts:
+    command: ["run", "--watch", "-A", "scripts/alerts-poll.ts"]
+    volumes:
+      - ./:/app
+      - /app/node_modules
+      - /app/_fresh
+      - deno-dir:/deno-dir
+    environment:
+      DENO_DIR: /deno-dir
+
+volumes:
+  deno-dir:
