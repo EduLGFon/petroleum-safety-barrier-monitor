@@ -70,9 +70,27 @@ insert into availability_statuses (id, label, is_compliant) values
   (5, 'Indisponível', false)
 on conflict (id) do update set label = excluded.label, is_compliant = excluded.is_compliant;
 
+-- Criticality ranks ESO > A > B > C > D (verified 2026-09-27 against the
+-- dump: TAG suffix letter plus the groups_2 ESO flag). Three ordered steps
+-- (the FK is checked per statement, so the new rows must exist before the
+-- remap references them): (1) add the collision-free rank rows; (2) one-time
+-- remap of legacy binary rows - old 0 ('Não Crítica') becomes rank D (4),
+-- old 1 ('Crítica') stays 1 which is now rank A, guarded by the old label
+-- so re-runs never touch new ESO (0) rows; (3) relabel 0/1 to the ranks.
+-- The next poller cycle rewrites every in-scope row's rank anyway
+-- (criticality_id rides the sync signature).
 insert into criticality_levels (id, label) values
-  (0, 'Não Crítica'),
-  (1, 'Crítica')
+  (2, 'B'),
+  (3, 'C'),
+  (4, 'D')
+on conflict (id) do update set label = excluded.label;
+update barriers set criticality_id = 4 where criticality_id = 0
+  and exists (
+    select 1 from criticality_levels where id = 0 and label = 'Não Crítica'
+  );
+insert into criticality_levels (id, label) values
+  (0, 'ESO'),
+  (1, 'A')
 on conflict (id) do update set label = excluded.label;
 
 insert into categories (id, label) values

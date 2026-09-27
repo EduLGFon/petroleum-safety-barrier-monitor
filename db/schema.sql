@@ -177,6 +177,11 @@ drop index if exists idx_barriers_tag_trgm;
 create index if not exists idx_barriers_tag              on barriers using btree (tag);
 create index if not exists idx_barriers_status_since     on barriers(status_since);
 
+-- Scope provenance per barrier (which gate admitted the row: keyword, eso,
+-- keyword+eso, all). Added with the ESO-OR-keyword scope so narrowing the
+-- scope later stays reversible; the sync rewrites it on every touch.
+alter table barriers add column if not exists scope_source text not null default '';
+
 -- ─── Status history (one row per transition, newest last) ─────────────────
 
 create table if not exists barrier_status_history (
