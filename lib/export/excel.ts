@@ -10,7 +10,9 @@ import {
   ts,
 } from "./html.ts";
 
-import { CONF_COLORS, DISP_COLORS } from "../constants.ts";
+import { CONF_COLORS, CRIT_COLORS, DISP_COLORS } from "../constants.ts";
+
+import { isCriticalRankLabel } from "../enums/codes.ts";
 
 import { kpiStats, summaryRows } from "./summary.ts";
 
@@ -136,7 +138,7 @@ export function exportToExcel(
     const bg = idx % 2 === 0 ? "#F8FAFC" : "#FFFFFF";
     const disp = DISP_COLORS[String(b.availability)]?.solid ?? "#64748b";
     const conf = CONF_COLORS[String(b.compliance)]?.solid ?? "#64748b";
-    const isCrit = b.criticality === "Crítica";
+    const isCrit = isCriticalRankLabel(String(b.criticality));
     const cells = data[idx].map((v, ci) => {
       const base =
         "font-size:9pt;color:#1E293B;padding:3px 5px;white-space:normal;word-wrap:break-word;vertical-align:top;border:1pt solid #E2E8F0;";
@@ -157,7 +159,8 @@ export function exportToExcel(
         return `<td style="${base}text-align:center;">${pill(v, conf)}</td>`;
       }
       if (ci === 6) {
-        const c = isCrit ? "#F97316" : "#64748B";
+        const rank = String(b.criticality);
+        const c = CRIT_COLORS[rank]?.solid ?? "#64748B";
         const extra = isCrit ? `background:${c}1F;font-weight:bold;` : "";
         return `<td style="${base}text-align:center;color:${c};${extra}">${
           escHtml(v)

@@ -18,7 +18,7 @@ function mk(over: Partial<Barrier> = {}): Barrier {
     typology: "Estação Coletora",
     location: "FAL",
     locDesc: "FAL - Olinda",
-    criticality: "Não Crítica",
+    criticality: "D",
     category: "Válvula de Alívio de Pressão",
     grouping: "Sistemas de Alívio",
     owner: "Equipe de Manutenção",
@@ -149,7 +149,7 @@ Deno.test("kpiStats formats one Conforme and one critical NC", () => {
       id: 2,
       compliance: "Não Conforme",
       availability: "Indisponível",
-      criticality: "Crítica",
+      criticality: "A",
     }),
   ]);
   assertEquals(s.total, "2");
