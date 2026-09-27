@@ -4,7 +4,7 @@
 // live data. Empty props mean still loading or truly empty data: selects
 // show only the placeholder instead of a fixed seed list. Station filtering
 // stays on the location tabs; plan and date boxes hide via the Columns
-// dialog filters toggles.
+// dialog filters toggles; the rank gate defaults to critical tiers only.
 import { Combo, GLASS_INPUT } from "./filter/FilterSelect.tsx";
 
 import type { ColumnKey, PinnedKey } from "./table/columns.ts";
@@ -20,6 +20,30 @@ import type { ComponentChildren } from "preact";
 import { SearchIcon } from "./ui/Icons.tsx";
 
 import { AURORA } from "../lib/aurora.ts";
+
+// Rank gate as a Criticidade combo option: selecting it lists ESO/A only,
+// replacing the old standalone checkbox. Any rank selection turns the gate
+// off (otherwise B/C/D would self-empty); clearing the combo lists all.
+export const CRIT_ONLY_OPTION = "Somente críticas";
+
+// Canonical rank order for the combo; novel labels keep vocab order after.
+const CRIT_RANK_ORDER = ["ESO", "A", "B", "C", "D"];
+
+// critComboOpts: gate option first, known ranks pinned next, rest as-is.
+export function critComboOpts(vocabs: string[]): string[] {
+  const rest = vocabs.filter((v) => !CRIT_RANK_ORDER.includes(v));
+  const ranks = CRIT_RANK_ORDER.filter((r) => vocabs.includes(r));
+  return [CRIT_ONLY_OPTION, ...ranks, ...rest];
+}
+
+// critComboValue: resolves the displayed combo value from filter state.
+// The gate shows only when no single rank is picked; explicit rank wins.
+export function critComboValue(
+  criticality: string,
+  criticalOnly: boolean,
+): string {
+  return criticalOnly && !criticality ? CRIT_ONLY_OPTION : criticality;
+}
 
 export interface FilterVocabs {
   typologies: string[];
@@ -202,10 +226,15 @@ export function FilterBar(
         opts={vocabs.categories}
       />
       <Combo
-        value={filters.criticality}
-        onChange={(v) => onFilter({ criticality: v })}
+        value={critComboValue(filters.criticality, filters.criticalOnly)}
+        onChange={(v) =>
+          onFilter(
+            v === CRIT_ONLY_OPTION
+              ? { criticality: "", criticalOnly: true }
+              : { criticality: v, criticalOnly: false },
+          )}
         placeholder="Criticidade"
-        opts={vocabs.criticalities}
+        opts={critComboOpts(vocabs.criticalities)}
       />
       <Combo
         value={filters.availability}
