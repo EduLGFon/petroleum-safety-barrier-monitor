@@ -5,6 +5,8 @@
 // stays a thin persistence layer.
 import type { AlertRule } from "../sql/alert_rules.ts";
 
+import { isCriticalRankId } from "../../enums/codes.ts";
+
 export interface RuleTransition {
   categoryId: number;
   statusId: number;
@@ -25,7 +27,7 @@ export function matchesRule(t: RuleTransition, rule: AlertRule): boolean {
   if (rule.category_id !== null && rule.category_id !== t.categoryId) {
     return false;
   }
-  if (rule.critical_only && t.criticalityId !== 1) return false;
+  if (rule.critical_only && !isCriticalRankId(t.criticalityId)) return false;
   if (t.compliant && !rule.include_recovery) return false;
   if (
     !t.compliant && rule.to_status_id !== null &&

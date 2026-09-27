@@ -23,6 +23,8 @@ import { type AlertMailer, type RetryPolicy, sendWithRetry } from "./mailer.ts";
 
 import { compareUrgency } from "../../dashboard/urgent.ts";
 
+import { isCriticalRankId } from "../../enums/codes.ts";
+
 import type { ResolverLabels } from "../../resolve.ts";
 
 import type { AlertRule } from "../sql/alert_rules.ts";
@@ -244,7 +246,9 @@ export async function runAlertCycle(
           if (r.category_id !== null && r.category_id !== c.categoryId) {
             continue;
           }
-          if (r.critical_only && wire.criticalityId !== 1) continue;
+          if (r.critical_only && !isCriticalRankId(wire.criticalityId)) {
+            continue;
+          }
           staleEvents.push({
             barrierId: c.id,
             transitionDate: today,
@@ -256,7 +260,9 @@ export async function runAlertCycle(
               location: String(wire.locationId),
               availability: String(wire.availabilityId),
               criticality: String(wire.criticalityId),
-              urgency: wire.criticalityId === 1 ? "critical" : "urgent",
+              urgency: isCriticalRankId(wire.criticalityId)
+                ? "critical"
+                : "urgent",
               attempts: 0,
               lastError: null,
               deadLetter: false,
@@ -265,7 +271,9 @@ export async function runAlertCycle(
               immediate: r.notify_immediate,
               ...extractDetail(wire, today, wire.availabilityId, labels),
             },
-            urgency: wire.criticalityId === 1 ? "critical" : "urgent",
+            urgency: isCriticalRankId(wire.criticalityId)
+              ? "critical"
+              : "urgent",
           });
           break; // one stale event per barrier per run is enough
         }

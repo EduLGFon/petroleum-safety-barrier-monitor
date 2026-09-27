@@ -49,7 +49,7 @@ Deno.test("critical-only skips non-critical barriers", () => {
   const calm = {
     categoryId: 1,
     statusId: 5,
-    criticalityId: 0,
+    criticalityId: 2,
     compliant: false,
   };
   const crit = { ...calm, criticalityId: 1 };

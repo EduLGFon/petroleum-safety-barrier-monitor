@@ -13,7 +13,7 @@ import type { WireBarrier } from "../../wireTypes.ts";
 
 import { isUrgent } from "../../dashboard/urgent.ts";
 
-import { fromAvailabilityId } from "../../enums.ts";
+import { fromAvailabilityId, isCriticalRankId } from "../../enums.ts";
 
 import { isCompliant } from "../../constants.ts";
 
@@ -76,7 +76,7 @@ export async function detectUrgentTransitions(
     // candidate statusId - otherwise reverted transitions go invisible.
     const compliant = landingCompliant(c.statusId, statusInfo);
     const urgency = !compliant
-      ? (wire.criticalityId === 1 ? "critical" : "urgent")
+      ? (isCriticalRankId(wire.criticalityId) ? "critical" : "urgent")
       : "none";
     const match = matchRules(
       {

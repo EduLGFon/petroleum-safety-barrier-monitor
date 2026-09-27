@@ -128,13 +128,13 @@ Deno.test("detectUrgentTransitions tiers critical by criticality", async () => {
     (ids) => {
       const out = new Map<number, WireBarrier>();
       for (const id of ids) {
-        out.set(id, wire({ id, criticalityId: 0 }));
+        out.set(id, wire({ id, criticalityId: 3 }));
       }
       return Promise.resolve(out);
     },
     null,
   );
   assertStrictEquals(out.length, 1);
-  // criticalityId 0 is non-critical -> urgent, not critical
+  // criticalityId 3 (rank C) is non-critical -> urgent, not critical
   assertStrictEquals(out[0]!.urgency, "urgent");
 });
