@@ -3,6 +3,7 @@
 // cards (label / value / sub / signature-gradient progress). Only the
 // "Não Conformes" card carries the red glow.
 import { AURORA, AURORA_TYPE, progressWidth } from "../lib/aurora.ts";
+import { CriticalityStrip } from "./CriticalityStrip.tsx";
 import { useEffect, useRef, useState } from "preact/hooks";
 import type { KpiSnapshot } from "../lib/types.ts";
 import { fmt, pct } from "../lib/utils.ts";
@@ -138,74 +139,77 @@ export function KpiGrid({ kpi, location }: Props) {
   ];
 
   return (
-    <div
-      style={{
-        display: "grid",
-        gridTemplateColumns: "repeat(auto-fit,minmax(var(--d-kpi-min),1fr))",
-        gap: "var(--d-kpi-gap)",
-        marginBottom: "var(--d-section)",
-      }}
-    >
-      {cards.map((c) => (
-        <div
-          key={c.label}
-          className="animate-card-in glass-card"
-          style={{
-            background: AURORA.card,
-            border: `1px solid ${AURORA.cardBorder}`,
-            borderRadius: AURORA.cardRadius,
-            padding: "14px 16px",
-            boxShadow: c.alert ? AURORA.redGlow : "none",
-            minWidth: 0,
-            animationDelay: `${c.delay}ms`,
-          }}
-        >
+    <>
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(auto-fit,minmax(var(--d-kpi-min),1fr))",
+          gap: "var(--d-kpi-gap)",
+          marginBottom: "var(--d-section)",
+        }}
+      >
+        {cards.map((c) => (
           <div
+            key={c.label}
+            className="animate-card-in glass-card"
             style={{
-              fontSize: AURORA_TYPE.kpiLabel.fontSize,
-              letterSpacing: AURORA_TYPE.kpiLabel.letterSpacing,
-              fontWeight: AURORA_TYPE.kpiLabel.fontWeight,
-              color: AURORA.label,
-              textTransform: "uppercase",
+              background: AURORA.card,
+              border: `1px solid ${AURORA.cardBorder}`,
+              borderRadius: AURORA.cardRadius,
+              padding: "14px 16px",
+              boxShadow: c.alert ? AURORA.redGlow : "none",
+              minWidth: 0,
+              animationDelay: `${c.delay}ms`,
             }}
           >
-            {c.label.toUpperCase()}
-          </div>
-          <div
-            className="tnum"
-            style={{
-              fontFamily: "var(--font-display)",
-              fontSize: AURORA_TYPE.kpiValue.fontSize,
-              fontWeight: AURORA_TYPE.kpiValue.fontWeight,
-              color: AURORA.value,
-              letterSpacing: AURORA_TYPE.kpiValue.letterSpacing,
-            }}
-          >
-            <AnimVal n={c.rawNum} isPercent={c.isPercent} />
-          </div>
-          <div style={{ fontSize: 12, color: AURORA.sub }}>{c.sub}</div>
-          {c.share !== undefined && (
             <div
               style={{
-                height: 3,
-                borderRadius: 99,
-                marginTop: 10,
-                background: AURORA.track,
+                fontSize: AURORA_TYPE.kpiLabel.fontSize,
+                letterSpacing: AURORA_TYPE.kpiLabel.letterSpacing,
+                fontWeight: AURORA_TYPE.kpiLabel.fontWeight,
+                color: AURORA.label,
+                textTransform: "uppercase",
               }}
             >
+              {c.label.toUpperCase()}
+            </div>
+            <div
+              className="tnum"
+              style={{
+                fontFamily: "var(--font-display)",
+                fontSize: AURORA_TYPE.kpiValue.fontSize,
+                fontWeight: AURORA_TYPE.kpiValue.fontWeight,
+                color: AURORA.value,
+                letterSpacing: AURORA_TYPE.kpiValue.letterSpacing,
+              }}
+            >
+              <AnimVal n={c.rawNum} isPercent={c.isPercent} />
+            </div>
+            <div style={{ fontSize: 12, color: AURORA.sub }}>{c.sub}</div>
+            {c.share !== undefined && (
               <div
                 style={{
-                  width: progressWidth(c.share),
-                  height: "100%",
+                  height: 3,
                   borderRadius: 99,
-                  background: AURORA.grad,
-                  transition: "width .7s var(--ease-out)",
+                  marginTop: 10,
+                  background: AURORA.track,
                 }}
-              />
-            </div>
-          )}
-        </div>
-      ))}
-    </div>
+              >
+                <div
+                  style={{
+                    width: progressWidth(c.share),
+                    height: "100%",
+                    borderRadius: 99,
+                    background: AURORA.grad,
+                    transition: "width .7s var(--ease-out)",
+                  }}
+                />
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+      <CriticalityStrip byCriticality={kpi.byCriticality} />
+    </>
   );
 }
