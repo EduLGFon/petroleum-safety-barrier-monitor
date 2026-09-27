@@ -10,7 +10,7 @@ import { resolveBarriers } from "../resolve.ts";
 
 import type { BarriersApi } from "./types.ts";
 
-import { fromLocationId } from "../enums.ts";
+import { fromLocationId, isCriticalRankId } from "../enums.ts";
 
 import { getWireBarriers } from "../data.ts";
 
@@ -44,6 +44,9 @@ function matchesQuery(w: WireBarrier, q: BarriersQuery): boolean {
   if (
     q.criticalityId !== undefined && w.criticalityId !== q.criticalityId
   ) return false;
+  if (q.criticalOnly === true && !isCriticalRankId(w.criticalityId)) {
+    return false;
+  }
   if (q.hasActionPlan !== undefined) {
     const has = w.actionPlan.trim() !== "";
     if (has !== q.hasActionPlan) return false;

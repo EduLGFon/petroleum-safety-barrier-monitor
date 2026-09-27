@@ -103,6 +103,9 @@ export interface BarriersQuery {
   typologyId?: number;
   // Action-plan presence: true = with plan, false = without.
   hasActionPlan?: boolean;
+  // Critical-tiers gate: true lists only ESO/A ranks. Absent (or false)
+  // lists every rank; the dashboard sends true unless the user opts out.
+  criticalOnly?: boolean;
   query?: string;
   // Inclusive ISO-date bounds (YYYY-MM-DD) applied to status_since.
   since?: string;

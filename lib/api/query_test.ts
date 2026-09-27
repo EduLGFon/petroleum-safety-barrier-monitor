@@ -133,11 +133,17 @@ Deno.test("toWireQuery maps plan presence to hasActionPlan", () => {
 });
 
 Deno.test("toWireQuery maps criticality to id, warns on unknown", () => {
-  assertEquals(toWireQuery({ criticality: "Crítica" }), { criticalityId: 1 });
+  assertEquals(toWireQuery({ criticality: "A" }), { criticalityId: 1 });
   const warnings = collectWarnings(() => {
     assertEquals(toWireQuery({ criticality: "Talvez" }), {});
   });
   assertStrictEquals(warnings.length, 1);
+});
+
+Deno.test("toWireQuery passes criticalOnly through when true", () => {
+  assertEquals(toWireQuery({ criticalOnly: true }), { criticalOnly: true });
+  assertEquals(toWireQuery({ criticalOnly: false }), {});
+  assertEquals(toWireQuery({}), {});
 });
 
 Deno.test("toWireQuery maps typology to id, warns on unknown", () => {

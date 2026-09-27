@@ -26,6 +26,7 @@ export interface BarriersApi {
       | "categoryId"
       | "typologyId"
       | "criticalityId"
+      | "criticalOnly"
       | "hasActionPlan"
       | "query"
       | "since"
@@ -42,6 +43,7 @@ export interface BarriersApi {
       | "categoryId"
       | "typologyId"
       | "criticalityId"
+      | "criticalOnly"
       | "hasActionPlan"
       | "query"
       | "since"
@@ -58,6 +60,8 @@ export interface DomainQuery {
   typology?: string;
   criticality?: string;
   plan?: string; // '' | 'Com plano' | 'Sem plano'
+  // Rank gate passthrough (true = ESO/A only); undefined = every rank.
+  criticalOnly?: boolean;
   query?: string;
   // Inclusive ISO-date bounds (YYYY-MM-DD) on statusSince.
   since?: string;

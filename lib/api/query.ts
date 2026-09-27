@@ -72,6 +72,7 @@ export function toWireQuery(
   if (f.plan === "Com plano") q.hasActionPlan = true;
   else if (f.plan === "Sem plano") q.hasActionPlan = false;
   else if (f.plan) console.warn(`[toWireQuery] unknown plan: ${f.plan}`);
+  if (f.criticalOnly === true) q.criticalOnly = true;
   if (f.criticality) {
     const id = toCriticalityId(f.criticality as never);
     if (id === undefined) {
