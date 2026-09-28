@@ -184,11 +184,16 @@ Deno.test("useFilterState counts the critical gate as an active filter", async (
 Deno.test("useFilterState resetFilters returns filters to defaults", async () => {
   const hh = await renderHook(useFilterState);
   hh.get().setFilter({ query: "pump" });
+  // A station tab counts as an active filter, so the reset takes it back to
+  // Todas too: otherwise "Limpar filtros" would leave the table narrowed.
+  hh.get().setLocation("FAL");
   await hh.rerender();
+  assertStrictEquals(hh.get().hasActiveFilters, true);
   hh.get().resetFilters();
   await hh.rerender();
   const f = hh.get();
   assertStrictEquals(f.filters.query, "");
   assertStrictEquals(f.filters.page, 1);
+  assertStrictEquals(f.location, "ALL");
   assertStrictEquals(f.hasActiveFilters, false);
 });

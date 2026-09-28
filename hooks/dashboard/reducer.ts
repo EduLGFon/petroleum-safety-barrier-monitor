@@ -34,7 +34,11 @@ export function reducer(s: State, a: Action): State {
       return { ...s, filters: { ...s.filters, sortCol: col, sortDir: dir } };
     }
     case "RESET_FILTERS":
-      return { ...s, filters: defaultFilters() };
+      // "Limpar filtros" clears everything that narrows the table, including
+      // the station tab: leaving a FAL behind would keep the button's promise
+      // (show every barrier) unfulfilled while hasActiveFilters still reports
+      // an active filter.
+      return { location: "ALL", filters: defaultFilters() };
     case "RESTORE": {
       const { location, ...rest } = a.payload;
       return {

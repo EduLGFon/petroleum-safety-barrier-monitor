@@ -57,8 +57,9 @@ Deno.test("SET_SORT to a new column starts ascending", () => {
   assertEquals(next.filters.sortDir, "asc");
 });
 
-Deno.test("RESET_FILTERS returns fresh defaults", () => {
+Deno.test("RESET_FILTERS returns fresh defaults and the Todas station", () => {
   const s = state({
+    location: "FAL",
     filters: {
       ...defaultFilters(),
       query: "x",

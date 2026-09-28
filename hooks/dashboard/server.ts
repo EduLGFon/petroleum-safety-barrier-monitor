@@ -243,7 +243,8 @@ export function useServerDashboard(
     setLoc(code);
     clearAll();
   }, [setLoc, clearAll]);
-  // Resets filters to defaults and clears selection; persisted via saveDash effect.
+  // Resets filters and the station tab to defaults, and clears selection;
+  // persisted via saveDash effect.
   const resetFilters = useCallback(() => {
     resetFil();
     clearAll();

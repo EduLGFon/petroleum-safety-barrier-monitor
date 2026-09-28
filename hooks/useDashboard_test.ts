@@ -116,15 +116,18 @@ Deno.test("useDashboard setLocation narrows scope and clears selection", async (
   assertStrictEquals(d.rows.length, 2);
 });
 
-Deno.test("useDashboard resetFilters clears query and selection", async () => {
+Deno.test("useDashboard resetFilters clears query, station and selection", async () => {
   const hh = await renderHook(useDashboard, { args: [ALL] });
   hh.get().setFilter({ query: "pump" });
+  hh.get().setLocation("FAL");
   hh.get().toggleSelect(1);
   await hh.rerender(ALL);
   hh.get().resetFilters();
   await hh.rerender(ALL);
   const d = hh.get();
   assertStrictEquals(d.filters.query, "");
+  assertStrictEquals(d.location, "ALL");
+  assertStrictEquals(d.hasActiveFilters, false);
   assertEquals(d.selectedIds, new Set());
 });
 
