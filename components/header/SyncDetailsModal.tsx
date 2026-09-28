@@ -1,8 +1,7 @@
-// SyncDetailsModal - full sync audit dialog (items, technical note).
+// SyncDetailsModal - tabbed sync audit dialog (last run + last 24h).
 // This is why it exists: the hover card stays a skim-friendly summary;
-// everything verbose (full item list with timestamps, raw scope,
-// untruncated note) lives here behind "Ver detalhes". Dialog behavior
-// mirrors BarrierModal (ESC, backdrop dismiss, body lock, focus trap).
+// per-barrier analysis (filter, search, paging, expand-for-diff) lives here.
+// Rows load snapshots lazily so the modal never fetches all diffs at once.
 import {
   formatDuration,
   formatInstant,
@@ -12,35 +11,33 @@ import {
   toHealthKind,
 } from "../../lib/sync-indicator.ts";
 
-import type { SyncChange, SyncStatus } from "../../lib/types.ts";
-
-import { Row, SectionTitle, Stat } from "./SyncHoverCard.tsx";
-
-import { useCallback, useEffect, useRef } from "preact/hooks";
+import { useCallback, useEffect, useRef, useState } from "preact/hooks";
 
 import { lockBody, unlockBody } from "../../lib/body-lock.ts";
 
 import type { Conn } from "../../hooks/useConnection.ts";
 
+import { Row, SectionTitle } from "./SyncHoverCard.tsx";
+
+import { SyncChangesList } from "./SyncChangesList.tsx";
+
+import type { SyncStatus } from "../../lib/types.ts";
+
 interface Props {
   sync: SyncStatus;
   conn: Conn;
-  changes: SyncChange[] | null;
+  baseUrl: string;
   onClose: () => void;
+  onOpenBarrier?: (barrierId: number) => void;
 }
 
-// KIND_WORD: plain pt-BR kind name plus marker tone per change kind.
-const KIND_WORD: Record<SyncChange["kind"], { word: string; color: string }> = {
-  new: { word: "Nova", color: "#17c964" },
-  updated: { word: "Atualizada", color: "#f5a524" },
-  removed: { word: "Removida", color: "#f31260" },
-};
-
-// SyncDetailsModal: fixed overlay plus scrollable audit panel.
-export function SyncDetailsModal({ sync, conn, changes, onClose }: Props) {
+export function SyncDetailsModal(
+  { sync, conn, baseUrl, onClose, onOpenBarrier }: Props,
+) {
   const run = sync.lastRun;
   const kind = toHealthKind(sync, conn);
   const end = run ? formatInstant(run.finishedAt) : null;
+  const [tab, setTab] = useState<"last-run" | "last-day">("last-run");
   const onKey = useCallback((e: KeyboardEvent) => {
     if (e.key === "Escape") onClose();
   }, [onClose]);
@@ -116,8 +113,8 @@ export function SyncDetailsModal({ sync, conn, changes, onClose }: Props) {
         <div
           style={{
             width: "100%",
-            maxWidth: 440,
-            maxHeight: "84dvh",
+            maxWidth: 520,
+            maxHeight: "86dvh",
             display: "flex",
             flexDirection: "column",
             background: "var(--au-dialog)",
@@ -190,125 +187,10 @@ export function SyncDetailsModal({ sync, conn, changes, onClose }: Props) {
                   v={formatDuration(run.startedAt, run.finishedAt)}
                 />
                 <Row k="Origem" v={friendlyScope(run.scope)} />
-                <Row k="Código" v={run.scope} />
                 <Row
                   k="Resultado"
                   v={run.status === "ok" ? "Concluída" : "Falhou"}
                 />
-              </div>
-            )}
-            {run && (
-              <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                <SectionTitle text="O QUE MUDOU" />
-                <div
-                  style={{
-                    display: "grid",
-                    gridTemplateColumns: "1fr 1fr",
-                    border: "1px solid var(--au-row)",
-                    borderRadius: 8,
-                  }}
-                >
-                  <Stat value={run.inserts} caption="Novas" color="#17c964" />
-                  <Stat
-                    value={run.updates}
-                    caption="Atualizadas"
-                    color="#f5a524"
-                  />
-                  <Stat
-                    value={run.deletes}
-                    caption="Removidas"
-                    color="#f31260"
-                  />
-                  <Stat
-                    value={run.skips}
-                    caption="Sem alteração"
-                    color="#a1a1aa"
-                  />
-                </div>
-              </div>
-            )}
-            {run && (
-              <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                <SectionTitle
-                  text={changes === null
-                    ? "ITENS ALTERADOS"
-                    : `ITENS ALTERADOS (${changes.length})`}
-                />
-                {changes === null && (
-                  <div style={{ color: "var(--au-sub)", fontSize: 11 }}>
-                    Carregando itens…
-                  </div>
-                )}
-                {changes !== null && changes.length === 0 && (
-                  <div style={{ color: "var(--au-sub)", fontSize: 11 }}>
-                    Nenhum item alterado nesta sincronização.
-                  </div>
-                )}
-                {changes !== null && changes.map((c) => {
-                  const meta = KIND_WORD[c.kind];
-                  const at = formatInstant(c.changedAt);
-                  return (
-                    <div
-                      key={`${c.kind}-${c.barrierId}`}
-                      style={{
-                        display: "flex",
-                        flexDirection: "column",
-                        gap: 1,
-                        padding: "6px 8px",
-                        border: "1px solid var(--au-row)",
-                        borderRadius: 8,
-                      }}
-                    >
-                      <div
-                        style={{
-                          display: "flex",
-                          alignItems: "center",
-                          gap: 6,
-                          minWidth: 0,
-                        }}
-                      >
-                        <span
-                          style={{
-                            fontSize: 10,
-                            fontWeight: 800,
-                            color: meta.color,
-                            background:
-                              `color-mix(in srgb, ${meta.color} 13%, transparent)`,
-                            borderRadius: 4,
-                            padding: "1px 5px",
-                            flexShrink: 0,
-                          }}
-                        >
-                          {meta.word}
-                        </span>
-                        <span
-                          style={{
-                            fontFamily: "var(--font-mono)",
-                            fontSize: 12,
-                            color: "var(--au-value)",
-                            overflow: "hidden",
-                            textOverflow: "ellipsis",
-                            whiteSpace: "nowrap",
-                          }}
-                        >
-                          {c.tag}
-                        </span>
-                      </div>
-                      <div
-                        style={{
-                          fontSize: 11,
-                          color: "var(--au-sub)",
-                          overflow: "hidden",
-                          textOverflow: "ellipsis",
-                          whiteSpace: "nowrap",
-                        }}
-                      >
-                        {[c.location, c.status, at?.dateTime].filter(Boolean)
-                          .join(" · ")}
-                      </div>
-                    </div>
-                  );
-                })}
               </div>
             )}
             {run?.note && (
@@ -324,6 +206,63 @@ export function SyncDetailsModal({ sync, conn, changes, onClose }: Props) {
                   {run.note}
                 </div>
               </div>
+            )}
+            {run && (
+              <div
+                style={{ display: "flex", gap: 6 }}
+                role="tablist"
+                aria-label="Escopo das alterações"
+              >
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={tab === "last-run"}
+                  onClick={() => setTab("last-run")}
+                  style={{
+                    flex: 1,
+                    border: "1px solid var(--au-card-border)",
+                    background: tab === "last-run"
+                      ? "var(--au-row)"
+                      : "transparent",
+                    color: "var(--au-pill-text)",
+                    borderRadius: 8,
+                    padding: "6px 8px",
+                    cursor: "pointer",
+                    fontSize: 12,
+                    fontWeight: tab === "last-run" ? 700 : 400,
+                  }}
+                >
+                  Última sync
+                </button>
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={tab === "last-day"}
+                  onClick={() => setTab("last-day")}
+                  style={{
+                    flex: 1,
+                    border: "1px solid var(--au-card-border)",
+                    background: tab === "last-day"
+                      ? "var(--au-row)"
+                      : "transparent",
+                    color: "var(--au-pill-text)",
+                    borderRadius: 8,
+                    padding: "6px 8px",
+                    cursor: "pointer",
+                    fontSize: 12,
+                    fontWeight: tab === "last-day" ? 700 : 400,
+                  }}
+                >
+                  Últimas 24h
+                </button>
+              </div>
+            )}
+            {run && baseUrl && (
+              <SyncChangesList
+                baseUrl={baseUrl}
+                scope={tab}
+                onOpenBarrier={onOpenBarrier}
+              />
             )}
             <div
               style={{
