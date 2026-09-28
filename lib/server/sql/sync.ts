@@ -128,6 +128,7 @@ export const defaultSyncIo: SyncIo = {
       location_id: number;
       availability_id: number;
       deleted_at: string | null;
+      is_active: boolean | null;
       tag: string;
       typology_id: number;
       loc_desc_id: number;
@@ -140,6 +141,7 @@ export const defaultSyncIo: SyncIo = {
       scope_source: string | null;
     }>(
       `select id, external_code, location_id, availability_id, deleted_at,
+         is_active,
          tag, typology_id, loc_desc_id, criticality_id, category_id,
          grouping_id, owner_id, comments, action_plan,
          coalesce(scope_source, '') as scope_source
@@ -161,6 +163,8 @@ export const defaultSyncIo: SyncIo = {
         ownerId: r.owner_id,
         comments: r.comments,
         actionPlan: r.action_plan,
+        // Pre-migration rows read null; treat as enabled (the old default).
+        isActive: r.is_active ?? true,
         scopeSource: r.scope_source ?? "",
       };
       return {
@@ -267,8 +271,8 @@ export const defaultSyncIo: SyncIo = {
            tag = $2, location_id = $3, typology_id = $4, loc_desc_id = $5,
            criticality_id = $6, category_id = $7, grouping_id = $8,
            owner_id = $9, comments = $10, action_plan = $11,
-           source_updated_at = $12, scope_source = $13,
-           deleted_at = case when $14 then null else deleted_at end
+           source_updated_at = $12, scope_source = $13, is_active = $14,
+           deleted_at = case when $15 then null else deleted_at end
          where id = $1`,
         [
           entry.local.id,
@@ -284,6 +288,7 @@ export const defaultSyncIo: SyncIo = {
           input.actionPlan,
           input.sourceUpdatedAt,
           input.scopeSource,
+          input.isActive,
           entry.kind === "restore",
         ],
       );
@@ -364,6 +369,7 @@ async function insertBarrier(input: {
   ownerId: number | null;
   availabilityId: number;
   scopeSource: string;
+  isActive: boolean;
   comments: string;
   actionPlan: string;
   sourceUpdatedAt: string | null;
@@ -373,8 +379,8 @@ async function insertBarrier(input: {
        (external_code, tag, location_id, typology_id, loc_desc_id,
         criticality_id, category_id, grouping_id, owner_id,
         availability_id, comments, action_plan, status_since,
-        source_updated_at, scope_source)
-     values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, current_date, $13, $14)
+        source_updated_at, scope_source, is_active)
+     values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, current_date, $13, $14, $15)
      on conflict (external_code) do nothing
      returning id`,
     [
@@ -392,6 +398,7 @@ async function insertBarrier(input: {
       input.actionPlan,
       input.sourceUpdatedAt,
       input.scopeSource,
+      input.isActive,
     ],
   );
   return rows[0]?.id ?? null;

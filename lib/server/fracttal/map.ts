@@ -65,6 +65,10 @@ export interface SyncBarrierInput {
   comments: string;
   actionPlan: string;
   sourceUpdatedAt: string | null;
+  // Upstream enable flag (Fracttal `active`, default true). False marks a
+  // Desativada row; it never changes availability derivation, only the
+  // admin Situacao filter visibility.
+  isActive: boolean;
   // Scope provenance (keyword / eso / keyword+eso): which gate admitted the
   // row. Rides the sync signature so scope edits rewrite every touched row.
   scopeSource: string;
@@ -209,6 +213,9 @@ export function mapAsset(
       // event date, else the out-of-service date, else unknown (null).
       sourceUpdatedAt: work?.urgent?.date ?? work?.planned?.date ??
         outOfServiceDate,
+      // Upstream enable flag; null/unknown means enabled (fail-open to
+      // visible, the pre-flag behavior for old fixtures and dumps).
+      isActive: asset.active ?? true,
       scopeSource,
     },
   };

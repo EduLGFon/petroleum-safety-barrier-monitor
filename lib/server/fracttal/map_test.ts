@@ -135,6 +135,19 @@ Deno.test("mapAsset defaults unparseable criticality to rank D with a warning", 
   assertStrictEquals(mapped.warnings.length, 1);
 });
 
+Deno.test("mapAsset preserves the upstream active flag without changing availability", () => {
+  const disabled = mapAsset(asset({ active: false, available: true }), ctx);
+  if (!disabled.ok) throw new Error("expected ok");
+  assertStrictEquals(disabled.input.isActive, false);
+  assertStrictEquals(disabled.input.availabilityId, AVAILABILITY_AVAILABLE);
+  const enabled = mapAsset(asset({ active: true }), ctx);
+  if (!enabled.ok) throw new Error("expected ok");
+  assertStrictEquals(enabled.input.isActive, true);
+  const unknown = mapAsset(asset({ active: null }), ctx);
+  if (!unknown.ok) throw new Error("expected ok");
+  assertStrictEquals(unknown.input.isActive, true);
+});
+
 Deno.test("mapAsset ranks ESO above the TAG suffix letter", () => {
   const mapped = mapAsset(
     asset({

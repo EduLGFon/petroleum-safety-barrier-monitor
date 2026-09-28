@@ -17,6 +17,7 @@ Deno.test("diffSignatureFields names changed keys plus availability", () => {
     ownerId: null,
     comments: "",
     actionPlan: "",
+    isActive: true,
     scopeSource: "all",
   };
   const same = { ...old };

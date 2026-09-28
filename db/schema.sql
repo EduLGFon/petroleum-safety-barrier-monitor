@@ -279,7 +279,7 @@ create index if not exists idx_sync_state_status on sync_state(status, started_a
 -- never explain "what changed on barrier X" without loading everything.
 -- changed_fields names the SignatureSource keys that differed
 -- (tag, locationId, typologyId, locDescId, criticalityId, categoryId,
--- groupingId, ownerId, comments, actionPlan, scopeSource) plus
+-- groupingId, ownerId, comments, actionPlan, isActive, scopeSource) plus
 -- "availabilityId" when the status flipped. Snapshots are compact JSON with
 -- the same keys plus availabilityId, so the detail view renders before/after
 -- without a second lookup. Rows are written by applyPlan() in

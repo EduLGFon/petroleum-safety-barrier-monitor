@@ -79,6 +79,8 @@ export interface SyncIo {
 
 // SignatureSource: the fields that drive change detection (shared with
 // the SQL repo so stored-row signatures and planner signatures never drift).
+// isActive rides the signature so an upstream enable/disable flip rewrites
+// the row and lands in changed_fields for the audit trail.
 export type SignatureSource = Pick<
   SyncBarrierInput,
   | "tag"
@@ -91,6 +93,7 @@ export type SignatureSource = Pick<
   | "ownerId"
   | "comments"
   | "actionPlan"
+  | "isActive"
   | "scopeSource"
 >;
 
@@ -109,6 +112,7 @@ export function fieldsSignature(input: SignatureSource): string {
     input.ownerId,
     input.comments,
     input.actionPlan,
+    input.isActive,
     input.scopeSource,
   ]);
 }
@@ -128,6 +132,7 @@ export const SIGNATURE_FIELD_KEYS = [
   "ownerId",
   "comments",
   "actionPlan",
+  "isActive",
   "scopeSource",
 ] as const;
 export function diffSignatureFields(

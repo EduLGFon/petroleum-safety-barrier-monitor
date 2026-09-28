@@ -37,6 +37,7 @@ function baseInput(over: Partial<SyncBarrierInput> = {}): SyncBarrierInput {
     comments: "",
     actionPlan: "",
     sourceUpdatedAt: null,
+    isActive: true,
     scopeSource: "keyword",
     ...over,
   };
@@ -159,6 +160,15 @@ Deno.test("countPlan totals a mixed plan", () => {
   assertStrictEquals(plan.counts.updates, 0);
   assertStrictEquals(plan.counts.deletes, 1);
   assertStrictEquals(plan.counts.skips, 1);
+});
+
+Deno.test("planReconcile updates on an upstream active flag flip", () => {
+  const local = [localRow()];
+  const plan = planReconcile([baseInput({ isActive: false })], local);
+  const entry = plan.entries[0];
+  assertStrictEquals(entry.kind, "update");
+  if (entry.kind !== "update") throw new Error("unreachable");
+  assertStrictEquals(entry.statusChanged, false);
 });
 
 // ---- runSync with an injected fake io ----

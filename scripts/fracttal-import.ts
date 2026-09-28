@@ -55,6 +55,7 @@ const BARRIER_COLS = [
   "status_since",
   "external_code",
   "scope_source",
+  "is_active",
   "origin",
   "install_local",
   "equip_typology",
@@ -168,6 +169,8 @@ interface EquipmentRow {
   groups2Description: string;
   prioritiesDescription: string;
   outOfServiceDate: string | null;
+  // Upstream enable flag; unknown values default to enabled downstream.
+  isActive: boolean;
 }
 
 // Aggregated per-barrier state built while scanning WOs/WRs. Work-event
@@ -341,6 +344,10 @@ async function main() {
       groups2Description: str(row.groups_2_description),
       prioritiesDescription: str(row.priorities_description),
       outOfServiceDate: isoDate(row.initial_date_out_of_service),
+      // Dump `active` semantics are unverified for status derivation, but
+      // the flag itself is preserved so the admin Situacao filter can list
+      // Desativada rows. Non-boolean values default to enabled.
+      isActive: row.active === false ? false : true,
       station,
       category,
       scope: sources.join("+") || "all",
@@ -353,6 +360,8 @@ async function main() {
     `Pass A (equipment): ${equipmentSeen} rows, ${candidates} barrier candidates, ` +
       `${stations.size} stations, ${categories.size} categories, ${excluded} excluded`,
   );
+  const disabledSeen = [...barriers.values()].filter((b) => !b.isActive).length;
+  console.log(`  disabled upstream (active=false): ${disabledSeen}`);
 
   // ── Pass B / C: work orders + work requests ──────────────────────────────
   let woSeen = 0;
@@ -502,6 +511,7 @@ async function main() {
         status_since: s.statusSince,
         external_code: acc.code,
         scope_source: acc.scope,
+        is_active: acc.isActive,
       };
     });
     const insert = buildInsert(
