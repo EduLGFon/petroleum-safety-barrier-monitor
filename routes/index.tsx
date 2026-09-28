@@ -75,7 +75,11 @@ export default define.page(async function Home(
       </main>
     );
   }
-  const barriers = await api.getAllBarriers({});
+  const barriers = await api.getAllBarriers(
+    // Admins receive every row so the Situacao filter can list Desativada
+    // and Excluida scopes client-side; everyone else gets the active view.
+    sessionUser?.role === "admin" ? { rowScope: "all" } : {},
+  );
   return (
     <main style={PAGE_STYLE}>
       <Dashboard
