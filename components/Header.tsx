@@ -9,11 +9,11 @@ import {
   toHealthKind,
 } from "../lib/sync-indicator.ts";
 
-import type { AuthUser, SyncChange, SyncStatus } from "../lib/types.ts";
-
 import { type Conn, useConnection } from "../hooks/useConnection.ts";
 
 import { SyncDetailsModal } from "./header/SyncDetailsModal.tsx";
+
+import type { AuthUser, SyncStatus } from "../lib/types.ts";
 
 import { SyncHoverCard } from "./header/SyncHoverCard.tsx";
 
@@ -37,9 +37,8 @@ interface Props {
   // Live sync status for the merged indicator (HTTP mode only). Null hides
   // the subtitle line and hover card; the dot falls back to connection only.
   syncStatus?: SyncStatus | null;
-  // Barriers touched by recent sync runs for the card's "what changed"
-  // section. Null hides the section (loading or mock mode).
-  syncChanges?: SyncChange[] | null;
+  // Opens one barrier in the dashboard modal (from sync detail rows).
+  onOpenBarrier?: (barrierId: number) => void;
 }
 
 type ConnState = Conn;
@@ -95,7 +94,7 @@ export function Header(
     apiBaseUrl = "",
     sessionUser = null,
     syncStatus = null,
-    syncChanges = null,
+    onOpenBarrier,
   }: Props,
 ) {
   const healthUrl = apiBaseUrl
@@ -305,8 +304,9 @@ export function Header(
         <SyncDetailsModal
           sync={syncStatus}
           conn={conn}
-          changes={syncChanges}
+          baseUrl={apiBaseUrl}
           onClose={() => setDetailsOpen(false)}
+          onOpenBarrier={onOpenBarrier}
         />
       )}
     </>

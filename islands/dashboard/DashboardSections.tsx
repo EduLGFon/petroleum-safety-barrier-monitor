@@ -1,16 +1,11 @@
 // Dashboard sections - page shell with every dashboard section.
 // Why: client (mock) and server (HTTP) modes share one render tree; only the
 // data hook feeding `dash` differs. Settings defaults gate lives here too.
-import type {
-  AuthUser,
-  Barrier,
-  SyncChange,
-  SyncStatus,
-} from "../../lib/types.ts";
-
 import { TableStatusRow } from "../../components/table/TableStatusRow.tsx";
 
 import { DashboardFooter, DashboardOverlays } from "./DashboardChrome.tsx";
+
+import type { AuthUser, Barrier, SyncStatus } from "../../lib/types.ts";
 
 import { LocationFilter } from "../../components/LocationFilter.tsx";
 
@@ -65,9 +60,6 @@ interface SectionsProps {
   serverMode: boolean;
   // Live sync status for the header health indicator (HTTP mode only).
   syncStatus?: SyncStatus | null;
-  // Barriers touched by recent sync runs for the card's "what changed"
-  // section (HTTP mode only; null hides the section).
-  syncChanges?: SyncChange[] | null;
   // Authenticated session identity for the Header user menu. Null when the
   // island renders without SSR identity (never in production page flow).
   sessionUser?: AuthUser | null;
@@ -101,7 +93,6 @@ export function DashboardSections(
     serverMode,
     sessionUser = null,
     syncStatus = null,
-    syncChanges = null,
     apiBaseUrl = "",
     onServerExport,
   }: SectionsProps,
@@ -212,7 +203,7 @@ export function DashboardSections(
           apiBaseUrl={apiBaseUrl}
           sessionUser={sessionUser}
           syncStatus={syncStatus ?? null}
-          syncChanges={syncChanges ?? null}
+          onOpenBarrier={(id) => setOpenId(id)}
         />
 
         {/* Location tabs */}

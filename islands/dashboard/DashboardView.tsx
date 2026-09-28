@@ -5,8 +5,6 @@ import type { AuthUser, Barrier, Vocabularies } from "../../lib/types.ts";
 
 import { ServerErrorBanner, ServerErrorCard } from "./ServerError.tsx";
 
-import { useSyncChanges } from "../../hooks/dashboard/sync-changes.ts";
-
 import { useServerDashboard } from "../../hooks/dashboard/server.ts";
 
 import { useSyncStatus } from "../../hooks/dashboard/sync-status.ts";
@@ -150,7 +148,6 @@ function ServerView(
   // Sync indicator polls every minute with a 15s fast lane while a run is
   // in flight (HTTP mode only; mock mode has no sync to report).
   const syncStatus = useSyncStatus(baseUrl, 60_000, 15_000, true);
-  const syncChanges = useSyncChanges(baseUrl, 60_000, true);
 
   // Fade the shell in once the first scope resolves; later refetches keep
   // showing stale data instead of flashing the splash on every keystroke,
@@ -191,7 +188,6 @@ function ServerView(
         serverMode
         sessionUser={sessionUser}
         syncStatus={syncStatus}
-        syncChanges={syncChanges}
         apiBaseUrl={baseUrl}
         onServerExport={exportServer}
       />

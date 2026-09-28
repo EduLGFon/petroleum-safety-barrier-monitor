@@ -10,14 +10,23 @@ import type {
 } from "../../lib/types.ts";
 
 import { useCallback, useEffect, useMemo, useState } from "preact/hooks";
-import { exportFromServer } from "./export-server.ts";
+
 import { restoreSelection, useSelection } from "./selection.ts";
+
 import { httpAdapterFactory } from "../../lib/api/http.ts";
+
 import type { BarriersApi } from "../../lib/api/types.ts";
+
 import { useVisibleColumns } from "./visible-columns.ts";
-import type { Fmt } from "../../lib/export/format.ts";
+
 import { filterScope, scopeWireQuery } from "./scope.ts";
+
+import { exportFromServer } from "./export-server.ts";
+
+import type { Fmt } from "../../lib/export/format.ts";
+
 import { isAuthExpired } from "../../lib/api/http.ts";
+
 import { loadDash, saveDash } from "./persistence.ts";
 
 import { useFilterState } from "./filter-state.ts";
@@ -284,11 +293,27 @@ export function useServerDashboard(
     setSelectedIds(new Set(all.map((b) => b.id)));
   }, [adapter, scopeQuery, setSelectedIds]);
 
-  // Detail resolves from the current page only; a persisted id from another
-  // page re-resolves when the user navigates back to it.
-  const openBarrier = openId
-    ? items.find((b) => b.id === openId) ?? null
-    : null;
+  // Detail resolves from the current page; when the id is not on this page
+  // (e.g. opened from the sync-changes modal), fetch it on demand so the
+  // modal still opens. The fetched row clears on page hit or close.
+  const [fetchedBarrier, setFetchedBarrier] = useState<Barrier | null>(null);
+  const pageHit = openId ? items.find((b) => b.id === openId) ?? null : null;
+  useEffect(() => {
+    if (!openId || pageHit) {
+      setFetchedBarrier(null);
+      return;
+    }
+    let cancelled = false;
+    adapter.getBarrierById(openId).then((b) => {
+      if (!cancelled) setFetchedBarrier(b);
+    }).catch(() => {
+      if (!cancelled) setFetchedBarrier(null);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [adapter, openId, pageHit]);
+  const openBarrier = pageHit ?? fetchedBarrier;
 
   // Split loading into initial vs refresh so row updates (filter/page/search/
   // pageSize) keep stale rows on screen instead of flashing the full splash.

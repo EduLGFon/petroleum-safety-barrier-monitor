@@ -173,6 +173,52 @@ export interface SyncChange {
   changedAt: string;
 }
 
+// Sync change list item with before/after status and field names.
+// Served by GET /api/sync-changes?scope=last-run|last-day (paged); the list
+// stays light so the modal never loads all diffs at once.
+export interface SyncChangeItem extends SyncChange {
+  oldStatus: string | null;
+  changedFields: string[];
+  runId: number | null;
+}
+
+// Per-barrier sync detail, loaded on demand when a row expands.
+// oldSnapshot/newSnapshot carry SignatureSource keys plus availabilityId.
+export interface SyncBarrierDetail {
+  barrierId: number;
+  tag: string;
+  location: string;
+  kind: "new" | "updated" | "removed" | "restored";
+  oldAvailabilityId: number | null;
+  newAvailabilityId: number | null;
+  changedFields: string[];
+  oldSnapshot: Record<string, unknown>;
+  newSnapshot: Record<string, unknown>;
+  changedAt: string;
+  runId: number | null;
+}
+
+// One finished sync run for the run picker / scope header.
+export interface SyncRun {
+  id: number;
+  scope: string;
+  status: "ok" | "failed";
+  startedAt: string;
+  finishedAt: string;
+  inserts: number;
+  updates: number;
+  deletes: number;
+  skips: number;
+}
+
+// Grouped counts powering the tab summary (reconciles to total).
+export interface SyncChangeSummary {
+  total: number;
+  byKind: Record<string, number>;
+  byStatus: Record<string, number>;
+  critical: number;
+}
+
 export type SortableColumn = keyof Pick<
   Barrier,
   | "id"
