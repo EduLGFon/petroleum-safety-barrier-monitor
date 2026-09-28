@@ -62,6 +62,9 @@ listed here exactly, so the codebase does not fork.
 | Senha                       | `password` (`password_hash`)                 |
 | Regra de alerta             | `alertRule` (`alert_rules`)                  |
 | Destinatário                | `recipient` (`alert_recipients`)             |
+| Desativada (barreira)       | `inactive` (`is_active = false`)             |
+| Excluída (barreira)         | `deleted` (`deleted_at IS NOT NULL`)         |
+| Situação (filtro)           | `rowScope` (`active`/`inactive`/`deleted`/`all`) |
 
 ## Type / property renames
 

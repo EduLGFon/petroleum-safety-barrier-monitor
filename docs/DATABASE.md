@@ -94,6 +94,7 @@ barriers
   external_code         text unique, nullable (Fracttal match key)
   source_updated_at     timestamptz, nullable
   deleted_at            timestamptz, nullable (soft delete via sync)
+  is_active             boolean, not null default true (Fracttal enable flag; false = Desativada)
   created_at / updated_at
 
 sync_state
@@ -216,8 +217,11 @@ explicit `authorId` contract. Only `admin` roles may write.
 by the constraint, not by application logic. `deleted_at` is the soft delete -
 items that disappear from Fracttal (scoped crawl) keep their row and history
 intact, but `buildWhere`/`scopeText` and the `chart.ts` /
-`vocabularies.ts` queries already filter `where b.deleted_at is null` by
-default; an "admin" view can list deleted ones. `sync_state` records one row
+`vocabularies.ts` queries already filter to the admin-chosen `rowScope`
+(default `active`: `deleted_at is null and is_active`) instead of showing
+everything; the dashboard Situacao filter (admin only) lists `inactive`
+(`is_active = false`), `deleted`, or `all`. `is_active` mirrors the upstream
+`active` flag and never changes availability derivation. `sync_state` records one row
 per run (inserts/updates/deletes/skips counts, `status`, `note`).
 `sync_barrier_changes` records one row per barrier touched by a run (kind,
 old/new availability, `changed_fields`, compact old/new snapshots) so the

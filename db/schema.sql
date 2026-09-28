@@ -126,11 +126,16 @@ create table if not exists barriers (
   deleted_at          timestamptz,          -- set by sync when the upstream row disappears; row stays for audit
 
   created_at         timestamptz not null default now(),
-  updated_at         timestamptz not null default now()
+  updated_at         timestamptz not null default now(),
+  -- Upstream enable flag (Fracttal `active`). False means the source
+  -- disabled the asset; the row stays visible behind the admin Situacao
+  -- filter instead of vanishing. Sync and import maintain it.
+  is_active          boolean     not null default true
 );
 
 create index if not exists idx_barriers_external_code on barriers(external_code);
 create index if not exists idx_barriers_deleted_at on barriers(deleted_at);
+create index if not exists idx_barriers_is_active on barriers(is_active);
 
 -- Later-added sheet columns ride along idempotently (same pattern as
 -- locations.name above) so existing databases gain them on next migrate.
@@ -149,6 +154,10 @@ alter table barriers add column if not exists contingency_desc text;
 alter table barriers add column if not exists evidence_code text;
 alter table barriers add column if not exists degradation_desc text;
 alter table barriers add column if not exists extra_comments text;
+-- Upstream enable flag rides along idempotently like the sheet columns so
+-- existing databases gain it on the next migrate (default true = enabled).
+alter table barriers add column if not exists is_active boolean not null default true;
+create index if not exists idx_barriers_is_active on barriers(is_active);
 
 create or replace function barriers_set_compliance() returns trigger as $$
 begin
