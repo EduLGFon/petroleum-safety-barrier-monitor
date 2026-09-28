@@ -38,7 +38,7 @@ function bytesToLatin(bin: Uint8Array): string {
   return out;
 }
 
-interface ParsedPdf {
+export interface ParsedPdf {
   bytes: Bytes;
   pageCount: number;
   texts: string[];
@@ -46,8 +46,9 @@ interface ParsedPdf {
 
 // readPdf: minimal validation - header, startxref pointing at "xref", every
 // xref offset landing on "N 0 obj", every stream inflating - then every Tj/TJ
-// string decoded as WinAnsi in encounter order.
-async function readPdf(bin: Bytes): Promise<ParsedPdf> {
+// string decoded as WinAnsi in encounter order. Exported for document_test,
+// which asserts report content through the same reader.
+export async function readPdf(bin: Bytes): Promise<ParsedPdf> {
   const raw = bytesToLatin(bin);
   assert(raw.startsWith("%PDF-1.4"), "missing PDF header");
   assert(raw.trimEnd().endsWith("%%EOF"), "missing EOF marker");
