@@ -44,8 +44,11 @@ dashboard island, the upstream sync loop and the alert digest loop. There is no
 - Table with 10 switchable, reorderable columns, sortable headers, tri-state
   selection, per-page and whole-filter selection scopes, "days without
   contingency" chips on non-compliant rows, and pager with a go-to-page field.
+  The dashboard spans the full viewport (no max-width), so the table uses the
+  whole monitor instead of a centred 1400 px band.
 - Filter bar: debounced text search, typology, category, criticality rank gate
-  (critical tiers first), availability, compliance, action plan, date range.
+  (one tap for the critical tiers), availability, compliance, action plan,
+  date range.
 - Barrier modal with a details tab, a status history timeline, and an admin
   editing tab.
 - Exports: CSV, Excel and PDF over the whole selected set (streamed from the

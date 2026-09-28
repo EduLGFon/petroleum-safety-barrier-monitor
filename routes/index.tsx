@@ -28,6 +28,17 @@ function getApiMode(): "mock" | "http" {
 
 // Home page: gates the session, then server-loads the dashboard seed (list
 // or vocabularies by mode) plus company name for the Dashboard island.
+// The shell spans the whole viewport on purpose: a max-width cap left the
+// table, KPI band and charts stranded in the middle of a 24" monitor, and
+// every section below is fluid (auto-fit grids, the chart measures its
+// column), so the dashboard simply uses the space it is given.
+const PAGE_STYLE = {
+  margin: "0 auto",
+  padding: "var(--d-shell)",
+  background: "transparent",
+  minHeight: "100vh",
+} as const;
+
 export default define.page(async function Home(
   { url, req }: { url: URL; req: Request },
 ) {
@@ -52,15 +63,7 @@ export default define.page(async function Home(
     })();
     const vocabularies: Vocabularies = await getVocabularies();
     return (
-      <main
-        style={{
-          maxWidth: 1400,
-          margin: "0 auto",
-          padding: "var(--d-shell)",
-          background: "transparent",
-          minHeight: "100vh",
-        }}
-      >
+      <main style={PAGE_STYLE}>
         <Dashboard
           initialBarriers={[]}
           companyName={companyName}
@@ -74,15 +77,7 @@ export default define.page(async function Home(
   }
   const barriers = await api.getAllBarriers({});
   return (
-    <main
-      style={{
-        maxWidth: 1400,
-        margin: "0 auto",
-        padding: "var(--d-shell)",
-        background: "transparent",
-        minHeight: "100vh",
-      }}
-    >
+    <main style={PAGE_STYLE}>
       <Dashboard
         initialBarriers={barriers}
         companyName={companyName}
