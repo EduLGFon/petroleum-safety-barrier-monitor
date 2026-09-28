@@ -92,7 +92,9 @@ export function getWireBarriers(): WireBarrier[] {
       // A small disabled/deleted tail exercises the admin Situacao filter
       // without shrinking the default active view below usefulness.
       const isActive = !rng.bool(0.05);
-      const deletedAt = !isActive ? null : (rng.bool(0.02) ? statusSince : null);
+      const deletedAt = !isActive
+        ? null
+        : (rng.bool(0.02) ? statusSince : null);
 
       barriers.push({
         id,

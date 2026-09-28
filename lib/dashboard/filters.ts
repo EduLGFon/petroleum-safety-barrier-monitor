@@ -16,7 +16,9 @@ export function applyRowScope(
       (x.deletedAt ?? null) === null && (x.isActive ?? true) === false
     );
   }
-  if (scope === "deleted") return b.filter((x) => (x.deletedAt ?? null) !== null);
+  if (scope === "deleted") {
+    return b.filter((x) => (x.deletedAt ?? null) !== null);
+  }
   if (scope === "all") return b;
   return b.filter((x) =>
     (x.deletedAt ?? null) === null && (x.isActive ?? true) === true

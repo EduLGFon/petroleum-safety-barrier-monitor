@@ -25,7 +25,8 @@ function wireComplianceId(dispId: number): number {
 function matchesQuery(w: WireBarrier, q: BarriersQuery): boolean {
   // Row visibility scope mirrors buildWhere: default active hides disabled
   // and soft-deleted rows; absent flags read as active/live.
-  const scope = q.rowScope ?? (q.includeDeleted === true ? "deleted" : "active");
+  const scope = q.rowScope ??
+    (q.includeDeleted === true ? "deleted" : "active");
   const deleted = w.deletedAt ?? null;
   const active = w.isActive ?? true;
   if (scope === "deleted" && deleted === null) return false;
