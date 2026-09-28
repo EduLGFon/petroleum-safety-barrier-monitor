@@ -39,8 +39,15 @@ Deno.test("useServerDashboard loads page/kpi/chart after hydration", async () =>
   assertStrictEquals(d.loading, false);
   assertStrictEquals(d.error, null);
   assertStrictEquals(d.rows.length, 25); // one page
-  // No filter is on by default, so the whole deterministic mock set counts.
-  assertStrictEquals(d.filteredTotal, 6800);
+  // No filter is on by default, so the active scope of the deterministic
+  // mock set counts (the generator keeps a small disabled/deleted tail for
+  // the admin Situacao filter, excluded here).
+  const expected = await mockAdapter.getBarriers({
+    rowScope: "active",
+    page: 1,
+    pageSize: 25,
+  });
+  assertStrictEquals(d.filteredTotal, expected.total);
   assertStrictEquals(d.kpi.total, d.filteredTotal);
   assertEquals(calls, ["barriers:0", "kpi:0", "chart:0"]);
 });

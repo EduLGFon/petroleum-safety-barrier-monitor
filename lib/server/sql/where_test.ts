@@ -12,7 +12,10 @@ Deno.test("resolveOrderBy whitelists columns, coerces direction", () => {
 Deno.test("buildWhere defaults to hiding soft-deleted rows", () => {
   const { text, args } = buildWhere({});
   assertEquals(args, []);
-  assertEquals(text, "where b.deleted_at is null");
+  assertEquals(
+    text,
+    "where b.deleted_at is null and coalesce(b.is_active, true)",
+  );
 });
 
 Deno.test("buildWhere includeDeleted flips to deleted-only", () => {
