@@ -19,15 +19,6 @@ export function TrustFooter() {
         textTransform: "uppercase",
       }}
     >
-      <span
-        style={{
-          width: 6,
-          height: 6,
-          borderRadius: 99,
-          background: "#34d399",
-          boxShadow: "0 0 8px #34d399",
-        }}
-      />
       🔒 Sessão protegida
     </div>
   );
