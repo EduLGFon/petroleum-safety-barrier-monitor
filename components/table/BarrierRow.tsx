@@ -161,6 +161,8 @@ function Cell({ col, barrier: b, onSelect }: CellProps) {
     case "tag": {
       const isNC = b.compliance === "Não Conforme";
       const ncDays = isNC && b.statusSince ? daysSince(b.statusSince) : 0;
+      const deleted = (b.deletedAt ?? null) !== null;
+      const inactive = !deleted && (b.isActive ?? true) === false;
       return (
         <td
           onClick={() => onSelect(b)}
@@ -182,6 +184,18 @@ function Cell({ col, barrier: b, onSelect }: CellProps) {
           >
             {b.tag}
           </div>
+          {/* Row visibility badges: only render off-scope rows carry one. */}
+          {(deleted || inactive) && (
+            <div style={{ marginTop: "var(--d-gap-xs)" }}>
+              <Badge
+                label={deleted ? "Excluída" : "Desativada"}
+                solid="var(--text-muted)"
+                bg="var(--au-row)"
+                border="var(--text-muted)"
+                size="sm"
+              />
+            </div>
+          )}
           {/* "sem contingenciamento" duration label for NC items */}
           <div className="trow-nc-slot">
             {isNC && b.statusSince && (

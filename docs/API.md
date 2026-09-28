@@ -121,12 +121,14 @@ Full inventory: `barriers`, `barriers/deleted`,
 `barriers/:id`, `barriers/:id/status`, `export`, `kpi`, `chart`, `health`,
 `recipients`, `recipients/:id` (`_params.ts` is only parsers, never a route):
 
-- `GET /api/barriers?locationId=1&availabilityId=4&complianceId=1&categoryId=2&typologyId=0&criticalityId=1&hasActionPlan=false&query=FAL&since=2024-01-01&until=2024-12-31&page=1&pageSize=25&sortCol=statusSince&sortDir=desc` →
+- `GET /api/barriers?locationId=1&availabilityId=4&complianceId=1&categoryId=2&typologyId=0&criticalityId=1&hasActionPlan=false&rowScope=active&query=FAL&since=2024-01-01&until=2024-12-31&page=1&pageSize=25&sortCol=statusSince&sortDir=desc` →
   `BarriersResponse { items: WireBarrier[], total, page, pageSize, totalPages }`
   - `locationId` omitted/`0` = all; `query` matches `tag ILIKE %q% OR loc.code`
     (`\%_` escaped, capped at 200 chars); `typologyId` filters the Tipologia
     column; `since`/`until` = `YYYY-MM-DD` over
-    `status_since`; `page` default 1 (floor, min 1); `pageSize` default 25
+    `status_since`; `rowScope` = `active` (default: enabled live rows),
+    `inactive` (upstream-disabled), `deleted` or `all` (both admin-only,
+    non-admins get `401`); `page` default 1 (floor, min 1); `pageSize` default 25
     (clamped `1..100000`); `sortCol` whitelist
     (`id/tag/location/typology/criticality/category/owner/availability/compliance/statusSince`,
     default `id`); strict parsers in `routes/api/_params.ts`; `{ error, code,
@@ -165,8 +167,12 @@ Full inventory: `barriers`, `barriers/deleted`,
   the selected rows (still intersected with the filters, so a stale selection
   cannot widen the scope).
 - `GET /api/barriers/deleted` (+ the same filters) → `BarriersResponse`
-  with only deleted rows (soft-delete sync audit). Requires
-  `ADMIN_TOKEN`; the `/api/barriers/:id` detail keeps hiding deleted ones.
+  with only deleted rows (soft-delete sync audit, legacy alias for
+  `GET /api/barriers?rowScope=deleted`). Requires
+  `ADMIN_TOKEN`; the `/api/barriers/:id` detail returns deleted rows to
+  admins and keeps hiding them from everyone else. `WireBarrier` carries
+  `isActive` (false = Desativada) and `deletedAt` (null = live) so the
+  dashboard Situacao filter badges rows without a second lookup.
 - `GET /api/kpi?locationId=1&availabilityId=4&...` → `WireKpiSnapshot`
   over the same filter subset as the table (location, availability,
   compliance, category, text, dates; omitted = all)

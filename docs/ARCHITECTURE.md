@@ -191,7 +191,8 @@ Full contract lives in `docs/API.md`. Summary:
   `getKpi` / `getChartData` (full filter subset, minus paging/sort).
 - Routes: `GET /api/barriers`, `GET /api/barriers/:id`,
   `PATCH /api/barriers/:id/status` (admin write via `record_status_change()`,
-  author derives from session), `GET /api/barriers/deleted` (admin),
+  author derives from session), `GET /api/barriers/deleted` (admin, legacy
+  alias for `?rowScope=deleted`),
   `GET /api/kpi`, `GET /api/chart`, `GET|POST /api/export` (csv/xlsx/pdf over
   the whole selection, streamed in batches),
   `GET /api/health` (DB-free liveness), `GET /api/vocabularies`
@@ -244,6 +245,10 @@ Full contract lives in `docs/API.md`. Summary:
   NOT frontend contracts - the server serves the dynamic id-keyed
   vocabularies (`{id, code, name, count}` and `{id, label}`) to the island, and
   `lib/resolve.ts` + `lib/api/query.ts` bind those ids at request time.
+  `barriers.is_active` mirrors the upstream `active` flag and `deleted_at`
+  the soft delete; list/KPI/chart/export honor the admin `rowScope`
+  (`active`/`inactive`/`deleted`/`all`, default `active`) and the dashboard
+  Situacao combo (admin only) switches it with row badges on off-scope rows.
   `scripts/migrate.ts` applies `db/schema.sql` + `db/seed_lookups.sql`
   (idempotent, seed approximates the imported catalog); `scripts/seed.ts`
   bulk-inserts `getWireBarriers()` output in batches of 500 (`--force`

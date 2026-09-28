@@ -155,6 +155,15 @@ export function DashboardSections(
     }
   }, [hydrated, defaultsApplied, loading, settings.defaultFilters, setFilter]);
 
+  // Non-admins are forced onto the active scope: a restored or shared
+  // persisted blob carrying deleted/all must never leak hidden rows, and
+  // the Situacao combo never renders for them (see FilterBar isAdmin).
+  const isAdmin = sessionUser?.role === "admin";
+  useEffect(() => {
+    if (!hydrated || isAdmin) return;
+    if (filters.rowScope !== "active") setFilter({ rowScope: "active" });
+  }, [hydrated, isAdmin, filters.rowScope, setFilter]);
+
   // Settings filter vocabularies are fully dynamic: server mode reuses the
   // SSR/live stations, client mode derives distinct stations from the loaded
   // list. No seed station list is used here, so new installations appear
@@ -249,6 +258,7 @@ export function DashboardSections(
             hiddenPinned={hiddenPinned}
             isRefreshing={isRefreshing}
             onFilter={setFilter}
+            isAdmin={isAdmin}
             visible={visibleCols}
             onToggleCol={toggleCol}
             onMoveCol={moveCol}

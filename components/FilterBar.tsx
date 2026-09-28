@@ -12,7 +12,7 @@ import type { ColumnKey, PinnedKey } from "./table/columns.ts";
 
 import { ColumnsMenu } from "./table/ColumnsMenu.tsx";
 
-import type { FilterState } from "../lib/types.ts";
+import type { FilterState, RowScope } from "../lib/types.ts";
 
 import { useEffect, useState } from "preact/hooks";
 
@@ -63,6 +63,9 @@ interface Props {
   // search-field busy pulse; never blocks typing.
   isRefreshing?: boolean;
   onFilter: (p: Partial<FilterState>) => void;
+  // Admin-only row visibility (Situacao). Non-admins never receive it, so
+  // the scope stays forced to active for their session.
+  isAdmin?: boolean;
   // End-of-bar cluster: column switcher only (count, selection summary
   // and filter reset live in the TableStatusRow below the filters).
   visible: ColumnKey[];
@@ -113,6 +116,19 @@ function DateBound(
   );
 }
 
+// Admin Situacao options (display pt-BR, identifiers English RowScope).
+export const ROW_SCOPE_OPTS: { label: string; scope: RowScope }[] = [
+  { label: "Ativas", scope: "active" },
+  { label: "Desativadas", scope: "inactive" },
+  { label: "Excluídas", scope: "deleted" },
+  { label: "Todas", scope: "all" },
+];
+
+// rowScopeLabel: display label for the current scope value.
+export function rowScopeLabel(scope: RowScope): string {
+  return ROW_SCOPE_OPTS.find((o) => o.scope === scope)?.label ?? "Ativas";
+}
+
 // FilterBar: controlled search + faceted selects in table-column order
 // (TAG search, typology, category, criticality, availability,
 // compliance) plus plan and statusSince date bounds, ending with the Columns
@@ -124,6 +140,7 @@ export function FilterBar(
     hiddenPinned,
     isRefreshing = false,
     onFilter,
+    isAdmin = false,
     visible,
     onToggleCol,
     onMoveCol,
@@ -249,6 +266,18 @@ export function FilterBar(
         placeholder="Conformidade"
         opts={vocabs.compliances}
       />
+      {isAdmin && (
+        <Combo
+          value={rowScopeLabel(filters.rowScope)}
+          onChange={(v) =>
+            onFilter({
+              rowScope: ROW_SCOPE_OPTS.find((o) => o.label === v)?.scope ??
+                "active",
+            })}
+          placeholder="Situação"
+          opts={ROW_SCOPE_OPTS.map((o) => o.label)}
+        />
+      )}
       {!hiddenPinned.includes("plan") && (
         <Combo
           value={filters.plan}
