@@ -50,10 +50,12 @@ insert into locations (id, code, type, name) values
   -- FCN/MAN come from the inventory sheet TOTAL field list.
   (36, 'FCN', 'Instalação', 'Fazenda Cedro Norte'),
   (37, 'MAN', 'Instalação', 'Mariricu Norte')
-on conflict (id) do update set
-  code = excluded.code,
-  type = excluded.type,
-  name = excluded.name;
+-- Live imports rebuild this catalog with their own ids (see
+-- scripts/fracttal-import.ts), so the seed must never renumber or fail on
+-- existing rows: bare DO NOTHING skips any id- or code-conflicting row,
+-- fills genuinely missing codes, and leaves live ids (and barrier FKs)
+-- untouched.
+on conflict do nothing;
 
 -- 'ALL' (id 0) is a UI filter sentinel, not a real installation: remove the
 -- legacy row when nothing references it so no barrier can point at it.
@@ -162,7 +164,9 @@ insert into categories (id, label) values
   (65, 'Válvulassegurança'),
   (66, 'Válvúla'),
   (67, 'Válvula BIN')
-on conflict (id) do update set label = excluded.label;
+-- Same rationale as locations above: the live import rebuilds categories
+-- with its own ids, so the seed fills gaps without renumbering or failing.
+on conflict do nothing;
 
 insert into groupings (id, label) values
   (0, 'Sistemas de Alívio'),

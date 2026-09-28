@@ -262,6 +262,36 @@ create table if not exists sync_state (
 
 create index if not exists idx_sync_state_status on sync_state(status, started_at desc);
 
+-- ─── Per-barrier sync changes (what changed, per run, per barrier) ─────────
+-- One row per barrier touched by a run (insert / update / restore / delete).
+-- This is why it exists: sync_state holds only counts, and
+-- barrier_status_history only records status flips by the sync author.
+-- Field-only updates would otherwise be invisible, and the dashboard could
+-- never explain "what changed on barrier X" without loading everything.
+-- changed_fields names the SignatureSource keys that differed
+-- (tag, locationId, typologyId, locDescId, criticalityId, categoryId,
+-- groupingId, ownerId, comments, actionPlan, scopeSource) plus
+-- "availabilityId" when the status flipped. Snapshots are compact JSON with
+-- the same keys plus availabilityId, so the detail view renders before/after
+-- without a second lookup. Rows are written by applyPlan() in
+-- lib/server/sql/sync.ts; old runs simply have no rows (detail unavailable).
+create table if not exists sync_barrier_changes (
+  id                integer generated always as identity primary key,
+  run_id            integer     not null references sync_state(id) on delete cascade,
+  barrier_id        integer     not null references barriers(id) on delete cascade,
+  kind              text        not null,              -- new | updated | restored | removed
+  old_availability_id integer,
+  new_availability_id integer,
+  changed_fields    jsonb       not null default '[]'::jsonb,
+  old_snapshot      jsonb       not null default '{}'::jsonb,
+  new_snapshot      jsonb       not null default '{}'::jsonb,
+  created_at        timestamptz not null default now()
+);
+
+create index if not exists idx_sync_changes_run on sync_barrier_changes(run_id, barrier_id);
+create index if not exists idx_sync_changes_barrier on sync_barrier_changes(barrier_id, created_at desc);
+create index if not exists idx_sync_changes_created on sync_barrier_changes(created_at desc);
+
 -- Barrier alert dedup: one row per (barrier, transition date, status) so a
 -- re-fired event can never double-notify. sent_at null = pending send; the
 -- send path (P5) flips it after a successful notify. payload holds context
