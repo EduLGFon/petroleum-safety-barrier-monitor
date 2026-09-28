@@ -12,7 +12,7 @@ export {
   sanitizeFilterPatch,
   sanitizeFilters,
 } from "./dashboard/filters.ts";
-export { applyFilters, applySorting, paginate } from "./dashboard/filters.ts";
+export { applyFilters, applyRowScope, applySorting, paginate } from "./dashboard/filters.ts";
 export {
   daysSince,
   fmt,

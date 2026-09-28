@@ -26,6 +26,7 @@ Deno.test("useFilterState starts from defaults and hydrates with empty storage",
     plan: "",
     since: "",
     until: "",
+    rowScope: "active",
     page: 1,
     pageSize: 25,
     sortCol: "id",
@@ -178,6 +179,18 @@ Deno.test("useFilterState counts the critical gate as an active filter", async (
   hh.get().resetFilters();
   await hh.rerender();
   assertStrictEquals(hh.get().filters.criticalOnly, false);
+  assertStrictEquals(hh.get().hasActiveFilters, false);
+});
+
+Deno.test("useFilterState counts the visibility scope as an active filter", async () => {
+  const hh = await renderHook(useFilterState);
+  assertStrictEquals(hh.get().hasActiveFilters, false);
+  hh.get().setFilter({ rowScope: "deleted" });
+  await hh.rerender();
+  assertStrictEquals(hh.get().hasActiveFilters, true);
+  hh.get().resetFilters();
+  await hh.rerender();
+  assertStrictEquals(hh.get().filters.rowScope, "active");
   assertStrictEquals(hh.get().hasActiveFilters, false);
 });
 

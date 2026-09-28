@@ -5,9 +5,27 @@ import type { Barrier, FilterState, SortableColumn } from "../types.ts";
 import { isCriticalRankLabel } from "../enums/codes.ts";
 import { PAGE_SIZE_OPTS } from "../constants.ts";
 
+// Applies the row visibility scope first (admin Situacao filter).
+// Absent flags read as active/live (old payloads and fixtures).
+export function applyRowScope(
+  b: Barrier[],
+  scope: FilterState["rowScope"],
+): Barrier[] {
+  if (scope === "inactive") {
+    return b.filter((x) =>
+      (x.deletedAt ?? null) === null && (x.isActive ?? true) === false
+    );
+  }
+  if (scope === "deleted") return b.filter((x) => (x.deletedAt ?? null) !== null);
+  if (scope === "all") return b;
+  return b.filter((x) =>
+    (x.deletedAt ?? null) === null && (x.isActive ?? true) === true
+  );
+}
+
 // Applies case-insensitive query (tag/location/category) plus exact filters; empty strings mean no filter.
 export function applyFilters(b: Barrier[], f: FilterState): Barrier[] {
-  let d = b;
+  let d = applyRowScope(b, f.rowScope);
   if (f.query) {
     const q = f.query.toLowerCase();
     d = d.filter((x) =>
@@ -92,6 +110,7 @@ export function defaultFilters(): FilterState {
     plan: "",
     since: "",
     until: "",
+    rowScope: "active",
     page: 1,
     pageSize: 25,
     sortCol: "id",
@@ -142,6 +161,14 @@ export function sanitizeFilterPatch(raw: unknown): Partial<FilterState> {
   if (plan === "Com plano" || plan === "Sem plano" || plan === "") {
     patch.plan = plan;
   }
+  // Admin Situacao scope; unknown values drop so a tampered blob can never
+  // wedge the grid into an empty hidden scope.
+  if (
+    r.rowScope === "active" || r.rowScope === "inactive" ||
+    r.rowScope === "deleted" || r.rowScope === "all"
+  ) {
+    patch.rowScope = r.rowScope;
+  }
   // ISO date bounds on statusSince; malformed values drop like the rest.
   const date = (v: unknown) => {
     if (typeof v !== "string") return undefined;
@@ -181,7 +208,7 @@ export function sanitizeFilters(raw: unknown): FilterState {
 // Version of the shipped filter defaults. Bump it whenever a default changes
 // so blobs written under the old defaults can be migrated instead of restored
 // verbatim - a value the old defaults implied would otherwise stick forever.
-export const FILTER_DEFAULTS_VERSION = 2;
+export const FILTER_DEFAULTS_VERSION = 3;
 
 // restoredFilters: the filter state to hydrate with, from a persisted slice.
 // The blob is sanitized, then keys that only an older implicit default could

@@ -243,6 +243,11 @@ export type SortableColumn = keyof Pick<
   | "statusSince"
 >;
 
+// Row visibility scope for the admin Situacao filter (display values are
+// pt-BR in the UI; identifiers stay English per docs/GLOSSARY.md).
+// Re-exported from the wire contract so domain and API share one union.
+export type { RowScope } from "./wireTypes.ts";
+
 export interface FilterState {
   query: string;
   availability: string;
@@ -260,6 +265,10 @@ export interface FilterState {
   plan: string;
   since: string;
   until: string;
+  // Row visibility scope (admin Situacao filter). Default active lists
+  // enabled live rows only; inactive/deleted/all reveal Desativada,
+  // Excluida, or every row. Non-admins are forced to active on restore.
+  rowScope: RowScope;
   page: number;
   pageSize: number;
   sortCol: SortableColumn;

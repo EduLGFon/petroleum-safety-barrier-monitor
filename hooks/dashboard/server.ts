@@ -5,6 +5,7 @@
 import type {
   Barrier,
   CategoryCompliance,
+  FilterState,
   KpiSnapshot,
   Vocabularies,
 } from "../../lib/types.ts";
@@ -71,7 +72,7 @@ export function useServerDashboard(
     hydrated,
     hasActiveFilters,
     setLocation: setLoc,
-    setFilter,
+    setFilter: setFil,
     setSort,
     resetFilters: resetFil,
     showUrgent,
@@ -258,13 +259,19 @@ export function useServerDashboard(
     resetFil();
     clearAll();
   }, [resetFil, clearAll]);
+  // Patches filters; a visibility-scope change clears the selection so ids
+  // from one scope never leak into another scope's export.
+  const setFilter = useCallback((patch: Partial<FilterState>) => {
+    if (patch.rowScope !== undefined) clearAll();
+    setFil(patch);
+  }, [setFil, clearAll]);
 
   // Self-heals a stale persisted page: clamps and persists the fix instead of
   // trapping the user on an empty table with a hidden pager. Guarded, no loop.
   useEffect(() => {
     if (!hydrated) return;
-    if (filters.page > pages) setFilter({ page: pages });
-  }, [hydrated, filters.page, pages, setFilter]);
+    if (filters.page > pages) setFil({ page: pages });
+  }, [hydrated, filters.page, pages, setFil]);
 
   // Selects all rows on the current page; persisted via saveDash effect.
   const selectAll = useCallback(

@@ -73,6 +73,14 @@ export function toWireQuery(
   else if (f.plan === "Sem plano") q.hasActionPlan = false;
   else if (f.plan) console.warn(`[toWireQuery] unknown plan: ${f.plan}`);
   if (f.criticalOnly === true) q.criticalOnly = true;
+  if (
+    f.rowScope === "active" || f.rowScope === "inactive" ||
+    f.rowScope === "deleted" || f.rowScope === "all"
+  ) {
+    q.rowScope = f.rowScope;
+  } else if (f.rowScope !== undefined) {
+    console.warn(`[toWireQuery] unknown rowScope: ${f.rowScope}`);
+  }
   if (f.criticality) {
     const id = toCriticalityId(f.criticality as never);
     if (id === undefined) {

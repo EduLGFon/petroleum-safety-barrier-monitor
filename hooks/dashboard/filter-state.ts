@@ -67,6 +67,7 @@ export function useFilterState(defaultLocation = "ALL") {
         plan: "",
         since: "",
         until: "",
+        rowScope: "active",
         sortCol: "statusSince" as SortableColumn,
         sortDir: "asc",
         page: 1,
@@ -83,6 +84,7 @@ export function useFilterState(defaultLocation = "ALL") {
     !!state.filters.category || !!state.filters.typology ||
     !!state.filters.criticality ||
     state.filters.criticalOnly === true ||
+    state.filters.rowScope !== "active" ||
     !!state.filters.plan || !!state.filters.since ||
     !!state.filters.until;
 

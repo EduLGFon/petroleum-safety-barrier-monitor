@@ -159,6 +159,7 @@ const newStatusRows = applyFilters(data, {
   plan: "",
   since: "",
   until: "",
+  rowScope: "all",
   page: 1,
   pageSize: 25,
   sortCol: "id",

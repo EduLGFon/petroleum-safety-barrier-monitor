@@ -157,6 +157,15 @@ Deno.test("toWireQuery maps typology to id, warns on unknown", () => {
   assertStrictEquals(warnings.length, 1);
 });
 
+Deno.test("toWireQuery passes known row scopes, warns on unknown", () => {
+  assertEquals(toWireQuery({ rowScope: "deleted" }), { rowScope: "deleted" });
+  assertEquals(toWireQuery({}), {});
+  const warnings = collectWarnings(() => {
+    assertEquals(toWireQuery({ rowScope: "lixeira" }), {});
+  });
+  assertStrictEquals(warnings.length, 1);
+});
+
 Deno.test("toWireQuery uses dynamic id overrides for typology", () => {
   const q = toWireQuery(
     { typology: "Duto Novo" },

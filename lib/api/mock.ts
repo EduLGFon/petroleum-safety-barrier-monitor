@@ -23,6 +23,16 @@ function wireComplianceId(dispId: number): number {
 
 // Checks a wire barrier against numeric query filters (mock WHERE clause).
 function matchesQuery(w: WireBarrier, q: BarriersQuery): boolean {
+  // Row visibility scope mirrors buildWhere: default active hides disabled
+  // and soft-deleted rows; absent flags read as active/live.
+  const scope = q.rowScope ?? (q.includeDeleted === true ? "deleted" : "active");
+  const deleted = w.deletedAt ?? null;
+  const active = w.isActive ?? true;
+  if (scope === "deleted" && deleted === null) return false;
+  if (scope === "inactive" && (deleted !== null || active !== false)) {
+    return false;
+  }
+  if (scope === "active" && (deleted !== null || active !== true)) return false;
   if (
     q.locationId !== undefined && q.locationId !== 0 &&
     w.locationId !== q.locationId

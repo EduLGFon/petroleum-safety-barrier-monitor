@@ -1,6 +1,7 @@
 // derived.ts - dashboard derived memos (kpi/chart/rows/details); split out so composer stays state-only.
 import {
   applyFilters,
+  applyRowScope,
   applySorting,
   computeChartData,
   computeKpi,
@@ -25,10 +26,14 @@ export function useDashboardDerived(
     [allBarriers, location],
   );
 
-  const kpi = useMemo(() => computeKpi(locationBarriers), [locationBarriers]);
-  const chartData = useMemo(() => computeChartData(locationBarriers), [
-    locationBarriers,
-  ]);
+  const kpi = useMemo(
+    () => computeKpi(applyRowScope(locationBarriers, filters.rowScope)),
+    [locationBarriers, filters.rowScope],
+  );
+  const chartData = useMemo(
+    () => computeChartData(applyRowScope(locationBarriers, filters.rowScope)),
+    [locationBarriers, filters.rowScope],
+  );
   const filtered = useMemo(
     () => applyFilters(locationBarriers, filters),
     [locationBarriers, filters],

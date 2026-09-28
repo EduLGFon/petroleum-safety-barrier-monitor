@@ -28,6 +28,7 @@ export interface BarriersApi {
       | "criticalityId"
       | "criticalOnly"
       | "hasActionPlan"
+      | "rowScope"
       | "query"
       | "since"
       | "until"
@@ -45,6 +46,7 @@ export interface BarriersApi {
       | "criticalityId"
       | "criticalOnly"
       | "hasActionPlan"
+      | "rowScope"
       | "query"
       | "since"
       | "until"
@@ -62,6 +64,8 @@ export interface DomainQuery {
   plan?: string; // '' | 'Com plano' | 'Sem plano'
   // Rank gate passthrough (true = ESO/A only); undefined = every rank.
   criticalOnly?: boolean;
+  // Row visibility scope passthrough (active/inactive/deleted/all).
+  rowScope?: string;
   query?: string;
   // Inclusive ISO-date bounds (YYYY-MM-DD) on statusSince.
   since?: string;

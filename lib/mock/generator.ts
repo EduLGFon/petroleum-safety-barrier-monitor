@@ -89,6 +89,10 @@ export function getWireBarriers(): WireBarrier[] {
       const isNC = ![0, 1, 2, 3].includes(availabilityId); // matches isCompliant logic by id
       const hasAction = isNC && rng.bool(0.4);
       const sheet = genSheetFields(rng);
+      // A small disabled/deleted tail exercises the admin Situacao filter
+      // without shrinking the default active view below usefulness.
+      const isActive = !rng.bool(0.05);
+      const deletedAt = !isActive ? null : (rng.bool(0.02) ? statusSince : null);
 
       barriers.push({
         id,
@@ -111,6 +115,8 @@ export function getWireBarriers(): WireBarrier[] {
         externalCode: String(rng.int(100000, 1999999)),
         // Display name rides from the seed catalog (server joins locations).
         locationName: locNames.get(locCode) ?? locCode,
+        isActive,
+        deletedAt,
         ...sheet,
       });
       id++;

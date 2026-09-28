@@ -154,6 +154,43 @@ Deno.test("sanitizeFilterPatch keeps plan values, drops unknown ones", () => {
   assertEquals(sanitizeFilterPatch({ plan: "Talvez" }), {});
 });
 
+Deno.test("sanitizeFilterPatch keeps known row scopes, drops unknown ones", () => {
+  assertEquals(sanitizeFilterPatch({ rowScope: "deleted" }), {
+    rowScope: "deleted",
+  });
+  assertEquals(sanitizeFilterPatch({ rowScope: "lixeira" }), {});
+});
+
+Deno.test("applyFilters scopes disabled and soft-deleted rows", () => {
+  const rows = [
+    barrier({ id: 1 }),
+    barrier({ id: 2, isActive: false }),
+    barrier({ id: 3, deletedAt: "2026-02-01" }),
+  ];
+  assertEquals(
+    applyFilters(rows, defaultFilters()).map((b) => b.id),
+    [1],
+  );
+  assertEquals(
+    applyFilters(rows, { ...defaultFilters(), rowScope: "inactive" }).map(
+      (b) => b.id,
+    ),
+    [2],
+  );
+  assertEquals(
+    applyFilters(rows, { ...defaultFilters(), rowScope: "deleted" }).map(
+      (b) => b.id,
+    ),
+    [3],
+  );
+  assertEquals(
+    applyFilters(rows, { ...defaultFilters(), rowScope: "all" }).map((b) =>
+      b.id
+    ),
+    [1, 2, 3],
+  );
+});
+
 Deno.test("sanitizeFilterPatch lets an explicit rank win over the gate", () => {
   assertEquals(
     sanitizeFilterPatch({ criticality: "B", criticalOnly: true }),

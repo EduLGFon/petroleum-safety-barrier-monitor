@@ -14,7 +14,7 @@ import { useFilterState } from "./dashboard/filter-state.ts";
 import { restoreSelection } from "./dashboard/selection.ts";
 import { useSelection } from "./dashboard/selection.ts";
 import { useCallback, useEffect } from "preact/hooks";
-import type { Barrier } from "../lib/types.ts";
+import type { Barrier, FilterState } from "../lib/types.ts";
 
 // Central dashboard store; starts from defaults for SSR, hydrates from `barrier-dashboard` after mount.
 // Persists location/filters/selection/openId via saveDash once hydrated.
@@ -25,7 +25,7 @@ export function useDashboard(allBarriers: Barrier[], defaultLocation = "ALL") {
     hydrated,
     hasActiveFilters,
     setLocation: setLoc,
-    setFilter,
+    setFilter: setFil,
     setSort,
     resetFilters: resetFil,
     showUrgent,
@@ -90,6 +90,12 @@ export function useDashboard(allBarriers: Barrier[], defaultLocation = "ALL") {
     setLoc(code);
     clearAll();
   }, [setLoc, clearAll]);
+  // Patches filters; a visibility-scope change clears the selection so ids
+  // from one scope never leak into another scope's export.
+  const setFilter = useCallback((patch: Partial<FilterState>) => {
+    if (patch.rowScope !== undefined) clearAll();
+    setFil(patch);
+  }, [setFil, clearAll]);
   // Resets filters and the station tab to defaults, and clears selection;
   // persisted via saveDash effect.
   const resetFilters = useCallback(() => {
@@ -102,8 +108,8 @@ export function useDashboard(allBarriers: Barrier[], defaultLocation = "ALL") {
   // user on an empty table with a hidden pager. Guarded, so no loop.
   useEffect(() => {
     if (!hydrated) return;
-    if (filters.page > totalPages) setFilter({ page: totalPages });
-  }, [hydrated, filters.page, totalPages, setFilter]);
+    if (filters.page > totalPages) setFil({ page: totalPages });
+  }, [hydrated, filters.page, totalPages, setFil]);
 
   // Selects all currently filtered rows; persisted as selectedIds via saveDash effect.
   const selectAll = useCallback(
