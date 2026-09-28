@@ -62,6 +62,7 @@ export function SettingsPanel(
     setDensity,
     setDefaults,
     setDefaultLoc,
+    resetFilterDefaults,
     setReduceMotion,
   } = useSettings();
   const [section, setSection] = useState<
@@ -272,6 +273,7 @@ export function SettingsPanel(
             settings={settings}
             setDefaults={setDefaults}
             setDefaultLoc={setDefaultLoc}
+            resetDefaults={resetFilterDefaults}
             locations={locations}
             availabilities={availabilities}
             compliances={compliances}

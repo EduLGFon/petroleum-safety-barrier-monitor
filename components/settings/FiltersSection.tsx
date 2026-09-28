@@ -12,6 +12,9 @@ interface Props {
   settings: SettingsState;
   setDefaults: (f: Partial<FilterState>) => void;
   setDefaultLoc: (l: string) => void;
+  // One atomic write that clears the filters AND the default location, so
+  // restoring the defaults never leaves half of them applied.
+  resetDefaults: () => void;
   // Live vocabularies from the dashboard (server SSR or client dataset).
   // Empty or absent means "no known values yet": the selects offer only
   // "Todas" instead of a fixed seed list.
@@ -33,6 +36,7 @@ export function FiltersSection(
     settings,
     setDefaults,
     setDefaultLoc,
+    resetDefaults,
     locations,
     availabilities,
     compliances,
@@ -206,10 +210,7 @@ export function FiltersSection(
       </div>
       <button
         type="button"
-        onClick={() => {
-          setDefaults({});
-          setDefaultLoc("ALL");
-        }}
+        onClick={resetDefaults}
         style={{
           padding: "var(--d-reset-pad)",
           background: "rgba(239,68,68,.07)",

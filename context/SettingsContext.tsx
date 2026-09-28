@@ -28,7 +28,13 @@ export type {
   SettingsState,
 } from "./settings/presets.ts";
 
-import { useCallback, useContext, useEffect, useState } from "preact/hooks";
+import {
+  useCallback,
+  useContext,
+  useEffect,
+  useRef,
+  useState,
+} from "preact/hooks";
 
 import { loadSettings, saveSettings } from "./settings/storage.ts";
 
@@ -45,6 +51,9 @@ interface Ctx {
   setDensity: (d: Density) => void;
   setDefaults: (f: Partial<FilterState>) => void;
   setDefaultLoc: (l: string) => void;
+  // Clears the startup filter defaults back to the shipped DEFAULTS in one
+  // write (filters + default location together).
+  resetFilterDefaults: () => void;
   setReduceMotion: (v: boolean) => void;
 }
 
@@ -55,6 +64,7 @@ const SettingsCtx = createContext<Ctx>({
   setDensity: () => {},
   setDefaults: () => {},
   setDefaultLoc: () => {},
+  resetFilterDefaults: () => {},
   setReduceMotion: () => {},
 });
 
@@ -64,9 +74,15 @@ export function SettingsProvider(
 ) {
   // Start with DEFAULTS for SSR consistency - hydrate from localStorage after mount
   const [settings, setSettings] = useState<SettingsState>(DEFAULTS);
+  // Latest known settings, kept in a ref instead of read from the render
+  // closure: two setters called in the same tick (restore-defaults clears the
+  // filters and the default location together) would otherwise both build on
+  // the same stale snapshot and the second write would drop the first.
+  const latest = useRef<SettingsState>(DEFAULTS);
 
   useEffect(() => {
     const s = loadSettings();
+    latest.current = s;
     setSettings(s);
     applyTheme(s.theme);
     applyAccent(s.accentColor);
@@ -74,40 +90,52 @@ export function SettingsProvider(
     applyMotion(s.reduceMotion);
   }, []);
 
-  // Persists next state to `barrier-settings` key; tolerates unavailable storage, still applies live.
-  const save = useCallback((next: SettingsState) => {
+  // Merges a patch into the current settings, publishes it and persists it to
+  // the `barrier-settings` key (tolerates unavailable storage - settings still
+  // apply live). Stable identity, so consumers never re-subscribe.
+  const patch = useCallback((fields: Partial<SettingsState>) => {
+    const next = { ...latest.current, ...fields };
+    latest.current = next;
     setSettings(next);
     saveSettings(next);
   }, []);
 
-  // Applies theme to DOM then persists via save (`barrier-settings`).
+  // Applies theme to DOM then persists via patch (`barrier-settings`).
   const setTheme = useCallback((t: Theme) => {
     applyTheme(t);
-    save({ ...settings, theme: t });
-  }, [settings, save]);
-  // Applies accent CSS vars then persists via save (`barrier-settings`).
+    patch({ theme: t });
+  }, [patch]);
+  // Applies accent CSS vars then persists via patch (`barrier-settings`).
   const setAccent = useCallback((c: AccentColor) => {
     applyAccent(c);
-    save({ ...settings, accentColor: c });
-  }, [settings, save]);
-  // Applies density token then persists via save (`barrier-settings`).
+    patch({ accentColor: c });
+  }, [patch]);
+  // Applies density token then persists via patch (`barrier-settings`).
   const setDensity = useCallback((d: Density) => {
     applyDensity(d);
-    save({ ...settings, density: d });
-  }, [settings, save]);
-  // Persists defaultFilters via save (`barrier-settings`); no DOM side effect.
+    patch({ density: d });
+  }, [patch]);
+  // Persists defaultFilters via patch (`barrier-settings`); no DOM side effect.
   const setDefaults = useCallback((f: Partial<FilterState>) => {
-    save({ ...settings, defaultFilters: f });
-  }, [settings, save]);
-  // Persists defaultLocation via save (`barrier-settings`); no DOM side effect.
+    patch({ defaultFilters: f });
+  }, [patch]);
+  // Persists defaultLocation via patch (`barrier-settings`); no DOM side effect.
   const setDefaultLoc = useCallback((l: string) => {
-    save({ ...settings, defaultLocation: l });
-  }, [settings, save]);
-  // Toggles .no-anim class then persists via save (`barrier-settings`).
+    patch({ defaultLocation: l });
+  }, [patch]);
+  // Restores the shipped startup defaults in ONE write (filters + default
+  // location), so a second click behaves exactly like the first.
+  const resetFilterDefaults = useCallback(() => {
+    patch({
+      defaultFilters: { ...DEFAULTS.defaultFilters },
+      defaultLocation: DEFAULTS.defaultLocation,
+    });
+  }, [patch]);
+  // Toggles .no-anim class then persists via patch (`barrier-settings`).
   const setReduceMotion = useCallback((v: boolean) => {
     applyMotion(v);
-    save({ ...settings, reduceMotion: v });
-  }, [settings, save]);
+    patch({ reduceMotion: v });
+  }, [patch]);
 
   return (
     <SettingsCtx.Provider
@@ -118,6 +146,7 @@ export function SettingsProvider(
         setDensity,
         setDefaults,
         setDefaultLoc,
+        resetFilterDefaults,
         setReduceMotion,
       }}
     >
