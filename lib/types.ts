@@ -7,6 +7,11 @@
  * new station values compile without code changes (dynamic-data principle).
  */
 
+// Row visibility scope (admin Situacao filter) lives in the wire contract;
+// re-exported here so UI code imports domain types from one module.
+import type { RowScope } from "./wireTypes.ts";
+export type { RowScope };
+
 export type Theme = "light" | "dark" | "amoled";
 export type AccentColor =
   | "blue"
@@ -242,11 +247,6 @@ export type SortableColumn = keyof Pick<
   | "compliance"
   | "statusSince"
 >;
-
-// Row visibility scope for the admin Situacao filter (display values are
-// pt-BR in the UI; identifiers stay English per docs/GLOSSARY.md).
-// Re-exported from the wire contract so domain and API share one union.
-export type { RowScope } from "./wireTypes.ts";
 
 export interface FilterState {
   query: string;
