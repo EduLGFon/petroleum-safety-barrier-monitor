@@ -1,4 +1,4 @@
-// API: GET|POST /api/export - the whole selection as csv, xlsx or html.
+// API: GET|POST /api/export - the whole selection as csv, xlsx or pdf.
 // This is why it exists: the dashboard download must cover every selected
 // barrier (18k and up), which no browser-side builder can hold. Filters
 // arrive as query params on both verbs; the selection (ids) arrives in the
@@ -28,7 +28,7 @@ import { streamExportCsv } from "../../lib/server/exportCsv.ts";
 import { FMT_EXT, FMT_MIME, normalizeFmt } from "../../lib/export/format.ts";
 import { resolveTimeZone } from "../../lib/export/html.ts";
 import { loadServerConfig } from "../../lib/server/config.ts";
-import { streamReportDocument } from "../../lib/server/exportHtml.ts";
+import { streamExportPdf } from "../../lib/server/exportPdf.ts";
 import { streamExportXlsx } from "../../lib/server/exportXlsx.ts";
 import { getCompanyName } from "../../lib/company.ts";
 import type { ExportScope } from "../../lib/server/exportRows.ts";
@@ -130,7 +130,7 @@ async function stream(
   // resolves to the current format instead of failing the request.
   const requested = normalizeFmt(body.format ?? sp.get("format") ?? "csv");
   if (!requested) {
-    return badRequest("format must be csv, xlsx or html", requestId);
+    return badRequest("format must be csv, xlsx or pdf", requestId);
   }
   const req: ExportRequest = {
     format: requested,
@@ -184,15 +184,15 @@ function respond(
       { status: 200, headers: fileHeaders(headers, "xlsx") },
     );
   }
-  if (req.format === "html") {
+  if (req.format === "pdf") {
     return new Response(
-      streamReportDocument(exportBatches(scope), {
+      streamExportPdf(exportBatches(scope), {
         companyName,
         kpi: scope.kpi,
         title: "barreiras",
         timeZone: req.timeZone,
       }),
-      { status: 200, headers: fileHeaders(headers, "html") },
+      { status: 200, headers: fileHeaders(headers, "pdf") },
     );
   }
   return new Response(streamExportCsv(exportBatches(scope), scope.kpi), {
@@ -204,7 +204,7 @@ function respond(
 // fileHeaders: content type plus the download disposition for a file format.
 function fileHeaders(
   base: Record<string, string>,
-  format: "csv" | "xlsx" | "html",
+  format: "csv" | "xlsx" | "pdf",
 ): Record<string, string> {
   return {
     ...base,

@@ -28,11 +28,11 @@ Deno.test("format ceilings stay inside what the formats accept", () => {
 Deno.test("normalizeFmt accepts the current keys and the legacy ones", () => {
   assertStrictEquals(normalizeFmt("csv"), "csv");
   assertStrictEquals(normalizeFmt("xlsx"), "xlsx");
-  assertStrictEquals(normalizeFmt("html"), "html");
+  assertStrictEquals(normalizeFmt("pdf"), "pdf");
   // Tabs opened before a format migration still send the old keys.
   assertStrictEquals(normalizeFmt("xls"), "xlsx");
   assertStrictEquals(normalizeFmt("xls "), "xlsx");
-  assertStrictEquals(normalizeFmt("pdf"), "html");
+  assertStrictEquals(normalizeFmt("html"), "pdf");
   assertStrictEquals(normalizeFmt("ods"), null);
   assertStrictEquals(normalizeFmt(undefined), null);
   assertStrictEquals(normalizeFmt(7), null);

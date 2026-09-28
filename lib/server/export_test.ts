@@ -4,7 +4,8 @@ import { streamExportCsv, streamToText } from "./exportCsv.ts";
 import { batchesOf, kpiOf, mkBarrier, mkCount } from "../export/fixture.ts";
 import { assert, assertStrictEquals } from "jsr:@std/assert@^1";
 import { streamExportXlsx } from "./exportXlsx.ts";
-import { streamReportDocument } from "./exportHtml.ts";
+import { streamExportPdf } from "./exportPdf.ts";
+import { readPdf } from "../export/pdf/writer_test.ts";
 import type { Bytes } from "../export/xlsx/zip.ts";
 
 import type { Barrier } from "../types.ts";
@@ -25,23 +26,20 @@ function xlsxOf(barriers: Barrier[], size = 500): Promise<Bytes> {
   return new Response(stream).arrayBuffer().then((b) => new Uint8Array(b));
 }
 
-function reportOf(
+// pdfOf: the streamed report as one array, so the test can read the file
+// back (page count and text via the writer test's parser).
+function pdfOf(
   barriers: Barrier[],
   size = 500,
   timeZone?: string,
-): Promise<string> {
-  return streamToText(
-    streamReportDocument(batchesOf(barriers, size), {
-      companyName: "Petrobras",
-      kpi: kpiOf(barriers),
-      title: "barreiras",
-      timeZone,
-    }),
-  );
-}
-
-function printRows(html: string): number {
-  return (html.match(/font-family:Courier/g) ?? []).length;
+): Promise<Bytes> {
+  const stream = streamExportPdf(batchesOf(barriers, size), {
+    companyName: "Petrobras",
+    kpi: kpiOf(barriers),
+    title: "barreiras",
+    timeZone,
+  });
+  return new Response(stream).arrayBuffer().then((b) => new Uint8Array(b));
 }
 
 Deno.test("streamExportCsv starts with a BOM for pt-BR Excel", async () => {
@@ -160,31 +158,44 @@ Deno.test("streamExportXlsx streams before the last batch is read", async () => 
   await reader.cancel();
 });
 
-Deno.test("streamReportDocument renders one standalone file over every batch", async () => {
-  const html = await reportOf(mkCount(1_200), 400);
-  assertStrictEquals(printRows(html), 1_200);
-  assertStrictEquals(html.includes("PSV-1200"), true);
-  assertStrictEquals(html.includes("<tbody>"), true);
-  assertStrictEquals(html.includes("</tbody></table>"), true);
-  // One file, not print parts: standalone shell, no part labels.
-  assertStrictEquals(html.startsWith("<!DOCTYPE html>"), true);
-  assertStrictEquals(html.includes("parte 1 de"), false);
-  assertStrictEquals(html.includes("<title>barreiras</title>"), true);
+Deno.test("streamExportPdf renders real PDF bytes over every batch", async () => {
+  const bin = await pdfOf(mkCount(1_200), 400);
+  const latin = (b: Bytes): string => {
+    let out = "";
+    for (let i = 0; i < b.length; i += 0x8000) {
+      out += String.fromCharCode(...b.subarray(i, i + 0x8000));
+    }
+    return out;
+  };
+  const raw = latin(bin);
+  assertStrictEquals(raw.startsWith("%PDF-1.4"), true);
+  assertStrictEquals(raw.trimEnd().endsWith("%%EOF"), true);
+  // One file, not print parts: no part labels, page count past one.
+  assertStrictEquals(raw.includes("parte 1 de"), false);
+  const count = Number(raw.match(/\/Count (\d+)/)?.[1]);
+  assert(count > 10, `only ${count} pages`);
+  assertStrictEquals(raw.includes("/Title (barreiras)"), true);
 });
 
-Deno.test("streamReportDocument stamps the browser zone the client sent", async () => {
+Deno.test("streamExportPdf stamps the browser zone the client sent", async () => {
   // The server runs on UTC; without the zone the banner would read 3h ahead
   // of a Brazil user. The label travels next to the time so the clock is
   // never ambiguous.
-  const html = await reportOf(mkCount(3), 500, "America/Sao_Paulo");
-  assertStrictEquals(html.includes("UTC-03:00"), true);
+  const bin = await pdfOf(mkCount(3), 500, "America/Sao_Paulo");
+  const pdf = await readPdf(bin);
+  assertStrictEquals(
+    pdf.texts.some((t) => t.includes("UTC-03:00")),
+    true,
+  );
 });
 
-Deno.test("streamReportDocument carries no page URL anywhere", async () => {
+Deno.test("streamExportPdf carries no page URL anywhere", async () => {
   // The print dialog used to stamp the page URL onto the saved file; the
   // download must not contain any URL-shaped string.
-  const html = await reportOf(mkCount(10), 4);
-  assertStrictEquals(html.includes("http://"), false);
-  assertStrictEquals(html.includes("https://"), false);
-  assertStrictEquals(/localhost/i.test(html), false);
+  const bin = await pdfOf(mkCount(10), 4);
+  const pdf = await readPdf(bin);
+  const all = pdf.texts.join("\n");
+  assertStrictEquals(all.includes("http://"), false);
+  assertStrictEquals(all.includes("https://"), false);
+  assertStrictEquals(/localhost/i.test(all), false);
 });

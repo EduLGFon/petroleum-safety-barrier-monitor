@@ -3,7 +3,7 @@
 // what a reader actually sees: brand once, every row, a footer per page.
 import { assert, assertStrictEquals } from "jsr:@std/assert@^1";
 
-import { batchesOf, kpiOf, mkBarrier, mkCount } from "../fixture.ts";
+import { kpiOf, mkBarrier, mkCount } from "../fixture.ts";
 import { buildPdfDocument, pdfReportPages } from "./document.ts";
 import { readPdf } from "./writer_test.ts";
 

@@ -1,7 +1,7 @@
 // ExportMenu - icon-only export button with a format dropdown.
 // This is why it exists: the toolbar keeps two side-by-side icon buttons
 // (columns + export) with no text labels; this one opens a small menu with
-// the existing Excel / HTML / CSV actions. Every format covers the whole
+// the existing Excel / PDF / CSV actions. Every format covers the whole
 // selection and never just the loaded page, and every format downloads as a
 // file - no preview step, so a large selection cannot freeze the tab. In
 // server mode the rows come from /api/export (streamed, so a cross-page
@@ -9,11 +9,7 @@
 // in-memory list. The dropdown portals to document.body (like FilterSelect
 // and ColumnsMenu) because the animated section and the table card both trap
 // stacking contexts, so a nested menu would paint under the rows.
-import {
-  exportReportToFile,
-  exportToCSV,
-  exportToXlsx,
-} from "../../lib/export.ts";
+import { exportToCSV, exportToPDF, exportToXlsx } from "../../lib/export.ts";
 
 import { useEffect, useMemo, useRef, useState } from "preact/hooks";
 
@@ -147,8 +143,8 @@ export function ExportMenu(
         if (kind === "xlsx") {
           await exportToXlsx(exportable, name, companyName);
         }
-        if (kind === "html") {
-          exportReportToFile(exportable, name, companyName);
+        if (kind === "pdf") {
+          await exportToPDF(exportable, name, companyName);
         }
         if (kind === "csv") exportToCSV(exportable, name);
       }

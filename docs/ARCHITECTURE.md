@@ -124,23 +124,35 @@ page-local.
 
 `lib/export/` holds one builder per format, all fed the same 30-column
 `rows.ts` mapping and the same `columns.ts` order, so the browser and the
-server emit identical cells. CSV and the report are text: split into
-head/row/tail pieces (`csv.ts`, `reportHtml.ts`) and driven by
-`lib/server/exportStream.ts`, which turns paged batches into a byte stream.
+server emit identical cells. CSV is text: split into head/row/tail pieces
+(`csv.ts`) and driven by `lib/server/exportStream.ts`, which turns paged
+batches into a byte stream.
 The spreadsheet is a real OOXML workbook: `lib/export/xlsx/` builds the
 package - `zip.ts` (streaming ZIP with `deflate-raw` and data descriptors),
 `xml.ts`, `styles.ts` (on-demand style registry), `widths.ts`, `parts.ts`
 (package plumbing), `dataSheet.ts` (the streamed "Barreiras" sheet) and
 `workbook.ts` (the ZIP assembly, shared by `lib/export/xlsx.ts` for the
-browser and `lib/server/exportXlsx.ts` for the route). Every format downloads
+browser and `lib/server/exportXlsx.ts` for the route).
+The PDF is real PDF 1.4 bytes: `lib/export/pdf/` holds `metrics.ts` (base-14
+Helvetica advances plus WinAnsi encoding), `columns.ts` (fixed column shares),
+`layout.ts` (page geometry and pagination), `writer.ts` (streaming objects,
+deflated content streams, trailing xref) and `document.ts` (brand block, KPI
+chips, table, footer - shared by `lib/export/pdf.ts` for the browser and
+`lib/server/exportPdf.ts` for the route). No PDF library is used at runtime;
+only base-14 fonts (never embedded) and FlateDecode streams, which every
+reader supports, and no URI or script object is ever emitted, so the file
+cannot carry a page URL.
+Every format downloads
 as one file straight from the database batches - no preview step, so a large
 selection cannot freeze the tab. Ceilings come from the
 formats themselves (`lib/export/limits.ts`): the export ceiling is 200,000
 rows, which sits under Excel's 1,048,576-row worksheet limit, so the workbook
 always fits one sheet. The
-report table is `table-layout:fixed` with a `<colgroup>` of percentages that
-sum to 100 (`printColPct`), so all 30 export columns print on the A4-landscape
-page instead of overflowing and being clipped at the paper edge.
+report table uses fixed column shares that sum to the printable width
+(`colGeometry`), so all 30 export columns land on the A4-landscape
+page instead of overflowing and being clipped at the paper edge; text wraps
+inside each column (long tokens break anywhere) and stays vector-crisp at
+any zoom.
 
 ## Island bridge topology
 
@@ -180,7 +192,7 @@ Full contract lives in `docs/API.md`. Summary:
 - Routes: `GET /api/barriers`, `GET /api/barriers/:id`,
   `PATCH /api/barriers/:id/status` (admin write via `record_status_change()`,
   author derives from session), `GET /api/barriers/deleted` (admin),
-  `GET /api/kpi`, `GET /api/chart`, `GET|POST /api/export` (csv/xlsx/html over
+  `GET /api/kpi`, `GET /api/chart`, `GET|POST /api/export` (csv/xlsx/pdf over
   the whole selection, streamed in batches),
   `GET /api/health` (DB-free liveness), `GET /api/vocabularies`
   (refresh cadence; SSR still seeds the first paint), `GET /api/sync-status`

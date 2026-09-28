@@ -106,11 +106,12 @@ export async function readPdf(bin: Bytes): Promise<ParsedPdf> {
     const inflated = await new Response(ds.readable).arrayBuffer();
     const text = bytesToLatin(new Uint8Array(inflated));
     // Balanced text objects keep readers from misparsing the stream.
-    assertStrictEquals(
-      (text.match(/BT/g) ?? []).length,
-      (text.match(/ET/g) ?? []).length,
-      "unbalanced BT/ET",
-    );
+    // Operators match as whole tokens: data words can contain "BT"/"ET".
+    const boundary = String.raw`(?:^|[\s[\]<>])`;
+    const edge = String.raw`(?=[\s[\]<>]|$)`;
+    const bt = text.match(new RegExp(`${boundary}BT${edge}`, "g")) ?? [];
+    const et = text.match(new RegExp(`${boundary}ET${edge}`, "g")) ?? [];
+    assertStrictEquals(bt.length, et.length, "unbalanced BT/ET");
     for (const s of text.matchAll(/\((?:\\.|[^\\()])*\) Tj/g)) {
       let out = "";
       const inner = s[0]!.slice(1, -4);

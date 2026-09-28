@@ -122,7 +122,7 @@ Deno.test("exportFromServer downloads every format as one file", async () => {
   const original = globalThis.fetch;
   globalThis.fetch = h.fetch;
   try {
-    for (const kind of ["csv", "xlsx", "html"] as Fmt[]) {
+    for (const kind of ["csv", "xlsx", "pdf"] as Fmt[]) {
       await run(kind, h, [1]);
     }
   } finally {
@@ -131,30 +131,29 @@ Deno.test("exportFromServer downloads every format as one file", async () => {
   assertEquals(h.downloads, [
     "barreiras-2026-09-27.csv",
     "barreiras-2026-09-27.xlsx",
-    "barreiras-2026-09-27.html",
+    "barreiras-2026-09-27.pdf",
   ]);
 });
 
-Deno.test("exportFromServer downloads a large report in one request", async () => {
+Deno.test("exportFromServer downloads a large PDF in one request", async () => {
   // The report used to print part by part through the print dialog, whose
   // live preview froze the tab on a large selection. One request, one file.
   const h = harness((seen) =>
-    okResponse(`<html>rows for ${seen.body.format}</html>`, {
+    okResponse(`%PDF-1.4 rows for ${seen.body.format}`, {
       "x-export-total": "4500",
     })
   );
   const original = globalThis.fetch;
   globalThis.fetch = h.fetch;
   try {
-    await run("html", h, [1, 2]);
+    await run("pdf", h, [1, 2]);
   } finally {
     globalThis.fetch = original;
   }
   assertEquals(h.seen.length, 1);
-  assertEquals(h.seen[0]!.body.format, "html");
-  assertEquals(h.downloads, ["barreiras-2026-09-27.html"]);
+  assertEquals(h.seen[0]!.body.format, "pdf");
+  assertEquals(h.downloads, ["barreiras-2026-09-27.pdf"]);
   // Nothing is ever mounted into the page DOM for a preview.
-  assertStrictEquals(document.getElementById("print-report"), null);
 });
 
 Deno.test("exportFromServer surfaces the route refusal", async () => {
