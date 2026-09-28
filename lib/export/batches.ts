@@ -1,5 +1,5 @@
 // Export batches - the shape every export builder consumes.
-// Why it exists: the CSV, .xlsx and print-report builders all take an async
+// Why it exists: the CSV, .xlsx and report builders all take an async
 // iterable of row batches so a streaming export never holds the whole
 // selection; the server feeds it database pages and the browser feeds it
 // slices of the in-memory list. Splitting the rows in one place keeps both

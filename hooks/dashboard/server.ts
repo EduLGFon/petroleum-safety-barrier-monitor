@@ -328,8 +328,9 @@ export function useServerDashboard(
   }, [refreshMs, hydrated, baseUrl]);
 
   // Exports the whole selection through /api/export: every format covers
-  // every selected barrier (the server streams the rows, so the browser
-  // never holds them), and an empty selection covers the filtered scope.
+  // every selected barrier as one file download (the server streams the
+  // rows, so the browser never holds them), and an empty selection covers
+  // the filtered scope.
   const exportServer = useCallback(
     (kind: Fmt, ids: number[], filename: string) =>
       exportFromServer({

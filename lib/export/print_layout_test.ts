@@ -3,7 +3,7 @@
 // eyeballed.
 import { assert, assertStrictEquals } from "jsr:@std/assert@^1";
 
-import { printColPct, printDocOpen, printTableHead } from "./pdfHtml.ts";
+import { printColPct, printDocOpen, printTableHead } from "./reportHtml.ts";
 
 import { EXPORT_HEADERS } from "./columns.ts";
 import { kpiStatsFrom } from "./summary.ts";

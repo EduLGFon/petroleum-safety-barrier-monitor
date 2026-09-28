@@ -124,20 +124,20 @@ page-local.
 
 `lib/export/` holds one builder per format, all fed the same 30-column
 `rows.ts` mapping and the same `columns.ts` order, so the browser and the
-server emit identical cells. CSV and the print report are text: split into
-head/row/tail pieces (`csv.ts`, `pdfHtml.ts`) and driven by
+server emit identical cells. CSV and the report are text: split into
+head/row/tail pieces (`csv.ts`, `reportHtml.ts`) and driven by
 `lib/server/exportStream.ts`, which turns paged batches into a byte stream.
 The spreadsheet is a real OOXML workbook: `lib/export/xlsx/` builds the
 package - `zip.ts` (streaming ZIP with `deflate-raw` and data descriptors),
 `xml.ts`, `styles.ts` (on-demand style registry), `widths.ts`, `parts.ts`
 (package plumbing), `dataSheet.ts` (the streamed "Barreiras" sheet) and
 `workbook.ts` (the ZIP assembly, shared by `lib/export/xlsx.ts` for the
-browser and `lib/server/exportXlsx.ts` for the route). Ceilings come from the
+browser and `lib/server/exportXlsx.ts` for the route). Every format downloads
+as one file straight from the database batches - no preview step, so a large
+selection cannot freeze the tab. Ceilings come from the
 formats themselves (`lib/export/limits.ts`): the export ceiling is 200,000
 rows, which sits under Excel's 1,048,576-row worksheet limit, so the workbook
-always fits one sheet, and the print report is printed in parts of
-`PDF_PART_ROWS` (one print dialog per part, the part number in the suggested
-filename) because the print dialog lays out the whole report at once. The
+always fits one sheet. The
 report table is `table-layout:fixed` with a `<colgroup>` of percentages that
 sum to 100 (`printColPct`), so all 30 export columns print on the A4-landscape
 page instead of overflowing and being clipped at the paper edge.
@@ -180,7 +180,7 @@ Full contract lives in `docs/API.md`. Summary:
 - Routes: `GET /api/barriers`, `GET /api/barriers/:id`,
   `PATCH /api/barriers/:id/status` (admin write via `record_status_change()`,
   author derives from session), `GET /api/barriers/deleted` (admin),
-  `GET /api/kpi`, `GET /api/chart`, `GET|POST /api/export` (csv/xlsx/pdf over
+  `GET /api/kpi`, `GET /api/chart`, `GET|POST /api/export` (csv/xlsx/html over
   the whole selection, streamed in batches),
   `GET /api/health` (DB-free liveness), `GET /api/vocabularies`
   (refresh cadence; SSR still seeds the first paint), `GET /api/sync-status`
@@ -264,5 +264,5 @@ adapter. `DATABASE_URL` feeds `lib/server/db.ts` and both `db:*` tasks.
   derives NC as `total - compliant` fail-closed, so novel values never vanish.
   Fixed fields + `other` always equal `total`.
 - Layouts survive scale: paginated/server-paged regions, exports streamed in
-  database-sized batches and split at the format ceilings (`EXPORT_MAX_ROWS`,
-  `PDF_PART_ROWS`), debounced search, precomputed sort keys.
+  database-sized batches under one row ceiling (`EXPORT_MAX_ROWS`),
+  debounced search, precomputed sort keys.

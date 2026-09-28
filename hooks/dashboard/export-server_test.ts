@@ -1,5 +1,6 @@
 // Tests for the server export client - what the dashboard sends to
-// /api/export (format, selection, print part) and how the answer is consumed.
+// /api/export (format, selection) and how the answer is consumed: always one
+// file download, never a preview.
 import {
   assert,
   assertEquals,
@@ -17,7 +18,7 @@ import type { BarriersQuery } from "../../lib/wireTypes.ts";
 interface Seen {
   url: string;
   method: string;
-  body: { format?: string; ids?: number[]; part?: number };
+  body: { format?: string; ids?: number[] };
 }
 
 const QUERY: BarriersQuery = {
@@ -27,31 +28,22 @@ const QUERY: BarriersQuery = {
   sortDir: "desc",
 };
 
-// Harness: stubs fetch, object URLs and print, and records what happened.
+// Harness: stubs fetch and object URLs, and records downloads by filename.
 function harness(
   respond: (seen: Seen) => Response,
 ): {
   seen: Seen[];
   downloads: string[];
-  prints: string[];
   // Mutable counter: the client calls onExpired() on a dead session.
   expired: { count: number };
   fetch: typeof globalThis.fetch;
 } {
   setupDom();
   const seen: Seen[] = [];
-  const prints: string[] = [];
   const expired = { count: 0 };
   const clicks: string[] = [];
   URL.createObjectURL = () => "blob:stub";
   URL.revokeObjectURL = () => {};
-  const g = globalThis as unknown as Record<string, unknown>;
-  g.print = () => {
-    prints.push(document.title);
-    // Real browsers fire afterprint when the dialog closes; the sequence
-    // waits on it, so the stub closes immediately.
-    globalThis.dispatchEvent(new Event("afterprint"));
-  };
   const doc = document;
   const originalCreate = doc.createElement.bind(doc);
   doc.createElement = ((tag: string) => {
@@ -65,7 +57,6 @@ function harness(
   return {
     seen,
     downloads: clicks,
-    prints,
     expired,
     fetch: (input: string | URL | Request, init?: RequestInit) => {
       const req = seen[seen.length] = {
@@ -124,12 +115,12 @@ Deno.test("exportFromServer posts the selection with the scope filters", async (
   assertEquals(call.body.format, "csv");
 });
 
-Deno.test("exportFromServer downloads the streamed file", async () => {
+Deno.test("exportFromServer downloads every format as one file", async () => {
   const h = harness(() => okResponse("payload"));
   const original = globalThis.fetch;
   globalThis.fetch = h.fetch;
   try {
-    for (const kind of ["csv", "xlsx"] as Fmt[]) {
+    for (const kind of ["csv", "xlsx", "html"] as Fmt[]) {
       await run(kind, h, [1]);
     }
   } finally {
@@ -138,52 +129,30 @@ Deno.test("exportFromServer downloads the streamed file", async () => {
   assertEquals(h.downloads, [
     "barreiras-2026-09-27.csv",
     "barreiras-2026-09-27.xlsx",
+    "barreiras-2026-09-27.html",
   ]);
 });
 
-Deno.test("exportFromServer prints the PDF one part at a time", async () => {
-  // 4,500 rows at 2,000 per part = 3 print jobs, each labelled with its
-  // position so the saved PDFs cannot be confused.
+Deno.test("exportFromServer downloads a large report in one request", async () => {
+  // The report used to print part by part through the print dialog, whose
+  // live preview froze the tab on a large selection. One request, one file.
   const h = harness((seen) =>
-    okResponse(`<div>part ${seen.body.part}</div>`, {
+    okResponse(`<html>rows for ${seen.body.format}</html>`, {
       "x-export-total": "4500",
-      "x-export-parts": "3",
     })
   );
   const original = globalThis.fetch;
   globalThis.fetch = h.fetch;
   try {
-    await run("pdf", h, [1, 2]);
-  } finally {
-    globalThis.fetch = original;
-  }
-  assertEquals(h.seen.map((s) => s.body.part), [1, 2, 3]);
-  assertEquals(h.prints, [
-    "barreiras-2026-09-27-parte-1-de-3",
-    "barreiras-2026-09-27-parte-2-de-3",
-    "barreiras-2026-09-27-parte-3-de-3",
-  ]);
-  // The report lands in the hidden print node, never in the app chrome.
-  assertStrictEquals(document.getElementById("print-report")?.innerHTML, "");
-  assertStrictEquals(
-    document.body.classList.contains("printing-report"),
-    false,
-  );
-});
-
-Deno.test("exportFromServer prints a single part for a small selection", async () => {
-  const h = harness(() =>
-    okResponse("<div>only</div>", { "x-export-total": "12" })
-  );
-  const original = globalThis.fetch;
-  globalThis.fetch = h.fetch;
-  try {
-    await run("pdf", h, [1]);
+    await run("html", h, [1, 2]);
   } finally {
     globalThis.fetch = original;
   }
   assertEquals(h.seen.length, 1);
-  assertEquals(h.prints, ["barreiras-2026-09-27"]);
+  assertEquals(h.seen[0]!.body.format, "html");
+  assertEquals(h.downloads, ["barreiras-2026-09-27.html"]);
+  // Nothing is ever mounted into the page DOM for a preview.
+  assertStrictEquals(document.getElementById("print-report"), null);
 });
 
 Deno.test("exportFromServer surfaces the route refusal", async () => {

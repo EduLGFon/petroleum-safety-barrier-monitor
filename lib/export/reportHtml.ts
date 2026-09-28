@@ -1,8 +1,10 @@
-// Print report HTML pieces - the landscape report as head/row/tail builders.
-// This is why it exists: the browser mounts the report in the hidden print
-// node while the server streams the same markup as the PDF print job, so
-// both render identical pages. Inline styles only: the fragment is injected
-// into the app page, where static/styles.css owns @page and the chrome rule.
+// Report HTML pieces - the landscape report as head/row/tail builders plus
+// the standalone document shell around them.
+// This is why it exists: the browser downloads the report as a file while the
+// server streams the same markup for a huge selection, so both render
+// identical pages. The shell carries its own <style> (page size, repeating
+// header), so the file prints correctly opened on its own, offline, with no
+// app CSS and no page URL stamped onto it.
 //
 // Fit: the table is `table-layout:fixed` with a <colgroup> of percentages
 // that add up to exactly 100. Auto layout cannot shrink a column below its
@@ -154,6 +156,36 @@ export function printDocClose(companyName: string): string {
     `<div style="font-size:7pt;color:#94A3B8;margin-top:10px;">${
       escHtml(withBrand(companyName, "Monitor de Barreiras"))
     } · gerado em ${escHtml(ts())}</div></div>`;
+}
+
+// reportDocument: wraps a report fragment in a standalone HTML document, so
+// the export downloads as a file instead of going through the print dialog.
+// The dialog builds a live preview of the whole report before it opens, which
+// freezes the tab on a large selection; a download never touches the page
+// DOM. The document carries its own <style> (page size, repeating header)
+// and names no external resource, so it opens and prints identically offline
+// - and, unlike the browser print chrome, it stamps no page URL on the file.
+// reportDocOpen: the standalone document shell. Split from reportDocument so
+// the server can stream rows inside it instead of holding the whole file.
+export function reportDocOpen(title: string): string {
+  return `<!DOCTYPE html>` +
+    `<html lang="pt-BR"><head><meta charset="utf-8">` +
+    `<title>${escHtml(title)}</title>` +
+    `<style>` +
+    `@page{size:A4 landscape;margin:12mm 10mm 14mm 10mm;}` +
+    `body{margin:0;color:#0F172A;}` +
+    `thead{display:table-header-group;}` +
+    `tr{page-break-inside:avoid;}` +
+    `</style></head><body>`;
+}
+
+export function reportDocClose(): string {
+  return `</body></html>`;
+}
+
+// reportDocument: wraps a report fragment in the standalone shell above.
+export function reportDocument(title: string, fragment: string): string {
+  return reportDocOpen(title) + fragment + reportDocClose();
 }
 
 // printRow: one report row; the NC duration column is derived like the

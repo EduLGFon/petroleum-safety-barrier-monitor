@@ -1,15 +1,15 @@
-// Client export helpers - download barriers as spreadsheet, PDF or CSV.
-// This is why it exists: zero-dependency browser exports. The spreadsheet is a
-// real .xlsx workbook (OOXML) with a brand header, KPI strip, frozen header,
-// styled columns and a summary sheet - built by the same builder the server
-// streams, so both files agree cell for cell. PDF prints a dedicated
-// landscape report (never the whole page), split into parts when the selection
-// is bigger than one print job can lay out. CSV uses ; with BOM. Importers
-// keep importing from here; formats live in small modules.
+// Client export helpers - download barriers as spreadsheet, report or CSV.
+// This is why it exists: zero-dependency browser downloads, one per format,
+// with no preview step in between. The spreadsheet is a real .xlsx workbook
+// (OOXML) with a brand header, KPI strip, frozen header, styled columns and a
+// summary sheet - built by the same builder the server streams, so both files
+// agree cell for cell. The report is a standalone landscape HTML document
+// (banner, KPI chips, all 30 columns) that the user opens and prints from.
+// CSV uses ; with BOM. Importers keep importing from here; formats live in
+// small modules.
 export { exportToXlsx } from "./export/xlsx.ts";
-export { buildPrintReport, exportToPDF } from "./export/pdf.ts";
-export { pdfPartTitle, printPdfParts, printReportPart } from "./export/pdf.ts";
+export { buildReportDocument, exportReportToFile } from "./export/report.ts";
 export { exportToCSV } from "./export/csv.ts";
-export { EXPORT_MAX_ROWS, PDF_PART_ROWS } from "./export/limits.ts";
+export { EXPORT_MAX_ROWS } from "./export/limits.ts";
 export { FMT_EXT, FMT_MIME, FMT_ORDER } from "./export/format.ts";
 export type { Fmt } from "./export/format.ts";

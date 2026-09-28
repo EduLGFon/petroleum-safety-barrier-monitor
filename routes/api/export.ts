@@ -1,11 +1,11 @@
-// API: GET|POST /api/export - the whole selection as csv, xlsx or pdf.
+// API: GET|POST /api/export - the whole selection as csv, xlsx or html.
 // This is why it exists: the dashboard download must cover every selected
 // barrier (18k and up), which no browser-side builder can hold. Filters
-// arrive as query params on both verbs; the selection (ids) and the print
-// part arrive in the request body, so an 18k-row selection never has to fit
-// a URL. Rows are streamed from the database in batches (lib/server/export*).
-// Authenticated like the other dashboard GETs (extraction needs a session
-// or ADMIN_TOKEN); anonymous gets 404 camouflage. Throttled tighter.
+// arrive as query params on both verbs; the selection (ids) arrives in the
+// request body, so an 18k-row selection never has to fit a URL. Rows are
+// streamed from the database in batches (lib/server/export*). Authenticated
+// like the other dashboard GETs (extraction needs a session or ADMIN_TOKEN);
+// anonymous gets 404 camouflage. Throttled tighter.
 import {
   badRequest,
   internal,
@@ -20,24 +20,19 @@ import {
   resolveExportScope,
 } from "../../lib/server/exportRows.ts";
 
-import {
-  EXPORT_MAX_ROWS,
-  PDF_PART_ROWS,
-  refusalMessage,
-} from "../../lib/export/limits.ts";
+import { EXPORT_MAX_ROWS, refusalMessage } from "../../lib/export/limits.ts";
 
 import { exportThrottle, routeClientKey } from "../../lib/server/throttle.ts";
 import { checkDbThrottle } from "../../lib/server/sql/throttle.ts";
 import { streamExportCsv } from "../../lib/server/exportCsv.ts";
 import { FMT_EXT, FMT_MIME, normalizeFmt } from "../../lib/export/format.ts";
 import { loadServerConfig } from "../../lib/server/config.ts";
+import { streamReportDocument } from "../../lib/server/exportHtml.ts";
 import { streamExportXlsx } from "../../lib/server/exportXlsx.ts";
 import { getCompanyName } from "../../lib/company.ts";
 import type { ExportScope } from "../../lib/server/exportRows.ts";
-import { streamPrintReport } from "../../lib/server/exportPdf.ts";
 import type { BarriersQuery } from "../../lib/wireTypes.ts";
 import { requireDataAuth } from "../../lib/server/auth.ts";
-import { pdfPartCount } from "../../lib/export/parts.ts";
 import { parseFilterQuery } from "./_params.ts";
 
 import { define } from "../../utils.ts";
@@ -45,12 +40,11 @@ import { define } from "../../utils.ts";
 import type { Fmt } from "../../lib/export/format.ts";
 
 // Request payload: the filters always come from the query string (one parser
-// for GET and POST alike), the selection and the print part from the body,
-// where an 18k-id list fits comfortably.
+// for GET and POST alike) and the selection from the body, where an 18k-id
+// list fits comfortably.
 interface ExportRequest {
   format: Fmt;
   ids?: number[];
-  part: number;
 }
 
 // parseIds: only positive safe integers, deduped and capped at the row
@@ -69,14 +63,8 @@ function parseIds(raw: unknown): number[] | undefined {
   return ids.slice(0, EXPORT_MAX_ROWS);
 }
 
-// parsePart: 1-based print part; anything invalid falls back to part 1.
-function parsePart(raw: unknown): number {
-  const n = typeof raw === "number" && Number.isSafeInteger(raw) ? raw : 0;
-  return n > 0 ? n : 1;
-}
-
 // readBody: the optional JSON payload. A missing or non-JSON body is a valid
-// request (full filtered scope, first print part), so GET works unchanged.
+// request (full filtered scope), so GET works unchanged.
 async function readBody(req: Request): Promise<Record<string, unknown>> {
   try {
     const parsed = await req.json();
@@ -112,8 +100,6 @@ async function stream(
   const clientKey = routeClientKey(ctx);
   let limit = exportThrottle.check(clientKey);
   try {
-    // Same budget as the in-memory bucket: a multi-part PDF export spends one
-    // request per print part, and a 200k-row selection is 100 parts.
     const shared = await checkDbThrottle("export", clientKey, 120, 60_000);
     limit = shared;
   } catch {
@@ -138,16 +124,15 @@ async function stream(
       : unauthorized(dataAuth.message, requestId);
   }
 
-  // A tab opened before the .xlsx migration still asks for "xls"; it resolves
-  // to the same workbook instead of failing the request.
+  // A tab opened before a format migration still asks for its old key; it
+  // resolves to the current format instead of failing the request.
   const requested = normalizeFmt(body.format ?? sp.get("format") ?? "csv");
   if (!requested) {
-    return badRequest("format must be csv, xlsx or pdf", requestId);
+    return badRequest("format must be csv, xlsx or html", requestId);
   }
   const req: ExportRequest = {
     format: requested,
     ids: parseIds(body.ids),
-    part: parsePart(body.part),
   };
   const query: BarriersQuery = {
     ...parseFilterQuery(sp),
@@ -173,9 +158,8 @@ async function stream(
   }
 }
 
-// respond: wires the format stream and its headers. CSV and xlsx download as
-// one file (the workbook streams straight out of the ZIP writer); pdf is a
-// print fragment, one part per request, so the caller prints them in order.
+// respond: wires the format stream and its download headers. Every format
+// downloads as one file, streamed straight from the database batches.
 function respond(
   req: ExportRequest,
   scope: ExportScope,
@@ -196,31 +180,14 @@ function respond(
       { status: 200, headers: fileHeaders(headers, "xlsx") },
     );
   }
-  if (req.format === "pdf") {
-    const parts = pdfPartCount(total);
-    const part = Math.min(req.part, parts);
-    // A print fragment, not a file: no download disposition, the caller
-    // injects it into the print node and prints it.
+  if (req.format === "html") {
     return new Response(
-      streamPrintReport(
-        exportBatches(scope, {
-          offset: (part - 1) * PDF_PART_ROWS,
-          limit: PDF_PART_ROWS,
-        }),
-        {
-          companyName,
-          kpi: scope.kpi,
-          part: { index: part, parts, total },
-        },
-      ),
-      {
-        status: 200,
-        headers: {
-          ...headers,
-          "x-export-parts": String(parts),
-          "content-type": FMT_MIME.pdf,
-        },
-      },
+      streamReportDocument(exportBatches(scope), {
+        companyName,
+        kpi: scope.kpi,
+        title: "barreiras",
+      }),
+      { status: 200, headers: fileHeaders(headers, "html") },
     );
   }
   return new Response(streamExportCsv(exportBatches(scope), scope.kpi), {
@@ -232,7 +199,7 @@ function respond(
 // fileHeaders: content type plus the download disposition for a file format.
 function fileHeaders(
   base: Record<string, string>,
-  format: "csv" | "xlsx",
+  format: "csv" | "xlsx" | "html",
 ): Record<string, string> {
   return {
     ...base,

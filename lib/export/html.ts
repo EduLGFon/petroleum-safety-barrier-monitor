@@ -1,5 +1,5 @@
 // Export HTML primitives - timestamp, escaping, download, pills, browser guard.
-// This is why it exists: the print report and the CSV share these browser-only
+// This is why it exists: the report file and the CSV share these browser-only
 // building blocks instead of reimplementing them per format. Row ceilings live
 // in limits.ts (format-driven, not DOM-driven).
 

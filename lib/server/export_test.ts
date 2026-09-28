@@ -4,8 +4,7 @@ import { streamExportCsv, streamToText } from "./exportCsv.ts";
 import { batchesOf, kpiOf, mkBarrier, mkCount } from "../export/fixture.ts";
 import { assert, assertStrictEquals } from "jsr:@std/assert@^1";
 import { streamExportXlsx } from "./exportXlsx.ts";
-import { streamPrintReport } from "./exportPdf.ts";
-import { pdfPartCount } from "../export/parts.ts";
+import { streamReportDocument } from "./exportHtml.ts";
 import type { Bytes } from "../export/xlsx/zip.ts";
 
 import type { Barrier } from "../types.ts";
@@ -26,12 +25,12 @@ function xlsxOf(barriers: Barrier[], size = 500): Promise<Bytes> {
   return new Response(stream).arrayBuffer().then((b) => new Uint8Array(b));
 }
 
-function printOf(barriers: Barrier[], size = 500): Promise<string> {
+function reportOf(barriers: Barrier[], size = 500): Promise<string> {
   return streamToText(
-    streamPrintReport(batchesOf(barriers, size), {
+    streamReportDocument(batchesOf(barriers, size), {
       companyName: "Petrobras",
       kpi: kpiOf(barriers),
-      part: { index: 1, parts: 1, total: barriers.length },
+      title: "barreiras",
     }),
   );
 }
@@ -156,35 +155,23 @@ Deno.test("streamExportXlsx streams before the last batch is read", async () => 
   await reader.cancel();
 });
 
-Deno.test("streamPrintReport renders every batched row", async () => {
-  const html = await printOf(mkCount(1_200), 400);
+Deno.test("streamReportDocument renders one standalone file over every batch", async () => {
+  const html = await reportOf(mkCount(1_200), 400);
   assertStrictEquals(printRows(html), 1_200);
   assertStrictEquals(html.includes("PSV-1200"), true);
   assertStrictEquals(html.includes("<tbody>"), true);
   assertStrictEquals(html.includes("</tbody></table>"), true);
-  // Single part: no part label in the banner.
+  // One file, not print parts: standalone shell, no part labels.
+  assertStrictEquals(html.startsWith("<!DOCTYPE html>"), true);
   assertStrictEquals(html.includes("parte 1 de"), false);
+  assertStrictEquals(html.includes("<title>barreiras</title>"), true);
 });
 
-Deno.test("streamPrintReport labels a multi-part run", async () => {
-  const rows = mkCount(10);
-  const html = await streamToText(
-    streamPrintReport(batchesOf(rows, 4), {
-      companyName: "Petrobras",
-      kpi: kpiOf(rows),
-      part: { index: 3, parts: 9, total: 18_000 },
-    }),
-  );
-  assertStrictEquals(html.includes("parte 3 de 9"), true);
-  // The KPI strip reports the scope the aggregate covers (these 10 rows), not
-  // the print-part descriptor, so every part shows the same totals.
-  assertStrictEquals(html.includes("10 registros"), true);
-});
-
-Deno.test("print parts cover the whole selection", () => {
-  assertStrictEquals(pdfPartCount(0), 1);
-  assertStrictEquals(pdfPartCount(1), 1);
-  assertStrictEquals(pdfPartCount(2_000), 1);
-  assertStrictEquals(pdfPartCount(2_001), 2);
-  assertStrictEquals(pdfPartCount(18_000), 9);
+Deno.test("streamReportDocument carries no page URL anywhere", async () => {
+  // The print dialog used to stamp the page URL onto the saved file; the
+  // download must not contain any URL-shaped string.
+  const html = await reportOf(mkCount(10), 4);
+  assertStrictEquals(html.includes("http://"), false);
+  assertStrictEquals(html.includes("https://"), false);
+  assertStrictEquals(/localhost/i.test(html), false);
 });

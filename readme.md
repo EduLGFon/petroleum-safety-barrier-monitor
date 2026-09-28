@@ -51,9 +51,9 @@ dashboard island, the upstream sync loop and the alert digest loop. There is no
   date range.
 - Barrier modal with a details tab, a status history timeline, and an admin
   editing tab.
-- Exports: CSV, XLSX and PDF over the whole selected set (streamed from the
-  server, split where the format needs it), with KPI summary blocks and
-  branded headers.
+- Exports: CSV, XLSX and HTML report over the whole selected set (streamed
+  from the server as file downloads, never a preview), with KPI summary
+  blocks and branded headers.
 - Header health indicator merging connection state and sync state, with a
   per-run delta line, hover card and a full audit modal listing the rows a run
   touched.
@@ -373,33 +373,33 @@ Failures use one envelope: `{ error, code, requestId }` with the
 `RATE_LIMITED`, `INTERNAL`. Internal details never reach the response; they go
 to the log with the request id.
 
-| Method           | Path                       | Auth        | Notes                                                            |
-| ---------------- | -------------------------- | ----------- | ---------------------------------------------------------------- |
-| `GET`            | `/api/health`              | none        | Liveness; never touches the database. Not throttled              |
-| `GET`            | `/api/barriers`            | data        | Paged, filtered, sorted wire list plus `total` / `totalPages`    |
-| `GET`            | `/api/barriers/:id`        | data        | One barrier with its status history                              |
-| `PATCH`          | `/api/barriers/:id/status` | admin       | The only status write path; triggers the immediate alert fan-out |
-| `PATCH`          | `/api/barriers/:id`        | admin       | Partial update of core and sheet fields                          |
-| `GET`            | `/api/barriers/deleted`    | admin       | Audit view of soft-deleted rows                                  |
-| `GET`            | `/api/kpi`                 | data        | KPI snapshot for the filter subset (minus paging/sorting)        |
-| `GET`            | `/api/chart`               | data        | Per-category compliant/total                                     |
-| `GET`, `POST`    | `/api/export`              | data        | Streamed CSV / XLSX / print report over the whole selection      |
-| `GET`            | `/api/vocabularies`        | data        | Filter vocabularies for the background refresh                   |
-| `GET`            | `/api/lookups`             | any session | Id-bearing lists that feed the admin forms                       |
-| `GET`            | `/api/field-options`       | data        | Curated answer lists per sheet question                          |
-| `PUT`            | `/api/field-options`       | admin       | Replaces one field's list                                        |
-| `GET`            | `/api/sync-status`         | data        | `syncing` / `idle` / `stale` / `unknown` plus last-run counts    |
-| `GET`            | `/api/sync-changes`        | data        | Rows touched by recent runs, for the indicator modal             |
-| `POST`           | `/api/auth/login`          | none        | Credentials to an HttpOnly session cookie                        |
-| `POST`           | `/api/auth/logout`         | none        | Revoke session and clear the cookie                              |
-| `GET`            | `/api/auth/me`             | session     | Current identity and role for the islands                        |
-| `POST`           | `/api/auth/password`       | session     | Self-service change; revokes every session, including this one   |
-| `GET`/`POST`     | `/api/users`               | admin       | List and create users (no self-registration)                     |
-| `PATCH`/`DELETE` | `/api/users/:id`           | admin       | Update or remove; the last active admin is protected             |
-| `GET`/`POST`     | `/api/recipients`          | admin       | Alert digest audience                                            |
-| `PATCH`/`DELETE` | `/api/recipients/:id`      | admin       | Rename, activate, remove                                         |
-| `GET`/`POST`     | `/api/alert-rules`         | admin       | Trigger definitions                                              |
-| `PATCH`/`DELETE` | `/api/alert-rules/:id`     | admin       | Edit or remove a trigger (this is how a category is muted)       |
+| Method           | Path                       | Auth        | Notes                                                               |
+| ---------------- | -------------------------- | ----------- | ------------------------------------------------------------------- |
+| `GET`            | `/api/health`              | none        | Liveness; never touches the database. Not throttled                 |
+| `GET`            | `/api/barriers`            | data        | Paged, filtered, sorted wire list plus `total` / `totalPages`       |
+| `GET`            | `/api/barriers/:id`        | data        | One barrier with its status history                                 |
+| `PATCH`          | `/api/barriers/:id/status` | admin       | The only status write path; triggers the immediate alert fan-out    |
+| `PATCH`          | `/api/barriers/:id`        | admin       | Partial update of core and sheet fields                             |
+| `GET`            | `/api/barriers/deleted`    | admin       | Audit view of soft-deleted rows                                     |
+| `GET`            | `/api/kpi`                 | data        | KPI snapshot for the filter subset (minus paging/sorting)           |
+| `GET`            | `/api/chart`               | data        | Per-category compliant/total                                        |
+| `GET`, `POST`    | `/api/export`              | data        | Streamed CSV / XLSX / HTML report download over the whole selection |
+| `GET`            | `/api/vocabularies`        | data        | Filter vocabularies for the background refresh                      |
+| `GET`            | `/api/lookups`             | any session | Id-bearing lists that feed the admin forms                          |
+| `GET`            | `/api/field-options`       | data        | Curated answer lists per sheet question                             |
+| `PUT`            | `/api/field-options`       | admin       | Replaces one field's list                                           |
+| `GET`            | `/api/sync-status`         | data        | `syncing` / `idle` / `stale` / `unknown` plus last-run counts       |
+| `GET`            | `/api/sync-changes`        | data        | Rows touched by recent runs, for the indicator modal                |
+| `POST`           | `/api/auth/login`          | none        | Credentials to an HttpOnly session cookie                           |
+| `POST`           | `/api/auth/logout`         | none        | Revoke session and clear the cookie                                 |
+| `GET`            | `/api/auth/me`             | session     | Current identity and role for the islands                           |
+| `POST`           | `/api/auth/password`       | session     | Self-service change; revokes every session, including this one      |
+| `GET`/`POST`     | `/api/users`               | admin       | List and create users (no self-registration)                        |
+| `PATCH`/`DELETE` | `/api/users/:id`           | admin       | Update or remove; the last active admin is protected                |
+| `GET`/`POST`     | `/api/recipients`          | admin       | Alert digest audience                                               |
+| `PATCH`/`DELETE` | `/api/recipients/:id`      | admin       | Rename, activate, remove                                            |
+| `GET`/`POST`     | `/api/alert-rules`         | admin       | Trigger definitions                                                 |
+| `PATCH`/`DELETE` | `/api/alert-rules/:id`     | admin       | Edit or remove a trigger (this is how a category is muted)          |
 
 Pages: `/login` is the only public route. `/` redirects anonymous visitors to
 `/login?next=...`, so no data ever ships to an unauthenticated browser.
@@ -469,7 +469,7 @@ Invariants worth knowing before touching the schema:
   120/min reads, 30/min writes, 120/min exports, 10/min password changes.
   Exports share a Postgres-backed budget across instances with an in-memory
   fallback, so limiting never breaks the request path. The export budget is
-  sized for a whole multi-part export (a PDF is one request per print part).
+  sized for whole-selection exports (one request per file download).
 - `ADMIN_TOKEN` (constant-time compared) is accepted by admin routes for
   scripts; it is rejected by the password-change route on purpose.
 - Same-origin by design: the dashboard fetches its own `/api/*`, so no CORS
@@ -613,13 +613,12 @@ so the file size never depends on the page size.
 | ------ | --------------- | ----------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | CSV    | whole selection | 200 000 rows per export | 30 columns, UTF-8 BOM, semicolon separated, plus a `RESUMO` KPI block. Byte-identical whether produced in the browser or streamed by the server                                                                                                                                        |
 | XLSX   | whole selection | 200 000 rows per export | Real OOXML workbook (one sheet, under Excel's 1,048,576-row limit): brand header, KPI strip, frozen header row with autofilter, fitted widths, status and criticality colours, numeric IDs, plus a `Resumo` sheet. Same file whether produced in the browser or streamed by the server |
-| PDF    | whole selection | 200 000 rows per export | Landscape A4 print report with all 30 columns (fixed column widths, so nothing is clipped at the paper edge), repeating table headers and KPI chips, printed in parts of 2 000 rows (one print dialog per part)                                                                        |
+| HTML   | whole selection | 200 000 rows per export | Standalone landscape report file with all 30 columns (fixed column widths, so nothing is clipped at the paper edge), repeating table headers and KPI chips; opened and printed from the browser, with no page URL stamped on it                                                        |
 
 Past 200 000 rows the export is refused with the real count so the filters can
 be narrowed - nothing is ever cut silently. The selection is intersected with
 the active filters on the server, so a stale selection cannot widen the file.
-Files are named with the export date; a multi-part PDF names each part
-(`...-parte-1-de-9`).
+Files are named with the export date, one file per export.
 
 ## Testing and quality gates
 

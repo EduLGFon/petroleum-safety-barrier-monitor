@@ -2,7 +2,6 @@
 // This is why it exists: the toolbar shell stays lean while format buttons and loading state live in one reusable block.
 import {
   DownloadIcon,
-  FilePdfIcon,
   FileSpreadsheetIcon,
   FileTextIcon,
 } from "../ui/Icons.tsx";
@@ -29,10 +28,10 @@ const FMTS: FmtDef[] = [
     color: "#34d399",
   },
   {
-    key: "pdf",
-    Icon: FilePdfIcon,
-    label: "PDF",
-    ext: ".pdf",
+    key: "html",
+    Icon: FileTextIcon,
+    label: "HTML",
+    ext: ".html",
     color: "#f87171",
   },
   {
