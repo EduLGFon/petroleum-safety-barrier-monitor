@@ -4,7 +4,8 @@
 // live data. Empty props mean still loading or truly empty data: selects
 // show only the placeholder instead of a fixed seed list. Station filtering
 // stays on the location tabs; plan and date boxes hide via the Columns
-// dialog filters toggles; the rank gate defaults to critical tiers only.
+// dialog filters toggles; the rank gate is an opt-in focus filter (off by
+// default, so the table opens on every rank).
 import { Combo, GLASS_INPUT } from "./filter/FilterSelect.tsx";
 
 import type { ColumnKey, PinnedKey } from "./table/columns.ts";

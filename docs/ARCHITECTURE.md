@@ -228,8 +228,10 @@ Full contract lives in `docs/API.md`. Summary:
   bulk-inserts `getWireBarriers()` output in batches of 500 (`--force`
   truncates first).
 - Browser `localStorage`: `barrier-dashboard` (location, filters, selection,
-  openId, ordered visible table columns plus hidden pinned filters;
-  validated per-field on restore, stale page self-heals) and
+  openId, ordered visible table columns plus hidden pinned filters,
+  `defaultsVersion`; validated per-field on restore, stale page self-heals,
+  and defaults a previous version implied are migrated away instead of
+  replayed - `FILTER_DEFAULTS_VERSION` in `lib/dashboard/filters.ts`) and
   `barrier-settings` (theme, accent, density, motion, defaults).
 
 ## Config

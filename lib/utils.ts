@@ -7,6 +7,8 @@
  */
 export {
   defaultFilters,
+  FILTER_DEFAULTS_VERSION,
+  restoredFilters,
   sanitizeFilterPatch,
   sanitizeFilters,
 } from "./dashboard/filters.ts";

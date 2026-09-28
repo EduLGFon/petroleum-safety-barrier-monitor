@@ -1,5 +1,6 @@
 // persistence.ts - dashboard localStorage slice; split out so reducer/state stay pure and SSR-safe.
 import type { ChartSort, ChartView } from "../../lib/dashboard/chart.ts";
+import { FILTER_DEFAULTS_VERSION } from "../../lib/dashboard/filters.ts";
 
 import type { FilterState } from "../../lib/types.ts";
 
@@ -16,6 +17,10 @@ export interface Persisted {
   // Hidden pinned filter columns ("plan"/"dates" strings); absent or
   // corrupt resolves to none hidden.
   hiddenPinned?: string[];
+  // Which shipped filter defaults wrote this blob (FILTER_DEFAULTS_VERSION).
+  // Absent means an older version, whose implied defaults are migrated away on
+  // restore instead of being replayed as if the user had chosen them.
+  defaultsVersion?: number;
 }
 
 // Loads persisted dashboard slice from `barrier-dashboard` key; SSR-safe, returns {} on miss/error.
@@ -30,9 +35,14 @@ export function loadDash(): Partial<Persisted> {
 }
 
 // Persists dashboard slice to `barrier-dashboard` key; no-op on storage failure, state stays in memory.
+// Stamps the current defaults version so the next restore knows which shipped
+// defaults produced these filters.
 export function saveDash(d: Persisted) {
   try {
-    localStorage.setItem(STORE_KEY, JSON.stringify(d));
+    localStorage.setItem(
+      STORE_KEY,
+      JSON.stringify({ ...d, defaultsVersion: FILTER_DEFAULTS_VERSION }),
+    );
   } catch {
     // Storage may be unavailable - dashboard still works in memory.
   }

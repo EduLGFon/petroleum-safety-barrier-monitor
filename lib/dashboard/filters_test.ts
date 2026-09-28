@@ -3,7 +3,9 @@ import {
   applyFilters,
   applySorting,
   defaultFilters,
+  FILTER_DEFAULTS_VERSION,
   paginate,
+  restoredFilters,
   sanitizeFilterPatch,
   sanitizeFilters,
 } from "./filters.ts";
@@ -186,13 +188,39 @@ Deno.test("applyFilters gates non-critical ranks when criticalOnly", () => {
     barrier({ id: 3, criticality: "B" }),
     barrier({ id: 4, criticality: "D" }),
   ];
+  // The default lists every rank; the gate is an opt-in focus filter.
   assertStrictEquals(
-    applyFilters(rows, defaultFilters()).map((b) => b.id).join(","),
-    "1,2",
+    applyFilters(rows, defaultFilters()).length,
+    4,
   );
   assertStrictEquals(
-    applyFilters(rows, { ...defaultFilters(), criticalOnly: false }).length,
-    4,
+    applyFilters(rows, { ...defaultFilters(), criticalOnly: true })
+      .map((b) => b.id).join(","),
+    "1,2",
+  );
+  assertStrictEquals(defaultFilters().criticalOnly, false);
+});
+
+Deno.test("restoredFilters migrates the implicit gate out of v1 state", () => {
+  // v1 shipped criticalOnly: true, so a v1 blob never means the user chose it.
+  assertEquals(
+    restoredFilters({ criticalOnly: true, query: "psv" }, 1).criticalOnly,
+    false,
+  );
+  assertStrictEquals(
+    restoredFilters({ criticalOnly: true, query: "psv" }, 1).query,
+    "psv",
+  );
+  // Current version: an explicit gate is a real choice and survives.
+  assertStrictEquals(
+    restoredFilters({ criticalOnly: true }, FILTER_DEFAULTS_VERSION)
+      .criticalOnly,
+    true,
+  );
+  // Unknown/absent version counts as v1, so nothing old is replayed.
+  assertStrictEquals(
+    restoredFilters({ criticalOnly: true }, NaN).criticalOnly,
+    false,
   );
 });
 

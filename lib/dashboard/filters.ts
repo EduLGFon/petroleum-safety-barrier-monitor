@@ -76,8 +76,10 @@ export function paginate<T>(a: T[], p: number, s: number): T[] {
   return a.slice((p - 1) * s, p * s);
 }
 
-// Returns a fresh default FilterState (page 1, 25 rows, sort by id asc,
-// critical tiers only); new object each call.
+// Returns a fresh default FilterState (page 1, 25 rows, sort by id asc); new
+// object each call. The critical-tier gate is OFF by default: the table opens
+// on every rank, and the gate stays a one-tap focus filter (persisted blobs
+// written before it was dropped are migrated by restoredFilters).
 export function defaultFilters(): FilterState {
   return {
     query: "",
@@ -86,7 +88,7 @@ export function defaultFilters(): FilterState {
     category: "",
     typology: "",
     criticality: "",
-    criticalOnly: true,
+    criticalOnly: false,
     plan: "",
     since: "",
     until: "",
@@ -172,4 +174,23 @@ export function sanitizeFilterPatch(raw: unknown): Partial<FilterState> {
 // Merges an untrusted persisted blob over fresh defaults; always complete.
 export function sanitizeFilters(raw: unknown): FilterState {
   return { ...defaultFilters(), ...sanitizeFilterPatch(raw) };
+}
+
+// Version of the shipped filter defaults. Bump it whenever a default changes
+// so blobs written under the old defaults can be migrated instead of restored
+// verbatim - a value the old defaults implied would otherwise stick forever.
+export const FILTER_DEFAULTS_VERSION = 2;
+
+// restoredFilters: the filter state to hydrate with, from a persisted slice.
+// The blob is sanitized, then keys that only an older implicit default could
+// have written are dropped: v1 shipped the critical-tier gate ON, so a v1
+// `criticalOnly: true` never meant a choice the user made. An absent or
+// unparsable version counts as v1 (conservative: migrate).
+export function restoredFilters(
+  raw: unknown,
+  version: number,
+): FilterState {
+  const patch = sanitizeFilterPatch(raw);
+  if (!Number.isInteger(version) || version < 2) delete patch.criticalOnly;
+  return { ...defaultFilters(), ...patch };
 }

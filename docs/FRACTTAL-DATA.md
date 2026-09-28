@@ -85,8 +85,8 @@ the join / `external_code` key. Data quality:
 Every `item_type = 2` row enters the monitor (minus the documented
 exclusion); the admitting gates ride per row in `scope_source` (`keyword` /
 `eso` / `keyword+eso` / `all`) so scope stays reversible. The dashboard
-opens on the critical tiers only (`criticalOnly`, ESO/A) with a one-tap
-toggle to every rank. GERAL manual-barrier coverage measured by
+opens on every rank and offers a one-tap `criticalOnly` gate (ESO/A) in the
+Criticidade filter. GERAL manual-barrier coverage measured by
 `scripts/geral-coverage.ts`: 49.8% (keyword scope) → 89.8% (ESO-OR-keyword)
 → 94.5% (all equipment; the 123 residual codes exist neither in the dump nor
 live).

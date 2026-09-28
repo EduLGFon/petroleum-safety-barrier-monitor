@@ -558,12 +558,12 @@ row entrance staggering capped so a 100-row page never feels slow. The last
 visible column cannot be hidden.
 
 **Filters.** Debounced search that grows on focus, portalled combo boxes with
-type-to-narrow and option counts, a criticality rank gate (critical tiers
-first), action-plan and date-range bounds, "clear filters" when anything is
-active, and a live count. Options are always the live vocabularies; there is no
-seed fallback. The table opens narrowed to the critical ranks, page size 25
-(options 25/50/100), sorted by id ascending; both the default narrowing and the
-default sort are configurable in the settings panel.
+type-to-narrow and option counts, a criticality rank gate (one tap lists only
+the critical tiers), action-plan and date-range bounds, "clear filters" when
+anything is active, and a live count. Options are always the live
+vocabularies; there is no seed fallback. The table opens unfiltered, page
+size 25 (options 25/50/100), sorted by id ascending; the default filters and
+the default sort are configurable in the settings panel.
 
 **Chart.** Two modes: stacked horizontal bars per category and an executive
 summary (donut with compliance percentage plus a Top-NC list). Sort by volume,

@@ -3,7 +3,7 @@
 // filter semantics; only the data source differs. Data-agnostic on purpose.
 import { useCallback, useEffect, useReducer, useState } from "preact/hooks";
 import type { FilterState, SortableColumn } from "../../lib/types.ts";
-import { defaultFilters, sanitizeFilters } from "../../lib/utils.ts";
+import { defaultFilters, restoredFilters } from "../../lib/utils.ts";
 import { loadDash } from "./persistence.ts";
 import { reducer } from "./reducer.ts";
 
@@ -18,13 +18,14 @@ export function useFilterState(defaultLocation = "ALL") {
   const [hydrated, setHydrated] = useState(false);
 
   // After mount: restore validated persisted filters (corrupt values fall
-  // back to defaults instead of wedging filters or page).
+  // back to defaults instead of wedging filters or page), migrating away the
+  // defaults a previous version shipped implicitly.
   useEffect(() => {
     const p = loadDash();
     const location = typeof p.location === "string" && p.location.trim() !== ""
       ? p.location
       : defaultLocation;
-    const filters = sanitizeFilters(p.filters ?? {});
+    const filters = restoredFilters(p.filters, Number(p.defaultsVersion));
     dispatch({ type: "RESTORE", payload: { location, ...filters } });
     setHydrated(true);
     // eslint-disable-next-line react-hooks/exhaustive-deps

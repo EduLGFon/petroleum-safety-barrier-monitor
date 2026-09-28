@@ -2,6 +2,8 @@
 // validated restore, and hydrated flag - through the linkedom renderHook harness.
 import { assertEquals, assertStrictEquals } from "jsr:@std/assert@^1";
 
+import { FILTER_DEFAULTS_VERSION } from "../../lib/utils.ts";
+
 import { memoryStorage, renderHook } from "../../scripts/test-dom.ts";
 
 import { useFilterState } from "./filter-state.ts";
@@ -20,7 +22,7 @@ Deno.test("useFilterState starts from defaults and hydrates with empty storage",
     category: "",
     typology: "",
     criticality: "",
-    criticalOnly: true,
+    criticalOnly: false,
     plan: "",
     since: "",
     until: "",
@@ -75,6 +77,31 @@ Deno.test("useFilterState sanitizes garbage filter patches on restore", async ()
   assertStrictEquals(f.filters.category, "");
   assertStrictEquals(f.filters.page, 1);
   assertStrictEquals(f.filters.sortDir, "asc");
+});
+
+Deno.test("useFilterState drops the implicit gate from a v1 blob", async () => {
+  // v1 shipped criticalOnly: true as a default, so restoring it verbatim would
+  // pin the table to the critical tiers for every returning user.
+  const storage = memoryStorage({
+    [STORE_KEY]: JSON.stringify({
+      filters: { criticalOnly: true, query: "psv" },
+    }),
+  });
+  const hh = await renderHook(useFilterState, { storage });
+  const f = hh.get();
+  assertStrictEquals(f.filters.criticalOnly, false);
+  assertStrictEquals(f.filters.query, "psv");
+});
+
+Deno.test("useFilterState keeps a gate the current version persisted", async () => {
+  const storage = memoryStorage({
+    [STORE_KEY]: JSON.stringify({
+      defaultsVersion: FILTER_DEFAULTS_VERSION,
+      filters: { criticalOnly: true },
+    }),
+  });
+  const hh = await renderHook(useFilterState, { storage });
+  assertStrictEquals(hh.get().filters.criticalOnly, true);
 });
 
 Deno.test("useFilterState setFilter resets page except on page-only patches", async () => {
