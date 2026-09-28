@@ -27,7 +27,7 @@
     "docker:audit": "docker compose run --rm tools deno run -A --env-file=.env scripts/fracttal-audit-stations.ts",
     "docker:sync": "docker compose run --rm tools deno run -A --env-file=.env scripts/fracttal-sync.ts --live",
     "docker:force-sync": "docker compose run --rm tools deno run -A --env-file=.env scripts/fracttal-force-sync.ts",
-    "docker:dev": "docker compose -f compose.yml -f compose.dev.yml up --build",
+    "docker:dev": "sudo docker compose -f compose.yml -f compose.dev.yml up --build",
     "docker:dev-down": "docker compose -f compose.yml -f compose.dev.yml down",
     "fracttal:poll": "deno run -A --env-file=.env scripts/fracttal-poll.ts",
     "fracttal:audit": "deno run -A --env-file=.env scripts/fracttal-audit-stations.ts",

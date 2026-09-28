@@ -5,6 +5,8 @@ import { useCallback, useEffect, useRef, useState } from "preact/hooks";
 
 import { HistoryIcon, InfoIcon, PencilIcon } from "../ui/Icons.tsx";
 
+import { UnsavedChangesDialog } from "./UnsavedChangesDialog.tsx";
+
 import { BarrierEditor } from "../../islands/BarrierEditor.tsx";
 
 import { lockBody, unlockBody } from "../../lib/body-lock.ts";
@@ -30,9 +32,29 @@ export function BarrierModal(
   { barrier, onClose, sessionUser, onSaved }: Props,
 ) {
   const [tab, setTab] = useState<Tab>("details");
+  const [isDirty, setIsDirty] = useState(false);
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const pendingRef = useRef<(() => void) | null>(null);
+  // runOrConfirm gates every exit from the edit tab: clean forms close
+  // at once, dirty forms park the action and ask for explicit discard.
+  const runOrConfirm = useCallback((action: () => void) => {
+    if (tab === "edit" && isDirty) {
+      pendingRef.current = action;
+      setConfirmOpen(true);
+    } else {
+      action();
+    }
+  }, [tab, isDirty]);
+  const requestClose = useCallback(() => runOrConfirm(onClose), [
+    runOrConfirm,
+    onClose,
+  ]);
   const key = useCallback((e: KeyboardEvent) => {
-    if (e.key === "Escape") onClose();
-  }, [onClose]);
+    if (e.key === "Escape") {
+      if (confirmOpen) return;
+      requestClose();
+    }
+  }, [requestClose, confirmOpen]);
   useEffect(() => {
     document.addEventListener("keydown", key);
     return () => document.removeEventListener("keydown", key);
@@ -43,6 +65,9 @@ export function BarrierModal(
     if (barrier) {
       lockBody();
       setTab("details");
+      setIsDirty(false);
+      setConfirmOpen(false);
+      pendingRef.current = null;
       return () => unlockBody();
     }
   }, [barrier]);
@@ -84,7 +109,7 @@ export function BarrierModal(
       <div
         inert={!isOpen}
         aria-hidden="true"
-        onClick={onClose}
+        onClick={requestClose}
         style={{
           position: "fixed",
           inset: 0,
@@ -115,7 +140,7 @@ export function BarrierModal(
           padding: 16,
         }}
         onClick={(e) => {
-          if (e.target === e.currentTarget) onClose();
+          if (e.target === e.currentTarget) requestClose();
         }}
       >
         <div
@@ -140,26 +165,56 @@ export function BarrierModal(
           {barrier && (
             <Content
               b={barrier}
-              onClose={onClose}
+              onClose={requestClose}
               tab={tab}
               setTab={setTab}
+              runOrConfirm={runOrConfirm}
+              onDirtyChange={setIsDirty}
+              onSavedClean={() => setIsDirty(false)}
               sessionUser={sessionUser}
               onSaved={onSaved}
             />
           )}
         </div>
       </div>
+      <UnsavedChangesDialog
+        open={confirmOpen}
+        onStay={() => {
+          pendingRef.current = null;
+          setConfirmOpen(false);
+        }}
+        onDiscard={() => {
+          const action = pendingRef.current;
+          pendingRef.current = null;
+          setConfirmOpen(false);
+          setIsDirty(false);
+          action?.();
+        }}
+      />
     </>
   );
 }
 // Content renders header, NC alert with days-since logic, and tab switch.
 // Admins get a third Editar tab hosting the BarrierEditor island.
 function Content(
-  { b, onClose, tab, setTab, sessionUser, onSaved }: {
+  {
+    b,
+    onClose,
+    tab,
+    setTab,
+    runOrConfirm,
+    onDirtyChange,
+    onSavedClean,
+    sessionUser,
+    onSaved,
+  }: {
     b: Barrier;
     onClose: () => void;
     tab: Tab;
     setTab: (t: Tab) => void;
+    runOrConfirm: (action: () => void) => void;
+    onDirtyChange: (dirty: boolean) => void;
+    onSavedClean: () => void;
     sessionUser?: AuthUser | null;
     onSaved?: () => void;
   },
@@ -193,7 +248,7 @@ function Content(
           <button
             type="button"
             key={key}
-            onClick={() => setTab(key)}
+            onClick={() => runOrConfirm(() => setTab(key))}
             style={{
               display: "flex",
               alignItems: "center",
@@ -229,12 +284,14 @@ function Content(
           <BarrierEditor
             key={local.id}
             barrier={local}
+            onDirtyChange={onDirtyChange}
             onSaved={(updated) => {
               if (updated) setLocal(updated);
+              onSavedClean();
               setTab("details");
               onSaved?.();
             }}
-            onCancel={() => setTab("details")}
+            onCancel={() => runOrConfirm(() => setTab("details"))}
           />
         )}
       </div>

@@ -23,6 +23,7 @@ interface Props {
   barrier: Barrier;
   onSaved: (updated?: Barrier) => void;
   onCancel: () => void;
+  onDirtyChange?: (dirty: boolean) => void;
 }
 
 const inputStyle = {
@@ -37,7 +38,9 @@ const inputStyle = {
   outline: "none",
 };
 
-export function BarrierEditor({ barrier, onSaved, onCancel }: Props) {
+export function BarrierEditor(
+  { barrier, onSaved, onCancel, onDirtyChange }: Props,
+) {
   const [lookups, setLookups] = useState<Lookups | null>(null);
   const [fieldOpts, setFieldOpts] = useState<Record<string, string[]>>(
     SEED_DEFAULTS,
@@ -85,6 +88,61 @@ export function BarrierEditor({ barrier, onSaved, onCancel }: Props) {
     barrier.degradationDesc,
   );
   const [extraComments, setExtraComments] = useState(barrier.extraComments);
+
+  // isDirty compares every editable field against the barrier prop. Lookup
+  // ids resolve async, so each expected id derives from the loaded lookups;
+  // before lookups load both sides are undefined and the row counts as clean.
+  const expectedLocationId = lookups?.locations?.find((x) =>
+    x.code === barrier.location
+  )?.id;
+  const expectedTypologyId = lookups?.typologies?.find((x) =>
+    x.label === barrier.typology
+  )?.id;
+  const expectedCategoryId = lookups?.categories?.find((x) =>
+    x.label === barrier.category
+  )?.id;
+  const expectedGroupingId = lookups?.groupings?.find((x) =>
+    x.label === barrier.grouping
+  )?.id;
+  const expectedOwnerId = lookups?.owners?.find((x) =>
+    x.label === barrier.owner
+  )?.id;
+  const expectedCriticalityId = lookups?.criticalities?.find((x) =>
+    x.label === barrier.criticality
+  )?.id;
+  const expectedAvailabilityId = lookups?.availabilities?.find((x) =>
+    x.label === barrier.availability
+  )?.id;
+  const isDirty = tag !== barrier.tag ||
+    locationId !== expectedLocationId ||
+    typologyId !== expectedTypologyId ||
+    categoryId !== expectedCategoryId ||
+    groupingId !== expectedGroupingId ||
+    ownerId !== expectedOwnerId ||
+    criticalityId !== expectedCriticalityId ||
+    availabilityId !== expectedAvailabilityId ||
+    statusNote !== "" ||
+    comments !== barrier.comments ||
+    actionPlan !== barrier.actionPlan ||
+    origin !== barrier.origin ||
+    installLocal !== barrier.installLocal ||
+    equipTypology !== barrier.equipTypology ||
+    fieldInstalled !== barrier.fieldInstalled ||
+    fieldOperational !== barrier.fieldOperational ||
+    opStatus !== barrier.opStatus ||
+    hasMaintPlan !== barrier.hasMaintPlan ||
+    planFollowed !== barrier.planFollowed ||
+    failureFree !== barrier.failureFree ||
+    maintStatus !== barrier.maintStatus ||
+    hasContingency !== barrier.hasContingency ||
+    contingencyDesc !== barrier.contingencyDesc ||
+    evidenceCode !== barrier.evidenceCode ||
+    degradationDesc !== barrier.degradationDesc ||
+    extraComments !== barrier.extraComments;
+
+  useEffect(() => {
+    onDirtyChange?.(isDirty);
+  }, [isDirty, onDirtyChange]);
 
   useEffect(() => {
     // Fetch lookups with ids + custom field options
