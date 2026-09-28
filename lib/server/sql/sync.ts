@@ -4,14 +4,24 @@
 // external_code + where guards), status changes go through the one sanctioned
 // record_status_change() path, and deletions are soft (deleted_at).
 import {
+  diffSignatureFields,
   fieldsSignature,
   type LocalBarrier,
   type PlanCounts,
   type PlanEntry,
+  type SignatureSource,
+  snapshotOf,
   type SyncIo,
 } from "../fracttal/sync.ts";
 
-import type { SyncChange, SyncStatus } from "../../types.ts";
+import type {
+  SyncBarrierDetail,
+  SyncChange,
+  SyncChangeItem,
+  SyncChangeSummary,
+  SyncRun,
+  SyncStatus,
+} from "../../types.ts";
 
 import type { MapContext } from "../fracttal/map.ts";
 
@@ -126,12 +136,8 @@ export const defaultSyncIo: SyncIo = {
         order by id`,
       [scopeLocationIds, remoteCodes],
     );
-    return rows.map((r) => ({
-      id: r.id,
-      externalCode: r.external_code,
-      availabilityId: r.availability_id,
-      deletedAt: r.deleted_at,
-      signature: fieldsSignature({
+    return rows.map((r) => {
+      const fields: SignatureSource = {
         tag: r.tag,
         locationId: r.location_id,
         typologyId: r.typology_id,
@@ -143,8 +149,16 @@ export const defaultSyncIo: SyncIo = {
         comments: r.comments,
         actionPlan: r.action_plan,
         scopeSource: r.scope_source ?? "",
-      }),
-    }));
+      };
+      return {
+        id: r.id,
+        externalCode: r.external_code,
+        availabilityId: r.availability_id,
+        deletedAt: r.deleted_at,
+        signature: fieldsSignature(fields),
+        fields,
+      };
+    });
   },
 
   async startRun(scope: string): Promise<number> {
@@ -171,7 +185,10 @@ export const defaultSyncIo: SyncIo = {
     return started.id;
   },
 
-  async applyPlan(entries: PlanEntry[]): Promise<PlanCounts> {
+  async applyPlan(
+    entries: PlanEntry[],
+    runId?: number | null,
+  ): Promise<PlanCounts> {
     const counts: PlanCounts = { inserts: 0, updates: 0, deletes: 0, skips: 0 };
     for (const entry of entries) {
       if (entry.kind === "skip") {
@@ -185,6 +202,17 @@ export const defaultSyncIo: SyncIo = {
           [entry.local.id],
         );
         counts.deletes++;
+        await recordBarrierChange(runId ?? null, {
+          barrierId: entry.local.id,
+          kind: "removed",
+          oldAvailabilityId: entry.local.availabilityId,
+          newAvailabilityId: null,
+          changedFields: [],
+          oldSnapshot: entry.local.fields
+            ? snapshotOf(entry.local.fields, entry.local.availabilityId)
+            : { availabilityId: entry.local.availabilityId },
+          newSnapshot: {},
+        });
         continue;
       }
       const input = entry.input;
@@ -203,6 +231,15 @@ export const defaultSyncIo: SyncIo = {
             ],
           );
           counts.inserts++;
+          await recordBarrierChange(runId ?? null, {
+            barrierId: id,
+            kind: "new",
+            oldAvailabilityId: null,
+            newAvailabilityId: input.availabilityId,
+            changedFields: [],
+            oldSnapshot: {},
+            newSnapshot: snapshotOf(input, input.availabilityId),
+          });
         } else {
           // Race: the unique external_code constraint won - another run
           // inserted this row first. Count as a skip, not an error.
@@ -249,6 +286,21 @@ export const defaultSyncIo: SyncIo = {
         );
       }
       counts.updates++;
+      await recordBarrierChange(runId ?? null, {
+        barrierId: entry.local.id,
+        kind: entry.kind === "restore" ? "restored" : "updated",
+        oldAvailabilityId: entry.local.availabilityId,
+        newAvailabilityId: input.availabilityId,
+        changedFields: diffSignatureFields(
+          entry.local.fields,
+          input,
+          entry.statusChanged,
+        ),
+        oldSnapshot: entry.local.fields
+          ? snapshotOf(entry.local.fields, entry.local.availabilityId)
+          : { availabilityId: entry.local.availabilityId },
+        newSnapshot: snapshotOf(input, input.availabilityId),
+      });
     }
     return counts;
   },
@@ -520,6 +572,458 @@ export async function getSyncRecentChanges(limit = 8): Promise<SyncChange[]> {
   return merged.slice(0, take);
 }
 
+// recordBarrierChange: one audit row per touched barrier. Best-effort: a
+// missing table (pre-migration DB) or a null runId skips silently so sync
+// writes never fail because the audit trail is unavailable.
+export async function recordBarrierChange(
+  runId: number | null,
+  change: {
+    barrierId: number;
+    kind: string;
+    oldAvailabilityId: number | null;
+    newAvailabilityId: number | null;
+    changedFields: string[];
+    oldSnapshot: Record<string, unknown>;
+    newSnapshot: Record<string, unknown>;
+  },
+): Promise<void> {
+  if (runId === null || runId === undefined) return;
+  try {
+    await queryRows(
+      `insert into sync_barrier_changes
+        (run_id, barrier_id, kind, old_availability_id, new_availability_id,
+         changed_fields, old_snapshot, new_snapshot)
+       values ($1, $2, $3, $4, $5, $6::jsonb, $7::jsonb, $8::jsonb)`,
+      [
+        runId,
+        change.barrierId,
+        change.kind,
+        change.oldAvailabilityId,
+        change.newAvailabilityId,
+        JSON.stringify(change.changedFields),
+        JSON.stringify(change.oldSnapshot),
+        JSON.stringify(change.newSnapshot),
+      ],
+    );
+  } catch (err) {
+    // Pre-migration databases have no sync_barrier_changes table yet; the
+    // barrier write above already committed, so only warn.
+    console.warn("[sync] recordBarrierChange skipped", err);
+  }
+}
+
+// getLatestFinishedRun: newest non-running sync_state row, or null.
+export async function getLatestFinishedRun(): Promise<SyncRun | null> {
+  const rows = await queryRows<SyncStatusRow>(
+    `select id, scope, status, inserts, updates, deletes, skips, note,
+      started_at, finished_at
+     from sync_state where status != 'running'
+     order by id desc limit 1`,
+  );
+  const r = rows[0];
+  if (!r) return null;
+  return {
+    id: r.id,
+    scope: r.scope,
+    status: r.status === "ok" ? "ok" : "failed",
+    startedAt: r.started_at,
+    finishedAt: r.finished_at,
+    inserts: r.inserts,
+    updates: r.updates,
+    deletes: r.deletes,
+    skips: r.skips,
+  };
+}
+
+// getSyncRuns: recent finished runs for the run picker (newest first).
+export async function getSyncRuns(limit = 10): Promise<SyncRun[]> {
+  const take = Math.max(1, Math.min(50, Math.floor(limit) || 10));
+  const rows = await queryRows<SyncStatusRow>(
+    `select id, scope, status, inserts, updates, deletes, skips, note,
+      started_at, finished_at
+     from sync_state where status != 'running'
+     order by id desc limit $1`,
+    [take],
+  );
+  return rows.map((r) => ({
+    id: r.id,
+    scope: r.scope,
+    status: r.status === "ok" ? "ok" : "failed",
+    startedAt: r.started_at,
+    finishedAt: r.finished_at,
+    inserts: r.inserts,
+    updates: r.updates,
+    deletes: r.deletes,
+    skips: r.skips,
+  }));
+}
+
+export interface ListSyncChangesArgs {
+  runId?: number | null;
+  sinceHours?: number | null;
+  kind?: string | null;
+  query?: string | null;
+  page?: number;
+  pageSize?: number;
+}
+
+export interface ListSyncChangesResult {
+  run: SyncRun | null;
+  items: SyncChangeItem[];
+  total: number;
+  page: number;
+  pageSize: number;
+  totalPages: number;
+  summary: SyncChangeSummary;
+}
+
+// listSyncChanges: paged per-barrier change list for one scope. Prefers the
+// sync_barrier_changes audit when present; falls back to history + deletes
+// for pre-migration runs so old runs still list something (without field
+// diffs). Light rows only - snapshots load per barrier via detail.
+export async function listSyncChanges(
+  args: ListSyncChangesArgs = {},
+): Promise<ListSyncChangesResult> {
+  const page = Math.max(1, Math.floor(args.page ?? 1) || 1);
+  const pageSize = Math.max(
+    1,
+    Math.min(100, Math.floor(args.pageSize ?? 25) || 25),
+  );
+  const offset = (page - 1) * pageSize;
+  const kind = (args.query === undefined ? args.kind : args.kind) ?? null;
+  const q = (args.query ?? "").trim().slice(0, 200);
+
+  let run: SyncRun | null = null;
+  let sinceIso: string | null = null;
+  if (args.runId !== undefined && args.runId !== null) {
+    const rows = await queryRows<SyncStatusRow>(
+      `select id, scope, status, inserts, updates, deletes, skips, note,
+        started_at, finished_at from sync_state where id = $1 limit 1`,
+      [args.runId],
+    );
+    const r = rows[0];
+    if (r) {
+      run = {
+        id: r.id,
+        scope: r.scope,
+        status: r.status === "ok" ? "ok" : "failed",
+        startedAt: r.started_at,
+        finishedAt: r.finished_at,
+        inserts: r.inserts,
+        updates: r.updates,
+        deletes: r.deletes,
+        skips: r.skips,
+      };
+    }
+  } else if (args.sinceHours !== undefined && args.sinceHours !== null) {
+    const h = Math.max(1, Math.min(72, args.sinceHours));
+    sinceIso = new Date(Date.now() - h * 3600_000).toISOString();
+  } else {
+    run = await getLatestFinishedRun();
+  }
+
+  // Primary path: audit table rows for the run, or last-N-hours window.
+  try {
+    const conds: string[] = [];
+    const params: unknown[] = [];
+    if (run) {
+      params.push(run.id);
+      conds.push(`c.run_id = $${params.length}`);
+    } else if (sinceIso) {
+      params.push(sinceIso);
+      conds.push(`c.created_at >= $${params.length}::timestamptz`);
+    } else {
+      return emptyChangeResult(page, pageSize, null);
+    }
+    if (kind && kind !== "all") {
+      if (kind === "new") {
+        params.push("new");
+        conds.push(`c.kind = $${params.length}`);
+      } else if (kind === "updated") {
+        params.push(["updated", "restored"]);
+        conds.push(`c.kind = any($${params.length})`);
+      } else if (kind === "removed") {
+        params.push("removed");
+        conds.push(`c.kind = $${params.length}`);
+      } else if (kind === "restored") {
+        params.push("restored");
+        conds.push(`c.kind = $${params.length}`);
+      }
+    }
+    if (q !== "") {
+      params.push(`%${q.replace(/[%_\\]/g, (m) => `\\${m}`)}%`);
+      conds.push(`b.tag ilike $${params.length} escape '\\'`);
+    }
+    const where = conds.length > 0 ? `where ${conds.join(" and ")}` : "";
+    const countRows = await queryRows<{ n: number }>(
+      `select count(*)::int as n from sync_barrier_changes c
+       join barriers b on b.id = c.barrier_id ${where}`,
+      params,
+    );
+    const total = countRows[0]?.n ?? 0;
+    const rows = await queryRows<{
+      barrier_id: number;
+      tag: string;
+      location: string;
+      kind: string;
+      old_availability_id: number | null;
+      new_availability_id: number | null;
+      old_status: string | null;
+      new_status: string | null;
+      changed_fields: unknown;
+      created_at: string;
+      run_id: number;
+      criticality_id: number | null;
+    }>(
+      `select c.barrier_id, b.tag,
+        coalesce(l.name, l.code, '') as location, c.kind,
+        c.old_availability_id, c.new_availability_id,
+        os.label as old_status, ns.label as new_status,
+        c.changed_fields, c.created_at, c.run_id, b.criticality_id
+       from sync_barrier_changes c
+       join barriers b on b.id = c.barrier_id
+       left join locations l on l.id = b.location_id
+       left join availability_statuses os on os.id = c.old_availability_id
+       left join availability_statuses ns on ns.id = c.new_availability_id
+       ${where} order by c.created_at desc, c.id desc
+       limit $${params.length + 1} offset $${params.length + 2}`,
+      [...params, pageSize, offset],
+    );
+    const items: SyncChangeItem[] = rows.map((r) => ({
+      barrierId: r.barrier_id,
+      tag: r.tag,
+      location: r.location,
+      kind: (r.kind === "new"
+        ? "new"
+        : r.kind === "removed"
+        ? "removed"
+        : "updated") as "new" | "updated" | "removed",
+      status: r.new_status ?? r.old_status ?? "",
+      oldStatus: r.old_status,
+      changedFields: Array.isArray(r.changed_fields)
+        ? (r.changed_fields as string[])
+        : [],
+      changedAt: r.created_at,
+      runId: r.run_id,
+    }));
+    const summary = await summarizeAuditRows(run?.id ?? null, sinceIso);
+    return {
+      run,
+      items,
+      total,
+      page,
+      pageSize,
+      totalPages: Math.max(1, Math.ceil(total / pageSize)),
+      summary,
+    };
+  } catch {
+    // Missing table (pre-migration): fall back to history-derived list.
+    return listSyncChangesLegacy({
+      run,
+      sinceIso,
+      kind,
+      query: q,
+      page,
+      pageSize,
+    });
+  }
+}
+
+function emptyChangeResult(
+  page: number,
+  pageSize: number,
+  run: SyncRun | null,
+): ListSyncChangesResult {
+  return {
+    run,
+    items: [],
+    total: 0,
+    page,
+    pageSize,
+    totalPages: 1,
+    summary: { total: 0, byKind: {}, byStatus: {}, critical: 0 },
+  };
+}
+
+async function summarizeAuditRows(
+  runId: number | null,
+  sinceIso: string | null,
+): Promise<SyncChangeSummary> {
+  try {
+    const conds: string[] = [];
+    const params: unknown[] = [];
+    if (runId !== null) {
+      params.push(runId);
+      conds.push(`c.run_id = $${params.length}`);
+    } else if (sinceIso) {
+      params.push(sinceIso);
+      conds.push(`c.created_at >= $${params.length}::timestamptz`);
+    } else {
+      return { total: 0, byKind: {}, byStatus: {}, critical: 0 };
+    }
+    const where = `where ${conds.join(" and ")}`;
+    const [kindRows, statusRows, critRows] = await Promise.all([
+      queryRows<{ kind: string; n: number }>(
+        `select c.kind, count(*)::int as n from sync_barrier_changes c ${where} group by c.kind`,
+        params,
+      ),
+      queryRows<{ label: string; n: number }>(
+        `select coalesce(ns.label, 'Removida') as label, count(*)::int as n
+         from sync_barrier_changes c
+         left join barriers b on b.id = c.barrier_id
+         left join availability_statuses ns on ns.id = c.new_availability_id
+         ${where} group by coalesce(ns.label, 'Removida')`,
+        params,
+      ),
+      queryRows<{ n: number }>(
+        `select count(*)::int as n from sync_barrier_changes c
+         join barriers b on b.id = c.barrier_id ${where}
+         and b.criticality_id in (0, 1)`,
+        params,
+      ),
+    ]);
+    const byKind: Record<string, number> = {};
+    let total = 0;
+    for (const r of kindRows) {
+      byKind[r.kind] = r.n;
+      total += r.n;
+    }
+    const byStatus: Record<string, number> = {};
+    for (const r of statusRows) byStatus[r.label] = r.n;
+    return { total, byKind, byStatus, critical: critRows[0]?.n ?? 0 };
+  } catch {
+    return { total: 0, byKind: {}, byStatus: {}, critical: 0 };
+  }
+}
+
+// listSyncChangesLegacy: history-derived fallback for pre-migration runs.
+// No changed_fields; status-only items, paged in memory (small windows).
+async function listSyncChangesLegacy(args: {
+  run: SyncRun | null;
+  sinceIso: string | null;
+  kind: string | null;
+  query: string;
+  page: number;
+  pageSize: number;
+}): Promise<ListSyncChangesResult> {
+  const take = 200;
+  let items: SyncChangeItem[] = [];
+  if (args.run && !args.sinceIso) {
+    const recent = await getSyncRecentChanges(take);
+    const start = new Date(args.run.startedAt).getTime();
+    const end = new Date(args.run.finishedAt).getTime() + 60_000;
+    items = recent
+      .filter((c) => {
+        const t = new Date(c.changedAt).getTime();
+        return t >= start && t <= end;
+      })
+      .map((c) => ({
+        ...c,
+        oldStatus: null,
+        changedFields: [],
+        runId: args.run!.id,
+      }));
+  } else if (args.sinceIso) {
+    const recent = await getSyncRecentChanges(take);
+    const since = new Date(args.sinceIso).getTime();
+    items = recent
+      .filter((c) => new Date(c.changedAt).getTime() >= since)
+      .map((c) => ({ ...c, oldStatus: null, changedFields: [], runId: null }));
+  }
+  if (args.kind && args.kind !== "all") {
+    items = items.filter((c) =>
+      args.kind === "updated"
+        ? c.kind === "updated"
+        : c.kind === (args.kind as "new" | "updated" | "removed")
+    );
+  }
+  if (args.query !== "") {
+    const needle = args.query.toLowerCase();
+    items = items.filter((c) => c.tag.toLowerCase().includes(needle));
+  }
+  const total = items.length;
+  const start = (args.page - 1) * args.pageSize;
+  const byKind: Record<string, number> = {};
+  for (const c of items) byKind[c.kind] = (byKind[c.kind] ?? 0) + 1;
+  return {
+    run: args.run,
+    items: items.slice(start, start + args.pageSize),
+    total,
+    page: args.page,
+    pageSize: args.pageSize,
+    totalPages: Math.max(1, Math.ceil(total / args.pageSize)),
+    summary: { total, byKind, byStatus: {}, critical: 0 },
+  };
+}
+
+// getBarrierSyncDetail: full before/after for one barrier in scope. Prefers
+// the audit row; falls back to current barrier + history slice.
+export async function getBarrierSyncDetail(
+  barrierId: number,
+  opts: { runId?: number | null; sinceHours?: number | null } = {},
+): Promise<SyncBarrierDetail | null> {
+  try {
+    const conds = [`c.barrier_id = $1`];
+    const params: unknown[] = [barrierId];
+    if (opts.runId !== undefined && opts.runId !== null) {
+      params.push(opts.runId);
+      conds.push(`c.run_id = $${params.length}`);
+    } else if (opts.sinceHours !== undefined && opts.sinceHours !== null) {
+      const h = Math.max(1, Math.min(72, opts.sinceHours));
+      params.push(new Date(Date.now() - h * 3600_000).toISOString());
+      conds.push(`c.created_at >= $${params.length}::timestamptz`);
+    }
+    const rows = await queryRows<{
+      barrier_id: number;
+      tag: string;
+      location: string;
+      kind: string;
+      old_availability_id: number | null;
+      new_availability_id: number | null;
+      changed_fields: unknown;
+      old_snapshot: unknown;
+      new_snapshot: unknown;
+      created_at: string;
+      run_id: number;
+    }>(
+      `select c.barrier_id, b.tag, coalesce(l.name, l.code, '') as location,
+        c.kind, c.old_availability_id, c.new_availability_id,
+        c.changed_fields, c.old_snapshot, c.new_snapshot,
+        c.created_at, c.run_id
+       from sync_barrier_changes c
+       join barriers b on b.id = c.barrier_id
+       left join locations l on l.id = b.location_id
+       where ${conds.join(" and ")}
+       order by c.created_at desc, c.id desc limit 1`,
+      params,
+    );
+    const r = rows[0];
+    if (!r) return null;
+    const asRecord = (v: unknown): Record<string, unknown> =>
+      typeof v === "object" && v !== null ? v as Record<string, unknown> : {};
+    return {
+      barrierId: r.barrier_id,
+      tag: r.tag,
+      location: r.location,
+      kind: (["new", "updated", "removed", "restored"] as const).includes(
+          r.kind as "new",
+        )
+        ? (r.kind as SyncBarrierDetail["kind"])
+        : "updated",
+      oldAvailabilityId: r.old_availability_id,
+      newAvailabilityId: r.new_availability_id,
+      changedFields: Array.isArray(r.changed_fields)
+        ? (r.changed_fields as string[])
+        : [],
+      oldSnapshot: asRecord(r.old_snapshot),
+      newSnapshot: asRecord(r.new_snapshot),
+      changedAt: r.created_at,
+      runId: r.run_id,
+    };
+  } catch {
+    return null;
+  }
+}
 // recordSyncFailure: persists a failure that happened outside any run
 // (cycle-level shared fetch, boot checks). Without it, pre-run failures
 // leave zero trace and the dashboard shows an ever-aging success as merely

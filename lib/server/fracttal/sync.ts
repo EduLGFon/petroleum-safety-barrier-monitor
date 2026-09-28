@@ -18,6 +18,10 @@ export interface LocalBarrier {
   availabilityId: number;
   deletedAt: string | null;
   signature: string;
+  // Full signature fields for per-field diffing (which columns changed).
+  // Optional so old fixtures/tests keep compiling; present in production
+  // rows built by loadLocal in lib/server/sql/sync.ts.
+  fields?: SignatureSource;
 }
 
 export type PlanEntry =
@@ -64,7 +68,7 @@ export interface SyncIo {
     remoteCodes: string[],
   ): Promise<LocalBarrier[]>;
   startRun(scope: string): Promise<number>;
-  applyPlan(entries: PlanEntry[]): Promise<PlanCounts>;
+  applyPlan(entries: PlanEntry[], runId?: number | null): Promise<PlanCounts>;
   finishRun(
     runId: number,
     status: "ok" | "failed",
@@ -109,6 +113,46 @@ export function fieldsSignature(input: SignatureSource): string {
   ]);
 }
 
+// diffSignatureFields: names the SignatureSource keys that differ between
+// the stored local fields and the new input, plus "availabilityId" when the
+// status flips. Used for changed_fields in sync_barrier_changes so the UI
+// can badge "what changed" per barrier without loading snapshots.
+export const SIGNATURE_FIELD_KEYS = [
+  "tag",
+  "locationId",
+  "typologyId",
+  "locDescId",
+  "criticalityId",
+  "categoryId",
+  "groupingId",
+  "ownerId",
+  "comments",
+  "actionPlan",
+  "scopeSource",
+] as const;
+export function diffSignatureFields(
+  oldFields: SignatureSource | undefined,
+  input: SignatureSource,
+  statusChanged: boolean,
+): string[] {
+  const changed: string[] = [];
+  if (oldFields !== undefined) {
+    for (const key of SIGNATURE_FIELD_KEYS) {
+      if (oldFields[key] !== input[key]) changed.push(key);
+    }
+  }
+  if (statusChanged) changed.push("availabilityId");
+  return changed;
+}
+
+// snapshotOf: compact JSON snapshot stored per change row (same keys as the
+// signature plus availabilityId), so detail renders before/after directly.
+export function snapshotOf(
+  fields: SignatureSource,
+  availabilityId: number,
+): Record<string, unknown> {
+  return { ...fields, availabilityId };
+}
 // planReconcile: pure diff of remote inputs vs local rows -> executable plan.
 // Deleted local rows reappearing upstream are restored, never duplicated.
 export function planReconcile(
@@ -335,7 +379,7 @@ export async function runSync(
     if (dryRun) return baseResult;
 
     const executable = plan.entries.filter((e) => e.kind !== "skip");
-    const written = await io.applyPlan(executable);
+    const written = await io.applyPlan(executable, runId);
     baseResult.written = written;
     await finish(
       written,
