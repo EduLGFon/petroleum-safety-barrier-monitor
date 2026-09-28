@@ -10,9 +10,9 @@ import { Combo, GLASS_INPUT } from "./filter/FilterSelect.tsx";
 
 import type { ColumnKey, PinnedKey } from "./table/columns.ts";
 
-import { ColumnsMenu } from "./table/ColumnsMenu.tsx";
-
 import type { FilterState, RowScope } from "../lib/types.ts";
+
+import { ColumnsMenu } from "./table/ColumnsMenu.tsx";
 
 import { useEffect, useState } from "preact/hooks";
 
