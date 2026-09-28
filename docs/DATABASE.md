@@ -219,6 +219,10 @@ intact, but `buildWhere`/`scopeText` and the `chart.ts` /
 `vocabularies.ts` queries already filter `where b.deleted_at is null` by
 default; an "admin" view can list deleted ones. `sync_state` records one row
 per run (inserts/updates/deletes/skips counts, `status`, `note`).
+`sync_barrier_changes` records one row per barrier touched by a run (kind,
+old/new availability, `changed_fields`, compact old/new snapshots) so the
+dashboard lists last-run / last-24h scopes paged and loads one barrier's
+before/after diff on demand.
 
 ### Alerts (P5 + rules)
 

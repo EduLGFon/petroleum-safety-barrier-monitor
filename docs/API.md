@@ -177,9 +177,16 @@ Full inventory: `barriers`, `barriers/deleted`,
   `runningSince`, last finished run with counts + note, tracked barrier
   total) for the dashboard indicator; polls every minute (15s fast lane
   while a run is in flight)
-- `GET /api/sync-changes?limit=8` (1..20) → `{ changes: SyncChange[] }`
-  (newest barriers touched by sync runs: tag, station, kind, status) for
-  the indicator card's "what changed" section; same cadence as sync-status
+- `GET /api/sync-changes?scope=last-run|last-day&runId=&kind=new|updated|removed|restored|all&query=&page=1&pageSize=25` →
+  `{ run, items: SyncChangeItem[], total, page, pageSize, totalPages, summary }`
+  (paged per-barrier list with `oldStatus`, `changedFields`, `runId`; summary
+  reconciles by kind/status/critical for the tab header). Legacy `?limit=8`
+  alone still returns `{ changes: SyncChange[] }` for the old hover card.
+- `GET /api/sync-runs?limit=10` → `{ runs: SyncRun[] }` (recent finished
+  runs, newest first, for the run picker).
+- `GET /api/barriers/:id/sync-detail?runId=&scope=last-day` →
+  `{ detail: SyncBarrierDetail }` (before/after snapshots + changed fields
+  for one barrier; loaded only when a row expands).
 - `GET /api/health` → `{ ok, time }` (liveness, no DB)
 - `GET /api/recipients` (+ `?activeOnly=1`), `POST /api/recipients`
   `{ email, name? }` (upsert by email, `201`), `PATCH /api/recipients/:id`
