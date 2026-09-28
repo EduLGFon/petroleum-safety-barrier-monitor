@@ -137,7 +137,10 @@ formats themselves (`lib/export/limits.ts`): the export ceiling is 200,000
 rows, which sits under Excel's 1,048,576-row worksheet limit, so the workbook
 always fits one sheet, and the print report is printed in parts of
 `PDF_PART_ROWS` (one print dialog per part, the part number in the suggested
-filename) because the print dialog lays out the whole report at once.
+filename) because the print dialog lays out the whole report at once. The
+report table is `table-layout:fixed` with a `<colgroup>` of percentages that
+sum to 100 (`printColPct`), so all 30 export columns print on the A4-landscape
+page instead of overflowing and being clipped at the paper edge.
 
 ## Island bridge topology
 
