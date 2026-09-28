@@ -18,7 +18,7 @@ import type { BarriersQuery } from "../../lib/wireTypes.ts";
 interface Seen {
   url: string;
   method: string;
-  body: { format?: string; ids?: number[] };
+  body: { format?: string; ids?: number[]; timeZone?: string };
 }
 
 const QUERY: BarriersQuery = {
@@ -113,6 +113,8 @@ Deno.test("exportFromServer posts the selection with the scope filters", async (
   assert(call.url.includes("sortDir=desc"), call.url);
   assertEquals(call.body.ids, [7, 8, 9]);
   assertEquals(call.body.format, "csv");
+  // The server stamps files in the user's zone, so the client sends it.
+  assertStrictEquals(typeof call.body.timeZone, "string");
 });
 
 Deno.test("exportFromServer downloads every format as one file", async () => {

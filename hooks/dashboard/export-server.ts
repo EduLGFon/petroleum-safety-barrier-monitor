@@ -4,6 +4,7 @@
 // POST body, so an 18k-id selection never has to fit a URL. Every format
 // covers the same rows as the table (scope filters plus the selected ids).
 import { FMT_EXT } from "../../lib/export/format.ts";
+import { browserTimeZone } from "../../lib/export/html.ts";
 import type { BarriersQuery } from "../../lib/wireTypes.ts";
 import type { Fmt } from "../../lib/export/format.ts";
 
@@ -20,8 +21,8 @@ export interface ServerExportRequest {
   onExpired: () => void;
 }
 
-// exportQueryString: the filter scope as URL params; the selection stays in
-// the body.
+// exportQueryString: the filter scope as URL params; the selection and the
+// browser time zone stay in the body.
 function exportQueryString(query: BarriersQuery): string {
   const qs = new URLSearchParams();
   for (const [k, v] of Object.entries(query)) {
@@ -45,7 +46,11 @@ async function requestFile(
       method: "POST",
       credentials: "same-origin",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ format: req.kind, ids: req.ids }),
+      body: JSON.stringify({
+        format: req.kind,
+        ids: req.ids,
+        timeZone: browserTimeZone(),
+      }),
     },
   );
   if (res.status === 401 || res.status === 404) {

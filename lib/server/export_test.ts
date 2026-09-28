@@ -25,12 +25,17 @@ function xlsxOf(barriers: Barrier[], size = 500): Promise<Bytes> {
   return new Response(stream).arrayBuffer().then((b) => new Uint8Array(b));
 }
 
-function reportOf(barriers: Barrier[], size = 500): Promise<string> {
+function reportOf(
+  barriers: Barrier[],
+  size = 500,
+  timeZone?: string,
+): Promise<string> {
   return streamToText(
     streamReportDocument(batchesOf(barriers, size), {
       companyName: "Petrobras",
       kpi: kpiOf(barriers),
       title: "barreiras",
+      timeZone,
     }),
   );
 }
@@ -165,6 +170,14 @@ Deno.test("streamReportDocument renders one standalone file over every batch", a
   assertStrictEquals(html.startsWith("<!DOCTYPE html>"), true);
   assertStrictEquals(html.includes("parte 1 de"), false);
   assertStrictEquals(html.includes("<title>barreiras</title>"), true);
+});
+
+Deno.test("streamReportDocument stamps the browser zone the client sent", async () => {
+  // The server runs on UTC; without the zone the banner would read 3h ahead
+  // of a Brazil user. The label travels next to the time so the clock is
+  // never ambiguous.
+  const html = await reportOf(mkCount(3), 500, "America/Sao_Paulo");
+  assertStrictEquals(html.includes("UTC-03:00"), true);
 });
 
 Deno.test("streamReportDocument carries no page URL anywhere", async () => {

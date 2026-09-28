@@ -121,11 +121,13 @@ function chip(label: string, value: string, bg: string, color: string) {
 }
 
 // printDocOpen: banner, KPI chips and the table head. Close with
-// printDocClose, and emit printRow per barrier in between.
+// printDocClose, and emit printRow per barrier in between. timeZone is the
+// user's IANA zone for the banner stamp (runtime local when absent).
 export function printDocOpen(
   companyName: string,
   stats: KpiStats,
   part?: PrintPart,
+  timeZone?: string,
 ): string {
   const eyebrow = companyName
     ? `<div style="font-size:10pt;letter-spacing:.18em;color:#93C5FD;">${
@@ -140,7 +142,7 @@ export function printDocOpen(
     eyebrow +
     `<div style="font-size:16pt;font-weight:bold;margin-top:2px;">Monitor de Barreiras de Segurança</div>` +
     `<div style="font-size:9pt;color:#CBD5E1;margin-top:4px;">${
-      escHtml(ts())
+      escHtml(ts(timeZone))
     }  |  ${stats.total} registros  ·  ${stats.pct} conformes${partLine}</div></div>` +
     `<div style="display:flex;gap:8px;margin:10px 0 2px 0;">` +
     chip("Total", stats.total, "#EFF6FF", "#1E3A5F") +
@@ -151,11 +153,11 @@ export function printDocOpen(
     `<table style="width:100%;table-layout:fixed;border-collapse:collapse;margin-top:6px;">${printColGroup()}<thead style="display:table-header-group;"><tr>${printTableHead()}</tr></thead><tbody>`;
 }
 
-export function printDocClose(companyName: string): string {
+export function printDocClose(companyName: string, timeZone?: string): string {
   return `</tbody></table>` +
     `<div style="font-size:7pt;color:#94A3B8;margin-top:10px;">${
       escHtml(withBrand(companyName, "Monitor de Barreiras"))
-    } · gerado em ${escHtml(ts())}</div></div>`;
+    } · gerado em ${escHtml(ts(timeZone))}</div></div>`;
 }
 
 // reportDocument: wraps a report fragment in a standalone HTML document, so

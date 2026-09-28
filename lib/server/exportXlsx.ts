@@ -15,6 +15,8 @@ export interface XlsxMeta {
   // Scope aggregate, so the KPI strip and the summary sheet reconcile with the
   // dashboard without buffering every row just to count them.
   kpi: KpiSnapshot;
+  // IANA zone for the "Exportado em" stamp, passed straight to the builder.
+  timeZone?: string;
 }
 
 // streamExportXlsx: the workbook as a byte stream, deflated entry by entry.

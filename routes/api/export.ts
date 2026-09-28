@@ -26,6 +26,7 @@ import { exportThrottle, routeClientKey } from "../../lib/server/throttle.ts";
 import { checkDbThrottle } from "../../lib/server/sql/throttle.ts";
 import { streamExportCsv } from "../../lib/server/exportCsv.ts";
 import { FMT_EXT, FMT_MIME, normalizeFmt } from "../../lib/export/format.ts";
+import { resolveTimeZone } from "../../lib/export/html.ts";
 import { loadServerConfig } from "../../lib/server/config.ts";
 import { streamReportDocument } from "../../lib/server/exportHtml.ts";
 import { streamExportXlsx } from "../../lib/server/exportXlsx.ts";
@@ -40,11 +41,12 @@ import { define } from "../../utils.ts";
 import type { Fmt } from "../../lib/export/format.ts";
 
 // Request payload: the filters always come from the query string (one parser
-// for GET and POST alike) and the selection from the body, where an 18k-id
-// list fits comfortably.
+// for GET and POST alike); the selection and the browser time zone come from
+// the body, where an 18k-id list fits comfortably.
 interface ExportRequest {
   format: Fmt;
   ids?: number[];
+  timeZone?: string;
 }
 
 // parseIds: only positive safe integers, deduped and capped at the row
@@ -133,6 +135,7 @@ async function stream(
   const req: ExportRequest = {
     format: requested,
     ids: parseIds(body.ids),
+    timeZone: resolveTimeZone(body.timeZone),
   };
   const query: BarriersQuery = {
     ...parseFilterQuery(sp),
@@ -176,6 +179,7 @@ function respond(
       streamExportXlsx(exportBatches(scope), {
         companyName,
         kpi: scope.kpi,
+        timeZone: req.timeZone,
       }),
       { status: 200, headers: fileHeaders(headers, "xlsx") },
     );
@@ -186,6 +190,7 @@ function respond(
         companyName,
         kpi: scope.kpi,
         title: "barreiras",
+        timeZone: req.timeZone,
       }),
       { status: 200, headers: fileHeaders(headers, "html") },
     );

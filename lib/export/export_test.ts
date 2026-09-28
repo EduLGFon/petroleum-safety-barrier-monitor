@@ -1,11 +1,11 @@
 // Unit tests for lib/export - row mapping, KPI/summary reconciliation, escaping.
-import { assertEquals, assertStrictEquals } from "jsr:@std/assert@^1";
+import { assert, assertEquals, assertStrictEquals } from "jsr:@std/assert@^1";
 
 import { kpiStats, summaryRows } from "./summary.ts";
 
 import type { Barrier } from "../types.ts";
 
-import { escHtml } from "./html.ts";
+import { browserTimeZone, escHtml, resolveTimeZone, ts } from "./html.ts";
 
 import { csvCell } from "./csv.ts";
 
@@ -194,4 +194,37 @@ Deno.test("escHtml escapes &, <, >, and double quotes", () => {
     "&lt;script&gt;&quot;&amp;&quot;&lt;/script&gt;",
   );
   assertStrictEquals(escHtml("plain"), "plain");
+});
+
+Deno.test("ts renders the same instant in the requested zone with its label", () => {
+  // 13:00 UTC is 10:00 in São Paulo: the old zone-less stamp showed the
+  // server clock, 3h ahead of the user.
+  const noon = new Date("2026-09-28T13:00:00Z");
+  const utc = ts("UTC", noon);
+  const sp = ts("America/Sao_Paulo", noon);
+  assert(utc.includes("13:00"), utc);
+  assert(utc.includes("UTC+00:00"), utc);
+  assert(sp.includes("10:00"), sp);
+  assert(sp.includes("UTC-03:00"), sp);
+});
+
+Deno.test("ts falls back to runtime local on a bad zone instead of throwing", () => {
+  const stamp = ts("Not/AZone", new Date("2026-09-28T13:00:00Z"));
+  assertStrictEquals(typeof stamp, "string");
+  assert(stamp.includes("28/09/2026"), stamp);
+});
+
+Deno.test("resolveTimeZone only accepts real IANA zones", () => {
+  assertStrictEquals(resolveTimeZone("America/Sao_Paulo"), "America/Sao_Paulo");
+  assertStrictEquals(resolveTimeZone("  UTC  "), "UTC");
+  assertStrictEquals(resolveTimeZone("Mars/Olympus"), undefined);
+  assertStrictEquals(resolveTimeZone(""), undefined);
+  assertStrictEquals(resolveTimeZone(undefined), undefined);
+  assertStrictEquals(resolveTimeZone(7), undefined);
+});
+
+Deno.test("browserTimeZone names the runtime zone", () => {
+  const zone = browserTimeZone();
+  assertStrictEquals(typeof zone, "string");
+  assert((zone as string).length > 0);
 });

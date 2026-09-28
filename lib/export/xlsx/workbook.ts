@@ -40,6 +40,10 @@ export interface XlsxMeta {
   // Scope aggregate, so the KPI strip and the summary sheet reconcile with
   // the dashboard without buffering every row just to count them.
   kpi: KpiSnapshot;
+  // IANA zone for the "Exportado em" stamp; runtime local when absent (the
+  // browser download already runs in the user's zone, the route passes the
+  // zone the client sent).
+  timeZone?: string;
 }
 
 // dataSheetChunks: the streamed worksheet part. The first batch is pulled
@@ -55,7 +59,7 @@ async function* dataSheetChunks(
   const last = EXPORT_HEADERS.length;
   const header = {
     stats,
-    subtitle: `Exportado em ${ts()}  |  ${stats.total} registros`,
+    subtitle: `Exportado em ${ts(meta.timeZone)}  |  ${stats.total} registros`,
     brand: withBrand(meta.companyName, "MONITOR DE BARREIRAS DE SEGURANÇA"),
     headers: EXPORT_HEADERS,
     widths,

@@ -17,6 +17,8 @@ export interface ReportMeta {
   kpi: KpiSnapshot;
   // Suggested filename, also the document <title>.
   title: string;
+  // IANA zone for the banner/footer stamps, passed straight to the builders.
+  timeZone?: string;
 }
 
 // streamReportDocument: standalone document head, then the rows of the whole
@@ -26,12 +28,15 @@ export function streamReportDocument(
   batches: AsyncIterable<Barrier[]>,
   meta: ReportMeta,
 ): ReadableStream<Uint8Array> {
-  const { companyName, title } = meta;
+  const { companyName, title, timeZone } = meta;
   const stats = kpiStatsFrom(meta.kpi);
   return textStream(batches, {
-    head: () => [reportDocOpen(title) + printDocOpen(companyName, stats)],
+    head: () => [
+      reportDocOpen(title) +
+      printDocOpen(companyName, stats, undefined, timeZone),
+    ],
     render: (batch, offset) =>
       batch.map((b, i) => printRow(b, offset + i)).join(""),
-    tail: () => [printDocClose(companyName) + reportDocClose()],
+    tail: () => [printDocClose(companyName, timeZone) + reportDocClose()],
   });
 }
