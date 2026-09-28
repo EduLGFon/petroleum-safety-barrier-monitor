@@ -1,7 +1,7 @@
 // Export HTML primitives - timestamp, escaping, download, pills, browser guard.
-// This is why it exists: spreadsheet, print report, and CSV share these
-// browser-only building blocks instead of reimplementing them per format.
-// Row ceilings live in limits.ts (format-driven, not DOM-driven).
+// This is why it exists: the print report and the CSV share these browser-only
+// building blocks instead of reimplementing them per format. Row ceilings live
+// in limits.ts (format-driven, not DOM-driven).
 
 // Returns current datetime as pt-BR DD/MM/YYYY HH:MM stamp for report headers.
 export function ts(): string {
@@ -14,7 +14,7 @@ export function ts(): string {
   });
 }
 
-// Escapes &<>" for safe HTML/XLS/PDF embedding; run before pill/cell interpolation.
+// Escapes &<>" for safe HTML/report embedding; run before pill/cell interpolation.
 export function escHtml(v: string): string {
   return v
     .replace(/&/g, "&amp;")

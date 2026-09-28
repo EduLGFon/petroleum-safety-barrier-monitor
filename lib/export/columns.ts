@@ -1,5 +1,5 @@
 // Export columns - the single ordered list of the 30 export columns.
-// This is why it exists: CSV, the .xls spreadsheet and the print report emit
+// This is why it exists: CSV, the .xlsx workbook and the print report emit
 // the same fields in the same order, so one list (shared with row() in
 // rows.ts) keeps the three files comparable column by column.
 export const EXPORT_HEADERS: string[] = [

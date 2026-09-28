@@ -172,6 +172,8 @@ export function sanitizeFilterPatch(raw: unknown): Partial<FilterState> {
 }
 
 // Merges an untrusted persisted blob over fresh defaults; always complete.
+// Restores that must also drop defaults an older version shipped use
+// restoredFilters below.
 export function sanitizeFilters(raw: unknown): FilterState {
   return { ...defaultFilters(), ...sanitizeFilterPatch(raw) };
 }
