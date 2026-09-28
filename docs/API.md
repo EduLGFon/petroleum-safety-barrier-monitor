@@ -145,18 +145,21 @@ Full inventory: `barriers`, `barriers/deleted`,
   (`[Imediato]` subject, single attempt, 10s budget) when the SMTP relay
   is configured - otherwise the digest cron sends. Fan-out failures only
   log; the response stays the updated `WireBarrier`.
-- `GET|POST /api/export?format=csv|xls|pdf` (+ the same filters as
-  `/api/barriers`) → the whole scope as CSV, `.xls` spreadsheet or PDF print
-  report (CSV with BOM, 30-column header, data rows, `RESUMO` block;
-  byte-identical cell mapping to the dashboard exports: `row()` +
-  `csvCell()`/`xlsRow()`/`printRow()` + `summaryRowsFrom()`). Rows stream
+- `GET|POST /api/export?format=csv|xlsx|pdf` (+ the same filters as
+  `/api/barriers`) → the whole scope as CSV, `.xlsx` workbook or PDF print
+  report (CSV with BOM and 30-column header plus a `RESUMO` block; the
+  workbook is real OOXML with the brand block, KPI strip, frozen header,
+  autofilter and a `Resumo` sheet; the print report is a landscape HTML
+  fragment - byte-identical cell mapping to the dashboard exports: `row()` +
+  `csvCell()`/`row()`/`printRow()` + `summaryRowsFrom()`). Rows stream
   from the database in 5,000-row batches (`ReadableStream`, so nothing is
   buffered whole), ceiling `EXPORT_MAX_ROWS` = 200,000 rows (`400` naming the
   real total when exceeded - refine the filters), `Content-Disposition:
-  attachment`, `X-Export-Total` with the scope total. The `.xls` splits into
-  successive worksheets past Excel's 65,536-row sheet limit. `POST` takes a
-  JSON body `{ format?, ids?, part? }`: `ids` narrows the export to the
-  selected rows (still intersected with the filters, so a stale selection
+  attachment`, `X-Export-Total` with the scope total. The workbook streams
+  straight out of the ZIP writer, so a 200k-row export never materialises in
+  memory. `format=xls` is still accepted as a legacy alias of `xlsx`. `POST`
+  takes a JSON body `{ format?, ids?, part? }`: `ids` narrows the export to
+  the selected rows (still intersected with the filters, so a stale selection
   cannot widen the scope) and `part` selects one PDF print part - a scope
   larger than 2,000 rows reports `X-Export-Parts` and is printed one part per
   request.
@@ -259,9 +262,8 @@ In `PUBLIC_API_MODE=http` the dashboard pages through the server
 `getChartData` (same filter subset, minus paging/sort), with cancellation,
 loading, error card/banner, retry, a 5-minute refresh cadence (hidden tabs
 skip), and vocabulary refetch. `getAllBarriers` in http forces
-`pageSize: 100000`. CSV export streams the full filtered set from
-`GET /api/export` (10k cap); xls/pdf stay page-local; detail resolves from
-the current page.
+`pageSize: 100000`. Every export format streams the full filtered set from
+`GET /api/export` (200k ceiling); detail resolves from the current page.
 
 To enable:
 
@@ -339,7 +341,7 @@ toWireQuery({ location: "FAL", availability: "Degradado", page: 1 });
 | `routes/api/barriers/deleted.ts`     | `GET /api/barriers/deleted` (deleted only, requires `ADMIN_TOKEN`)                                            |
 | `routes/api/barriers/[id].ts`        | `GET /api/barriers/:id` (session/token, read throttle)                                                        |
 | `routes/api/barriers/[id]/status.ts` | `PATCH /api/barriers/:id/status` (requires admin, write throttle; author derives from session)                |
-| `routes/api/export.ts`               | `GET/POST /api/export` (csv/xls/pdf; session/token, export throttle, streamed, selection via `ids`)           |
+| `routes/api/export.ts`               | `GET/POST /api/export` (csv/xlsx/pdf; session/token, export throttle, streamed, selection via `ids`)          |
 | `routes/api/kpi.ts`                  | `GET /api/kpi` (session/token, read throttle)                                                                 |
 | `routes/api/chart.ts`                | `GET /api/chart` (session/token, read throttle)                                                               |
 | `routes/api/sync-status.ts`          | `GET /api/sync-status` (session/token, read throttle; dashboard indicator)                                    |
@@ -367,9 +369,9 @@ toWireQuery({ location: "FAL", availability: "Degradado", page: 1 });
 | `lib/server/throttle.ts`             | `createThrottle` (fixed window, no deps) + per-route buckets                                                  |
 | `lib/server/sql/throttle.ts`         | Postgres `throttle_buckets` budget shared across isolates (memory fallback)                                   |
 | `lib/server/exportRows.ts`           | `resolveExportScope` (scope KPI) + `exportBatches` (5,000-row paged batches)                                  |
-| `lib/server/exportStream.ts`         | `textStream` (head / batch / tail skeleton shared by the three formats)                                       |
+| `lib/server/exportStream.ts`         | `textStream` (head / batch / tail skeleton shared by the CSV and print formats)                               |
 | `lib/server/exportCsv.ts`            | `streamExportCsv` (BOM + `row()` + `summaryRowsFrom()`)                                                       |
-| `lib/server/exportXls.ts`            | `streamExportXls` (worksheet split at `XLS_SHEET_ROWS`)                                                       |
+| `lib/server/exportXlsx.ts`           | `streamExportXlsx` (workbook streamed out of the ZIP writer, batch by batch)                                  |
 | `lib/server/exportPdf.ts`            | `streamPrintReport` (one print part)                                                                          |
 | `lib/server/sql/recipients.ts`       | CRUD `alert_recipients` (pure validation + thin store)                                                        |
 | `lib/server/sql/users.ts`            | CRUD `users` (roles, last-admin guard, no hashes in JSON)                                                     |

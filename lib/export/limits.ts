@@ -6,17 +6,14 @@
 import { fmt } from "../format.ts";
 
 // Hard ceiling for one export in any format and mode. Sits below Excel's
-// 1,048,576-row workbook limit and keeps a CSV around 60 MB at ~300 bytes
-// per row, so anything larger is split by the caller, never silently cut.
+// 1,048,576-row worksheet limit - so the whole export always fits one sheet -
+// and keeps a CSV around 60 MB at ~300 bytes per row, so anything larger is
+// split by the caller, never silently cut.
 export const EXPORT_MAX_ROWS = 200_000;
 
 // Rows fetched per database round trip while streaming. Keeps only one batch
 // resident in memory and every export query small, whatever the size.
 export const EXPORT_PAGE_ROWS = 5_000;
-
-// Excel refuses more than 65,536 data rows per worksheet, so wider exports
-// are split into successive <table> elements (one worksheet each).
-export const XLS_SHEET_ROWS = 65_536;
 
 // Rows per print job. The print dialog lays out the whole report at once, so
 // big selections print as successive parts instead of one job that freezes

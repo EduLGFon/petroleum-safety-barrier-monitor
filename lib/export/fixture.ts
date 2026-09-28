@@ -1,10 +1,13 @@
 // Export test fixtures - a barrier factory plus batch/KPI builders.
 // This is why it exists: the export tests (row mapping, the three server
-// streamers) all need the same fully-populated Barrier, and the streamers now
-// take batches plus a KPI snapshot instead of one array.
+// streamers) all need the same fully-populated Barrier, and the streamers take
+// batches plus a KPI snapshot instead of one array.
+import { batchesOf } from "./batches.ts";
 import type { Barrier, KpiSnapshot } from "../types.ts";
 
 import { computeKpi } from "../utils.ts";
+
+export { batchesOf };
 
 // mkBarrier: a complete, non-conforming-by-default barrier; override only the
 // fields a test cares about.
@@ -52,21 +55,6 @@ export function mkCount(n: number): Barrier[] {
     { length: n },
     (_, i) => mkBarrier({ id: i + 1, tag: `PSV-${i + 1}` }),
   );
-}
-
-// batches: the shape the server streamers consume - an async iterable of
-// batches, split every `size` rows the way the database paged them.
-export function batchesOf(
-  barriers: Barrier[],
-  size = 500,
-): AsyncIterable<Barrier[]> {
-  return {
-    async *[Symbol.asyncIterator]() {
-      for (let at = 0; at < barriers.length; at += size) {
-        yield barriers.slice(at, at + size);
-      }
-    },
-  };
 }
 
 // kpiOf: the aggregate the route passes alongside the rows, so a test can

@@ -1,6 +1,6 @@
 // Server export client - pulls the whole selection out of /api/export.
 // This is why it exists: the browser only holds one page of rows, so csv and
-// xls arrive as a streamed file download and pdf is printed part by part
+// xlsx arrive as a streamed file download and pdf is printed part by part
 // from the streamed report markup. The selection travels in the POST body,
 // so an 18k-id selection never has to fit a URL. Every format covers the
 // same rows as the table (scope filters plus the selected ids).
@@ -69,7 +69,7 @@ async function requestPart(
   return { res };
 }
 
-// exportFromServer: runs the export for the whole selection. csv/xls come
+// exportFromServer: runs the export for the whole selection. csv/xlsx come
 // back as one file; pdf is fetched part by part and printed in order, so a
 // selection too large for one print job still comes out complete.
 export async function exportFromServer(

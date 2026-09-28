@@ -1,11 +1,12 @@
 // Unit tests for the server export streamers - every format over the whole
 // selection, fed in database-sized batches exactly as /api/export does.
-import { streamExportXls } from "./exportXls.ts";
 import { streamExportCsv, streamToText } from "./exportCsv.ts";
-import { streamPrintReport } from "./exportPdf.ts";
 import { batchesOf, kpiOf, mkBarrier, mkCount } from "../export/fixture.ts";
-import { assertStrictEquals } from "jsr:@std/assert@^1";
+import { assert, assertStrictEquals } from "jsr:@std/assert@^1";
+import { streamExportXlsx } from "./exportXlsx.ts";
+import { streamPrintReport } from "./exportPdf.ts";
 import { pdfPartCount } from "../export/parts.ts";
+import type { Bytes } from "../export/xlsx/zip.ts";
 
 import type { Barrier } from "../types.ts";
 
@@ -15,21 +16,14 @@ function csvOf(barriers: Barrier[], size = 500): Promise<string> {
   );
 }
 
-function xlsOf(
-  barriers: Barrier[],
-  size = 500,
-  sheetRows?: number,
-): Promise<string> {
-  return streamToText(
-    streamExportXls(batchesOf(barriers, size), {
-      companyName: "Petrobras",
-      kpi: kpiOf(barriers),
-      sheets: sheetRows
-        ? Math.max(1, Math.ceil(barriers.length / sheetRows))
-        : 1,
-      sheetRows,
-    }),
-  );
+// xlsxOf: the streamed workbook as one array, so the test can read the
+// package back (SheetJS in workbook_test.ts, the part names here).
+function xlsxOf(barriers: Barrier[], size = 500): Promise<Bytes> {
+  const stream = streamExportXlsx(batchesOf(barriers, size), {
+    companyName: "Petrobras",
+    kpi: kpiOf(barriers),
+  });
+  return new Response(stream).arrayBuffer().then((b) => new Uint8Array(b));
 }
 
 function printOf(barriers: Barrier[], size = 500): Promise<string> {
@@ -42,19 +36,8 @@ function printOf(barriers: Barrier[], size = 500): Promise<string> {
   );
 }
 
-// The styled TAG cell only exists in data rows, so these counters see the
-// rows alone - not the header (<th>), the KPI strip or the summary table.
-function xlsRows(html: string): number {
-  return (html.match(/Courier New/g) ?? []).length;
-}
-
 function printRows(html: string): number {
   return (html.match(/font-family:Courier/g) ?? []).length;
-}
-
-// Splits a body into its <table> elements so worksheet splits are visible.
-function tablesOf(html: string): number {
-  return html.split("<table").length - 1;
 }
 
 Deno.test("streamExportCsv starts with a BOM for pt-BR Excel", async () => {
@@ -127,35 +110,50 @@ Deno.test("streamExportCsv streams before the last batch is read", async () => {
   await reader.cancel();
 });
 
-Deno.test("streamExportXls emits one worksheet with every row", async () => {
+Deno.test("streamExportXlsx writes a workbook package over every batch", async () => {
   const rows = mkCount(1_200);
-  const stream = streamExportXls(batchesOf(rows, 400), {
-    companyName: "Petrobras",
-    kpi: kpiOf(rows),
-    sheets: 1,
-  });
-  // Byte level: the BOM has to lead the file for Excel on Windows. The
-  // decoded text cannot show it (TextDecoder strips it), so the file is tee'd.
-  const [head, body] = stream.tee();
-  const first = await head.getReader().read();
-  assertStrictEquals(first.value?.[0], 0xef);
-  const html = await streamToText(body);
-  // One data worksheet plus the trailing summary table.
-  assertStrictEquals(tablesOf(html), 2);
-  assertStrictEquals(xlsRows(html), 1_200);
-  assertStrictEquals(html.startsWith("<html"), true);
-  assertStrictEquals(html.includes("PSV-1200"), true);
+  const bin = await xlsxOf(rows, 400);
+  // A ZIP container, not HTML: "PK" then the package part names.
+  assertStrictEquals(bin[0], 0x50);
+  assertStrictEquals(bin[1], 0x4b);
+  const names = new TextDecoder().decode(bin);
+  for (
+    const part of [
+      "[Content_Types].xml",
+      "xl/workbook.xml",
+      "xl/worksheets/sheet1.xml",
+      "xl/worksheets/sheet2.xml",
+      "xl/styles.xml",
+    ]
+  ) {
+    assert(names.includes(part), `missing ${part}`);
+  }
+  // Deflated: an 18k-row selection would be an order of magnitude bigger as
+  // the HTML table this export used to be.
+  assert(bin.length < 1_200 * 200, `workbook not compressed: ${bin.length}`);
 });
 
-Deno.test("streamExportXls splits into worksheets past the sheet limit", async () => {
-  // 10 rows in worksheets of 4: 4 + 4 + 2, each labelled with its position so
-  // a split file still reads as one export.
-  const html = await xlsOf(mkCount(10), 4, 4);
-  assertStrictEquals(tablesOf(html), 4); // 3 data sheets + summary
-  assertStrictEquals(xlsRows(html), 10);
-  for (const sheet of [1, 2, 3]) {
-    assertStrictEquals(html.includes(`Planilha ${sheet} de 3`), true);
-  }
+Deno.test("streamExportXlsx streams before the last batch is read", async () => {
+  // Back-pressure: the ZIP header must be readable while the source still has
+  // rows left, otherwise a big export buffers everything.
+  const many = mkCount(10);
+  let released = 0;
+  const source = {
+    async *[Symbol.asyncIterator]() {
+      for (let at = 0; at < many.length; at += 5) {
+        released += 5;
+        yield many.slice(at, at + 5);
+      }
+    },
+  };
+  const reader = streamExportXlsx(source, {
+    companyName: "Petrobras",
+    kpi: kpiOf(many),
+  }).getReader();
+  const head = await reader.read();
+  assertStrictEquals(head.done, false);
+  assertStrictEquals(released, 5);
+  await reader.cancel();
 });
 
 Deno.test("streamPrintReport renders every batched row", async () => {

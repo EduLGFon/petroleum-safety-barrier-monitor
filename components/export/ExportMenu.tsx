@@ -8,7 +8,7 @@
 // portals to document.body (like FilterSelect and ColumnsMenu) because the
 // animated section and the table card both trap stacking contexts, so a
 // nested menu would paint under the rows.
-import { exportToCSV, exportToExcel, exportToPDF } from "../../lib/export.ts";
+import { exportToCSV, exportToPDF, exportToXlsx } from "../../lib/export.ts";
 
 import { useEffect, useMemo, useRef, useState } from "preact/hooks";
 
@@ -139,8 +139,8 @@ export function ExportMenu(
       if (serverMode && onServerExport) {
         await onServerExport(kind, ids, name);
       } else {
-        if (kind === "xls") {
-          await exportToExcel(exportable, name, companyName);
+        if (kind === "xlsx") {
+          await exportToXlsx(exportable, name, companyName);
         }
         if (kind === "pdf") {
           await exportToPDF(exportable, name, companyName);

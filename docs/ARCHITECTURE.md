@@ -69,7 +69,7 @@ theme/accent/density/motion from `barrier-settings` before hydration.
   island root because server route context does not reach hydrated islands.
 - `lib/server/` - server-only Postgres pool (`db.ts`) + SQL repositories
   - edge helpers (`errors.ts`, `throttle.ts`, `config.ts`, `page-auth.ts`,
-    `exportRows.ts`, `exportStream.ts`, `exportCsv.ts`, `exportXls.ts`,
+    `exportRows.ts`, `exportStream.ts`, `exportCsv.ts`, `exportXlsx.ts`,
     `exportPdf.ts`).
     Only `routes/index.tsx` and `routes/api/*` may import it.
 
@@ -122,16 +122,22 @@ page-local.
 
 ## Export pipeline
 
-`lib/export/` holds one markup builder per format, split into
-head/row/tail pieces (`csv.ts`, `excelHtml.ts`, `pdfHtml.ts`, sharing
-`columns.ts` and `rows.ts`) so the browser and the server emit identical
-cells. `lib/server/exportStream.ts` turns paged batches into a byte stream
-and `lib/server/export{csv,xls,pdf}.ts` render each format. Ceilings come
-from the formats themselves (`lib/export/limits.ts`): the export ceiling is
-200,000 rows, the `.xls` splits into worksheets past Excel's 65,536-row
-sheet limit, and the print report is printed in parts of `PDF_PART_ROWS`
-(one print dialog per part, the part number in the suggested filename)
-because the print dialog lays out the whole report at once.
+`lib/export/` holds one builder per format, all fed the same 30-column
+`rows.ts` mapping and the same `columns.ts` order, so the browser and the
+server emit identical cells. CSV and the print report are text: split into
+head/row/tail pieces (`csv.ts`, `pdfHtml.ts`) and driven by
+`lib/server/exportStream.ts`, which turns paged batches into a byte stream.
+The spreadsheet is a real OOXML workbook: `lib/export/xlsx/` builds the
+package - `zip.ts` (streaming ZIP with `deflate-raw` and data descriptors),
+`xml.ts`, `styles.ts` (on-demand style registry), `widths.ts`, `parts.ts`
+(package plumbing), `dataSheet.ts` (the streamed "Barreiras" sheet) and
+`workbook.ts` (the ZIP assembly, shared by `lib/export/xlsx.ts` for the
+browser and `lib/server/exportXlsx.ts` for the route). Ceilings come from the
+formats themselves (`lib/export/limits.ts`): the export ceiling is 200,000
+rows, which sits under Excel's 1,048,576-row worksheet limit, so the workbook
+always fits one sheet, and the print report is printed in parts of
+`PDF_PART_ROWS` (one print dialog per part, the part number in the suggested
+filename) because the print dialog lays out the whole report at once.
 
 ## Island bridge topology
 
@@ -171,7 +177,7 @@ Full contract lives in `docs/API.md`. Summary:
 - Routes: `GET /api/barriers`, `GET /api/barriers/:id`,
   `PATCH /api/barriers/:id/status` (admin write via `record_status_change()`,
   author derives from session), `GET /api/barriers/deleted` (admin),
-  `GET /api/kpi`, `GET /api/chart`, `GET|POST /api/export` (csv/xls/pdf over
+  `GET /api/kpi`, `GET /api/chart`, `GET|POST /api/export` (csv/xlsx/pdf over
   the whole selection, streamed in batches),
   `GET /api/health` (DB-free liveness), `GET /api/vocabularies`
   (refresh cadence; SSR still seeds the first paint), `GET /api/sync-status`
@@ -256,4 +262,4 @@ adapter. `DATABASE_URL` feeds `lib/server/db.ts` and both `db:*` tasks.
   Fixed fields + `other` always equal `total`.
 - Layouts survive scale: paginated/server-paged regions, exports streamed in
   database-sized batches and split at the format ceilings (`EXPORT_MAX_ROWS`,
-  `XLS_SHEET_ROWS`, `PDF_PART_ROWS`), debounced search, precomputed sort keys.
+  `PDF_PART_ROWS`), debounced search, precomputed sort keys.

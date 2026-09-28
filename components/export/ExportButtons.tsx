@@ -22,10 +22,10 @@ export interface FmtDef {
 }
 const FMTS: FmtDef[] = [
   {
-    key: "xls",
+    key: "xlsx",
     Icon: FileSpreadsheetIcon,
     label: "Excel",
-    ext: ".xls",
+    ext: ".xlsx",
     color: "#34d399",
   },
   {

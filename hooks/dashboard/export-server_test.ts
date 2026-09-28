@@ -129,7 +129,7 @@ Deno.test("exportFromServer downloads the streamed file", async () => {
   const original = globalThis.fetch;
   globalThis.fetch = h.fetch;
   try {
-    for (const kind of ["csv", "xls"] as Fmt[]) {
+    for (const kind of ["csv", "xlsx"] as Fmt[]) {
       await run(kind, h, [1]);
     }
   } finally {
@@ -137,7 +137,7 @@ Deno.test("exportFromServer downloads the streamed file", async () => {
   }
   assertEquals(h.downloads, [
     "barreiras-2026-09-27.csv",
-    "barreiras-2026-09-27.xls",
+    "barreiras-2026-09-27.xlsx",
   ]);
 });
 
@@ -212,7 +212,7 @@ Deno.test("exportFromServer sends a dead session to login", async () => {
   const original = globalThis.fetch;
   globalThis.fetch = h.fetch;
   try {
-    await assertRejects(() => run("xls", h, [1]), Error, "Sessão expirada");
+    await assertRejects(() => run("xlsx", h, [1]), Error, "Sessão expirada");
   } finally {
     globalThis.fetch = original;
   }

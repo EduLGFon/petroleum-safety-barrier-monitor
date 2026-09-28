@@ -1,4 +1,4 @@
-// API: GET|POST /api/export - the whole selection as csv, xls or pdf.
+// API: GET|POST /api/export - the whole selection as csv, xlsx or pdf.
 // This is why it exists: the dashboard download must cover every selected
 // barrier (18k and up), which no browser-side builder can hold. Filters
 // arrive as query params on both verbs; the selection (ids) and the print
@@ -24,15 +24,14 @@ import {
   EXPORT_MAX_ROWS,
   PDF_PART_ROWS,
   refusalMessage,
-  XLS_SHEET_ROWS,
 } from "../../lib/export/limits.ts";
 
 import { exportThrottle, routeClientKey } from "../../lib/server/throttle.ts";
 import { checkDbThrottle } from "../../lib/server/sql/throttle.ts";
-import { FMT_EXT, FMT_MIME, isFmt } from "../../lib/export/format.ts";
-import { loadServerConfig } from "../../lib/server/config.ts";
 import { streamExportCsv } from "../../lib/server/exportCsv.ts";
-import { streamExportXls } from "../../lib/server/exportXls.ts";
+import { FMT_EXT, FMT_MIME, normalizeFmt } from "../../lib/export/format.ts";
+import { loadServerConfig } from "../../lib/server/config.ts";
+import { streamExportXlsx } from "../../lib/server/exportXlsx.ts";
 import { getCompanyName } from "../../lib/company.ts";
 import type { ExportScope } from "../../lib/server/exportRows.ts";
 import { streamPrintReport } from "../../lib/server/exportPdf.ts";
@@ -139,9 +138,11 @@ async function stream(
       : unauthorized(dataAuth.message, requestId);
   }
 
-  const requested = body.format ?? sp.get("format") ?? "csv";
-  if (!isFmt(requested)) {
-    return badRequest("format must be csv, xls or pdf", requestId);
+  // A tab opened before the .xlsx migration still asks for "xls"; it resolves
+  // to the same workbook instead of failing the request.
+  const requested = normalizeFmt(body.format ?? sp.get("format") ?? "csv");
+  if (!requested) {
+    return badRequest("format must be csv, xlsx or pdf", requestId);
   }
   const req: ExportRequest = {
     format: requested,
@@ -172,8 +173,8 @@ async function stream(
   }
 }
 
-// respond: wires the format stream and its headers. CSV and xls download as
-// one file (xls split into worksheets past Excel's sheet limit); pdf is a
+// respond: wires the format stream and its headers. CSV and xlsx download as
+// one file (the workbook streams straight out of the ZIP writer); pdf is a
 // print fragment, one part per request, so the caller prints them in order.
 function respond(
   req: ExportRequest,
@@ -186,14 +187,13 @@ function respond(
     "x-request-id": requestId,
     "x-export-total": String(total),
   };
-  if (req.format === "xls") {
+  if (req.format === "xlsx") {
     return new Response(
-      streamExportXls(exportBatches(scope), {
+      streamExportXlsx(exportBatches(scope), {
         companyName,
         kpi: scope.kpi,
-        sheets: Math.max(1, Math.ceil(total / XLS_SHEET_ROWS)),
       }),
-      { status: 200, headers: fileHeaders(headers, "xls") },
+      { status: 200, headers: fileHeaders(headers, "xlsx") },
     );
   }
   if (req.format === "pdf") {
@@ -232,7 +232,7 @@ function respond(
 // fileHeaders: content type plus the download disposition for a file format.
 function fileHeaders(
   base: Record<string, string>,
-  format: "csv" | "xls",
+  format: "csv" | "xlsx",
 ): Record<string, string> {
   return {
     ...base,

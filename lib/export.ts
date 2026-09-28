@@ -1,11 +1,12 @@
 // Client export helpers - download barriers as spreadsheet, PDF or CSV.
-// This is why it exists: zero-dependency browser exports. The spreadsheet
-// is an HTML table saved as .xls (opens in Excel/LibreOffice) with brand
-// header, KPI strip, styled columns and a summary table. PDF prints a
-// dedicated landscape report (never the whole page), split into parts when
-// the selection is bigger than one print job can lay out. CSV uses ; with
-// BOM. Importers keep importing from here; formats live in small modules.
-export { buildExcelHtml, exportToExcel } from "./export/excel.ts";
+// This is why it exists: zero-dependency browser exports. The spreadsheet is a
+// real .xlsx workbook (OOXML) with a brand header, KPI strip, frozen header,
+// styled columns and a summary sheet - built by the same builder the server
+// streams, so both files agree cell for cell. PDF prints a dedicated
+// landscape report (never the whole page), split into parts when the selection
+// is bigger than one print job can lay out. CSV uses ; with BOM. Importers
+// keep importing from here; formats live in small modules.
+export { exportToXlsx } from "./export/xlsx.ts";
 export { buildPrintReport, exportToPDF } from "./export/pdf.ts";
 export { pdfPartTitle, printPdfParts, printReportPart } from "./export/pdf.ts";
 export { exportToCSV } from "./export/csv.ts";
