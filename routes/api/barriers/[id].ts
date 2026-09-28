@@ -95,7 +95,11 @@ export const handler = define.handlers({
     }
 
     try {
-      const barrier = await getBarrierById(barrierId);
+      // Admins may audit soft-deleted rows by id; everyone else keeps the
+      // live-only view so deleted barriers stay hidden by default.
+      const barrier = await getBarrierById(barrierId, {
+        includeDeleted: dataAuth.role === "admin",
+      });
       if (!barrier) return notFound("Barrier not found", requestId);
       return Response.json(barrier);
     } catch (err) {

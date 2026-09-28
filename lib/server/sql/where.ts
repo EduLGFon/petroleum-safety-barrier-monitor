@@ -101,15 +101,28 @@ export function buildWhere(
     args.push(q.until);
     conds.push(`and b.status_since <= $${args.length}::date`);
   }
-  // Soft-delete scope: default views hide deleted rows; the admin deleted
-  // listing (GET /api/barriers/deleted) flips to deleted-only. Keeps the
-  // clause first so every barrier query inherits the filter without callers
-  // remembering it.
-  const scope = q.includeDeleted === true
+  // Row visibility scope (admin Situacao filter). Default hides both
+  // disabled and soft-deleted rows; each scope keeps the clause first so
+  // every barrier query inherits it without callers remembering it.
+  // includeDeleted stays as a legacy alias for deleted-only callers.
+  const scope = resolveRowScope(q);
+  const scopeText = scope === "deleted"
     ? "where b.deleted_at is not null"
-    : "where b.deleted_at is null";
+    : scope === "inactive"
+    ? "where b.deleted_at is null and not coalesce(b.is_active, true)"
+    : scope === "all"
+    ? "where true"
+    : "where b.deleted_at is null and coalesce(b.is_active, true)";
   return {
-    text: `${scope}${conds.length > 0 ? ` ${conds.join(" ")}` : ""}`,
+    text: `${scopeText}${conds.length > 0 ? ` ${conds.join(" ")}` : ""}`,
     args,
   };
+}
+
+// resolveRowScope: canonical scope for a query. rowScope wins; legacy
+// includeDeleted maps to deleted; absent means active.
+export function resolveRowScope(q: BarriersQuery): string {
+  if (q.rowScope !== undefined) return q.rowScope;
+  if (q.includeDeleted === true) return "deleted";
+  return "active";
 }

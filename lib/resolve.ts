@@ -85,6 +85,9 @@ export function resolveBarrier(
     actionPlan: w.actionPlan,
     statusSince: w.statusSince,
     statusHistory: w.statusHistory.map((h) => resolveHistoryEntry(h, labels)),
+    // Visibility flags ride the wire unresolved (booleans/dates, no labels).
+    isActive: w.isActive ?? true,
+    deletedAt: w.deletedAt ?? null,
     // Sheet inventory columns travel resolved already (free text, no ids).
     origin: w.origin,
     externalCode: w.externalCode,

@@ -2,6 +2,7 @@
 // This is why it exists: one validation policy (integers only, ISO dates,
 // trimmed/capped text) instead of per-route copies drifting apart. Files
 // starting with _ are never routes in Fresh, so this is import-only.
+import type { RowScope } from "../../lib/wireTypes.ts";
 
 // Parses optional integer query param; undefined for missing/malformed.
 // Rejects floats, negatives are left to SQL clamping per field.
@@ -33,10 +34,18 @@ export function parseBooleanParam(v: string | null): boolean | undefined {
   return undefined;
 }
 
+// Parses the admin Situacao scope; undefined for missing/unknown values.
+export function parseRowScope(v: string | null): RowScope | undefined {
+  if (v === "active" || v === "inactive" || v === "deleted" || v === "all") {
+    return v;
+  }
+  return undefined;
+}
+
 // Reads the shared barrier filter subset (location, availability,
 // compliance, category, criticality, critical-tiers gate, action-plan
-// presence, text, dates) that list, KPI, chart, and export all honor;
-// paging/sort stay per-route so caps differ honestly.
+// presence, text, dates, row visibility scope) that list, KPI, chart, and
+// export all honor; paging/sort stay per-route so caps differ honestly.
 export function parseFilterQuery(sp: URLSearchParams): {
   locationId?: number;
   availabilityId?: number;
@@ -49,6 +58,7 @@ export function parseFilterQuery(sp: URLSearchParams): {
   query?: string;
   since?: string;
   until?: string;
+  rowScope?: RowScope;
 } {
   return {
     locationId: parseIntParam(sp.get("locationId")),
@@ -62,5 +72,6 @@ export function parseFilterQuery(sp: URLSearchParams): {
     query: parseQueryParam(sp.get("query")),
     since: parseDateParam(sp.get("since")),
     until: parseDateParam(sp.get("until")),
+    rowScope: parseRowScope(sp.get("rowScope")),
   };
 }

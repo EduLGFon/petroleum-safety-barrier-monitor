@@ -34,6 +34,12 @@ export interface WireBarrier {
   actionPlan: string;
   statusSince: string; // ISO date
   statusHistory: WireStatusHistoryEntry[];
+  // Upstream enable flag (Fracttal `active`); false = Desativada.
+  // Soft-delete stamp (ISO); null = live row. Both ride the wire so the
+  // admin Situacao filter can badge rows without a second lookup.
+  // Optional so old fixtures/servers keep parsing; absent reads as live.
+  isActive?: boolean;
+  deletedAt?: string | null;
   // Sheet inventory columns (GERAL). Free text, "" = unset; Fracttal does
   // not feed them (import writes ""), admins fill them in later.
   origin: string;
@@ -97,6 +103,10 @@ export interface WireCategoryCompliance {
 }
 
 /** Query params accepted by GET /api/barriers */
+// Row visibility scope: active (default) lists enabled live rows only;
+// inactive lists upstream-disabled rows; deleted lists soft-deleted rows
+// (admin only); all lists everything (admin only, audit use).
+export type RowScope = "active" | "inactive" | "deleted" | "all";
 export interface BarriersQuery {
   locationId?: number;
   availabilityId?: number;
@@ -124,7 +134,10 @@ export interface BarriersQuery {
   ids?: number[];
   // Admin deleted listing only (GET /api/barriers/deleted): flips the
   // soft-delete filter to deleted-only. The dashboard never sets this.
+  // Prefer rowScope; this stays as a legacy alias for old callers.
   includeDeleted?: boolean;
+  // Admin Situacao filter scope (see RowScope). Absent means active.
+  rowScope?: RowScope;
 }
 
 export interface BarriersResponse {

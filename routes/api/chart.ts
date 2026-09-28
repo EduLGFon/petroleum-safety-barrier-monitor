@@ -52,6 +52,12 @@ export const handler = define.handlers({
     }
 
     const filter = parseFilterQuery(ctx.url.searchParams);
+    if (
+      (filter.rowScope === "deleted" || filter.rowScope === "all") &&
+      dataAuth.role !== "admin"
+    ) {
+      return unauthorized("admin only", requestId);
+    }
 
     try {
       const rows = await getChartData(filter);

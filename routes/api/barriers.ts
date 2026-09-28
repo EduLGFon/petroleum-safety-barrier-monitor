@@ -62,6 +62,14 @@ export const handler = define.handlers({
       sortCol: sp.get("sortCol") ?? undefined,
       sortDir: sp.get("sortDir") === "desc" ? "desc" : "asc",
     };
+    // Deleted/audit scopes are admin-only; authenticated non-admins get a
+    // 401 instead of the rows.
+    if (
+      (query.rowScope === "deleted" || query.rowScope === "all") &&
+      dataAuth.role !== "admin"
+    ) {
+      return unauthorized("admin only", requestId);
+    }
 
     try {
       const data = await listBarriers(query);

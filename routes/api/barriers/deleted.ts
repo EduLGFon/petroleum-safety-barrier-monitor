@@ -72,7 +72,8 @@ export const handler = define.handlers({
       pageSize: parseIntParam(sp.get("pageSize")),
       sortCol: sp.get("sortCol") ?? undefined,
       sortDir: sp.get("sortDir") === "desc" ? "desc" : "asc",
-      includeDeleted: true,
+      // Legacy alias: this endpoint always lists deleted-only rows.
+      rowScope: "deleted",
     };
 
     try {

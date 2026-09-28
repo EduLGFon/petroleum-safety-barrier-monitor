@@ -19,6 +19,10 @@ export interface BarrierRow {
   action_plan: string;
   status_since: string; // YYYY-MM-DD via to_char
   status_history: unknown; // json array (parsed object or string)
+  // Row visibility: upstream enable flag (null = pre-migration, read as
+  // enabled) and soft-delete stamp (null = live row).
+  is_active: boolean | null;
+  deleted_at: string | null;
   // Sheet inventory columns (nullable in SQL, "" on the wire).
   origin: string | null;
   external_code: string | null;
@@ -78,6 +82,9 @@ export function toWireBarrier(r: BarrierRow): WireBarrier {
     actionPlan: r.action_plan,
     statusSince: r.status_since,
     statusHistory: toHistory(r.status_history),
+    // Pre-migration nulls read as enabled/live (the old default views).
+    isActive: r.is_active ?? true,
+    deletedAt: r.deleted_at,
     origin: sheet(r.origin),
     externalCode: sheet(r.external_code),
     locationName: sheet(r.location_name),
@@ -107,6 +114,7 @@ export const SELECT_COLUMNS = `
   b.availability_id, b.comments, b.action_plan,
   to_char(b.status_since, 'YYYY-MM-DD') as status_since,
   coalesce(h.history, '[]'::json) as status_history,
+  b.is_active, to_char(b.deleted_at, 'YYYY-MM-DD"T"HH24:MI:SS"Z"') as deleted_at,
   b.origin, b.external_code, loc.name as location_name, b.install_local,
   b.equip_typology, b.field_installed, b.field_operational, b.op_status,
   b.has_maint_plan, b.plan_followed, b.failure_free, b.maint_status,

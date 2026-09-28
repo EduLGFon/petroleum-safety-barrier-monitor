@@ -69,8 +69,12 @@ export async function listBarriers(
 }
 
 // Fetches a single wire barrier by id, or null when missing/deleted.
-export async function getBarrierById(id: number): Promise<WireBarrier | null> {
-  const found = await getBarriersByIds([id]);
+// Admin callers pass includeDeleted to audit soft-deleted rows.
+export async function getBarrierById(
+  id: number,
+  opts: { includeDeleted?: boolean } = {},
+): Promise<WireBarrier | null> {
+  const found = await getBarriersByIds([id], opts);
   return found.get(id) ?? null;
 }
 
@@ -101,9 +105,10 @@ export async function listBarrierWindow(
 // getBarriersByIds: batch version of getBarrierById (the alert detector
 // resolves hundreds of candidates per run - one query each would stall it).
 // Chunked IN lists keep placeholder counts bounded; missing/deleted ids are
-// simply absent from the map.
+// simply absent from the map unless includeDeleted grants the admin view.
 export async function getBarriersByIds(
   ids: number[],
+  opts: { includeDeleted?: boolean } = {},
 ): Promise<Map<number, WireBarrier>> {
   const out = new Map<number, WireBarrier>();
   const unique = [...new Set(ids)].filter((n) => Number.isInteger(n));
@@ -114,7 +119,9 @@ export async function getBarriersByIds(
       `select ${SELECT_COLUMNS} from barriers b
        join locations loc on loc.id = b.location_id
        ${HISTORY_JOIN}
-       where b.id in (${placeholders}) and b.deleted_at is null`,
+       where b.id in (${placeholders})${
+        opts.includeDeleted ? "" : " and b.deleted_at is null"
+      }`,
       chunk,
     );
     for (const r of rows) {

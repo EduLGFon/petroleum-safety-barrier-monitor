@@ -144,6 +144,12 @@ async function stream(
     sortCol: sp.get("sortCol") ?? undefined,
     sortDir: sp.get("sortDir") === "desc" ? "desc" : "asc",
   };
+  if (
+    (query.rowScope === "deleted" || query.rowScope === "all") &&
+    dataAuth.role !== "admin"
+  ) {
+    return unauthorized("admin only", requestId);
+  }
 
   try {
     const scope = await resolveExportScope(query);

@@ -28,6 +28,27 @@ Deno.test("buildWhere includeDeleted composes with other filters", () => {
   assert(text.includes("b.location_id = $1"));
 });
 
+Deno.test("buildWhere rowScope selects visibility without args", () => {
+  assertEquals(
+    buildWhere({ rowScope: "active" }).text,
+    "where b.deleted_at is null and coalesce(b.is_active, true)",
+  );
+  assertEquals(
+    buildWhere({ rowScope: "inactive" }).text,
+    "where b.deleted_at is null and not coalesce(b.is_active, true)",
+  );
+  assertEquals(
+    buildWhere({ rowScope: "deleted" }).text,
+    "where b.deleted_at is not null",
+  );
+  assertEquals(buildWhere({ rowScope: "all" }).text, "where true");
+});
+
+Deno.test("buildWhere rowScope wins over legacy includeDeleted", () => {
+  const { text } = buildWhere({ rowScope: "active", includeDeleted: true });
+  assert(text.includes("coalesce(b.is_active, true)"));
+});
+
 Deno.test("buildWhere binds ids as numbered args", () => {
   const { text, args } = buildWhere({ locationId: 1, categoryId: 4 });
   assertEquals(args, [1, 4]);

@@ -60,6 +60,11 @@ export interface Barrier {
   actionPlan: string;
   statusSince: string;
   statusHistory: StatusHistoryEntry[];
+  // Upstream enable flag (false = Desativada) and soft-delete stamp
+  // (null = live). The dashboard Situacao filter and row badges read these.
+  // Optional so old payloads keep parsing; absent reads as active/live.
+  isActive?: boolean;
+  deletedAt?: string | null;
   // Sheet inventory columns (GERAL). Free text, "" = unset; Fracttal does
   // not feed them (import writes ""), admins fill them in later.
   origin: string;
