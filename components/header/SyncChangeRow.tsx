@@ -7,7 +7,7 @@ import { formatInstant } from "../../lib/sync-indicator.ts";
 
 import type { SyncChangeItem } from "../../lib/types.ts";
 
-import { syncFieldLabel } from "./sync-fields.ts";
+import { syncFieldLabel, syncFieldValue } from "./sync-fields.ts";
 
 import { useState } from "preact/hooks";
 
@@ -16,12 +16,6 @@ const KIND_META: Record<string, { word: string; color: string }> = {
   updated: { word: "Atualizada", color: "#f5a524" },
   removed: { word: "Removida", color: "#f31260" },
 };
-
-function fmtSnapshotValue(v: unknown): string {
-  if (v === null || v === undefined) return "-";
-  if (typeof v === "object") return JSON.stringify(v);
-  return String(v);
-}
 
 export function SyncChangeRow(
   { item, baseUrl, runId, scope, onOpenBarrier }: {
@@ -179,7 +173,8 @@ export function SyncChangeRow(
                     {syncFieldLabel(f)}
                   </span>
                   <span style={{ overflowWrap: "anywhere" }}>
-                    {fmtSnapshotValue(
+                    {syncFieldValue(
+                      f,
                       (detail.oldSnapshot as Record<string, unknown>)[f],
                     )}
                   </span>
@@ -189,7 +184,8 @@ export function SyncChangeRow(
                       color: "var(--au-value)",
                     }}
                   >
-                    → {fmtSnapshotValue(
+                    → {syncFieldValue(
+                      f,
                       (detail.newSnapshot as Record<string, unknown>)[f],
                     )}
                   </span>

@@ -27,6 +27,19 @@ import type { MapContext } from "../fracttal/map.ts";
 
 import { queryRows } from "../db.ts";
 
+import { getResolverLabels } from "./vocabularies.ts";
+
+import {
+  fromAvailabilityId,
+  fromCategoryId,
+  fromCriticalityId,
+  fromGroupingId,
+  fromLocationId,
+  fromLocDescId,
+  fromOwnerId,
+  fromTypologyId,
+} from "../../enums.ts";
+
 export const SYNC_AUTHOR_ID = 10; // authors.id, see db/seed_lookups.sql
 
 // Freshness windows for the status indicator, in minutes. A `running` row
@@ -1001,6 +1014,93 @@ export async function getBarrierSyncDetail(
     if (!r) return null;
     const asRecord = (v: unknown): Record<string, unknown> =>
       typeof v === "object" && v !== null ? v as Record<string, unknown> : {};
+    const oldSnapshot = asRecord(r.old_snapshot);
+    const newSnapshot = asRecord(r.new_snapshot);
+    // Snapshots store numeric ids (typologyId, criticalityId, ...); bare
+    // numbers mean nothing in the UI ("Tipologia 3 → 0"), so resolve id
+    // fields to display labels before returning. DB vocabularies win over
+    // seed enums (locations/categories are dynamic); a lookup failure
+    // keeps raw ids and the client formats them via seed enums instead.
+    try {
+      const [labels, availRows, critRows] = await Promise.all([
+        getResolverLabels(),
+        queryRows<{ id: number; label: string }>(
+          `select id, label from availability_statuses`,
+        ),
+        queryRows<{ id: number; label: string }>(
+          `select id, label from criticality_levels`,
+        ),
+      ]);
+      const avail: Record<number, string> = Object.fromEntries(
+        availRows.map((x) => [x.id, x.label]),
+      );
+      const crit: Record<number, string> = Object.fromEntries(
+        critRows.map((x) => [x.id, x.label]),
+      );
+      const resolveSnapshot = (
+        snap: Record<string, unknown>,
+      ): Record<string, unknown> => {
+        const out: Record<string, unknown> = { ...snap };
+        const num = (k: string): number | null => {
+          const v = snap[k];
+          return typeof v === "number" && Number.isInteger(v) ? v : null;
+        };
+        const id = num("locationId");
+        if (id !== null) {
+          out.locationId = labels.locations[id] ?? fromLocationId(id);
+        }
+        const typ = num("typologyId");
+        if (typ !== null) {
+          out.typologyId = labels.typologies[typ] ?? fromTypologyId(typ);
+        }
+        const loc = num("locDescId");
+        if (loc !== null) {
+          out.locDescId = labels.locDescs[loc] ?? fromLocDescId(loc);
+        }
+        const cri = num("criticalityId");
+        if (cri !== null) {
+          out.criticalityId = crit[cri] ?? fromCriticalityId(cri);
+        }
+        const cat = num("categoryId");
+        if (cat !== null) {
+          out.categoryId = labels.categories[cat] ?? fromCategoryId(cat);
+        }
+        const grp = num("groupingId");
+        if (grp !== null) {
+          out.groupingId = labels.groupings[grp] ?? fromGroupingId(grp);
+        }
+        const own = snap["ownerId"];
+        if (typeof own === "number" && Number.isInteger(own)) {
+          out.ownerId = own < 0 ? "" : labels.owners[own] ?? fromOwnerId(own);
+        }
+        const av = num("availabilityId");
+        if (av !== null) {
+          out.availabilityId = avail[av] ?? fromAvailabilityId(av);
+        }
+        return out;
+      };
+      return {
+        barrierId: r.barrier_id,
+        tag: r.tag,
+        location: r.location,
+        kind: (["new", "updated", "removed", "restored"] as const).includes(
+            r.kind as "new",
+          )
+          ? (r.kind as SyncBarrierDetail["kind"])
+          : "updated",
+        oldAvailabilityId: r.old_availability_id,
+        newAvailabilityId: r.new_availability_id,
+        changedFields: Array.isArray(r.changed_fields)
+          ? (r.changed_fields as string[])
+          : [],
+        oldSnapshot: resolveSnapshot(oldSnapshot),
+        newSnapshot: resolveSnapshot(newSnapshot),
+        changedAt: r.created_at,
+        runId: r.run_id,
+      };
+    } catch {
+      // Label lookups are best-effort; raw ids still render client-side.
+    }
     return {
       barrierId: r.barrier_id,
       tag: r.tag,
