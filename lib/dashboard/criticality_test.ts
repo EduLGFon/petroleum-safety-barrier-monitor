@@ -1,7 +1,7 @@
 // Unit tests for the criticality rank ordering (pure helper, no DOM).
 import { assertEquals } from "jsr:@std/assert@^1";
 
-import { orderRankEntries } from "./criticality.ts";
+import { orderRankEntries, splitRankGroups } from "./criticality.ts";
 
 Deno.test("orderRankEntries puts canonical ranks first in ESO-A-B-C-D order", () => {
   assertEquals(
@@ -14,5 +14,15 @@ Deno.test("orderRankEntries sorts novel ranks after by volume", () => {
   assertEquals(
     orderRankEntries([["Z-Nova", 9], ["A", 1], ["Outra", 3]]),
     [["A", 1], ["Z-Nova", 9], ["Outra", 3]],
+  );
+});
+
+Deno.test("splitRankGroups keeps ESO-A critical and pushes novel ranks to other", () => {
+  assertEquals(
+    splitRankGroups([["D", 1], ["B", 2], ["ESO", 3], ["Z-Nova", 9], ["A", 5]]),
+    {
+      critical: [["ESO", 3], ["A", 5]],
+      other: [["B", 2], ["D", 1], ["Z-Nova", 9]],
+    },
   );
 });
