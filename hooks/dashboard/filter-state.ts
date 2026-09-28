@@ -74,11 +74,15 @@ export function useFilterState(defaultLocation = "ALL") {
     });
   }, []);
 
+  // Every filter counts, including the critical-tier gate: it narrows the
+  // result set like any other facet, so leaving it out hid "Limpar filtros"
+  // exactly when the gate was the only active filter.
   const hasActiveFilters = state.location !== "ALL" ||
     !!state.filters.query ||
     !!state.filters.availability || !!state.filters.compliance ||
     !!state.filters.category || !!state.filters.typology ||
     !!state.filters.criticality ||
+    state.filters.criticalOnly === true ||
     !!state.filters.plan || !!state.filters.since ||
     !!state.filters.until;
 

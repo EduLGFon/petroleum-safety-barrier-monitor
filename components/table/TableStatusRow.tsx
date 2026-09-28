@@ -4,8 +4,9 @@
 // the filter row stays filter-only and the table header stays narrow.
 // Default (nothing selected) shows the results count; any selection swaps
 // in the SelectionScope summary (page count, extend-to-filtered link, or
-// full-set clear link). "Limpar filtros" keeps its existing visibility
-// (only while a filter is active), relocated here from the filter row.
+// full-set clear link). "Limpar filtros" shows whenever any filter is
+// active (the critical-tier gate included), relocated here from the
+// filter row.
 import { SelectionScope } from "./SelectionScope.tsx";
 import { TriCheck } from "../export/TriCheck.tsx";
 import { FilterIcon } from "../ui/Icons.tsx";

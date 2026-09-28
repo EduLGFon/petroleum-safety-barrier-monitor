@@ -165,6 +165,22 @@ Deno.test("useFilterState showUrgent builds the NC-oldest-first scope", async ()
   assertStrictEquals(f.filters.page, 1);
 });
 
+Deno.test("useFilterState counts the critical gate as an active filter", async () => {
+  const hh = await renderHook(useFilterState);
+  assertStrictEquals(hh.get().hasActiveFilters, false);
+  hh.get().setFilter({ criticalOnly: true });
+  await hh.rerender();
+  assertStrictEquals(hh.get().hasActiveFilters, true);
+  // The gate also counts when it rides on top of other facets.
+  hh.get().setFilter({ compliance: "Não Conforme" });
+  await hh.rerender();
+  assertStrictEquals(hh.get().hasActiveFilters, true);
+  hh.get().resetFilters();
+  await hh.rerender();
+  assertStrictEquals(hh.get().filters.criticalOnly, false);
+  assertStrictEquals(hh.get().hasActiveFilters, false);
+});
+
 Deno.test("useFilterState resetFilters returns filters to defaults", async () => {
   const hh = await renderHook(useFilterState);
   hh.get().setFilter({ query: "pump" });
