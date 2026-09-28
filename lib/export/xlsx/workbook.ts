@@ -118,15 +118,23 @@ async function* xlsxEntries(
     chunks: dataSheetChunks(rest, meta, styles, widths),
   };
   yield { name: "xl/styles.xml", chunks: [utf8(book.xml())] };
+  // The summary rows are fully known here (a handful of indicators), so both
+  // columns fit their longest content through the same fitter as the data.
+  const summary = summaryRowsFrom(meta.kpi);
+  const summaryWidths = xlsxColWidths(
+    summary.map(([label, value]) => [label, value]),
+    ["Resumo", "Qtd."],
+  );
   yield {
     name: "xl/worksheets/sheet2.xml",
     chunks: [
       utf8(
         summarySheet(
-          summaryRowsFrom(meta.kpi),
+          summary,
           styles.brand,
           styles.header,
           styles.kpiValue("FF1E3A5F"),
+          [summaryWidths[0] ?? 6, summaryWidths[1] ?? 6],
         ),
       ),
     ],

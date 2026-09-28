@@ -6,7 +6,9 @@
 import { assert, assertEquals, assertStrictEquals } from "jsr:@std/assert@^1";
 
 import { batchesOf, kpiOf, mkBarrier, mkCount } from "../fixture.ts";
+import { summarySheet } from "./parts.ts";
 import { xlsxBytes } from "./workbook.ts";
+import { xlsxColWidths } from "./widths.ts";
 import { EXPORT_HEADERS } from "../columns.ts";
 
 import type { Bytes } from "./zip.ts";
@@ -131,6 +133,27 @@ Deno.test("the summary sheet reconciles with the rows", async () => {
     .reduce((a, b) => a + b, 0);
   assertStrictEquals(availability, 3);
   assertEquals(grid[grid.length - 1], ["% Conformidade", "33%"]);
+});
+
+Deno.test("the summary sheet hugs its content", () => {
+  const rows: Array<[string, string]> = [
+    ["Total", "3"],
+    ["Indisponível Contingenciado", "1"],
+  ];
+  // Same fitter as the data sheet, over the two summary columns.
+  const widths = xlsxColWidths(
+    rows.map(([label, value]) => [label, value]),
+    ["Resumo", "Qtd."],
+  );
+  // Longest label (27) + margin, so it reads instead of clipping under
+  // Excel's 8.43-char default; the value column keeps its floor.
+  assertEquals(widths, [28, 6]);
+  const xml = summarySheet(rows, 1, 5, 6, [widths[0]!, widths[1]!]);
+  assert(
+    xml.includes('<col min="1" max="1" width="28" customWidth="1"/>'),
+    xml,
+  );
+  assert(xml.includes('<col min="2" max="2" width="6" customWidth="1"/>'), xml);
 });
 
 Deno.test("hostile text is escaped and control bytes dropped", async () => {

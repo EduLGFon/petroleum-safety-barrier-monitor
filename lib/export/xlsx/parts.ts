@@ -96,12 +96,15 @@ export function appProps(): string {
 
 // summarySheet: the indicator table (same rows as the CSV RESUMO block and the
 // print report footer), so the workbook carries the reconciling totals on a
-// sheet of their own instead of a table glued below the data.
+// sheet of their own instead of a table glued below the data. widths hugs the
+// two columns to their content, like the data sheet fit: without a <cols>
+// element Excel falls back to its 8.43-char default and the labels clip.
 export function summarySheet(
   rows: Array<[string, string]>,
   titleStyle: number,
   labelStyle: number,
   valueStyle: number,
+  widths: [number, number],
 ): string {
   const body = rows.map(([label, value], i) =>
     rowXml(
@@ -110,7 +113,11 @@ export function summarySheet(
         inlineStr(cellRef(2, i + 2), value, valueStyle),
     )
   ).join("");
+  const cols = widths.map((w, i) =>
+    `<col min="${i + 1}" max="${i + 1}" width="${w}" customWidth="1"/>`
+  ).join("");
   return `${xmlDoc()}<worksheet xmlns="${NS_MAIN}">` +
+    `<cols>${cols}</cols>` +
     `<sheetData>${
       rowXml(1, inlineStr("A1", "Resumo", titleStyle))
     }${body}</sheetData>` +
