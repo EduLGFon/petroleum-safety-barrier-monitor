@@ -104,11 +104,6 @@ export function SyncHoverCard({ sync, conn, onOpenDetails }: Props) {
   const end = run ? formatInstant(run.finishedAt) : null;
   const running = sync?.runningSince ? formatInstant(sync.runningSince) : null;
   const headlineRel = kind === "syncing" ? running?.relative : end?.relative;
-  const connLabel = conn === "connected"
-    ? "Conectado"
-    : conn === "reconnecting"
-    ? "Reconectando…"
-    : "Desconectado";
   return (
     // Bridge: the transparent top padding keeps the cursor inside the hover
     // wrapper while crossing from the title to the card, so no mouseleave
@@ -214,8 +209,7 @@ export function SyncHoverCard({ sync, conn, onOpenDetails }: Props) {
             fontSize: 11,
           }}
         >
-          {sync && `${fmt(sync.totals.barriers)} barreiras monitoradas - `}
-          {connLabel} - atualiza a cada 1 min
+          {sync && `${fmt(sync.totals.barriers)} barreiras monitoradas`}
         </div>
       </div>
     </div>
