@@ -14,6 +14,16 @@ Deno.test("useElementWidth starts on the fallback width", async () => {
   hh.unmount();
 });
 
+Deno.test("useElementWidth keeps a stable ref across re-renders", async () => {
+  const hh = await renderHook(useElementWidth);
+  const first = hh.get().ref;
+  await hh.rerender();
+  // A re-render must not detach/reattach the ref: that would force a layout
+  // read on every hover while the chart follows the cursor.
+  assertStrictEquals(hh.get().ref, first);
+  hh.unmount();
+});
+
 Deno.test("useElementWidth honours a custom fallback and ignores a zero box", async () => {
   const hh = await renderHook(useElementWidth, { args: [320] });
   assertStrictEquals(hh.get().width, 320);
