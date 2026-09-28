@@ -39,9 +39,10 @@ export interface StyleSpec {
 
 const DEFAULT_FONT: FontSpec = { size: 9, color: "FF1E293B" };
 
-// argb: "#rgb"/"#rrggbb" (any case) to the ARGB Excel expects. Anything else
-// (the hsl() fallbacks of dispColorFor/critColorFor, an empty string) becomes
-// the neutral fallback instead of a colour Excel would refuse to parse.
+// argb: "#rgb"/"#rrggbb"/"#aarrggbb" (any case) to the ARGB Excel expects.
+// Anything else (the hsl() fallbacks of dispColorFor/critColorFor, an empty
+// string) becomes the neutral fallback instead of a colour Excel would refuse
+// to parse.
 export function argb(color: string, fallback = "FF64748B"): string {
   const hex = color.trim().replace(/^#/, "");
   if (/^[0-9a-f]{3}$/i.test(hex)) {
@@ -49,7 +50,18 @@ export function argb(color: string, fallback = "FF64748B"): string {
     return `FF${r}${r}${g}${g}${b}${b}`.toUpperCase();
   }
   if (/^[0-9a-f]{6}$/i.test(hex)) return `FF${hex}`.toUpperCase();
+  if (/^[0-9a-f]{8}$/i.test(hex)) return hex.toUpperCase();
   return fallback;
+}
+
+// wash: the same colour as a translucent ARGB background, i.e. the ARGB value
+// with its alpha replaced (never appended - that would be 10 hex digits).
+export function wash(
+  color: string,
+  alpha = "1F",
+  fallback = "FF64748B",
+): string {
+  return alpha + argb(color, fallback).slice(2);
 }
 
 export interface StyleBook {
@@ -137,11 +149,13 @@ export function styleBook(): StyleBook {
     const fill = spec.fill ? fillId(spec.fill) : 0;
     const border = spec.border ? borderId(spec.border) : 0;
     const a = spec.align ?? {};
+    // Attributes must be space separated: a joined-without-space list would
+    // still parse in lenient readers but is not well-formed XML.
     const alignAttrs = [
       a.horizontal ? `horizontal="${a.horizontal}"` : "",
       a.vertical ? `vertical="${a.vertical}"` : "",
       a.wrap ? 'wrapText="1"' : "",
-    ].join("");
+    ].filter((part) => part !== "").join(" ");
     const needsAlign = alignAttrs !== "";
     return `<xf numFmtId="0" fontId="${font}" fillId="${fill}" ` +
       `borderId="${border}" xfId="0" applyFont="1"${
