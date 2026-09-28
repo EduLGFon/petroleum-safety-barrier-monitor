@@ -1,20 +1,24 @@
 // Aurora Executive Dark KPI cards.
-// This is why it exists: six live metrics rendered as identical glass
-// cards (label / value / sub / signature-gradient progress). Only the
-// "Não Conformes" card carries the red glow.
+// This is why it exists: five live metrics rendered as identical glass
+// cards (label / value / sub / signature-gradient progress) plus a
+// per-rank criticality panel. The Disponíveis card was dropped (the
+// StatusBand shows the same count a few pixels above) and Sem plano de
+// ação too (92.8% of rows lack a plan, so it never discriminated); both
+// signals survive as table filters. Only the "Não Conformes" card carries
+// the red glow.
 import { AURORA, AURORA_TYPE, progressWidth } from "../lib/aurora.ts";
 import { CriticalityStrip } from "./CriticalityStrip.tsx";
 import { useEffect, useRef, useState } from "preact/hooks";
 import type { KpiSnapshot } from "../lib/types.ts";
-import { fmt, pct } from "../lib/utils.ts";
+import { fmt, pct1 } from "../lib/utils.ts";
 
 interface Props {
   kpi: KpiSnapshot;
-  location: string;
 }
 interface C {
   label: string;
   rawNum: number;
+  decimals?: number;
   isPercent?: boolean;
   sub: string;
   share?: number;
@@ -35,7 +39,7 @@ function useAnimatedValue(target: number, duration = 600) {
       const p = Math.min((now - t0) / duration, 1);
       // Ease out cubic
       const e = 1 - Math.pow(1 - p, 3);
-      setCur(Math.round(start + (end - start) * e));
+      setCur(start + (end - start) * e);
       if (p < 1) raf.current = requestAnimationFrame(tick);
     };
     raf.current = requestAnimationFrame(tick);
@@ -44,8 +48,14 @@ function useAnimatedValue(target: number, duration = 600) {
   return cur;
 }
 
-// AnimVal: pt-BR animated number with optional % suffix; bumps key on n change to retrigger the pop animation.
-function AnimVal({ n, isPercent }: { n: number; isPercent?: boolean }) {
+// AnimVal: pt-BR animated number with optional decimals and % suffix; bumps key on n change to retrigger the pop animation.
+function AnimVal(
+  { n, decimals = 0, isPercent }: {
+    n: number;
+    decimals?: number;
+    isPercent?: boolean;
+  },
+) {
   const v = useAnimatedValue(n);
   const prev = useRef(n);
   const [key, setKey] = useState(0);
@@ -55,85 +65,86 @@ function AnimVal({ n, isPercent }: { n: number; isPercent?: boolean }) {
       prev.current = n;
     }
   }, [n]);
+  const shown = decimals > 0
+    ? v.toLocaleString("pt-BR", {
+      minimumFractionDigits: decimals,
+      maximumFractionDigits: decimals,
+    })
+    : fmt(Math.round(v));
   return (
     <span key={key} className="animate-num">
-      {fmt(v)}
+      {shown}
       {isPercent ? "%" : ""}
     </span>
   );
 }
 
-// KpiGrid: glass cards from KpiSnapshot + location label; shares divide by total||1, contingency card sums contingencyOutage + degradedContingency.
-export function KpiGrid({ kpi, location }: Props) {
+// KpiGrid: glass cards from KpiSnapshot; shares divide by total||1 with one
+// decimal, contingency card sums contingencyOutage + degradedContingency.
+export function KpiGrid({ kpi }: Props) {
   const t = kpi.total || 1;
-  const loc = location === "ALL" ? "total geral" : `em ${location}`;
-  const dispShare = Math.round(kpi.available / t * 100);
-  const ncShare = Math.round(kpi.nonCompliant / t * 100);
-  const contShare = Math.round(
-    (kpi.contingencyOutage + kpi.degradedContingency) / t * 100,
-  );
-  const otherShare = Math.round((kpi.other ?? 0) / t * 100);
+  // One-decimal share of the scope total (bar widths + sub labels).
+  const share1 = (v: number) => Math.round(v / t * 1000) / 10;
+  const byCrit = kpi.byCriticality ?? {};
+  const ncByCrit = kpi.ncByCriticality ?? {};
+  const criticalTotal = (byCrit["ESO"] ?? 0) + (byCrit["A"] ?? 0);
+  const ncEso = ncByCrit["ESO"] ?? 0;
+  const ncA = ncByCrit["A"] ?? 0;
+  const ncShare = share1(kpi.nonCompliant);
+  const cont = kpi.contingencyOutage + kpi.degradedContingency;
+  const otherShare = share1(kpi.other ?? 0);
   const cards: C[] = [
     {
       label: "Total de Barreiras",
       rawNum: kpi.total,
-      sub: loc,
+      sub: `${fmt(criticalTotal)} críticas ESO+A`,
       share: 100,
       delay: 0,
     },
     {
-      label: "Disponíveis",
-      rawNum: kpi.available,
-      sub: pct(dispShare) + " do inv.",
-      share: dispShare,
+      label: "% Conformidade",
+      rawNum: kpi.pctCompliant,
+      decimals: 1,
+      isPercent: true,
+      sub: `${fmt(kpi.compliant)} conformes de ${fmt(kpi.total)}`,
+      share: kpi.pctCompliant,
       delay: 50,
     },
     {
       label: "Não Conformes",
       rawNum: kpi.nonCompliant,
-      sub: pct(ncShare) + " do inv.",
+      sub: `${pct1(ncShare)} do inv. · ${fmt(kpi.degraded)} degrad. + ${
+        fmt(kpi.unavailable)
+      } indisp.`,
       share: ncShare,
       alert: true,
       delay: 100,
     },
     {
-      label: "Contingenciadas",
-      rawNum: kpi.contingencyOutage + kpi.degradedContingency,
-      sub: "Ind. + Degr. contingenciadas",
-      share: contShare,
+      label: "Críticas NC",
+      rawNum: kpi.criticalNonCompliant,
+      sub: `${fmt(ncEso)} ESO · ${fmt(ncA)} A`,
+      share: share1(kpi.criticalNonCompliant),
+      alert: kpi.criticalNonCompliant > 0,
       delay: 150,
     },
     {
-      label: "% Conformidade",
-      rawNum: kpi.pctCompliant,
-      isPercent: true,
-      sub: fmt(kpi.compliant) + " conformes",
-      share: kpi.pctCompliant,
+      label: "Contingenciadas",
+      rawNum: cont,
+      sub: `${fmt(kpi.contingencyOutage)} indisp. + ${
+        fmt(kpi.degradedContingency)
+      } degrad.`,
+      share: share1(cont),
       delay: 200,
-    },
-    {
-      label: "Críticas NC",
-      rawNum: kpi.criticalNonCompliant,
-      sub: "Críticas não conformes",
-      alert: kpi.criticalNonCompliant > 0,
-      delay: 250,
-    },
-    {
-      label: "Sem plano de ação",
-      rawNum: kpi.withoutActionPlan,
-      sub: "Barreiras sem plano",
-      share: Math.round(kpi.withoutActionPlan / t * 100),
-      alert: kpi.withoutActionPlan > 0,
-      delay: 275,
     },
     ...((kpi.other ?? 0) > 0
       ? [{
         label: "Outros Status",
         rawNum: kpi.other ?? 0,
-        sub: pct(otherShare) + " do inv.",
+        sub: pct1(otherShare) + " do inv.",
         share: otherShare,
         alert: true,
-        delay: 300,
+        delay: 250,
       } as C]
       : []),
   ];
@@ -183,7 +194,11 @@ export function KpiGrid({ kpi, location }: Props) {
                 letterSpacing: AURORA_TYPE.kpiValue.letterSpacing,
               }}
             >
-              <AnimVal n={c.rawNum} isPercent={c.isPercent} />
+              <AnimVal
+                n={c.rawNum}
+                decimals={c.decimals}
+                isPercent={c.isPercent}
+              />
             </div>
             <div style={{ fontSize: 12, color: AURORA.sub }}>{c.sub}</div>
             {c.share !== undefined && (
@@ -209,7 +224,10 @@ export function KpiGrid({ kpi, location }: Props) {
           </div>
         ))}
       </div>
-      <CriticalityStrip byCriticality={kpi.byCriticality} />
+      <CriticalityStrip
+        byCriticality={kpi.byCriticality}
+        ncByCriticality={kpi.ncByCriticality}
+      />
     </>
   );
 }

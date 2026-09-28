@@ -221,7 +221,6 @@ export function DashboardSections(
         <KpiSections
           kpi={kpi}
           chartData={chartData}
-          location={location}
           activeAvailability={filters.availability}
           onDispFilter={(v) => setFilter({ availability: v })}
           onSelectCategory={(v) =>

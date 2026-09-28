@@ -14,7 +14,6 @@ import { NcAlert } from "./NcAlert.tsx";
 interface KpiSectionsProps {
   kpi: KpiSnapshot;
   chartData: CategoryCompliance[];
-  location: string;
   activeAvailability: string;
   onDispFilter: (v: string) => void;
   // Chart row click-through: full category name ("" clears the filter).
@@ -31,7 +30,6 @@ export function KpiSections(
   {
     kpi,
     chartData,
-    location,
     activeAvailability,
     onDispFilter,
     onSelectCategory,
@@ -53,8 +51,8 @@ export function KpiSections(
         />
       </div>
 
-      {/* KPI cards */}
-      <KpiGrid kpi={kpi} location={location} />
+      {/* KPI cards + criticality panel */}
+      <KpiGrid kpi={kpi} />
 
       {/* Chart */}
       <div style={{ animation: "slideUp .3s .28s var(--ease-out) both" }}>
