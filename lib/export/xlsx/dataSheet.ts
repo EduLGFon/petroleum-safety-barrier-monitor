@@ -10,7 +10,7 @@ import {
   NS_MAIN,
   type StyleBook,
   type StyleSpec,
-  wash,
+  tint,
 } from "./styles.ts";
 import { confColorFor, critColorFor, dispColorFor } from "../../constants.ts";
 import {
@@ -53,10 +53,6 @@ const BRAND_H = 26;
 const RULE_H = 3;
 const HEADER_H = 30;
 
-// Wash of the status colour behind its label: the cell equivalent of the pill
-// the HTML export drew.
-const TINT = "1F";
-
 export interface SheetStyles {
   brand: number;
   subtitle: number;
@@ -94,12 +90,12 @@ function textStyle(
   };
 }
 
-// tintedStyle: a status/rank cell - coloured label over a wash of its colour,
-// bold when the rank is a critical tier.
+// tintedStyle: a status/rank cell - coloured label over a light blend of its
+// colour, bold when the rank is a critical tier.
 function tintedStyle(color: string, bold: boolean, zebra: boolean): StyleSpec {
   return {
     font: { size: 9, bold, color: argb(color) },
-    fill: zebra ? ZEBRA_BG : wash(color, TINT),
+    fill: zebra ? ZEBRA_BG : tint(color),
     align: { horizontal: "center", vertical: "center", wrap: true },
     border: BORDER,
   };

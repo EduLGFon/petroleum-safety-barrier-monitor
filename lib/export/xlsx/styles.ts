@@ -54,14 +54,22 @@ export function argb(color: string, fallback = "FF64748B"): string {
   return fallback;
 }
 
-// wash: the same colour as a translucent ARGB background, i.e. the ARGB value
-// with its alpha replaced (never appended - that would be 10 hex digits).
-export function wash(
+// tint: the colour blended toward white as an opaque ARGB fill. Excel
+// ignores the alpha channel of solid pattern fills, so the old translucent
+// wash rendered as the full-strength colour - the same paint as the font -
+// and the text disappeared. A real blend stays a light tint in every reader.
+export function tint(
   color: string,
-  alpha = "1F",
+  amount = 0.88,
   fallback = "FF64748B",
 ): string {
-  return alpha + argb(color, fallback).slice(2);
+  const base = argb(color, fallback);
+  const mix = (at: number) => {
+    const c = parseInt(base.slice(at, at + 2), 16);
+    return Math.round(c + (255 - c) * amount).toString(16).padStart(2, "0")
+      .toUpperCase();
+  };
+  return `FF${mix(2)}${mix(4)}${mix(6)}`;
 }
 
 export interface StyleBook {

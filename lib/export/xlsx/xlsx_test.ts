@@ -3,13 +3,15 @@
 // path, so a broken data descriptor or CRC fails here rather than in Excel.
 import { assert, assertEquals, assertStrictEquals } from "jsr:@std/assert@^1";
 
-import { argb, styleBook, wash } from "./styles.ts";
+import { argb, styleBook, tint } from "./styles.ts";
 
 import type { Bytes } from "./zip.ts";
 
 import { bytesOf, crc32Update, writeZip } from "./zip.ts";
 
 import { colName, escXml, inlineStr, utf8 } from "./xml.ts";
+
+import { sheetStyles } from "./dataSheet.ts";
 
 import { xlsxColWidths } from "./widths.ts";
 
@@ -158,11 +160,29 @@ Deno.test("argb converts hex and falls back for anything else", () => {
   assertStrictEquals(argb("nope", "FFFFFFFF"), "FFFFFFFF");
 });
 
-Deno.test("wash replaces the alpha instead of appending it", () => {
-  // Appending would produce 10 hex digits, which no reader accepts.
-  assertStrictEquals(wash("#22c55e"), "1F22C55E");
-  assertStrictEquals(wash("22C55E", "33"), "3322C55E");
-  assertStrictEquals(wash("hsl(1 2% 3%)"), "1F64748B");
+Deno.test("tint blends the colour toward white, always opaque", () => {
+  // Excel ignores fill alpha, so the blend must be opaque paint, never a
+  // translucent wash: alpha is what hid the status text.
+  assertStrictEquals(tint("#22c55e"), "FFE4F8EC");
+  assertStrictEquals(tint("#000000", 0.5), "FF808080");
+  assertStrictEquals(tint("#ffffff"), "FFFFFFFF");
+  assertStrictEquals(tint("hsl(1 2% 3%)"), "FFECEEF1");
+});
+
+Deno.test("status fills stay opaque so the text never disappears", () => {
+  const book = styleBook();
+  const styles = sheetStyles(book);
+  styles.availability("Disponível");
+  styles.availability("Indisponível");
+  styles.compliance("Não Conforme");
+  styles.critical("ESO");
+  styles.zebraCritical("D");
+  const rgbs = [...book.xml().matchAll(/rgb="([0-9A-Fa-f]{8})"/g)]
+    .map((m) => m[1]);
+  assert(rgbs.length > 0);
+  // Every paint in the file is fully opaque: a translucent fill renders as
+  // the full-strength colour in Excel, exactly like the label on top of it.
+  for (const rgb of rgbs) assert(rgb!.startsWith("FF"), rgb);
 });
 
 Deno.test("styleBook reuses styles and keeps Excel's reserved entries", () => {
