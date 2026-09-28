@@ -1,10 +1,10 @@
 // xlsx data sheet - the streamed "Barreiras" worksheet.
 // Why it exists: the row block (brand, subtitle, KPI strip, header) plus one
 // <row> per barrier, emitted while the database hands over batches. It also
-// owns the per-cell styling decisions, which are the same ones the old HTML
-// spreadsheet made: ID right-aligned, TAG in bold mono, availability and
-// compliance tinted by their status colour, criticality by its rank tier, the
-// NC duration in italic orange, and zebra banding for scanning.
+// owns the per-cell styling decisions: TAG left in bold mono, short metadata
+// (ID, codes, names, flags, ranks) centered, availability and compliance
+// tinted by their status colour, criticality by its rank tier, the NC
+// duration centered in italic orange, and zebra banding for scanning.
 import {
   argb,
   NS_MAIN,
@@ -13,6 +13,7 @@ import {
   tint,
 } from "./styles.ts";
 import { confColorFor, critColorFor, dispColorFor } from "../../constants.ts";
+import { EXPORT_HEADERS } from "../columns.ts";
 import {
   blankCell,
   cellRef,
@@ -62,6 +63,9 @@ export interface SheetStyles {
   header: number;
   cell: number;
   zebra: number;
+  // Centered twins of the plain body cells, for short metadata columns.
+  cellC: number;
+  zebraC: number;
   id: number;
   zebraId: number;
   tag: number;
@@ -101,16 +105,38 @@ function tintedStyle(color: string, bold: boolean, zebra: boolean): StyleSpec {
   };
 }
 
+// LEFT_HEADERS: the free-text columns that stay left-aligned for reading.
+// Everything else holds short metadata (codes, names, flags, ranks, pills)
+// and centers, so narrow columns read as tidy stacks instead of ragged rows.
+// Keyed by header, like the wrap list in widths.ts, so inserting a column
+// upstream cannot move the alignment onto the wrong field; an unknown header
+// centers, which suits short metadata better than long prose.
+const LEFT_HEADERS = new Set([
+  "TAG",
+  "Comentários",
+  "Plano de Ação",
+  "Local Instalação",
+  "Desc. Contingência",
+  "Desc. Degradação",
+  "Comentários 2",
+]);
+
+// alignmentOf: "left" for the free-text columns, "center" for the rest.
+export function alignmentOf(header: string): "left" | "center" {
+  return LEFT_HEADERS.has(header) ? "left" : "center";
+}
+
 // sheetStyles: registers every style the data sheet needs. The per-value
 // helpers register lazily, so a status or rank added after this deploy still
 // gets its colour, and the registry dedupes repeats.
 export function sheetStyles(book: StyleBook): SheetStyles {
   const wrap = { vertical: "top", wrap: true } as const;
-  const right = { horizontal: "right", vertical: "top", wrap: true } as const;
+  const center = { horizontal: "center", vertical: "top", wrap: true } as const;
   const plain = { size: 9, color: CELL_TEXT } as const;
   const cell = (zebra: boolean) => textStyle(plain, wrap, zebra);
+  const cellC = (zebra: boolean) => textStyle(plain, center, zebra);
   const id = (zebra: boolean) =>
-    textStyle({ size: 9, color: MUTED_TEXT }, right, zebra);
+    textStyle({ size: 9, color: MUTED_TEXT }, center, zebra);
   const tag = (zebra: boolean) =>
     textStyle(
       { size: 8, bold: true, color: TAG_TEXT, mono: true },
@@ -118,7 +144,7 @@ export function sheetStyles(book: StyleBook): SheetStyles {
       zebra,
     );
   const duration = (zebra: boolean) =>
-    textStyle({ size: 9, italic: true, color: DURATION_TEXT }, wrap, zebra);
+    textStyle({ size: 9, italic: true, color: DURATION_TEXT }, center, zebra);
   return {
     brand: book.style({
       font: { size: 16, bold: true, color: BRAND_TEXT },
@@ -148,6 +174,8 @@ export function sheetStyles(book: StyleBook): SheetStyles {
     }),
     cell: book.style(cell(false)),
     zebra: book.style(cell(true)),
+    cellC: book.style(cellC(false)),
+    zebraC: book.style(cellC(true)),
     id: book.style(id(false)),
     zebraId: book.style(id(true)),
     tag: book.style(tag(false)),
@@ -347,6 +375,10 @@ export function dataRow(
     }
     if (ci === 9 && cells[ci]) {
       return zebra ? styles.zebraDuration : styles.duration;
+    }
+    // Plain body text: centered for short metadata, left for free text.
+    if (alignmentOf(EXPORT_HEADERS[ci] ?? "") === "center") {
+      return zebra ? styles.zebraC : styles.cellC;
     }
     return zebra ? styles.zebra : styles.cell;
   };

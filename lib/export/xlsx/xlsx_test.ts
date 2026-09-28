@@ -11,7 +11,11 @@ import { bytesOf, crc32Update, writeZip } from "./zip.ts";
 
 import { colName, escXml, inlineStr, utf8 } from "./xml.ts";
 
-import { sheetStyles } from "./dataSheet.ts";
+import { alignmentOf, dataRow, sheetStyles } from "./dataSheet.ts";
+
+import { mkBarrier } from "../fixture.ts";
+
+import { row } from "../rows.ts";
 
 import { xlsxColWidths } from "./widths.ts";
 
@@ -218,6 +222,70 @@ Deno.test("styleBook reuses styles and keeps Excel's reserved entries", () => {
   assert(crit > 0);
 });
 
+Deno.test("alignmentOf centers short metadata, left-aligns free text", () => {
+  for (
+    const h of [
+      "ID",
+      "Instalação",
+      "Tipologia",
+      "Categoria",
+      "Agrupamento",
+      "Dono",
+      "Origem",
+      "Código Fracttal",
+      "Nome Instalação",
+      "Tipologia Equip.",
+      "Elem. em Campo?",
+      "Status Manut.",
+      "Cód. Evidência",
+      "Sem Cont. há",
+      "Criticidade",
+      "Disponibilidade",
+      "Conformidade",
+    ]
+  ) {
+    assertStrictEquals(alignmentOf(h), "center", h);
+  }
+  for (
+    const h of [
+      "TAG",
+      "Comentários",
+      "Plano de Ação",
+      "Local Instalação",
+      "Desc. Contingência",
+      "Desc. Degradação",
+      "Comentários 2",
+    ]
+  ) {
+    assertStrictEquals(alignmentOf(h), "left", h);
+  }
+  // An unknown future column centers, which suits short metadata.
+  assertStrictEquals(alignmentOf("Coluna Nova"), "center");
+});
+
+Deno.test("dataRow centers the metadata cells in the built sheet", () => {
+  const book = styleBook();
+  const styles = sheetStyles(book);
+  const barrier = mkBarrier({ comments: "algum texto livre" });
+  const xml = dataRow(barrier, row(barrier), 7, false, styles);
+  // Cell reference -> style index, then the xf for that index.
+  const styleOf = (ref: string): string => {
+    const m = xml.match(new RegExp(`<c r="${ref}" s="(\\d+)"`));
+    assert(m, ref);
+    const xfs = [...book.xml().matchAll(/<xf [^>]*>.*?<\/xf>/g)]
+      .map((x) => x[0]);
+    return xfs[Number(m[1])] ?? "";
+  };
+  // Short metadata centers (ID, Instalação, Dono, duration, pills).
+  for (const ref of ["A7", "C7", "H7", "J7", "G7", "I7", "K7"]) {
+    assert(styleOf(ref).includes('horizontal="center"'), ref);
+  }
+  // TAG and free text stay left (no horizontal attribute at all).
+  for (const ref of ["B7", "L7", "M7"]) {
+    assert(!styleOf(ref).includes("horizontal="), ref);
+  }
+});
+
 Deno.test("xlsxColWidths fits the content and caps free text", () => {
   const rows = [[
     "1",
@@ -235,14 +303,14 @@ Deno.test("xlsxColWidths fits the content and caps free text", () => {
   ]];
   const widths = xlsxColWidths(rows);
   assertStrictEquals(widths.length, EXPORT_HEADERS.length);
-  // Short codes get the minimum, long free text is capped at the wrap width.
-  assertStrictEquals(widths[0], 8);
-  assertStrictEquals(widths[1], 9);
-  assertStrictEquals(widths[11], 28); // "Comentários": 26 + padding
+  // Columns hug the longest content with a single-character margin.
+  assertStrictEquals(widths[0], 6); // "ID": floor for short codes
+  assertStrictEquals(widths[1], 8); // "PSV-001" + margin
+  assertStrictEquals(widths[11], 27); // "Comentários": 26 + margin
   // Every width stays inside the readable band.
-  assert(widths.every((w) => w >= 8 && w <= 60));
+  assert(widths.every((w) => w >= 6 && w <= 60));
   // Header-only widths (empty export) still describe the sheet.
   const empty = xlsxColWidths([]);
-  assert(empty.every((w) => w >= 8));
-  assert(empty[4] > 8); // "Categoria" header
+  assert(empty.every((w) => w >= 6));
+  assert(empty[4] > 6); // "Categoria" header
 });

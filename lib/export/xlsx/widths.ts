@@ -9,12 +9,13 @@ import { EXPORT_HEADERS } from "../columns.ts";
 // sample is capped to keep the fit O(sample) instead of O(export).
 export const WIDTH_SAMPLE_ROWS = 200;
 
-// Narrowest and widest a column may get, in characters.
-const MIN_CHARS = 8;
+// Narrowest a column may get, in characters: just enough that a short code
+// never clips against the cell walls.
+const MIN_CHARS = 6;
 const MAX_CHARS = 60;
 const WRAP_CHARS = 26;
-// Padding for the cell margins Excel adds around the text.
-const CHARS_PAD = 2;
+// Single-character margin between the longest content and the cell walls.
+const CHARS_PAD = 1;
 
 // Columns that carry free text: capped so one long comment cannot stretch the
 // whole sheet. Keyed by header (not index) so inserting a column upstream
