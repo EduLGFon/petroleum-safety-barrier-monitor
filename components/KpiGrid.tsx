@@ -1,28 +1,33 @@
 // Aurora Executive Dark KPI cards.
-// This is why it exists: headline metrics plus two criticality group cards
-// (critical ESO+A vs the rest), all rendered as identical glass cards in a
-// single grid. The Disponíveis card was dropped (the StatusBand shows the
-// same count a few pixels above), Sem plano de ação too (92.8% of rows
-// lack a plan, so it never discriminated), and Total plus the Críticas NC
-// aggregate dissolved into the group cards, which carry the same numbers
-// with per-rank graphs inside; every dropped signal survives as a table
-// filter. Only the "Não Conformes" card carries the red glow.
-import { splitRankGroups } from "../lib/dashboard/criticality.ts";
+// This is why it exists: four headline metrics plus two criticality group
+// cards (critical ESO+A vs the rest), all rendered as identical glass cards
+// in a single grid. Every card carries its own breakdown graphed inside,
+// so all cards run the same height and no viewport space sits empty. The
+// Disponíveis card was dropped (the StatusBand shows the same count a few
+// pixels above), Sem plano de ação too (92.8% of rows lack a plan, so it
+// never discriminated), and Total plus the Críticas NC aggregate dissolved
+// into the group cards; every dropped signal survives as a table filter.
+// Only the "Não Conformes" card carries the red glow.
 import { AURORA, AURORA_TYPE, progressWidth } from "../lib/aurora.ts";
+import { splitRankGroups } from "../lib/dashboard/criticality.ts";
+import { critColorFor, dispColorFor } from "../lib/constants.ts";
 import { useEffect, useRef, useState } from "preact/hooks";
-import { critColorFor } from "../lib/constants.ts";
 import type { KpiSnapshot } from "../lib/types.ts";
 import { fmt, pct1 } from "../lib/utils.ts";
 
 interface Props {
   kpi: KpiSnapshot;
 }
-// One rank row inside a group card: total with NC count and NC-rate bar.
-interface RankRow {
+// One breakdown row inside a card: label, right-aligned value, detail hint,
+// and a composition bar (share of the card total, 0-100).
+interface CardRow {
   label: string;
   color: string;
-  total: number;
-  nc: number;
+  value: string;
+  hint: string;
+  hintAlert?: boolean;
+  frac: number;
+  bar: string;
 }
 interface C {
   label: string;
@@ -30,12 +35,16 @@ interface C {
   decimals?: number;
   isPercent?: boolean;
   sub: string;
-  // Group cards carry rank rows instead of the bottom progress bar.
-  rows?: RankRow[];
+  // Breakdown cards graph rows inside instead of the bottom progress bar.
+  rows?: CardRow[];
   share?: number;
   alert?: boolean;
   delay: number;
 }
+
+// Status green/red shared with the chart summary donut.
+const GREEN = "#22c55e";
+const RED = "#ef4444";
 
 // useAnimatedValue: eases cur toward target over duration (ease-out cubic via rAF); skips when unchanged and cancels on cleanup.
 function useAnimatedValue(target: number, duration = 600) {
@@ -90,9 +99,9 @@ function AnimVal(
   );
 }
 
-// RankRows: per-rank breakdown inside a group card - dot + rank, total,
-// NC count, and an NC-rate bar. Pure markup over precomputed rows.
-function RankRows({ rows }: { rows: RankRow[] }) {
+// CardRows: breakdown graphed inside a card - dot + label, value, hint,
+// and a composition bar. Pure markup over precomputed rows.
+function CardRows({ rows }: { rows: CardRow[] }) {
   return (
     <div
       style={{
@@ -102,80 +111,77 @@ function RankRows({ rows }: { rows: RankRow[] }) {
         marginTop: 10,
       }}
     >
-      {rows.map((r) => {
-        const rate = r.total > 0 ? r.nc / r.total * 100 : 0;
-        return (
-          <div key={r.label} style={{ minWidth: 0 }}>
-            <div
+      {rows.map((r) => (
+        <div key={r.label} style={{ minWidth: 0 }}>
+          <div
+            style={{
+              display: "flex",
+              alignItems: "baseline",
+              gap: 7,
+              fontSize: 12,
+            }}
+          >
+            <span
+              aria-hidden="true"
               style={{
-                display: "flex",
-                alignItems: "baseline",
-                gap: 7,
-                fontSize: 12,
+                width: 7,
+                height: 7,
+                borderRadius: 4,
+                background: r.color,
+                flexShrink: 0,
+                alignSelf: "center",
+              }}
+            />
+            <span
+              style={{
+                fontWeight: 700,
+                color: r.color,
+                whiteSpace: "nowrap",
               }}
             >
-              <span
-                aria-hidden="true"
-                style={{
-                  width: 7,
-                  height: 7,
-                  borderRadius: 4,
-                  background: r.color,
-                  flexShrink: 0,
-                  alignSelf: "center",
-                }}
-              />
-              <span
-                style={{
-                  fontWeight: 700,
-                  color: r.color,
-                  whiteSpace: "nowrap",
-                }}
-              >
-                {r.label}
-              </span>
-              <span
-                className="tnum"
-                style={{
-                  marginLeft: "auto",
-                  fontWeight: 700,
-                  color: AURORA.value,
-                }}
-              >
-                {fmt(r.total)}
-              </span>
-              <span
-                className="tnum"
-                style={{
-                  fontWeight: r.nc > 0 ? 700 : 500,
-                  color: r.nc > 0 ? "#ef4444" : AURORA.sub,
-                  whiteSpace: "nowrap",
-                }}
-              >
-                {fmt(r.nc)} NC
-              </span>
-            </div>
-            <div
+              {r.label}
+            </span>
+            <span
+              className="tnum"
               style={{
-                height: 3,
-                borderRadius: 99,
-                marginTop: 4,
-                background: AURORA.track,
+                marginLeft: "auto",
+                fontWeight: 700,
+                color: AURORA.value,
               }}
             >
-              <div
-                style={{
-                  width: `${Math.max(0, Math.min(100, rate))}%`,
-                  height: "100%",
-                  borderRadius: 99,
-                  background: r.nc > 0 ? "#ef4444" : AURORA.track,
-                  transition: "width .5s var(--ease-out)",
-                }}
-              />
-            </div>
+              {r.value}
+            </span>
+            <span
+              className="tnum"
+              style={{
+                fontWeight: r.hintAlert ? 700 : 500,
+                color: r.hintAlert ? RED : AURORA.sub,
+                whiteSpace: "nowrap",
+              }}
+            >
+              {r.hint}
+            </span>
           </div>
-        );
-      })}
+          <div
+            style={{
+              height: 3,
+              borderRadius: 99,
+              marginTop: 4,
+              background: AURORA.track,
+            }}
+          >
+            <div
+              style={{
+                width: `${Math.max(0, Math.min(100, r.frac))}%`,
+                height: "100%",
+                borderRadius: 99,
+                background: r.bar,
+                transition: "width .5s var(--ease-out)",
+              }}
+            />
+          </div>
+        </div>
+      ))}
     </div>
   );
 }
@@ -187,24 +193,26 @@ export function KpiGrid({ kpi }: Props) {
   const t = kpi.total || 1;
   // One-decimal share of the scope total (bar widths + sub labels).
   const share1 = (v: number) => Math.round(v / t * 1000) / 10;
-  // One-decimal rate within a group (NC concentration per group).
+  // One-decimal rate within a group (NC concentration per group or rank).
   const rate1 = (nc: number, total: number) =>
     total > 0 ? Math.round(nc / total * 1000) / 10 : 0;
   const byCrit = kpi.byCriticality ?? {};
   const ncByCrit = kpi.ncByCriticality ?? {};
   // Folds one rank group into a card: group total as value, group NC rate
-  // as sub, per-rank rows with graphs inside.
+  // as sub, per-rank rows with graphs inside (bars share the group total).
   const groupOf = (entries: Array<[string, number]>) => {
-    let total = 0, nc = 0;
-    const rows = entries.map(([label, n]) => {
+    const total = entries.reduce((a, [, n]) => a + n, 0);
+    const nc = entries.reduce((a, [label]) => a + (ncByCrit[label] ?? 0), 0);
+    const rows: CardRow[] = entries.map(([label, n]) => {
       const c = ncByCrit[label] ?? 0;
-      total += n;
-      nc += c;
       return {
         label,
         color: critColorFor(label).solid,
-        total: n,
-        nc: c,
+        value: fmt(n),
+        hint: `${fmt(c)} NC · ${pct1(rate1(c, n))}`,
+        hintAlert: c > 0,
+        frac: total > 0 ? Math.round(n / total * 1000) / 10 : 0,
+        bar: c > 0 ? RED : AURORA.track,
       };
     });
     return { total, nc, rows };
@@ -215,7 +223,29 @@ export function KpiGrid({ kpi }: Props) {
   const crit = groupOf(critEntries);
   const rest = groupOf(otherEntries);
   const ncShare = share1(kpi.nonCompliant);
+  const confShare = share1(kpi.compliant);
   const otherShare = share1(kpi.other ?? 0);
+  // Composition of the NC card: degraded vs unavailable shares of the NC.
+  const degColor = dispColorFor("Degradado").solid;
+  const indColor = dispColorFor("Indisponível").solid;
+  const ncRows: CardRow[] = [
+    {
+      label: "Degradadas",
+      color: degColor,
+      value: fmt(kpi.degraded),
+      hint: `${pct1(rate1(kpi.degraded, kpi.nonCompliant))} das NC`,
+      frac: rate1(kpi.degraded, kpi.nonCompliant),
+      bar: degColor,
+    },
+    {
+      label: "Indisponíveis",
+      color: indColor,
+      value: fmt(kpi.unavailable),
+      hint: `${pct1(rate1(kpi.unavailable, kpi.nonCompliant))} das NC`,
+      frac: rate1(kpi.unavailable, kpi.nonCompliant),
+      bar: indColor,
+    },
+  ];
   const cards: C[] = [
     {
       label: "% Conformidade",
@@ -223,16 +253,32 @@ export function KpiGrid({ kpi }: Props) {
       decimals: 1,
       isPercent: true,
       sub: `${fmt(kpi.compliant)} conformes de ${fmt(kpi.total)}`,
-      share: kpi.pctCompliant,
+      rows: [
+        {
+          label: "Conformes",
+          color: GREEN,
+          value: fmt(kpi.compliant),
+          hint: pct1(confShare),
+          frac: confShare,
+          bar: GREEN,
+        },
+        {
+          label: "Não conformes",
+          color: RED,
+          value: fmt(kpi.nonCompliant),
+          hint: pct1(ncShare),
+          hintAlert: kpi.nonCompliant > 0,
+          frac: ncShare,
+          bar: RED,
+        },
+      ],
       delay: 0,
     },
     {
       label: "Não Conformes",
       rawNum: kpi.nonCompliant,
-      sub: `${pct1(ncShare)} do inv. · ${fmt(kpi.degraded)} degrad. + ${
-        fmt(kpi.unavailable)
-      } indisp.`,
-      share: ncShare,
+      sub: `${pct1(ncShare)} do inventário`,
+      rows: ncRows,
       alert: true,
       delay: 50,
     },
@@ -322,7 +368,7 @@ export function KpiGrid({ kpi }: Props) {
             />
           </div>
           <div style={{ fontSize: 12, color: AURORA.sub }}>{c.sub}</div>
-          {c.rows ? <RankRows rows={c.rows} /> : c.share !== undefined && (
+          {c.rows ? <CardRows rows={c.rows} /> : c.share !== undefined && (
             <div
               style={{
                 height: 3,
