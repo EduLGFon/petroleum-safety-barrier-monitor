@@ -25,6 +25,9 @@ export function computeKpi(b: Barrier[]): KpiSnapshot {
     nonCompliant = 0,
     criticalNonCompliant = 0,
     withoutActionPlan = 0;
+  // Non-compliant count per criticality rank (dynamic keys like
+  // byCriticality) so the KPI cards can show ESO/A splits without the rows.
+  const ncByCriticality: Record<string, number> = {};
   for (const x of b) {
     byAvailability[x.availability] = (byAvailability[x.availability] ?? 0) + 1;
     byCompliance[x.compliance] = (byCompliance[x.compliance] ?? 0) + 1;
@@ -59,6 +62,8 @@ export function computeKpi(b: Barrier[]): KpiSnapshot {
       // fixed fields always reconcile (compliant + nonCompliant === total) and
       // match computeChartData, which already buckets non-Conforme as NC.
       nonCompliant++;
+      ncByCriticality[x.criticality] = (ncByCriticality[x.criticality] ?? 0) +
+        1;
       if (isCriticalRankLabel(x.criticality)) criticalNonCompliant++;
     }
     if (x.actionPlan.trim() === "") withoutActionPlan++;
@@ -76,9 +81,12 @@ export function computeKpi(b: Barrier[]): KpiSnapshot {
     nonCompliant,
     criticalNonCompliant,
     withoutActionPlan,
-    pctCompliant: t > 0 ? Math.round(compliant / t * 100) : 0,
+    // One decimal (81.3, not 81) so the card matches summarizeCompliance and
+    // small scopes stop rounding to identical integers.
+    pctCompliant: t > 0 ? Math.round(compliant / t * 1000) / 10 : 0,
     byAvailability,
     byCompliance,
     byCriticality,
+    ncByCriticality,
   };
 }

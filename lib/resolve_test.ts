@@ -46,6 +46,16 @@ Deno.test("resolveKpi translates numeric buckets to labels", () => {
   assertStrictEquals(k.syncedAt, "2026-09-10T00:00:00.000Z");
 });
 
+Deno.test("resolveKpi translates the NC-by-criticality bucket", () => {
+  const k = resolveKpi(snapshot({
+    total: 3,
+    byCriticality: { "0": 1, "1": 2 },
+    ncByCriticality: { "1": 2 },
+  }));
+  assertEquals(k.byCriticality, { "ESO": 1, "A": 2 });
+  assertEquals(k.ncByCriticality, { "A": 2 });
+});
+
 Deno.test("resolveKpi passes string buckets through for old servers", () => {
   const k = resolveKpi(snapshot({ byAvailability: { "Disponível": 5 } }));
   assertEquals(k.byAvailability, { "Disponível": 5 });

@@ -109,6 +109,35 @@ Deno.test("computeKpi counts novel availability in other", () => {
   assertStrictEquals(k.byAvailability?.["Em Comissionamento"], 1);
 });
 
+Deno.test("computeKpi keeps one decimal on pctCompliant", () => {
+  const k = computeKpi([
+    barrier({ availability: "Disponível", compliance: "Conforme" }),
+    barrier({
+      id: 2,
+      availability: "Degradado",
+      compliance: "Não Conforme",
+    }),
+    barrier({
+      id: 3,
+      availability: "Indisponível",
+      compliance: "Não Conforme",
+    }),
+  ]);
+  assertStrictEquals(k.pctCompliant, 33.3);
+});
+
+Deno.test("computeKpi buckets NC per criticality rank", () => {
+  const k = computeKpi([
+    barrier({ compliance: "Não Conforme", criticality: "ESO" }),
+    barrier({ id: 2, compliance: "Não Conforme", criticality: "A" }),
+    barrier({ id: 3, compliance: "Não Conforme", criticality: "A" }),
+    barrier({ id: 4, compliance: "Conforme", criticality: "A" }),
+    barrier({ id: 5, compliance: "Não Conforme", criticality: "B" }),
+  ]);
+  assertEquals(k.ncByCriticality, { "ESO": 1, "A": 2, "B": 1 });
+  assertStrictEquals(k.criticalNonCompliant, 3);
+});
+
 Deno.test("computeKpi counts barriers without an action plan", () => {
   const k = computeKpi([
     barrier({ availability: "Disponível", compliance: "Conforme" }),

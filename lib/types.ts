@@ -98,6 +98,7 @@ export interface KpiSnapshot {
   other: number;
   compliant: number;
   nonCompliant: number;
+  // 0-100 with one decimal (81.3), same scale as summarizeCompliance.
   pctCompliant: number;
   criticalNonCompliant: number;
   // Barriers without an action plan (sheet "Possui Plano" signal). The plan
@@ -112,6 +113,10 @@ export interface KpiSnapshot {
   byAvailability?: Record<string, number>;
   byCompliance?: Record<string, number>;
   byCriticality?: Record<string, number>;
+  // Non-compliant count per criticality rank (same dynamic keys as
+  // byCriticality). Feeds the ESO/A split on the Críticas NC card and the
+  // per-rank NC rates in the criticality panel.
+  ncByCriticality?: Record<string, number>;
   // Server time when the snapshot was computed (ISO). Absent in mock mode.
   syncedAt?: string;
 }

@@ -21,14 +21,14 @@ export interface KpiStats {
 
 // Derives pt-BR formatted KPI totals from a snapshot; zeros and 0% (no
 // div-by-zero/NaN). Matches dashboard KPI exactly, including fail-closed
-// novel values.
+// novel values. pctCompliant carries one decimal, so fmt renders "81,3%".
 export function kpiStatsFrom(k: KpiSnapshot): KpiStats {
   const n = fmt;
   return {
     total: n(k.total),
     compliant: n(k.compliant),
     nonCompliant: n(k.nonCompliant),
-    pct: `${k.pctCompliant}%`,
+    pct: `${n(k.pctCompliant)}%`,
     critical: n(k.criticalNonCompliant),
   };
 }
@@ -58,7 +58,7 @@ export function summaryRowsFrom(k: KpiSnapshot): Array<[string, string]> {
     ["Conformes", n(k.compliant)],
     ["Não Conformes", n(k.nonCompliant)],
     ["Críticas NC", n(k.criticalNonCompliant)],
-    ["% Conformidade", `${k.pctCompliant}%`],
+    ["% Conformidade", `${n(k.pctCompliant)}%`],
   ];
 }
 

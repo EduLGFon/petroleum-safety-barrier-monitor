@@ -4,6 +4,7 @@ import {
   fmtDate,
   humanDuration,
   installationLabel,
+  pct1,
   timeAgoPt,
 } from "./format.ts";
 
@@ -55,6 +56,14 @@ Deno.test("installationLabel joins code and name", () => {
   assertStrictEquals(installationLabel("FAL", ""), "FAL");
   assertStrictEquals(installationLabel("FAL", "FAL"), "FAL");
   assertStrictEquals(installationLabel("", "Fazenda Alegre"), "Fazenda Alegre");
+});
+
+Deno.test("pct1 renders one-decimal pt-BR percent", () => {
+  assertStrictEquals(pct1(81.34), "81,3%");
+  assertStrictEquals(pct1(50), "50%");
+  assertStrictEquals(pct1(100), "100%");
+  assertStrictEquals(pct1(0), "0%");
+  assertStrictEquals(pct1(NaN), "-");
 });
 
 Deno.test("timeAgoPt renders pt-BR relative freshness", () => {

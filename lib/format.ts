@@ -52,6 +52,12 @@ export function fmt(n: number): string {
 export function pct(n: number): string {
   return `${n}%`;
 }
+// One-decimal pt-BR percent ("81,3%"); non-finite input renders "-".
+// Rounds to one decimal first so 81.34 and 81.3 both show "81,3%".
+export function pct1(n: number): string {
+  if (!Number.isFinite(n)) return "-";
+  return `${fmt(Math.round(n * 10) / 10)}%`;
+}
 // Relative "x ago" in pt-BR from an ISO timestamp ("há 5 min") for live
 // freshness labels. Future or malformed input renders "agora mesmo"; the
 // optional now makes it deterministic in tests. Never throws.

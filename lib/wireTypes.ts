@@ -66,6 +66,7 @@ export interface WireKpiSnapshot {
   other: number;
   compliant: number;
   nonCompliant: number;
+  // 0-100 with one decimal (81.3), same scale as summarizeCompliance.
   pctCompliant: number;
   criticalNonCompliant: number;
   // Barriers with an empty action_plan (sheet "Possui Plano" signal).
@@ -78,6 +79,9 @@ export interface WireKpiSnapshot {
   byAvailability?: Record<string, number>;
   byCompliance?: Record<string, number>;
   byCriticality?: Record<string, number>;
+  // Non-compliant count per criticality rank, keyed by numeric id as string
+  // like byCriticality; resolveKpi translates it the same way.
+  ncByCriticality?: Record<string, number>;
   // Server time when the snapshot was computed (ISO). Lets the UI show
   // staleness once the dashboard moves to server-paginated mode.
   syncedAt?: string;

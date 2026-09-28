@@ -132,7 +132,7 @@ Deno.test("the summary sheet reconciles with the rows", async () => {
     .map((r) => Number(r[1]))
     .reduce((a, b) => a + b, 0);
   assertStrictEquals(availability, 3);
-  assertEquals(grid[grid.length - 1], ["% Conformidade", "33%"]);
+  assertEquals(grid[grid.length - 1], ["% Conformidade", "33,3%"]);
 });
 
 Deno.test("the summary sheet hugs its content", () => {

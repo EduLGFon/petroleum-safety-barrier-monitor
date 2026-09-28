@@ -138,7 +138,7 @@ export async function getKpi(
   const where = buildWhere(q);
   const from =
     `from barriers b join locations loc on loc.id = b.location_id ${where.text}`;
-  const [rows, dispRows, confRows, critRows] = await Promise.all([
+  const [rows, dispRows, confRows, critRows, ncCritRows] = await Promise.all([
     queryRows<{
       total: string;
       available: string;
@@ -184,6 +184,15 @@ export async function getKpi(
        ${from} group by b.criticality_id`,
       where.args,
     ),
+    // Non-compliant count per criticality rank (fail-closed NC definition,
+    // same as the non_compliant fixed field above).
+    queryRows<{ id: string; count: string }>(
+      `select b.criticality_id::text as id, count(*)::text as count
+       ${from} and coalesce(b.compliance_id, 1) <> 0 group by b.criticality_id`,
+      // NOTE: ${from} already contains the WHERE clause; appending AND keeps
+      // the filter subset identical to the other buckets.
+      where.args,
+    ),
   ]);
 
   const r = rows[0];
@@ -210,10 +219,11 @@ export async function getKpi(
     nonCompliant: Number(r?.non_compliant ?? 0),
     criticalNonCompliant: Number(r?.critical_non_compliant ?? 0),
     withoutActionPlan: Number(r?.without_action_plan ?? 0),
-    pctCompliant: total > 0 ? Math.round((compliant / total) * 100) : 0,
+    pctCompliant: total > 0 ? Math.round((compliant / total) * 1000) / 10 : 0,
     byAvailability: toBucket(dispRows),
     byCompliance: toBucket(confRows),
     byCriticality: toBucket(critRows),
+    ncByCriticality: toBucket(ncCritRows),
     syncedAt: new Date().toISOString(),
   };
 }

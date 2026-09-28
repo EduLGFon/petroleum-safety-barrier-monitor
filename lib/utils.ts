@@ -20,6 +20,7 @@ export {
   humanDuration,
   installationLabel,
   pct,
+  pct1,
   timeAgoPt,
 } from "./format.ts";
 export { computeChartData } from "./dashboard/chart.ts";

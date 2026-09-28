@@ -123,6 +123,7 @@ export function resolveKpi(w: WireKpiSnapshot): KpiSnapshot {
     byAvailability,
     byCompliance,
     byCriticality,
+    ncByCriticality,
     syncedAt,
     ...fixed
   } = w as WireKpiSnapshot & Partial<KpiSnapshot>;
@@ -153,6 +154,9 @@ export function resolveKpi(w: WireKpiSnapshot): KpiSnapshot {
       : {}),
     ...(byCriticality
       ? { byCriticality: mapBucket(byCriticality, fromCriticalityId) }
+      : {}),
+    ...(ncByCriticality
+      ? { ncByCriticality: mapBucket(ncByCriticality, fromCriticalityId) }
       : {}),
     ...(syncedAt ? { syncedAt } : {}),
   };
