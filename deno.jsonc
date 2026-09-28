@@ -47,6 +47,7 @@
     "@std/path": "jsr:@std/path@^1.1.6",
     "@db/postgres": "jsr:@db/postgres@^0.19.5",
     "xlsx": "npm:xlsx@0.18.5",
+    "pdf-lib": "npm:pdf-lib@1.17.1",
     "linkedom": "npm:linkedom@^0.18.13"
   },
   "lint": {
