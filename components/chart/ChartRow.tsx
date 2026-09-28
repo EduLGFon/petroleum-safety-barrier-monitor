@@ -7,7 +7,7 @@ import { truncateLabel } from "../../lib/dashboard/chart.ts";
 
 import type { CSSProperties } from "preact";
 
-import { PLOT_W, px } from "./geometry.ts";
+import { px } from "./geometry.ts";
 
 import { fmt } from "../../lib/utils.ts";
 
@@ -19,6 +19,8 @@ interface Props {
   labelW: number;
   barH: number;
   rowH: number;
+  // Width of the plot area, so the hover target covers the whole row.
+  plotW: number;
   w: (v: number) => number;
   onHover: (i: number, x: number, y: number) => void;
   onLeave: () => void;
@@ -41,6 +43,7 @@ export function ChartRow(
     labelW,
     barH,
     rowH,
+    plotW,
     w,
     onHover,
     onLeave,
@@ -136,7 +139,7 @@ export function ChartRow(
       <rect
         x={labelW}
         y={y - 4}
-        width={PLOT_W}
+        width={plotW}
         height={rowH}
         fill="transparent"
       />

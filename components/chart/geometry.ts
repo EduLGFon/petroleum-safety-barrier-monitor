@@ -1,12 +1,12 @@
 // chart geometry - shared sizes and pure scale helpers for the compliance SVG.
-// Why it exists: single source of truth for density heights, plot width and
-// tooltip offsets so rows, tooltip and frame stay in sync without duplication.
+// Why it exists: single source of truth for density heights, the plot layout
+// that fills its column and tooltip offsets, so rows, tooltip and frame stay
+// in sync without duplication.
 import type { CategoryCompliance } from "../../lib/types.ts";
 
 export const COUNT_W = 56;
 export const TOP = 6;
 export const AXIS_H = 26;
-export const PLOT_W = 380;
 
 /* Floating tooltip geometry - offset from the cursor, margin from edges. */
 export const TIP_OFFSET = 14;
@@ -26,6 +26,31 @@ export const GEO = {
 // DensityKey: valid density names matching the GEO keys.
 export type DensityKey = keyof typeof GEO;
 
+// Narrowest plot a bar row is drawn on, in SVG user units. Below it the
+// viewBox stays wider than the column, so the browser scales the whole SVG
+// down (the one case that still letterboxes) instead of crushing the bars.
+// Sized so a real dashboard column (>= ~500 px) always fits in every density.
+export const MIN_PLOT_W = 260;
+
+export interface ChartLayout {
+  // Usable width of the bars, in SVG user units.
+  plotW: number;
+  // viewBox width: label column + plot + count column. Equal to the measured
+  // column width whenever the column is at least MIN_PLOT_W wide, which is
+  // what keeps the drawing unscaled (and free of dead space) in every
+  // density and at every monitor size.
+  width: number;
+}
+
+// layoutChart: fits the chart to the width its column actually offers. The
+// plot absorbs the slack, so the SVG scales 1:1 with the column instead of
+// being centred inside it (side margins) or shrunk to fit (vertical
+// letterboxing) - the two dead-space shapes a fixed viewBox produced.
+export function layoutChart(available: number, labelW: number): ChartLayout {
+  const plotW = Math.max(MIN_PLOT_W, available - labelW - COUNT_W);
+  return { plotW, width: labelW + plotW + COUNT_W };
+}
+
 // rowTotal: combined Conforme + Não Conforme count for one category.
 export function rowTotal(d: CategoryCompliance): number {
   return d.Conforme + d["Não Conforme"];
@@ -43,13 +68,13 @@ export function buildTicks(max: number): number[] {
 }
 
 // scaleW: linear value→pixels scale against the max row total.
-export function scaleW(v: number, max: number): number {
-  return Math.max(0, (v / max) * PLOT_W);
+export function scaleW(v: number, max: number, plotW: number): number {
+  return Math.max(0, (v / max) * plotW);
 }
 
-// makeW: binds max into a single-arg scaler for row rendering.
-export function makeW(max: number): (v: number) => number {
-  return (v: number) => scaleW(v, max);
+// makeW: binds max and plot width into a single-arg scaler for row rendering.
+export function makeW(max: number, plotW: number): (v: number) => number {
+  return (v: number) => scaleW(v, max, plotW);
 }
 
 // px: number→CSS pixel string for transitioned SVG geometry.
@@ -60,9 +85,4 @@ export function px(n: number): string {
 // chartHeight: total SVG height for rowCount rows at the given row height.
 export function chartHeight(rowCount: number, rowH: number): number {
   return TOP + rowCount * rowH + AXIS_H;
-}
-
-// chartWidth: total SVG width for the given label column width.
-export function chartWidth(labelW: number): number {
-  return labelW + PLOT_W + COUNT_W;
 }

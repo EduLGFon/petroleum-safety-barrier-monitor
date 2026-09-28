@@ -8,15 +8,17 @@
 import {
   buildTicks,
   chartHeight,
-  chartWidth,
   computeMax,
   GEO,
+  layoutChart,
   makeW,
   px,
   TOP,
 } from "./chart/geometry.ts";
 
 import { useSettings } from "../context/SettingsContext.tsx";
+
+import { useElementWidth } from "../hooks/useElementWidth.ts";
 
 import type { CategoryCompliance } from "../lib/types.ts";
 
@@ -65,6 +67,10 @@ export default function ComplianceChartInner(
   );
   const { settings } = useSettings();
   const { ROW_H, BAR_H, LABEL_W } = GEO[settings.density] ?? GEO.comfortable;
+  // Measured column width drives the viewBox, so the drawing always spans the
+  // column exactly: no side margins on a wide monitor, no vertical gap under
+  // the toolbar when the column is narrower than a fixed viewBox would be.
+  const { ref, width: available } = useElementWidth();
   // Dismiss the floating tip when anything scrolls (page or the chart's own
   // scroll container) or the viewport resizes: the stored clientX/clientY
   // anchor would otherwise go stale and the tip would float detached from
@@ -80,17 +86,17 @@ export default function ComplianceChartInner(
   }, []);
   const max = maxOverride ?? computeMax(data);
   const height = chartHeight(data.length, ROW_H);
-  const width = chartWidth(LABEL_W);
+  const { plotW, width } = layoutChart(available, LABEL_W);
   const ticks = buildTicks(max);
   // w: linear value→pixels scale against the max row total.
-  const w = makeW(max);
+  const w = makeW(max, plotW);
   const hovered = hover !== null ? data[hover.i] : null;
   // Geometry lives in attributes (SSR/fallback) AND in style: only the
   // CSS values go through the transition engine, which is what morphs
   // the bars when the station changes.
 
   return (
-    <div style={{ position: "relative" }}>
+    <div ref={ref} style={{ position: "relative" }}>
       <svg
         width="100%"
         height={height}
@@ -145,6 +151,7 @@ export default function ComplianceChartInner(
             labelW={LABEL_W}
             barH={BAR_H}
             rowH={ROW_H}
+            plotW={plotW}
             w={w}
             onHover={(ii, x, y) => setHover({ i: ii, x, y })}
             onLeave={() => setHover(null)}

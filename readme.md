@@ -568,8 +568,10 @@ the default sort are configurable in the settings panel.
 **Chart.** Two modes: stacked horizontal bars per category and an executive
 summary (donut with compliance percentage plus a Top-NC list). Sort by volume,
 NC rate or name; expand past the top 20 into an aggregated tail; click any row
-to filter the table; search inside categories; density-aware geometry;
-viewport-clamped tooltip; preferences persisted.
+to filter the table; search inside categories; density-aware geometry; the
+plot measures its column so the bars fill it in every density and at every
+monitor width (no dead space around the drawing); viewport-clamped tooltip;
+preferences persisted.
 
 **Selection and export.** Selection survives paging and filter changes, is
 capped when restored, and is cleared on installation or filter reset. Every
