@@ -1,7 +1,7 @@
-// Unit tests for the criticality strip ordering (pure helper, no DOM).
+// Unit tests for the criticality rank ordering (pure helper, no DOM).
 import { assertEquals } from "jsr:@std/assert@^1";
 
-import { orderRankEntries } from "./CriticalityStrip.tsx";
+import { orderRankEntries } from "./criticality.ts";
 
 Deno.test("orderRankEntries puts canonical ranks first in ESO-A-B-C-D order", () => {
   assertEquals(

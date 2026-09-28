@@ -1,14 +1,16 @@
 // Aurora Executive Dark KPI cards.
-// This is why it exists: five live metrics rendered as identical glass
-// cards (label / value / sub / signature-gradient progress) plus a
-// per-rank criticality panel. The Disponíveis card was dropped (the
-// StatusBand shows the same count a few pixels above) and Sem plano de
-// ação too (92.8% of rows lack a plan, so it never discriminated); both
-// signals survive as table filters. Only the "Não Conformes" card carries
-// the red glow.
+// This is why it exists: headline metrics plus one card per criticality
+// rank, all rendered as identical glass cards (label / value / sub /
+// signature-gradient progress) in a single grid. The Disponíveis card was
+// dropped (the StatusBand shows the same count a few pixels above), Sem
+// plano de ação too (92.8% of rows lack a plan, so it never
+// discriminated), and Contingenciadas gave way to the per-rank cards;
+// every dropped signal survives as a table filter. Only the "Não
+// Conformes" card carries the red glow.
 import { AURORA, AURORA_TYPE, progressWidth } from "../lib/aurora.ts";
-import { CriticalityStrip } from "./CriticalityStrip.tsx";
+import { orderRankEntries } from "../lib/dashboard/criticality.ts";
 import { useEffect, useRef, useState } from "preact/hooks";
+import { critColorFor } from "../lib/constants.ts";
 import type { KpiSnapshot } from "../lib/types.ts";
 import { fmt, pct1 } from "../lib/utils.ts";
 
@@ -17,6 +19,8 @@ interface Props {
 }
 interface C {
   label: string;
+  // Rank cards paint the label in the rank color; headlines use AURORA.label.
+  labelColor?: string;
   rawNum: number;
   decimals?: number;
   isPercent?: boolean;
@@ -80,7 +84,8 @@ function AnimVal(
 }
 
 // KpiGrid: glass cards from KpiSnapshot; shares divide by total||1 with one
-// decimal, contingency card sums contingencyOutage + degradedContingency.
+// decimal. Rank cards follow the canonical ESO > A > B > C > D order with
+// novel ranks trailing by volume.
 export function KpiGrid({ kpi }: Props) {
   const t = kpi.total || 1;
   // One-decimal share of the scope total (bar widths + sub labels).
@@ -91,8 +96,22 @@ export function KpiGrid({ kpi }: Props) {
   const ncEso = ncByCrit["ESO"] ?? 0;
   const ncA = ncByCrit["A"] ?? 0;
   const ncShare = share1(kpi.nonCompliant);
-  const cont = kpi.contingencyOutage + kpi.degradedContingency;
   const otherShare = share1(kpi.other ?? 0);
+  // One card per rank: total as value, NC count + NC rate as sub.
+  const rankCards: C[] = orderRankEntries(
+    Object.entries(byCrit).filter(([, n]) => n > 0),
+  ).map(([label, n], i) => {
+    const nc = ncByCrit[label] ?? 0;
+    const rate = n > 0 ? nc / n * 100 : 0;
+    return {
+      label: `Crit. ${label}`,
+      labelColor: critColorFor(label).solid,
+      rawNum: n,
+      sub: `${fmt(nc)} NC · ${pct1(rate)}`,
+      share: share1(n),
+      delay: 200 + Math.min(i, 5) * 25,
+    };
+  });
   const cards: C[] = [
     {
       label: "Total de Barreiras",
@@ -128,15 +147,7 @@ export function KpiGrid({ kpi }: Props) {
       alert: kpi.criticalNonCompliant > 0,
       delay: 150,
     },
-    {
-      label: "Contingenciadas",
-      rawNum: cont,
-      sub: `${fmt(kpi.contingencyOutage)} indisp. + ${
-        fmt(kpi.degradedContingency)
-      } degrad.`,
-      share: share1(cont),
-      delay: 200,
-    },
+    ...rankCards,
     ...((kpi.other ?? 0) > 0
       ? [{
         label: "Outros Status",
@@ -144,90 +155,84 @@ export function KpiGrid({ kpi }: Props) {
         sub: pct1(otherShare) + " do inv.",
         share: otherShare,
         alert: true,
-        delay: 250,
+        delay: 200 + Math.min(rankCards.length, 5) * 25 + 25,
       } as C]
       : []),
   ];
 
   return (
-    <>
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(auto-fit,minmax(var(--d-kpi-min),1fr))",
-          gap: "var(--d-kpi-gap)",
-          marginBottom: "var(--d-section)",
-        }}
-      >
-        {cards.map((c) => (
+    <div
+      style={{
+        display: "grid",
+        gridTemplateColumns: "repeat(auto-fit,minmax(var(--d-kpi-min),1fr))",
+        gap: "var(--d-kpi-gap)",
+        marginBottom: "var(--d-section)",
+      }}
+    >
+      {cards.map((c) => (
+        <div
+          key={c.label}
+          className="animate-card-in glass-card"
+          style={{
+            background: AURORA.card,
+            border: `1px solid ${AURORA.cardBorder}`,
+            borderRadius: AURORA.cardRadius,
+            padding: "14px 16px",
+            boxShadow: c.alert ? AURORA.redGlow : "none",
+            minWidth: 0,
+            animationDelay: `${c.delay}ms`,
+          }}
+        >
           <div
-            key={c.label}
-            className="animate-card-in glass-card"
             style={{
-              background: AURORA.card,
-              border: `1px solid ${AURORA.cardBorder}`,
-              borderRadius: AURORA.cardRadius,
-              padding: "14px 16px",
-              boxShadow: c.alert ? AURORA.redGlow : "none",
-              minWidth: 0,
-              animationDelay: `${c.delay}ms`,
+              fontSize: AURORA_TYPE.kpiLabel.fontSize,
+              letterSpacing: AURORA_TYPE.kpiLabel.letterSpacing,
+              fontWeight: AURORA_TYPE.kpiLabel.fontWeight,
+              color: c.labelColor ?? AURORA.label,
+              textTransform: "uppercase",
             }}
           >
+            {c.label.toUpperCase()}
+          </div>
+          <div
+            className="tnum"
+            style={{
+              fontFamily: "var(--font-display)",
+              fontSize: AURORA_TYPE.kpiValue.fontSize,
+              fontWeight: AURORA_TYPE.kpiValue.fontWeight,
+              color: AURORA.value,
+              letterSpacing: AURORA_TYPE.kpiValue.letterSpacing,
+            }}
+          >
+            <AnimVal
+              n={c.rawNum}
+              decimals={c.decimals}
+              isPercent={c.isPercent}
+            />
+          </div>
+          <div style={{ fontSize: 12, color: AURORA.sub }}>{c.sub}</div>
+          {c.share !== undefined && (
             <div
               style={{
-                fontSize: AURORA_TYPE.kpiLabel.fontSize,
-                letterSpacing: AURORA_TYPE.kpiLabel.letterSpacing,
-                fontWeight: AURORA_TYPE.kpiLabel.fontWeight,
-                color: AURORA.label,
-                textTransform: "uppercase",
+                height: 3,
+                borderRadius: 99,
+                marginTop: 10,
+                background: AURORA.track,
               }}
             >
-              {c.label.toUpperCase()}
-            </div>
-            <div
-              className="tnum"
-              style={{
-                fontFamily: "var(--font-display)",
-                fontSize: AURORA_TYPE.kpiValue.fontSize,
-                fontWeight: AURORA_TYPE.kpiValue.fontWeight,
-                color: AURORA.value,
-                letterSpacing: AURORA_TYPE.kpiValue.letterSpacing,
-              }}
-            >
-              <AnimVal
-                n={c.rawNum}
-                decimals={c.decimals}
-                isPercent={c.isPercent}
-              />
-            </div>
-            <div style={{ fontSize: 12, color: AURORA.sub }}>{c.sub}</div>
-            {c.share !== undefined && (
               <div
                 style={{
-                  height: 3,
+                  width: progressWidth(c.share),
+                  height: "100%",
                   borderRadius: 99,
-                  marginTop: 10,
-                  background: AURORA.track,
+                  background: AURORA.grad,
+                  transition: "width .7s var(--ease-out)",
                 }}
-              >
-                <div
-                  style={{
-                    width: progressWidth(c.share),
-                    height: "100%",
-                    borderRadius: 99,
-                    background: AURORA.grad,
-                    transition: "width .7s var(--ease-out)",
-                  }}
-                />
-              </div>
-            )}
-          </div>
-        ))}
-      </div>
-      <CriticalityStrip
-        byCriticality={kpi.byCriticality}
-        ncByCriticality={kpi.ncByCriticality}
-      />
-    </>
+              />
+            </div>
+          )}
+        </div>
+      ))}
+    </div>
   );
 }
