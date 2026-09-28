@@ -72,11 +72,6 @@ export function SyncDetailsModal(
       first.focus();
     }
   };
-  const connLabel = conn === "connected"
-    ? "Conectado"
-    : conn === "reconnecting"
-    ? "Reconectando…"
-    : "Desconectado";
   return (
     <>
       <div
@@ -264,16 +259,6 @@ export function SyncDetailsModal(
                 onOpenBarrier={onOpenBarrier}
               />
             )}
-            <div
-              style={{
-                borderTop: "1px solid var(--au-row)",
-                paddingTop: 8,
-                color: "var(--au-sub)",
-                fontSize: 11,
-              }}
-            >
-              {connLabel} - atualiza a cada 1 min
-            </div>
           </div>
         </div>
       </div>
