@@ -23,7 +23,11 @@ import {
 
 import { OPEN_WORK_ORDER_STATUSES } from "../lib/server/fracttal/barrier-rules.ts";
 
-import { runSync, type SyncResult } from "../lib/server/fracttal/sync.ts";
+import {
+  isScopeBusy,
+  runSync,
+  type SyncResult,
+} from "../lib/server/fracttal/sync.ts";
 
 import { createFracttalClient } from "../lib/server/fracttal/client.ts";
 
@@ -189,6 +193,15 @@ async function main(): Promise<void> {
       workEvents: work.workEvents,
     });
   } catch (err) {
+    // Atomic startRun lost the race after preflight (the poller opened a
+    // fresh run in between): same clean refusal as the guard above, no ops
+    // mail - contention is routine, not an error.
+    if (isScopeBusy(err)) {
+      console.error(
+        `[force-sync] scope ${flags.scope} is fresh-running (poller active). Stop the poller or re-run with --force.`,
+      );
+      Deno.exit(3);
+    }
     const note = err instanceof Error ? err.message : String(err);
     await notifyFailureToAll(notifiers, {
       scope: flags.scope,

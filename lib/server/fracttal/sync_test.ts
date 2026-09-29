@@ -4,11 +4,13 @@ import {
   assertCompletePage,
   buildRunNote,
   fieldsSignature,
+  isScopeBusy,
   type LocalBarrier,
   type PlanCounts,
   type PlanEntry,
   planReconcile,
   runSync,
+  ScopeBusyError,
   type SyncIo,
 } from "./sync.ts";
 
@@ -417,6 +419,83 @@ Deno.test("runSync records a failed run and rethrows with the [sync] prefix", as
   assertStrictEquals(finish.note, "boom");
   assertStrictEquals(finish.counts.inserts, 0);
   assertStrictEquals(finish.counts.skips, 0);
+});
+
+Deno.test("isScopeBusy detects lease contention", () => {
+  assertStrictEquals(
+    isScopeBusy(new ScopeBusyError("[sync] scope s already running")),
+    true,
+  );
+  assertStrictEquals(
+    isScopeBusy(new Error("[sync] scope s already running")),
+    true,
+  );
+  assertStrictEquals(isScopeBusy(new Error("boom")), false);
+  assertStrictEquals(isScopeBusy(null), false);
+});
+
+Deno.test("runSync propagates ScopeBusyError without a failure row", async () => {
+  const { io, state } = makeFakeIo();
+  const busyIo: SyncIo = {
+    ...io,
+    startRun(_scope: string): Promise<number> {
+      return Promise.reject(
+        new ScopeBusyError("[sync] scope s already running"),
+      );
+    },
+  };
+  let caught: Error | null = null;
+  try {
+    await runSync(() => Promise.resolve([rawRow()]), {
+      io: busyIo,
+      dryRun: false,
+      scope: "s",
+    });
+  } catch (err) {
+    caught = err as Error;
+  }
+  // The run never opened, so there is nothing to finish and nothing applied.
+  assertStrictEquals(caught instanceof ScopeBusyError, true);
+  assertStrictEquals(state.calls.applyPlan.length, 0);
+  assertStrictEquals(state.calls.finishRun.length, 0);
+});
+
+Deno.test("runSync heartbeats a live run and stops the timer", async () => {
+  const { io } = makeFakeIo();
+  const beats: number[] = [];
+  const beatingIo: SyncIo = {
+    ...io,
+    heartbeat(runId: number): Promise<void> {
+      beats.push(runId);
+      return Promise.resolve();
+    },
+  };
+  const intervals: number[] = [];
+  const cleared: unknown[] = [];
+  const realSetInterval = globalThis.setInterval;
+  const realClearInterval = globalThis.clearInterval;
+  let nextId = 1;
+  globalThis.setInterval = ((_fn: () => void): number => {
+    intervals.push(nextId);
+    return nextId++;
+  }) as typeof setInterval;
+  globalThis.clearInterval = ((id: unknown): void => {
+    cleared.push(id);
+  }) as typeof clearInterval;
+  try {
+    const result = await runSync(() => Promise.resolve([rawRow()]), {
+      io: beatingIo,
+      dryRun: false,
+      scope: "s",
+    });
+    assertStrictEquals(result.status, "ok");
+    assertStrictEquals(intervals.length, 1);
+    assertStrictEquals(cleared.length, 1);
+    assertStrictEquals(cleared[0], intervals[0]);
+  } finally {
+    globalThis.setInterval = realSetInterval;
+    globalThis.clearInterval = realClearInterval;
+  }
 });
 
 Deno.test("buildRunNote summarizes counts and the first skips", () => {

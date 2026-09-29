@@ -6,7 +6,7 @@ import { assertStrictEquals } from "jsr:@std/assert@^1";
 
 import type { SyncFailureInfo } from "./notify.ts";
 
-import type { SyncResult } from "./sync.ts";
+import { ScopeBusyError, type SyncResult } from "./sync.ts";
 
 function okResult(): SyncResult {
   return {
@@ -72,6 +72,24 @@ Deno.test("pollOnce notifies ops with the failure details", async () => {
   assertStrictEquals(seen[0]!.scope, "s");
   assertStrictEquals(seen[0]!.note, "boom");
   assertStrictEquals(seen[0]!.startedAt, "2026-09-12T10:00:00.000Z");
+});
+
+Deno.test("pollOnce maps lease contention to skipped without notifying", async () => {
+  let notified = 0;
+  const outcome = await pollOnce("s", {
+    run: () => {
+      throw new ScopeBusyError("[sync] scope s already running");
+    },
+    lock: { isRunning: () => Promise.resolve(false) },
+    notifier: {
+      syncFailed: () => {
+        notified++;
+        return Promise.resolve();
+      },
+    },
+  });
+  assertStrictEquals(outcome.outcome, "skipped");
+  assertStrictEquals(notified, 0);
 });
 
 // ManualTimer: deterministic setTimeout/clearTimeout so the loop is tested

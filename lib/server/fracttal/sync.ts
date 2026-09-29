@@ -68,6 +68,10 @@ export interface SyncIo {
     remoteCodes: string[],
   ): Promise<LocalBarrier[]>;
   startRun(scope: string): Promise<number>;
+  // heartbeat: refresh the running lease while a sweep is alive (the SQL
+  // repo rewrites finished_at as the heartbeat). Optional so headless fakes
+  // keep compiling; runSync best-efforts it on a timer when present.
+  heartbeat?(runId: number): Promise<void>;
   applyPlan(entries: PlanEntry[], runId?: number | null): Promise<PlanCounts>;
   finishRun(
     runId: number,
@@ -75,6 +79,20 @@ export interface SyncIo {
     counts: PlanCounts,
     note: string,
   ): Promise<void>;
+}
+
+// ScopeBusyError: the scope already holds a fresh running lease (another
+// poller or one-shot owns it). Poll loops map this to `skipped`, never to
+// a failure notification - contention is routine, not an error.
+export class ScopeBusyError extends Error {
+  override name = "ScopeBusyError";
+}
+
+// isScopeBusy: true for lease contention. instanceof covers the module's
+// own throw; the message match covers the same signal across isolates.
+export function isScopeBusy(err: unknown): boolean {
+  if (err instanceof ScopeBusyError) return true;
+  return err instanceof Error && err.message.includes("already running");
 }
 
 // SignatureSource: the fields that drive change detection (shared with
@@ -260,6 +278,9 @@ export interface SyncOptions {
   scope?: string; // label for sync_state
   now?: () => Date;
   io?: SyncIo; // default: real SQL repo (see lib/server/sql/sync.ts)
+  // heartbeatMs: lease refresh cadence while a run is alive (default 60s).
+  // Only used when io.heartbeat exists; best-effort, never fails the run.
+  heartbeatMs?: number;
   // workEvents: prebuilt per-code work signals (the caller fetches work
   // orders/requests BEFORE runSync, so a fetch failure aborts with zero
   // writes instead of decaying statuses). Null = asset signals only.
@@ -311,6 +332,29 @@ export async function runSync(
   const started = now();
   const runId = dryRun ? null : await io.startRun(scope);
 
+  // Lease heartbeat: a slow fetch+apply must keep proving liveness, or the
+  // reaper cannot tell it apart from a killed process. Best-effort timer;
+  // stopped by finish() on every path below.
+  let heartbeatTimer: number | undefined;
+  const stopHeartbeat = (): void => {
+    if (heartbeatTimer !== undefined) {
+      clearInterval(heartbeatTimer);
+      heartbeatTimer = undefined;
+    }
+  };
+  if (!dryRun && runId !== null && io.heartbeat) {
+    const beat = io.heartbeat.bind(io);
+    const every = Math.max(10_000, options.heartbeatMs ?? 60_000);
+    heartbeatTimer = setInterval(() => {
+      void beat(runId).catch(() => {});
+    }, every);
+    try {
+      Deno.unrefTimer?.(heartbeatTimer);
+    } catch {
+      // Non-Deno runtimes lack unrefTimer; finish() still clears the timer.
+    }
+  }
+
   const emptyPlan: SyncPlan = {
     entries: [],
     counts: { inserts: 0, updates: 0, deletes: 0, skips: 0 },
@@ -337,6 +381,7 @@ export async function runSync(
     note: string,
   ) => {
     if (dryRun || runId === null) return;
+    stopHeartbeat();
     const counts: PlanCounts = {
       ...applied,
       skips: baseResult.plan.counts.skips + baseResult.malformed.length +

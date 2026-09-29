@@ -15,6 +15,8 @@ import type {
 
 import { notifyFailureToAll } from "./notify.ts";
 
+import { isScopeBusy } from "./sync.ts";
+
 import type { OpsNotifier } from "./notify.ts";
 
 import type { SyncResult } from "./sync.ts";
@@ -139,6 +141,11 @@ export function createCycleLoop<Shared>(
                   },
                 });
               } catch (err) {
+                // pollOnce already maps lease contention to `skipped`; this
+                // guard covers a direct ScopeBusyError from a custom runner.
+                if (isScopeBusy(err)) {
+                  return { scope: s.scope, outcome: "skipped" };
+                }
                 const note = err instanceof Error ? err.message : String(err);
                 return { scope: s.scope, outcome: "failed", note };
               }

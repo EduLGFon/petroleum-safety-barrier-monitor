@@ -169,9 +169,14 @@ only the work pass stays eager so its failure aborts with zero writes).
   `INSERT ... ON CONFLICT (external_code) DO NOTHING` - the UNIQUE constraint
   is the dedup authority; status changes go through the one sanctioned
   `record_status_change()` with author 10 "Sincronização Fracttal"), and
-  writes the run audit. Also exposes `syncScopeRunning(scope, staleMinutes=10)`
-  as the poll lock: true while a `running` row for the scope is fresh, so a
-  crashed run only blocks polls for the stale window instead of forever.
+  writes the run audit. `startRun` is an atomic claim (`INSERT ... WHERE NOT
+  EXISTS` a fresh lease) so two racers cannot both open a run; the loser gets
+  `ScopeBusyError`. Every live run heartbeats `finished_at` forward every 60s
+  (`touchSyncRun`), so liveness rides the heartbeat, never `started_at` - a
+  slow-but-alive sweep cannot reap itself or expire its own lock. Also exposes
+  `syncScopeRunning(scope, staleMinutes=10)` as the poll lock: true while a
+  `running` row for the scope holds a fresh heartbeat, so a crashed run only
+  blocks polls for the stale window instead of forever.
 - Sync failures never go silent. `scripts/fracttal-sync.ts` notifies ops on
   every failure (loud stderr line via `consoleNotifier` plus an optional ops
   email) and exits non-zero; the `failed` audit row is still written first, so
@@ -189,7 +194,8 @@ only the work pass stays eager so its failure aborts with zero writes).
 - `lib/server/fracttal/runner.ts` - `pollOnce` (scope lock → run → notify on
   failure) and `createPollLoop` for single-scope operation: a single crashed
   tick (lock query down, upstream down) is reported and the cadence
-  continues; `stop()` is stop-safe.
+  continues; lease contention (`ScopeBusyError` from the atomic claim) maps
+  to `skipped` with no ops notification; `stop()` is stop-safe.
 - `lib/server/fracttal/cycle.ts` - `createCycleLoop`: the tenant-global work
   pass is fetched once per cycle and shared, the sweep runs under one
   `fracttal-live:all` scope, and the next cycle chains after completion so a
@@ -407,7 +413,11 @@ select scope, status, note, started_at, finished_at from sync_state
 -- per-run health at a glance (note carries the buildRunNote summary)
 select scope, status, inserts, updates, deletes, skips, note, finished_at
  from sync_state order by id desc limit 5;
--- a scope stuck 'running' past the 10-minute lock window (crashed poller?)
-select scope, started_at from sync_state
- where status = 'running' and started_at < now() - interval '15 minutes';
+-- a scope stuck 'running' past the heartbeat window (crashed poller?
+-- liveness rides finished_at, rewritten every 60s while a run is alive)
+select scope, started_at, finished_at as last_heartbeat from sync_state
+ where status = 'running' and finished_at < now() - interval '15 minutes';
+-- rows whose note starts with 'reaped:' are orphan cleanups (previous poller
+-- died mid-sweep, next startRun reaped it), not real fetch/map/apply errors;
+-- the dashboard shows them amber as Interrompida, never red.
 ```

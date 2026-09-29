@@ -9,6 +9,7 @@ import {
   type LocalBarrier,
   type PlanCounts,
   type PlanEntry,
+  ScopeBusyError,
   type SignatureSource,
   snapshotOf,
   type SyncIo,
@@ -50,7 +51,9 @@ export const SYNC_STALE_MINUTES = 15;
 
 // syncScopeRunning: poll lock - true while a run for the scope is still
 // 'running'. A crashed run would block polls forever, so the lock is stale
-// once started_at is older than staleMinutes.
+// once the lease lapses. Liveness rides finished_at (rewritten as a
+// heartbeat while a run is alive), never started_at, so a slow-but-alive
+// sweep cannot expire its own lock mid-run.
 export async function syncScopeRunning(
   scope: string,
   staleMinutes = 10,
@@ -59,7 +62,7 @@ export async function syncScopeRunning(
     `select 1 as one
      from sync_state
      where scope = $1 and status = 'running'
-       and started_at >= now() - make_interval(mins => $2)
+       and finished_at >= now() - make_interval(mins => $2)
      limit 1`,
     [scope, staleMinutes],
   );
@@ -69,7 +72,9 @@ export async function syncScopeRunning(
 // reapStaleRuns: self-healing for orphaned `running` rows (process killed
 // between startRun and finishRun, e.g. SIGKILL / redeploy mid-sweep).
 // Marks them `failed` so they stop latching the dashboard `stale` state
-// forever. Best-effort: a failure here never blocks the new run.
+// forever. Best-effort: a failure here never blocks the new run. Only rows
+// whose heartbeat lapsed qualify, so a slow-but-alive run (heartbeating
+// finished_at forward) is never reaped from under itself.
 export async function reapStaleRuns(
   scope: string,
   staleMinutes = SYNC_STALE_MINUTES,
@@ -81,7 +86,7 @@ export async function reapStaleRuns(
            finished_at = now(),
            note = 'reaped: orphaned running row (superseded, never finished)'
        where scope = $1 and status = 'running'
-         and started_at < now() - make_interval(mins => $2)
+         and finished_at < now() - make_interval(mins => $2)
        returning 1
      ) select count(*)::int as n from reaped`,
     [scope, staleMinutes],
@@ -91,6 +96,21 @@ export async function reapStaleRuns(
     console.log(`[sync] reaped ${n} stale running row(s) scope=${scope}`);
   }
   return n;
+}
+
+// touchSyncRun: refresh the running lease (finished_at doubles as the
+// heartbeat). Best-effort: callers swallow errors so a lost heartbeat never
+// fails the run; the row guard keeps a finished run from being touched.
+export async function touchSyncRun(runId: number): Promise<void> {
+  try {
+    await queryRows(
+      `update sync_state set finished_at = now()
+       where id = $1 and status = 'running'`,
+      [runId],
+    );
+  } catch (err) {
+    console.warn("sync: best-effort heartbeat failed", err);
+  }
 }
 
 // defaultSyncIo: the wiring runSync uses when no custom io is injected.
@@ -190,16 +210,33 @@ export const defaultSyncIo: SyncIo = {
       // below already ignores superseded orphans as a second defense.
       console.warn("sync: best-effort reapStaleRuns failed", err);
     }
+    // Atomic claim: the INSERT only fires when no fresh lease exists, so
+    // two processes racing past the pollOnce lock cannot both open a run.
+    // The loser gets ScopeBusyError (mapped to `skipped`, never a failure).
     const rows = await queryRows<{ id: number }>(
       `insert into sync_state (scope, status, started_at, finished_at)
-       values ($1, 'running', now(), now())
+       select $1, 'running', now(), now()
+       where not exists (
+         select 1 from sync_state
+         where scope = $1 and status = 'running'
+           and finished_at >= now() - make_interval(mins => $2)
+       )
        returning id`,
-      [scope],
+      [scope, SYNC_FRESH_MINUTES],
     );
     const started = rows[0];
-    if (!started) throw new Error("startRun returned no row");
+    if (!started) {
+      throw new ScopeBusyError(`[sync] scope ${scope} already running`);
+    }
     console.log(`[sync] start scope=${scope} runId=${started.id}`);
     return started.id;
+  },
+
+  // heartbeat: refresh the running lease so the reaper and the lock see
+  // this run as alive. Best-effort: a lost heartbeat only risks a false
+  // reap on very slow runs, never fails the run itself.
+  async heartbeat(runId: number): Promise<void> {
+    await touchSyncRun(runId);
   },
 
   async applyPlan(
@@ -479,11 +516,11 @@ export function toSyncStatus(args: {
 // running row, stale-run flag, and the tracked barrier total. Read-only;
 // the route serves it to any authenticated dashboard user.
 //
-// Stale defense in depth: a `running` row older than SYNC_STALE_MINUTES
-// only counts when it is NEWER than the latest finished run. An orphan
-// left by a killed process (superseded by later `ok` rows) is ignored
-// here and reaped on the next startRun, instead of latching `stale`
-// forever while healthy runs keep landing.
+// Stale defense in depth: a `running` row whose heartbeat lapsed past
+// SYNC_STALE_MINUTES only counts when it is NEWER than the latest finished
+// run. An orphan left by a killed process (superseded by later `ok` rows)
+// is ignored here and reaped on the next startRun, instead of latching
+// `stale` forever while healthy runs keep landing.
 export async function getSyncStatus(): Promise<SyncStatus> {
   const [finished, running, stale, counted] = await Promise.all([
     queryRows<SyncStatusRow>(
@@ -495,14 +532,14 @@ export async function getSyncStatus(): Promise<SyncStatus> {
     queryRows<{ scope: string; started_at: string }>(
       `select scope, started_at from sync_state
        where status = 'running'
-         and started_at >= now() - make_interval(mins => $1)
+         and finished_at >= now() - make_interval(mins => $1)
        order by id desc limit 1`,
       [SYNC_FRESH_MINUTES],
     ),
     queryRows<{ id: number; started_at: string }>(
       `select id, started_at from sync_state
        where status = 'running'
-         and started_at < now() - make_interval(mins => $1)
+         and finished_at < now() - make_interval(mins => $1)
        order by id desc limit 1`,
       [SYNC_STALE_MINUTES],
     ),

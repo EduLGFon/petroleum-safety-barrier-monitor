@@ -7,7 +7,7 @@ import type { OpsNotifier, SyncFailureInfo } from "./notify.ts";
 
 import { notifyFailureToAll } from "./notify.ts";
 
-import type { SyncResult } from "./sync.ts";
+import { isScopeBusy, type SyncResult } from "./sync.ts";
 
 export interface ScopeLock {
   isRunning(scope: string): Promise<boolean>;
@@ -40,6 +40,9 @@ export async function pollOnce(
     const result = await opts.run(scope);
     return { scope, outcome: "ok", runId: result.runId };
   } catch (err) {
+    // Lease contention is routine (atomic startRun lost the race after the
+    // lock check): skip quietly instead of paging ops with a failure.
+    if (isScopeBusy(err)) return { scope, outcome: "skipped" };
     const note = err instanceof Error ? err.message : String(err);
     await opts.notifier.syncFailed({
       scope,

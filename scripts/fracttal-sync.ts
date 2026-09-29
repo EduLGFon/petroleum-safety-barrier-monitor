@@ -30,7 +30,11 @@ import { OPEN_WORK_ORDER_STATUSES } from "../lib/server/fracttal/barrier-rules.t
 
 import { buildWorkEvents, resolverFor } from "../lib/server/fracttal/work.ts";
 
-import { runSync, type SyncResult } from "../lib/server/fracttal/sync.ts";
+import {
+  isScopeBusy,
+  runSync,
+  type SyncResult,
+} from "../lib/server/fracttal/sync.ts";
 
 import type { WorkEventsResolver } from "../lib/server/fracttal/work.ts";
 
@@ -221,6 +225,15 @@ async function main(): Promise<void> {
       workEvents,
     });
   } catch (err) {
+    // Lease contention means the poller owns the scope right now: report a
+    // clean skip (exit 3, like force-sync's overlap guard) instead of an
+    // ops failure - contention is routine, not an error.
+    if (isScopeBusy(err)) {
+      console.log(
+        `[fracttal-sync] scope ${scope} is fresh-running (poller active), skipped`,
+      );
+      Deno.exit(3);
+    }
     const note = err instanceof Error ? err.message : String(err);
     await notifyFailureToAll(notifiers, {
       scope,
