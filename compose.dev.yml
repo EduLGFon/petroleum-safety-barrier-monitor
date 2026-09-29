@@ -15,6 +15,13 @@
 services:
   # Dashboard via vite HMR (default port 5173, listens on 0.0.0.0 in Docker).
   app:
+    build:
+      context: .
+      # Deps only, no `deno task build`: dev bind-mounts `./:/app` and runs
+      # `task dev` (vite HMR), so the prod bundle would be built (~20s) and
+      # then hidden by the mount. Prod (`compose.yml` alone) still builds
+      # the default `prod` stage with the bundle baked in.
+      target: base
     command: ["task", "dev", "--host", "--port", "5173"]
     volumes:
       - ./:/app

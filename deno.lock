@@ -1,6 +1,7 @@
 {
   "version": "5",
   "specifiers": {
+    "jsr:@db/postgres@0.19.5": "0.19.5",
     "jsr:@db/postgres@~0.19.5": "0.19.5",
     "jsr:@deno/esbuild-plugin@^1.2.0": "1.2.1",
     "jsr:@deno/installer-shell-setup@*": "0.3.4",
