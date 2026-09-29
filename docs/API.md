@@ -104,7 +104,10 @@ trigger (`trg_barriers_set_compliance` on the stored column
 string) and `syncedAt` (server ISO). `resolveKpi` translates the keys to
 display strings (already-string keys pass through intact for compat with older
 servers); when the buckets are absent the UI uses the fixed fields (covers
-only the known statuses).
+only the known statuses). Admin snapshots also carry `inactive`/`deleted`
+counts over the same filter subset ignoring `rowScope` (absent reads as 0);
+they feed the band's Situacao segments and are never computed for other
+roles, so hidden rows stay invisible there.
 
 `WireCategoryCompliance` carries `{ categoryId, compliant, total }`;
 `resolveChartData` derives `Não Conforme = max(0, total - compliant)`

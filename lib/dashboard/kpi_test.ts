@@ -1,7 +1,7 @@
 // Unit tests for lib/dashboard/kpi.ts - single-pass KPI aggregation.
 import { assertEquals, assertStrictEquals } from "jsr:@std/assert@^1";
-import type { Barrier } from "../types.ts";
 import { computeKpi, countScopeRows } from "./kpi.ts";
+import type { Barrier } from "../types.ts";
 
 function barrier(over: Partial<Barrier> = {}): Barrier {
   return {

@@ -1,11 +1,16 @@
 // Dashboard sections - page shell with every dashboard section.
 // Why: client (mock) and server (HTTP) modes share one render tree; only the
 // data hook feeding `dash` differs. Settings defaults gate lives here too.
+import type {
+  AuthUser,
+  Barrier,
+  KpiSnapshot,
+  SyncStatus,
+} from "../../lib/types.ts";
+
 import { TableStatusRow } from "../../components/table/TableStatusRow.tsx";
 
 import { DashboardFooter, DashboardOverlays } from "./DashboardChrome.tsx";
-
-import type { AuthUser, Barrier, SyncStatus } from "../../lib/types.ts";
 
 import { LocationFilter } from "../../components/LocationFilter.tsx";
 
@@ -30,11 +35,14 @@ import { Header } from "../../components/Header.tsx";
 import { KpiSections } from "./KpiSections.tsx";
 
 // Either data hook return, plus optional server-only fetch state.
+// kpi stays the domain KpiSnapshot (optional scope counts): the client hook
+// always counts scopes while the server hook may carry an older snapshot.
 // isInitial = first paint with zero rows (splash territory).
 // isRefreshing = background refetch with stale rows kept (table-local shimmer).
 export type Dash =
-  & ReturnType<typeof useDashboard>
+  & Omit<ReturnType<typeof useDashboard>, "kpi">
   & {
+    kpi: KpiSnapshot;
     loading?: boolean;
     isInitial?: boolean;
     isRefreshing?: boolean;
@@ -239,6 +247,9 @@ export function DashboardSections(
           isUrgentActive={isUrgentActive}
           showUrgent={showUrgent}
           resetFilters={resetFilters}
+          rowScope={filters.rowScope}
+          onRowScope={(s) => setFilter({ rowScope: s })}
+          isAdmin={isAdmin}
         />
 
         {

@@ -49,6 +49,10 @@ Deno.test("useServerDashboard loads page/kpi/chart after hydration", async () =>
   });
   assertStrictEquals(d.filteredTotal, expected.total);
   assertStrictEquals(d.kpi.total, d.filteredTotal);
+  // The band's scope segments count over the unscoped subset, so they see
+  // the generator tail the table hides.
+  assertStrictEquals(d.kpi.inactive! > 0, true);
+  assertStrictEquals(d.kpi.deleted! > 0, true);
   assertEquals(calls, ["barriers:0", "kpi:0", "chart:0"]);
 });
 

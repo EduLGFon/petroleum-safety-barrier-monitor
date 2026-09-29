@@ -88,6 +88,25 @@ export const CRIT_COLORS: Record<
   },
 };
 
+// Visibility-scope segments for the admin status band (Desativadas /
+// Excluídas). Deliberately grayscale: they switch which rows are visible,
+// not the availability of the rows themselves.
+export const SCOPE_COLORS: Record<
+  string,
+  { solid: string; bg: string; border: string }
+> = {
+  "Desativadas": {
+    solid: "#94a3b8",
+    bg: "rgba(148,163,184,.1)",
+    border: "rgba(148,163,184,.28)",
+  },
+  "Excluídas": {
+    solid: "#64748b",
+    bg: "rgba(100,116,139,.12)",
+    border: "rgba(100,116,139,.35)",
+  },
+};
+
 // Canonical order for the well-known availability values. Anything new
 // sorts after these (by volume) so bands and reports stay stable across
 // deploys. Shared by StatusBand and export summaries - single source.

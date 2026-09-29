@@ -37,7 +37,8 @@ dashboard island, the upstream sync loop and the alert digest loop. There is no
   compliance percentage, critical non-compliant, without action plan, plus a
   catch-all "other statuses" card and a criticality rank strip.
 - Availability status band sized by volume; clicking a segment filters the
-  table by that status.
+  table by that status. Admins also get Desativadas/Excluídas segments that
+  switch the visibility scope instead.
 - Compliance chart by category (stacked bars or an executive summary with a
   donut and a Top-NC list), sortable by volume, NC rate or name, with an
   aggregated "others" tail and click-through into the table.

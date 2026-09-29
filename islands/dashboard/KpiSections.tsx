@@ -1,7 +1,11 @@
 // KPI sections - status band, KPI cards, chart, and NC alert.
 // Why: one data-driven block (KPI snapshot + chart rows) shared verbatim by
 // both dashboard modes; keeps DashboardSections to shell composition.
-import type { CategoryCompliance, KpiSnapshot } from "../../lib/types.ts";
+import type {
+  CategoryCompliance,
+  KpiSnapshot,
+  RowScope,
+} from "../../lib/types.ts";
 
 import { ComplianceChart } from "../../components/ComplianceChart.tsx";
 
@@ -23,6 +27,11 @@ interface KpiSectionsProps {
   isUrgentActive: boolean;
   showUrgent: () => void;
   resetFilters: () => void;
+  // Visibility scope band segments (admin only; everyone else sees the
+  // availability band alone).
+  rowScope: RowScope;
+  onRowScope: (s: RowScope) => void;
+  isAdmin: boolean;
 }
 
 // KpiSections: availability band, cards, conformity chart, and NC alert.
@@ -38,6 +47,9 @@ export function KpiSections(
     isUrgentActive,
     showUrgent,
     resetFilters,
+    rowScope,
+    onRowScope,
+    isAdmin,
   }: KpiSectionsProps,
 ) {
   return (
@@ -48,6 +60,9 @@ export function KpiSections(
           kpi={kpi}
           activeFilter={activeAvailability}
           onFilter={onDispFilter}
+          rowScope={rowScope}
+          onRowScope={onRowScope}
+          isAdmin={isAdmin}
         />
       </div>
 

@@ -2,21 +2,31 @@
 // This is why it exists: availability shares as a bare row of glass
 // cells (colored label over white value), sized by volume. Segments are
 // dynamic - new statuses appear automatically - and click to filter.
+// Admins also get two trailing scope segments (Desativadas / Excluídas)
+// that switch the visibility scope instead of the availability filter.
 import {
   DISP_KNOWN_ORDER as KNOWN_ORDER,
   dispColorFor,
+  SCOPE_COLORS,
   shortStatusLabel,
 } from "../lib/constants.ts";
+import type { KpiSnapshot, RowScope } from "../lib/types.ts";
 import { AURORA, AURORA_TYPE } from "../lib/aurora.ts";
-import type { KpiSnapshot } from "../lib/types.ts";
 import { fmt } from "../lib/utils.ts";
 interface Props {
   kpi: KpiSnapshot;
   activeFilter: string;
   onFilter: (k: string) => void;
+  // Visibility scope switching (admin Situacao segments). Non-admins never
+  // receive scope segments, so their band is availability-only.
+  rowScope: RowScope;
+  onRowScope: (s: RowScope) => void;
+  isAdmin?: boolean;
 }
 // StatusBand: clickable availability segments sized by volume; click toggles the filter.
-export function StatusBand({ kpi, activeFilter, onFilter }: Props) {
+export function StatusBand(
+  { kpi, activeFilter, onFilter, rowScope, onRowScope, isAdmin = false }: Props,
+) {
   // Prefer the dynamic buckets; the wire path only carries fixed fields, so
   // reconstruct from those when buckets are absent (known statuses + other).
   const counts = kpi.byAvailability ?? {
@@ -36,6 +46,23 @@ export function StatusBand({ kpi, activeFilter, onFilter }: Props) {
     }
     return counts[b] - counts[a];
   });
+  // Admin scope segments trail the availability ones: same sizing and
+  // toggle behavior, but they switch rowScope instead of availability.
+  // Absent counts read as 0 so the segments stay put on old snapshots.
+  const scopeKeys = isAdmin
+    ? [
+      {
+        label: "Desativadas",
+        scope: "inactive" as RowScope,
+        count: kpi.inactive ?? 0,
+      },
+      {
+        label: "Excluídas",
+        scope: "deleted" as RowScope,
+        count: kpi.deleted ?? 0,
+      },
+    ]
+    : [];
   return (
     <div style={{ marginBottom: "var(--d-section)" }}>
       <div
@@ -102,6 +129,64 @@ export function StatusBand({ kpi, activeFilter, onFilter }: Props) {
                 }}
               >
                 {fmt(count)}
+              </div>
+            </button>
+          );
+        })}
+        {scopeKeys.map((seg, j) => {
+          const cfg = SCOPE_COLORS[seg.label] ?? dispColorFor(seg.label),
+            isA = rowScope === seg.scope,
+            isDim = rowScope !== "active" && !isA;
+          return (
+            <button
+              type="button"
+              key={seg.label}
+              onClick={() => onRowScope(isA ? "active" : seg.scope)}
+              title={`${seg.label} - clique para ver`}
+              aria-pressed={isA}
+              style={{
+                flex: Math.max(seg.count, 1),
+                background: AURORA.seg,
+                border: isA
+                  ? `1px solid ${AURORA.value}`
+                  : `1px solid ${AURORA.segBorder}`,
+                borderRadius: AURORA.segRadius,
+                cursor: "pointer",
+                padding: "10px 4px",
+                textAlign: "center",
+                opacity: isDim ? 0.35 : 1,
+                minWidth: "var(--d-seg-min)",
+                flexShrink: 0,
+                boxShadow: isA ? `0 0 18px ${cfg.solid}55` : "none",
+                transition:
+                  "opacity .22s var(--ease-std), box-shadow .22s var(--ease-std), border .15s",
+                animation: `cardAppear .3s ${
+                  Math.min((keys.length + j) * 40, 400)
+                }ms var(--ease-out) both`,
+              }}
+            >
+              <div
+                style={{
+                  fontSize: AURORA_TYPE.bandLabel.fontSize,
+                  fontWeight: AURORA_TYPE.bandLabel.fontWeight,
+                  color: cfg.solid,
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
+                  whiteSpace: "nowrap",
+                }}
+              >
+                {shortStatusLabel(seg.label)}
+              </div>
+              <div
+                className="tnum"
+                style={{
+                  fontFamily: "var(--font-display)",
+                  fontSize: AURORA_TYPE.bandValue.fontSize,
+                  fontWeight: AURORA_TYPE.bandValue.fontWeight,
+                  color: AURORA.value,
+                }}
+              >
+                {fmt(seg.count)}
               </div>
             </button>
           );
