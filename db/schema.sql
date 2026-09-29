@@ -135,7 +135,10 @@ create table if not exists barriers (
 
 create index if not exists idx_barriers_external_code on barriers(external_code);
 create index if not exists idx_barriers_deleted_at on barriers(deleted_at);
-create index if not exists idx_barriers_is_active on barriers(is_active);
+-- NOTE: indexes on later-added columns must be created AFTER their
+-- ALTER TABLE ... ADD COLUMN stanza below. An index placed here fails on
+-- pre-existing databases, where CREATE TABLE IF NOT EXISTS is a no-op and
+-- the column does not exist yet (see idx_barriers_is_active).
 
 -- Later-added sheet columns ride along idempotently (same pattern as
 -- locations.name above) so existing databases gain them on next migrate.

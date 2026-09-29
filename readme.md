@@ -622,9 +622,9 @@ Files are named with the export date, one file per export.
 
 ## Testing and quality gates
 
-- `deno task check` runs format check, lint and a type check over the entry
-  points, and `deno task test` runs the suite with a deliberately narrow
-  permission set (fixtures read, loopback network, and only the mail/database
+- `deno task check` runs format check, lint, a type check over the entry
+  points, and the migration-order guard, and `deno task test` runs the suite with a deliberately narrow
+  permission set (fixtures + schema read, loopback network, and only the mail/database
   environment variables). Tests cannot reach the live upstream API: everything
   external is exercised through injected fetch stubs, scripted sockets and
   replay fixtures.
