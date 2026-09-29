@@ -3,7 +3,7 @@
 # local toolchain. The image builds the Fresh bundle (`_fresh/`) at build
 # time; runtime config comes from the mounted `.env` (never baked in - see
 # .dockerignore), so the same image serves app, poller, and one-off tools.
-FROM denoland/deno:2.9.6
+FROM denoland/deno:2.9.7
 
 WORKDIR /app
 
