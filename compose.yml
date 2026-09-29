@@ -38,6 +38,10 @@ services:
   # Live Fracttal poll loop (env-driven scopes/cadence, same image).
   # Needs FRACTTAL_KEY/FRACTTAL_SECRET + FRACTTAL_SYNC_SCOPES in .env;
   # without credentials it exits(2) and the restart policy retries.
+  # stop_grace_period covers a full sweep (fetch + row-by-row apply can run
+  # minutes): without it Docker SIGKILLs 10s after SIGTERM mid-sweep and the
+  # next startRun reaps the orphan as a noisy `reaped:` failed row.
+  # Deploy drain: stop -t 180 poller when no fresh `running` row exists.
   poller:
     image: barrier-monitor:latest
     command: ["run", "-A", "scripts/fracttal-poll.ts"]
@@ -45,11 +49,13 @@ services:
     volumes:
       - ./.env:/app/.env:ro
     restart: unless-stopped
+    stop_grace_period: 3m
 
   # Scheduled alert digest (detect -> enqueue -> mail, same wiring as the
   # alerts:check --apply one-shot). Needs DATABASE_URL + OPS_SMTP_* in .env;
   # without a relay it dry-runs (detect + report only). Cadence via
-  # ALERTS_POLL_SECONDS (default 900).
+  # ALERTS_POLL_SECONDS (default 900). Grace period lets an in-flight digest
+  # finish sending before SIGKILL.
   alerts:
     image: barrier-monitor:latest
     command: ["run", "-A", "scripts/alerts-poll.ts"]
@@ -57,6 +63,7 @@ services:
     volumes:
       - ./.env:/app/.env:ro
     restart: unless-stopped
+    stop_grace_period: 1m
 
   # One-off toolbox (migrate, seed, import, sync, alerts). Never started by
   # `compose up`; invoked explicitly, e.g.:

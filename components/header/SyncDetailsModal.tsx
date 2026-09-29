@@ -7,6 +7,8 @@ import {
   formatInstant,
   friendlyScope,
   healthLabel,
+  isReapedNote,
+  runResultLabel,
   SYNC_DOT,
   toHealthKind,
 } from "../../lib/sync-indicator.ts";
@@ -37,6 +39,11 @@ export function SyncDetailsModal(
   const run = sync.lastRun;
   const kind = toHealthKind(sync, conn);
   const end = run ? formatInstant(run.finishedAt) : null;
+  const reaped = run ? isReapedNote(run.note) : false;
+  const duration = run
+    ? formatDuration(run.startedAt, run.finishedAt) +
+      (reaped ? " (tempo órfã até limpeza)" : "")
+    : null;
   const [tab, setTab] = useState<"last-run" | "last-day">("last-run");
   const onKey = useCallback((e: KeyboardEvent) => {
     if (e.key === "Escape") onClose();
@@ -177,15 +184,9 @@ export function SyncDetailsModal(
             {run && end && (
               <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
                 <Row k="Quando" v={end.full} />
-                <Row
-                  k="Duração"
-                  v={formatDuration(run.startedAt, run.finishedAt)}
-                />
+                {duration && <Row k="Duração" v={duration} />}
                 <Row k="Origem" v={friendlyScope(run.scope)} />
-                <Row
-                  k="Resultado"
-                  v={run.status === "ok" ? "Concluída" : "Falhou"}
-                />
+                <Row k="Resultado" v={runResultLabel(run.status, run.note)} />
               </div>
             )}
             {run?.note && (

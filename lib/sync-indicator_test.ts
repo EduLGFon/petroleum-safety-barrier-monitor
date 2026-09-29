@@ -6,6 +6,8 @@ import {
   formatInstant,
   friendlyScope,
   healthLabel,
+  isReapedNote,
+  runResultLabel,
   toDeltas,
   toHealthKind,
 } from "./sync-indicator.ts";
@@ -102,6 +104,33 @@ Deno.test("toHealthKind never downgrades a malformed timestamp", () => {
     lastRun: { ...sync().lastRun!, finishedAt: "not-a-date" },
   });
   assertStrictEquals(toHealthKind(broken, "connected", NOW_STALE), "synced");
+});
+
+Deno.test("toHealthKind maps reaped orphans to interrupted, not failed", () => {
+  const reaped = sync({
+    lastRun: {
+      ...sync().lastRun!,
+      status: "failed",
+      note: "reaped: orphaned running row (superseded, never finished)",
+    },
+  });
+  assertStrictEquals(
+    toHealthKind(reaped, "connected", NOW_FRESH),
+    "interrupted",
+  );
+  assertStrictEquals(healthLabel("interrupted"), "Sincronização interrompida");
+  assertStrictEquals(
+    runResultLabel("failed", reaped.lastRun!.note),
+    "Interrompida",
+  );
+  assertStrictEquals(runResultLabel("failed", "boom"), "Falhou");
+  assertStrictEquals(runResultLabel("ok", "anything"), "Concluída");
+  assertStrictEquals(
+    isReapedNote("reaped: orphaned running row (superseded, never finished)"),
+    true,
+  );
+  assertStrictEquals(isReapedNote("boom"), false);
+  assertStrictEquals(isReapedNote(null), false);
 });
 
 Deno.test("formatInstant renders pt-BR date and time parts", () => {

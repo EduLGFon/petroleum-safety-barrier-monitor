@@ -19,10 +19,14 @@ export interface Deltas {
 }
 
 // HealthKind: single merged state the dot and subtitle line render.
+// `interrupted` is a reaped orphan (previous poller died mid-sweep, next
+// startRun marked it failed). It renders amber like `outdated`, never red,
+// so self-heal bookkeeping does not alarm as a real sync error.
 export type HealthKind =
   | "synced"
   | "syncing"
   | "failed"
+  | "interrupted"
   | "stale"
   | "outdated"
   | "never"
@@ -39,10 +43,12 @@ export interface UnifiedHealth {
 
 // Sync palette: solid core per sync state. Connection halo comes from
 // AURORA_CONN so accent switching keeps working without JS changes.
+// `interrupted` shares the amber tone: an orphan cleanup, not an error.
 export const SYNC_DOT = {
   synced: "#17c964",
   syncing: "#f5a524",
   failed: "#f31260",
+  interrupted: "#fb923c",
   stale: "#f31260",
   outdated: "#fb923c",
   never: "#a1a1aa",
@@ -68,6 +74,28 @@ export function toDeltas(
   };
 }
 
+// REAPED_NOTE_PREFIX: audit marker written by reapStaleRuns in
+// lib/server/sql/sync.ts for orphaned `running` rows. The row's duration is
+// orphan dwell (started_at to reap time), never work time.
+export const REAPED_NOTE_PREFIX = "reaped:";
+
+// isReapedNote: true when a sync_state note is orphan cleanup, not a real
+// fetch/map/apply error. Case-insensitive prefix match, null-safe.
+export function isReapedNote(note: string | null | undefined): boolean {
+  if (typeof note !== "string") return false;
+  return note.trimStart().toLowerCase().startsWith(REAPED_NOTE_PREFIX);
+}
+
+// runResultLabel: pt-BR result word for the audit modal. Reaped orphans say
+// "Interrompida" so operators do not read dwell time as a failed attempt.
+export function runResultLabel(
+  status: "ok" | "failed",
+  note: string,
+): string {
+  if (status === "ok") return "Concluída";
+  return isReapedNote(note) ? "Interrompida" : "Falhou";
+}
+
 // SYNC_OUTDATED_MINUTES: an `ok` last run older than this stops rendering
 // green. The default poll cadence produces a finished run every ~7 minutes,
 // so 30 minutes without one means the poller is not producing (dead, not
@@ -76,6 +104,7 @@ export const SYNC_OUTDATED_MINUTES = 30;
 
 // toHealthKind: precedence matrix. Offline wins over everything so a dead
 // backend never shows a calm green dot; syncing beats idle/failed/stale.
+// Reaped orphans map to `interrupted` (amber), never `failed` (red).
 export function toHealthKind(
   sync: SyncStatus | null,
   conn: Conn,
@@ -88,7 +117,9 @@ export function toHealthKind(
   }
   if (sync.state === "stale") return "stale";
   if (sync.state === "unknown" || sync.lastRun === null) return "never";
-  if (sync.lastRun.status === "failed") return "failed";
+  if (sync.lastRun.status === "failed") {
+    return isReapedNote(sync.lastRun.note) ? "interrupted" : "failed";
+  }
   if (isOutdated(sync.lastRun.finishedAt, nowMs)) return "outdated";
   return "synced";
 }
@@ -196,6 +227,7 @@ export function friendlyScope(scope: string): string {
 export function healthLabel(kind: HealthKind): string {
   if (kind === "syncing") return "Sincronizando…";
   if (kind === "failed") return "Falha na sincronização";
+  if (kind === "interrupted") return "Sincronização interrompida";
   if (kind === "stale") return "Sincronização possivelmente travada";
   if (kind === "outdated") return "Sincronização desatualizada";
   if (kind === "never") return "Sem sincronizações";

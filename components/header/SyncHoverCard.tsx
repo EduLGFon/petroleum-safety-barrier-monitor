@@ -9,6 +9,7 @@ import {
   formatInstant,
   friendlyScope,
   healthLabel,
+  isReapedNote,
   SYNC_DOT,
   toHealthKind,
 } from "../../lib/sync-indicator.ts";
@@ -104,6 +105,10 @@ export function SyncHoverCard({ sync, conn, onOpenDetails }: Props) {
   const end = run ? formatInstant(run.finishedAt) : null;
   const running = sync?.runningSince ? formatInstant(sync.runningSince) : null;
   const headlineRel = kind === "syncing" ? running?.relative : end?.relative;
+  const duration = run
+    ? formatDuration(run.startedAt, run.finishedAt) +
+      (isReapedNote(run.note) ? " (tempo órfã até limpeza)" : "")
+    : null;
   return (
     // Bridge: the transparent top padding keeps the cursor inside the hover
     // wrapper while crossing from the title to the card, so no mouseleave
@@ -147,12 +152,7 @@ export function SyncHoverCard({ sync, conn, onOpenDetails }: Props) {
         </div>
         <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
           {end && <Row k="Quando" v={end.full} />}
-          {run && (
-            <Row
-              k="Duração"
-              v={formatDuration(run.startedAt, run.finishedAt)}
-            />
-          )}
+          {run && duration && <Row k="Duração" v={duration} />}
           {run && <Row k="Origem" v={friendlyScope(run.scope)} />}
           {!run && (
             <Row
