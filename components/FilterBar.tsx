@@ -276,6 +276,8 @@ export function FilterBar(
             })}
           placeholder="Situação"
           opts={ROW_SCOPE_OPTS.map((o) => o.label)}
+          openUnfiltered
+          clearValue="Todas"
         />
       )}
       {!hiddenPinned.includes("plan") && (

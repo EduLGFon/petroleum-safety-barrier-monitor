@@ -61,11 +61,19 @@ function MenuPortal({ left, top, width, children }: {
 // exact (case-insensitive) option and pressing Enter commits it; Escape or
 // blurring with no match reverts to the current value.
 export function Combo(
-  { value, onChange, placeholder, opts }: {
+  { value, onChange, placeholder, opts, openUnfiltered = false, clearValue }: {
     value: string;
     onChange: (v: string) => void;
     placeholder: string;
     opts: string[];
+    // Start with an empty draft on focus (full option list) instead of the
+    // current value. Combos that always carry a value would otherwise open
+    // narrowed to that single option, hiding every alternative.
+    openUnfiltered?: boolean;
+    // Value the "{placeholder} (todas)" row commits instead of "". A combo
+    // with no empty state (Situação) clears to its all-rows option, so the
+    // row means what its label says instead of falling back elsewhere.
+    clearValue?: string;
   },
 ) {
   const [open, setOpen] = useState(false);
@@ -73,6 +81,8 @@ export function Combo(
   const [anchor, setAnchor] = useState({ left: 0, top: 0, min: 0 });
   const input = useRef<HTMLInputElement>(null);
   const active = !!value;
+  // Clearing commits clearValue when the combo has no empty state.
+  const cleared = clearValue ?? "";
   // External value changes (reset, restored state) win while closed.
   useEffect(() => {
     if (!open) setDraft(value);
@@ -148,7 +158,7 @@ export function Combo(
         spellcheck={false}
         title={value || placeholder}
         onFocus={() => {
-          setDraft(value);
+          setDraft(openUnfiltered ? "" : value);
           setOpen(true);
         }}
         onBlur={() => {
@@ -213,19 +223,19 @@ export function Combo(
           >
             <li
               role="option"
-              aria-selected={value === ""}
+              aria-selected={value === cleared}
               onMouseDown={(e) => {
                 e.preventDefault();
-                commit("");
+                commit(cleared);
               }}
               style={{
                 padding: "6px 10px",
                 fontSize: "var(--d-body)",
                 borderRadius: 7,
                 cursor: "pointer",
-                color: value === "" ? "var(--accent-2)" : AURORA.label,
-                fontWeight: value === "" ? 700 : 400,
-                background: value === "" ? "var(--glow)" : "transparent",
+                color: value === cleared ? "var(--accent-2)" : AURORA.label,
+                fontWeight: value === cleared ? 700 : 400,
+                background: value === cleared ? "var(--glow)" : "transparent",
               }}
             >
               {placeholder} (todas)
