@@ -57,7 +57,11 @@ export const handler = define.handlers({
     }
 
     try {
-      const snapshot = await getKpi(filter);
+      // Admin snapshots carry inactive/deleted scope counts for the band
+      // segments; other roles get scope-local numbers only.
+      const snapshot = await getKpi(filter, {
+        scopeCounts: dataAuth.role === "admin",
+      });
       return Response.json(snapshot);
     } catch (err) {
       return internal(

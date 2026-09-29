@@ -127,6 +127,10 @@ export interface KpiSnapshot {
   // byCriticality). Feeds the ESO/A split on the Críticas NC card and the
   // per-rank NC rates in the criticality panel.
   ncByCriticality?: Record<string, number>;
+  // Row visibility scope counts over the same filter subset IGNORING
+  // rowScope (admin Situacao band segments). Absent reads as 0.
+  inactive?: number;
+  deleted?: number;
   // Server time when the snapshot was computed (ISO). Absent in mock mode.
   syncedAt?: string;
 }

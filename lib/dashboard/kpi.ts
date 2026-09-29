@@ -90,3 +90,17 @@ export function computeKpi(b: Barrier[]): KpiSnapshot {
     ncByCriticality,
   };
 }
+
+// countScopeRows: visibility-scope counts over rows that still carry hidden
+// ones (the station slice before applyRowScope, the full mock set). Absent
+// flags read as active/live, so old payloads count as fully visible.
+export function countScopeRows(
+  b: Barrier[],
+): { inactive: number; deleted: number } {
+  let inactive = 0, deleted = 0;
+  for (const x of b) {
+    if ((x.deletedAt ?? null) !== null) deleted++;
+    else if ((x.isActive ?? true) === false) inactive++;
+  }
+  return { inactive, deleted };
+}

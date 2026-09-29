@@ -1,7 +1,7 @@
 // Unit tests for lib/dashboard/kpi.ts - single-pass KPI aggregation.
 import { assertEquals, assertStrictEquals } from "jsr:@std/assert@^1";
 import type { Barrier } from "../types.ts";
-import { computeKpi } from "./kpi.ts";
+import { computeKpi, countScopeRows } from "./kpi.ts";
 
 function barrier(over: Partial<Barrier> = {}): Barrier {
   return {
@@ -151,4 +151,18 @@ Deno.test("computeKpi counts barriers without an action plan", () => {
   ]);
   assertStrictEquals(k.total, 3);
   assertStrictEquals(k.withoutActionPlan, 2);
+});
+
+Deno.test("countScopeRows splits disabled and soft-deleted rows", () => {
+  assertEquals(countScopeRows([]), { inactive: 0, deleted: 0 });
+  assertEquals(
+    countScopeRows([
+      barrier({ id: 1 }),
+      barrier({ id: 2, isActive: false }),
+      barrier({ id: 3, deletedAt: "2026-02-01" }),
+      // A deleted row counts as deleted even when also flagged inactive.
+      barrier({ id: 4, isActive: false, deletedAt: "2026-03-01" }),
+    ]),
+    { inactive: 1, deleted: 2 },
+  );
 });

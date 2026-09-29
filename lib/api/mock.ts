@@ -2,7 +2,11 @@
 // This is why it exists: filters operate on raw WireBarrier[] using numeric
 // ids, exactly like a real SQL WHERE clause would, then resolves only the
 // final page to domain objects.
-import { computeChartData, computeKpi as computeKpiLocal } from "../utils.ts";
+import {
+  computeChartData,
+  computeKpi as computeKpiLocal,
+  countScopeRows,
+} from "../utils.ts";
 
 import type { BarriersQuery, WireBarrier } from "../wireTypes.ts";
 
@@ -143,10 +147,17 @@ export const mockAdapter: BarriersApi = {
   },
 
   // Mock getKpi: filters by the full query and computes local KPI snapshot.
+  // Scope counts ride over the unscoped match so the admin band segments
+  // always reflect the whole filter subset (mock rows are role-seeded, so
+  // non-admin sets simply count zero hidden rows).
   getKpi(query) {
-    const all = getWireBarriers().filter((w) => matchesQuery(w, query));
+    const scoped = getWireBarriers().filter((w) => matchesQuery(w, query));
+    const unscoped = getWireBarriers().filter((w) =>
+      matchesQuery(w, { ...query, rowScope: "all" })
+    );
     return Promise.resolve({
-      ...computeKpiLocal(resolveBarriers(all)),
+      ...computeKpiLocal(resolveBarriers(scoped)),
+      ...countScopeRows(resolveBarriers(unscoped)),
       syncedAt: new Date().toISOString(),
     });
   },

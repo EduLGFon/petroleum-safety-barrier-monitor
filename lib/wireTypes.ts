@@ -88,6 +88,11 @@ export interface WireKpiSnapshot {
   // Non-compliant count per criticality rank, keyed by numeric id as string
   // like byCriticality; resolveKpi translates it the same way.
   ncByCriticality?: Record<string, number>;
+  // Row visibility scope counts over the same filter subset IGNORING
+  // rowScope (admin Situacao band segments). Absent on old servers and on
+  // non-admin calls, where hidden rows must stay invisible; read as 0.
+  inactive?: number;
+  deleted?: number;
   // Server time when the snapshot was computed (ISO). Lets the UI show
   // staleness once the dashboard moves to server-paginated mode.
   syncedAt?: string;

@@ -5,6 +5,7 @@ import {
   applySorting,
   computeChartData,
   computeKpi,
+  countScopeRows,
   paginate,
 } from "../../lib/utils.ts";
 import type { Barrier, FilterState } from "../../lib/types.ts";
@@ -26,8 +27,14 @@ export function useDashboardDerived(
     [allBarriers, location],
   );
 
+  // Main aggregates honor the visibility scope; the band's scope segments
+  // count over the whole station slice instead (seeded per role, so
+  // non-admin slices simply report zero hidden rows).
   const kpi = useMemo(
-    () => computeKpi(applyRowScope(locationBarriers, filters.rowScope)),
+    () => ({
+      ...computeKpi(applyRowScope(locationBarriers, filters.rowScope)),
+      ...countScopeRows(locationBarriers),
+    }),
     [locationBarriers, filters.rowScope],
   );
   const chartData = useMemo(

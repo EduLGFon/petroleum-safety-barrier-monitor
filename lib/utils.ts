@@ -29,4 +29,4 @@ export {
   timeAgoPt,
 } from "./format.ts";
 export { computeChartData } from "./dashboard/chart.ts";
-export { computeKpi } from "./dashboard/kpi.ts";
+export { computeKpi, countScopeRows } from "./dashboard/kpi.ts";

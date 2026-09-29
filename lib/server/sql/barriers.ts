@@ -135,9 +135,13 @@ export async function getBarriersByIds(
 // Computes KPI snapshot counts over the given filters (location-only callers
 // pass a bare id, which keeps the old call shape working). Fixed fields
 // cover the well-known statuses; dynamic by* buckets carry EVERY id present
-// (GROUP BY) so new statuses reconcile instead of vanishing.
+// (GROUP BY) so new statuses reconcile instead of vanishing. Admin callers
+// pass scopeCounts to also receive inactive/deleted totals over the same
+// filter subset ignoring rowScope (band segments); it stays off otherwise
+// so hidden rows never leak into non-admin snapshots.
 export async function getKpi(
   filter?: number | BarriersQuery,
+  opts: { scopeCounts?: boolean } = {},
 ): Promise<WireKpiSnapshot> {
   const q: BarriersQuery = typeof filter === "number"
     ? { locationId: filter }
@@ -145,6 +149,11 @@ export async function getKpi(
   const where = buildWhere(q);
   const from =
     `from barriers b join locations loc on loc.id = b.location_id ${where.text}`;
+  // Scope-wide visibility counts ignore rowScope but keep every other
+  // filter, so the band segments match the table they shortcut to.
+  const scopeWhere = opts.scopeCounts
+    ? buildWhere({ ...q, rowScope: "all" })
+    : null;
   const [rows, dispRows, confRows, critRows, ncCritRows] = await Promise.all([
     queryRows<{
       total: string;
@@ -202,6 +211,20 @@ export async function getKpi(
     ),
   ]);
 
+  // Visibility scope counts (admin band segments only): live-but-disabled
+  // rows plus soft-deleted rows over the unscoped filter subset. A separate
+  // round-trip gated on the flag, so non-admin snapshots never observe
+  // hidden rows and exports keep their five-query shape.
+  const scopeRows = scopeWhere
+    ? await queryRows<{ inactive: string; deleted: string }>(
+      `select
+         count(*) filter (where b.deleted_at is null and not coalesce(b.is_active, true))::text as inactive,
+         count(*) filter (where b.deleted_at is not null)::text as deleted
+       from barriers b join locations loc on loc.id = b.location_id ${scopeWhere.text}`,
+      scopeWhere.args,
+    )
+    : [];
+
   const r = rows[0];
   const total = Number(r?.total ?? 0);
   const compliant = Number(r?.compliant ?? 0);
@@ -231,6 +254,8 @@ export async function getKpi(
     byCompliance: toBucket(confRows),
     byCriticality: toBucket(critRows),
     ncByCriticality: toBucket(ncCritRows),
+    inactive: Number(scopeRows[0]?.inactive ?? 0),
+    deleted: Number(scopeRows[0]?.deleted ?? 0),
     syncedAt: new Date().toISOString(),
   };
 }
