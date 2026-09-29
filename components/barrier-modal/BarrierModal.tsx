@@ -27,6 +27,17 @@ interface Props {
   sessionUser?: AuthUser | null;
   onSaved?: () => void;
 }
+
+// canEditBarrier: the Editar tab is an admin tool on live rows only.
+// Soft-deleted rows reject metadata writes server-side, so offering the
+// form would end in a silent no-op save; the header scope tag says why.
+export function canEditBarrier(
+  b: Pick<Barrier, "deletedAt"> | null | undefined,
+  isAdmin: boolean,
+): boolean {
+  if (!isAdmin || !b) return false;
+  return (b.deletedAt ?? null) === null;
+}
 // BarrierModal renders the detail dialog shell; handles ESC close, body scroll-lock, and backdrop dismiss.
 export function BarrierModal(
   { barrier, onClose, sessionUser, onSaved }: Props,
@@ -195,7 +206,8 @@ export function BarrierModal(
   );
 }
 // Content renders header, NC alert with days-since logic, and tab switch.
-// Admins get a third Editar tab hosting the BarrierEditor island.
+// Admins get a third Editar tab hosting the BarrierEditor island, except on
+// soft-deleted rows (see canEditBarrier).
 function Content(
   {
     b,
@@ -228,7 +240,7 @@ function Content(
   const tabs: { key: Tab; label: string; Icon: typeof InfoIcon }[] = [
     { key: "details", label: "Detalhes", Icon: InfoIcon },
     { key: "history", label: "Histórico", Icon: HistoryIcon },
-    ...(isAdmin
+    ...(canEditBarrier(local, isAdmin)
       ? [{ key: "edit" as Tab, label: "Editar", Icon: PencilIcon }]
       : []),
   ];
@@ -280,7 +292,7 @@ function Content(
       <div style={{ overflowY: "auto", flex: 1 }}>
         {tab === "details" && <BarrierDetails b={local} />}
         {tab === "history" && <BarrierHistory b={local} />}
-        {tab === "edit" && isAdmin && (
+        {tab === "edit" && canEditBarrier(local, isAdmin) && (
           <BarrierEditor
             key={local.id}
             barrier={local}
