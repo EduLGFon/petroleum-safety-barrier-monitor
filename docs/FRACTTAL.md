@@ -105,8 +105,9 @@ Single source of truth: `lib/server/fracttal/barrier-rules.ts` (pure,
 tested). The dump import (`scripts/fracttal-import.ts`) and the live sync
 (`lib/server/fracttal/map.ts`) both call it, so scope, station, typology,
 tags, and availability can never diverge again. Precedence: the import
-owns catalog rows (creates locations/categories on rebuild); the sync
-never creates them (unknown labels skip and are listed in the run report).
+owns full catalog rebuilds (deterministic ids); the sync creates missing
+locations/categories rows between rebuilds (ids continue past max(id)),
+so tenant drift converges on the next cycle instead of skipping.
 
 The app models barriers with `availability`, `compliance`, and `criticality`.
 Fracttal assets expose `active` and `available` plus operational fields;
@@ -282,15 +283,15 @@ signal beats a silent decay.
 The dump import owns catalog rebuilds; the live sync owns the rows between
 rebuilds. When they disagree, this table wins:
 
-| Concern                   | Import rebuild (`--apply`)                                                                                | Live sync (between rebuilds)                            |
-| ------------------------- | --------------------------------------------------------------------------------------------------------- | ------------------------------------------------------- |
-| locations/categories rows | creates from the dump taxonomy (code/type/display name; operator list supersedes derived names)           | never creates; unknown labels skip + list in the report |
-| barrier set               | truncates + rebuilds (all equipment + exclusion list; admitting gates recorded per row in `scope_source`) | upserts by `external_code`, soft-deletes sweep-absent   |
-| availability              | full dump WO/WR merge                                                                                     | asset flag + open-status WO sweep + windowed WR pass    |
-| `tag`/typology            | derived from description / parent chain                                                                   | same rules; updates applied on change                   |
-| criticality               | TAG suffix letter + `groups_2 = 'ESO'` flag (shared `criticalityLabelFor`)                                | rank ESO > A > B > C > D; ESO/A critical                |
-| history                   | one import stamp per barrier                                                                              | appends on real change via `record_status_change()`     |
-| audit                     | one `dump-import` row                                                                                     | per-scope `running/ok/failed` rows                      |
+| Concern                   | Import rebuild (`--apply`)                                                                                | Live sync (between rebuilds)                                                                                    |
+| ------------------------- | --------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------- |
+| locations/categories rows | creates from the dump taxonomy (code/type/display name; operator list supersedes derived names)           | creates missing rows between rebuilds (ids past max(id), names write-once); unresolvable rows still skip + list |
+| barrier set               | truncates + rebuilds (all equipment + exclusion list; admitting gates recorded per row in `scope_source`) | upserts by `external_code`, soft-deletes sweep-absent                                                           |
+| availability              | full dump WO/WR merge                                                                                     | asset flag + open-status WO sweep + windowed WR pass                                                            |
+| `tag`/typology            | derived from description / parent chain                                                                   | same rules; updates applied on change                                                                           |
+| criticality               | TAG suffix letter + `groups_2 = 'ESO'` flag (shared `criticalityLabelFor`)                                | rank ESO > A > B > C > D; ESO/A critical                                                                        |
+| history                   | one import stamp per barrier                                                                              | appends on real change via `record_status_change()`                                                             |
+| audit                     | one `dump-import` row                                                                                     | per-scope `running/ok/failed` rows                                                                              |
 
 Rebuild when: a new dump arrives, the taxonomy needs an overhaul, or a
 backfill must reconcile every scope (see below).

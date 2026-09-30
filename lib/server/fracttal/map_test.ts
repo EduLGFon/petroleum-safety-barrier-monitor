@@ -1,15 +1,18 @@
 // Unit tests for the Fracttal -> app barrier mapper (P3). Exact label
-// resolution is the contract; unknown values skip with a reason, never guess.
+// resolution is the contract; unresolvable values skip with a reason, never
+// guess (missing station/category labels are bootstrapped by ensureCatalog,
+// so mapAsset only skips what truly cannot resolve).
 import {
   AVAILABILITY_AVAILABLE,
   AVAILABILITY_UNAVAILABLE,
+  catalogNeeds,
   IMPORT_DEFAULTS,
   mapAsset,
   type MapContext,
   type MappedRow,
 } from "./map.ts";
 
-import { assertStrictEquals } from "jsr:@std/assert@^1";
+import { assertEquals, assertStrictEquals } from "jsr:@std/assert@^1";
 
 import type { FracttalAsset } from "./types.ts";
 
@@ -287,4 +290,50 @@ Deno.test("mapAsset admits ESO-flagged rows outside the keyword scope", () => {
 
 Deno.test("mapAsset skips excluded source rows with the reason", () => {
   expectSkip(mapAsset(asset({ code: "1013971" }), ctx), "excluded asset");
+});
+
+Deno.test("catalogNeeds collects distinct categories and parent-derived stations", () => {
+  const needs = catalogNeeds([
+    asset({ code: "A-1", groups_description: "Disjuntor" }),
+    asset({ code: "A-2", groups_description: "Disjuntor" }),
+    asset({
+      code: "A-3",
+      groups_description: "Bomba",
+      parent_description:
+        "// Seacrest Petroleo/ Area Norte/ SAO MATEUS - SM/ Unidade",
+    }),
+  ]);
+  assertEquals(needs.categories.sort(), ["Bomba", "Disjuntor"]);
+  assertEquals(
+    needs.locations.map((l) => l.code).sort(),
+    ["FAL", "SM"],
+  );
+  const sm = needs.locations.find((l) => l.code === "SM");
+  assertStrictEquals(sm?.name, "Sao Mateus");
+  assertStrictEquals(sm?.type, "Instalação");
+});
+
+Deno.test("catalogNeeds falls back to location_code and skips unmappable rows", () => {
+  const needs = catalogNeeds([
+    asset({ code: "", groups_description: "Disjuntor" }),
+    asset({ code: "1013971", groups_description: "Disjuntor" }),
+    asset({ code: "X-1", groups_description: "Bomba", location_code: "" }),
+    asset({ code: "X-2", groups_description: "Bomba", location_code: "zzz" }),
+  ]);
+  assertEquals(needs.categories, ["Bomba"]);
+  assertEquals(needs.locations, [{
+    code: "ZZZ",
+    name: null,
+    type: "Instalação",
+  }]);
+});
+
+Deno.test("catalogNeeds keeps the first non-null station name", () => {
+  const parent = "// Seacrest Petroleo/ Area Norte/ SAO MATEUS - SM/ Unidade";
+  const needs = catalogNeeds([
+    asset({ code: "A-1", parent_description: parent }),
+    asset({ code: "A-2", parent_description: "// X/ Y/ SM" }),
+  ]);
+  assertStrictEquals(needs.locations.length, 1);
+  assertStrictEquals(needs.locations[0]?.name, "Sao Mateus");
 });

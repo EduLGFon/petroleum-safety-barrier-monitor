@@ -4,13 +4,15 @@
 // source through parse -> map -> reconcile -> apply, with every write behind
 // a dry-run flag. Real SQL I/O comes from lib/server/sql/sync.ts via
 // defaultSyncIo (imported lazily so fixtures/tests can run without a DB).
-import type { MapContext, SyncBarrierInput } from "./map.ts";
+import type { CatalogNeeds, MapContext, SyncBarrierInput } from "./map.ts";
 
 import type { WorkEventsResolver } from "./work.ts";
 
 import { parsePage } from "./client.ts";
 
 import { mapAsset } from "./map.ts";
+
+import { catalogNeeds } from "./map.ts";
 
 export interface LocalBarrier {
   id: number;
@@ -55,6 +57,14 @@ export interface SyncPlan {
 
 export interface SyncIo {
   buildMapContext(): Promise<MapContext>;
+  // ensureCatalog: create the missing locations/categories rows a sweep
+  // needs, then buildMapContext resolves every mapped row. Optional so
+  // headless fakes keep compiling; runSync calls it on applying runs only
+  // (never on dry runs, which must stay read-only). New ids continue past
+  // max(id): the import rebuild (truncate + deterministic ids) stays the
+  // canonical full reset, while day-to-day tenant drift (new stations,
+  // renamed categories) converges on the next cycle instead of skipping.
+  ensureCatalog?(needs: CatalogNeeds): Promise<void>;
   // loadLocal: local barriers that could match this sync: the stations the
   // remote rows resolved to (deletion stays per-scope, so a sweep of one
   // station can never retire another's barriers) PLUS any row whose
@@ -395,6 +405,14 @@ export async function runSync(
     baseResult.parsed = rows.length;
     const parsed = parsePage({ data: rows });
     baseResult.malformed = parsed.malformed;
+
+    // Catalog bootstrap before mapping: without it every asset whose
+    // station/category label postdates the seed (or a dump import) skips,
+    // and a migrate-only database never reaches full tenant coverage.
+    // Dry runs stay read-only, so they keep reporting those skips instead.
+    if (!dryRun && io.ensureCatalog) {
+      await io.ensureCatalog(catalogNeeds(parsed.items));
+    }
 
     const ctx = await io.buildMapContext();
     const inputs: SyncBarrierInput[] = [];

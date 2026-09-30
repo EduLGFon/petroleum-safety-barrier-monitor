@@ -24,7 +24,7 @@ import type {
   SyncStatus,
 } from "../../types.ts";
 
-import type { MapContext } from "../fracttal/map.ts";
+import type { CatalogNeeds, MapContext } from "../fracttal/map.ts";
 
 import { queryRows } from "../db.ts";
 
@@ -115,6 +115,56 @@ export async function touchSyncRun(runId: number): Promise<void> {
 
 // defaultSyncIo: the wiring runSync uses when no custom io is injected.
 export const defaultSyncIo: SyncIo = {
+  // ensureCatalog: insert the sweep's missing categories + locations so
+  // mapping resolves the whole tenant, not just the seeded/imported
+  // snapshot. Ids continue past max(id) (never renumbering live rows);
+  // ON CONFLICT DO NOTHING keeps reruns and racing cycles idempotent.
+  // Display names are write-once (first non-null wins, mirroring the
+  // import): an operator hand-edit to a name is never overwritten here.
+  async ensureCatalog(needs: CatalogNeeds): Promise<void> {
+    if (needs.categories.length > 0) {
+      const have = await queryRows<{ id: number }>(
+        `select id from categories`,
+      );
+      let next = have.reduce((m, r) => Math.max(m, r.id), -1) + 1;
+      for (let i = 0; i < needs.categories.length; i += 500) {
+        const chunk = needs.categories.slice(i, i + 500);
+        const placeholders = chunk
+          .map((_, k) => `($${2 * k + 1}, $${2 * k + 2})`)
+          .join(", ");
+        const args: unknown[] = [];
+        for (const label of chunk) args.push(next++, label);
+        await queryRows(
+          `insert into categories (id, label) values ${placeholders} ` +
+            `on conflict (label) do nothing`,
+          args,
+        );
+      }
+    }
+    if (needs.locations.length > 0) {
+      const have = await queryRows<{ id: number }>(
+        `select id from locations`,
+      );
+      let next = have.reduce((m, r) => Math.max(m, r.id), 0) + 1;
+      for (let i = 0; i < needs.locations.length; i += 200) {
+        const chunk = needs.locations.slice(i, i + 200);
+        const placeholders = chunk
+          .map((_, k) =>
+            `($${4 * k + 1}, $${4 * k + 2}, $${4 * k + 3}, $${4 * k + 4})`
+          )
+          .join(", ");
+        const args: unknown[] = [];
+        for (const loc of chunk) {
+          args.push(next++, loc.code, loc.type, loc.name);
+        }
+        await queryRows(
+          `insert into locations (id, code, type, name) values ${placeholders} ` +
+            `on conflict (code) do nothing`,
+          args,
+        );
+      }
+    }
+  },
   async buildMapContext(): Promise<MapContext> {
     const [locRows, catRows, critRows] = await Promise.all([
       queryRows<{ id: number; code: string }>(

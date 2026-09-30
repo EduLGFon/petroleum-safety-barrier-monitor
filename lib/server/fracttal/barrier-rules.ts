@@ -3,9 +3,10 @@
 // derived availability, station, typology, and tags independently and
 // diverged (first live sync would have decayed Degradado rows and churned
 // tags/typology). Both paths now call these pure rules; the import keeps
-// file streaming + SQL, the sync keeps upsert + soft-delete. Precedence:
-// the import owns catalog rows (creates locations/categories), the sync
-// never creates them (unknown labels skip and are listed, never guessed).
+// file streaming + SQL, the sync keeps upsert + soft-delete plus missing
+// catalog creation. Precedence: the import owns full catalog rebuilds
+// (deterministic ids); the sync creates missing locations/categories
+// between rebuilds (unknown labels converge, never guessed).
 export const AVAILABILITY_AVAILABLE = 0;
 export const AVAILABILITY_OUT_OF_SERVICE = 1;
 export const AVAILABILITY_DEGRADED = 4;

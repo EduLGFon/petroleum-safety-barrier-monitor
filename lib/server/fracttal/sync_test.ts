@@ -16,7 +16,7 @@ import {
 
 import { assertStrictEquals, assertStringIncludes } from "jsr:@std/assert@^1";
 
-import type { MapContext, SyncBarrierInput } from "./map.ts";
+import type { CatalogNeeds, MapContext, SyncBarrierInput } from "./map.ts";
 
 const ctx: MapContext = {
   locationIds: { FAL: 1, SM: 2 },
@@ -541,4 +541,47 @@ Deno.test("runSync persists a summary note on ok runs", async () => {
   assertStringIncludes(finish.note, "parsed=2");
   assertStringIncludes(finish.note, "mapSkips=1");
   assertStringIncludes(finish.note, "ZZZ-1");
+});
+
+Deno.test("runSync bootstraps the catalog with the sweep labels on applying runs", async () => {
+  const { io } = makeFakeIo();
+  const seen: CatalogNeeds[] = [];
+  const ensuringIo: SyncIo = {
+    ...io,
+    ensureCatalog(needs: CatalogNeeds): Promise<void> {
+      seen.push(needs);
+      return Promise.resolve();
+    },
+  };
+  const result = await runSync(() => Promise.resolve([rawRow()]), {
+    io: ensuringIo,
+    dryRun: false,
+  });
+  assertStrictEquals(result.status, "ok");
+  assertStrictEquals(seen.length, 1);
+  assertStrictEquals(
+    seen[0]?.categories.join(","),
+    "Sistema de Combate a Incêndio",
+  );
+  assertStrictEquals(
+    seen[0]?.locations.map((l) => l.code).join(","),
+    "FAL",
+  );
+});
+
+Deno.test("runSync never touches the catalog on dry runs", async () => {
+  const { io } = makeFakeIo();
+  let called = 0;
+  const ensuringIo: SyncIo = {
+    ...io,
+    ensureCatalog(): Promise<void> {
+      called++;
+      return Promise.resolve();
+    },
+  };
+  await runSync(() => Promise.resolve([rawRow()]), {
+    io: ensuringIo,
+    dryRun: true,
+  });
+  assertStrictEquals(called, 0);
 });

@@ -9,9 +9,12 @@
 // category read groups_description (groups_1_description is the polo/area
 // upstream, never the category), and the station is the L2 parse of
 // parent_description with the raw location_code as fallback (live
-// location_code values are group/asset tags, never station codes). The sync
-// never creates catalog rows: the import owns locations/categories, unknown
-// labels here skip and are listed in the run report.
+// location_code values are group/asset tags, never station codes). Missing
+// catalog rows no longer skip: the sync creates them itself (see
+// catalogNeeds + SyncIo.ensureCatalog) with exactly the derivation below,
+// so a migrate-only database converges to full tenant coverage on the first
+// cycle. Unknown criticality ranks still skip: those ids are a hard contract
+// with lib/enums, not free-text labels.
 import {
   AVAILABILITY_AVAILABLE,
   AVAILABILITY_UNAVAILABLE,
@@ -19,9 +22,11 @@ import {
   criticalityLabelFor,
   exclusionReason,
   isoDate,
+  locationTypeOf,
   resolveAvailability,
   scopeSources,
   stationCodeOf,
+  stationNameOf,
   type StatusEvent,
   tagFor,
   typologyIdOf,
@@ -219,4 +224,59 @@ export function mapAsset(
       scopeSource,
     },
   };
+}
+
+// CatalogNeeds: the distinct free-text labels one sweep needs present in
+// the locations/categories tables. Pure extraction so the IO layer can
+// create them before mapping (see SyncIo.ensureCatalog).
+export interface CatalogLocationNeed {
+  code: string;
+  name: string | null;
+  type: string;
+}
+
+export interface CatalogNeeds {
+  categories: string[];
+  locations: CatalogLocationNeed[];
+}
+
+// catalogNeeds: collect the distinct category labels and station entries a
+// batch of assets resolves to, using the exact derivation mapAsset applies
+// (parent L2 parse first, raw location_code fallback; first non-null
+// display name wins per station, mirroring the import). Rows that can never
+// map (empty code, documented exclusions, no station at all) are left out:
+// they stay listed as mapping skips, not catalog gaps.
+export function catalogNeeds(items: FracttalAsset[]): CatalogNeeds {
+  const categories = new Set<string>();
+  const locations = new Map<string, CatalogLocationNeed>();
+  for (const asset of items) {
+    const code = (asset.code ?? "").trim();
+    if (code === "" || exclusionReason(code) !== null) continue;
+    categories.add(categoryFor(asset.groups_description));
+    const stationLabel = stationCodeOf(asset.parent_description);
+    if (stationLabel !== "") {
+      const existing = locations.get(stationLabel);
+      const name = stationNameOf(asset.parent_description);
+      if (!existing) {
+        locations.set(stationLabel, {
+          code: stationLabel,
+          name,
+          type: locationTypeOf(stationLabel),
+        });
+      } else if (existing.name == null && name != null) {
+        existing.name = name;
+      }
+      continue;
+    }
+    const locationCode = (asset.location_code ?? "").trim().toUpperCase();
+    if (locationCode === "") continue;
+    if (!locations.has(locationCode)) {
+      locations.set(locationCode, {
+        code: locationCode,
+        name: null,
+        type: locationTypeOf(locationCode),
+      });
+    }
+  }
+  return { categories: [...categories], locations: [...locations.values()] };
 }

@@ -234,9 +234,10 @@ Full contract lives in `docs/API.md`. Summary:
 - Shared mapping rules (`lib/server/fracttal/barrier-rules.ts`): the one
   converged source for scope keywords, station parse, typology,
   work-event classification, and 4-state availability used by both the
-  import and the live sync. Precedence: the import owns catalog rows
-  (creates locations/categories on rebuild); the sync never creates
-  them (unknown labels skip and are listed).
+  import and the live sync. Precedence: the import owns full catalog
+  rebuilds (creates locations/categories with deterministic ids); the sync
+  creates missing rows between rebuilds (unknown labels converge instead
+  of skipping).
 - Postgres (`docs/DATABASE.md`): lookup tables + `barriers` +
   `barrier_status_history` + `users`/`sessions` (cookie logins, two roles) +
   `alert_rules` (per-category triggers) + `alert_events`/`alert_recipients`.
