@@ -74,13 +74,13 @@ export async function resolveRequestAuth(req: Request): Promise<RequestAuth> {
   }
   const raw = getSessionTokenFromRequest(req);
   if (!raw) return { ok: false, message: token.message };
-  try {
-    const user = await getSessionUser(await hashSessionToken(raw));
-    if (!user) return { ok: false, message: "invalid session" };
-    return { ok: true, role: user.role, user, via: "session" };
-  } catch {
-    return { ok: false, message: "invalid session" };
-  }
+  // No catch-all here: a null row means an invalid session (401), but a
+  // THROWN error means the session store is unreachable (DB blip) and must
+  // propagate so routes answer 503 - never a spurious "invalid session"
+  // that logs the user out for an infra failure.
+  const user = await getSessionUser(await hashSessionToken(raw));
+  if (!user) return { ok: false, message: "invalid session" };
+  return { ok: true, role: user.role, user, via: "session" };
 }
 
 // requireAdminAuth: guard for writes, user and alert management. Accepts a

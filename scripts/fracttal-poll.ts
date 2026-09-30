@@ -15,7 +15,7 @@
 //   FRACTTAL_POLL_SECONDS                pause between cycles (default 300;
 //                                       effective period is cycle + pause)
 //   FRACTTAL_SYNC_ITEM_TYPE              default 2 (Equipment)
-//   FRACTTAL_SYNC_MAX_PAGES              item pages per cycle (default 200 x
+//   FRACTTAL_SYNC_MAX_PAGES              item pages per cycle (default 250 x
 //                                        100 rows; the tenant holds ~18k
 //                                        equipment today. A scope needing more
 //                                        aborts loudly - raise it)
@@ -89,7 +89,7 @@ function parseFlags(): PollFlags {
       2) as ItemTypeValue,
     maxPages: Math.max(
       1,
-      Math.floor(Number(Deno.env.get("FRACTTAL_SYNC_MAX_PAGES")) || 200),
+      Math.floor(Number(Deno.env.get("FRACTTAL_SYNC_MAX_PAGES")) || 250),
     ),
     workMaxPages: Math.max(
       1,
@@ -159,6 +159,13 @@ function main(): void {
     ratePerMin: flags.ratePerMin,
   });
 
+  // idToCode carries the previous cycle's equipment id map into the work
+  // pass: open-sweep work rows with an empty `code` still carry `id_item`,
+  // and items are fetched after work within a cycle, so the fallback joins
+  // against last cycle's sweep (id/code mappings are stable). Refreshed
+  // after every item sweep below.
+  let idToCode = new Map<number, string>();
+
   const notifiers: OpsNotifier[] = [consoleNotifier];
   const smtp = smtpConfigFromEnv();
   if (smtp) notifiers.push(smtpEmailNotifier(smtp));
@@ -188,6 +195,20 @@ function main(): void {
             maxPages: flags.maxPages,
             concurrency: flags.concurrency,
           });
+          // Refresh the id fallback map for the NEXT cycle's work pass
+          // (this cycle's work already fetched against the previous map).
+          const next = new Map<number, string>();
+          for (const raw of items.itemRows) {
+            if (typeof raw !== "object" || raw === null) continue;
+            const row = raw as Record<string, unknown>;
+            if (
+              typeof row.id === "number" && typeof row.code === "string" &&
+              row.code !== ""
+            ) {
+              next.set(row.id, row.code);
+            }
+          }
+          idToCode = next;
           if (items.itemRows.length === 0) {
             console.warn(`[fracttal-poll] sweep: 0 items (check API health)`);
           } else {
@@ -205,11 +226,13 @@ function main(): void {
       },
     }],
     fetchShared: async () => {
+      const map = idToCode;
       const work = await fetchWorkSignals(client, {
         maxPages: flags.workMaxPages,
         openStatuses,
         openMaxPages: flags.maxPages,
         concurrency: flags.concurrency,
+        itemIdToCode: (id) => map.get(id) ?? null,
       });
       const mode = openOnly ? "open sweep" : "newest window";
       if (work.ordersTruncated) {
@@ -223,7 +246,11 @@ function main(): void {
           `${work.workRequests} requests${
             work.requestsTruncated ? " (windowed)" : ""
           }, ` +
-          `malformed ${work.workMalformed}`,
+          `malformed ${work.workMalformed}` +
+          (work.workMalformedReasons.length > 0
+            ? ` [${work.workMalformedReasons.join("; ")}]`
+            : "") +
+          (work.workRecovered > 0 ? ` recovered=${work.workRecovered}` : ""),
       );
       return work;
     },

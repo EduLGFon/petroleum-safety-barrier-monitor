@@ -261,3 +261,32 @@ Deno.test("fetchItemSignals reassembles concurrent pages in order", async () => 
   assertStrictEquals(codes[299], "EQ-200-99");
   assertStrictEquals(fetched.pagesFetched, 3);
 });
+
+Deno.test("fetchWorkSignals reports malformed reasons and id_item recovery", async () => {
+  const { client } = stubClient({
+    items: [],
+    orders: [
+      plannedOrder("EQ-1"),
+      { ...plannedOrder(""), code: "", id_item: 7 },
+      { code: "" },
+    ],
+    requests: [{ code_item: "" }],
+  });
+  const plain = await fetchWorkSignals(client, { maxPages: 5 });
+  assertStrictEquals(plain.workMalformed, 3);
+  assertStrictEquals(plain.workRecovered, 0);
+  assertStrictEquals(
+    plain.workMalformedReasons.join("|"),
+    "orders: work order missing code ×2|requests: work request missing code_item ×1",
+  );
+  const withMap = await fetchWorkSignals(client, {
+    maxPages: 5,
+    itemIdToCode: (id) => id === 7 ? "EQ-7" : null,
+  });
+  assertStrictEquals(withMap.workMalformed, 2);
+  assertStrictEquals(withMap.workRecovered, 1);
+  assertStrictEquals(
+    withMap.workEvents("EQ-7")?.planned?.source,
+    "OS - 1: fix",
+  );
+});

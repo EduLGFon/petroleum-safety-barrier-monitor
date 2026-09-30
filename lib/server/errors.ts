@@ -7,6 +7,7 @@ export type ApiErrorCode =
   | "NOT_FOUND"
   | "UNAUTHORIZED"
   | "RATE_LIMITED"
+  | "UNAVAILABLE"
   | "INTERNAL";
 
 export interface ApiErrorBody {
@@ -53,6 +54,18 @@ export function rateLimited(
   retryAfterMs: number,
 ): Response {
   return apiError(429, "RATE_LIMITED", message, requestId, {
+    "retry-after": String(Math.max(1, Math.ceil(retryAfterMs / 1000))),
+  });
+}
+
+// unavailable: dependency failure (DB blip) is 503 with Retry-After, never
+// 401 - a dead database must not read as a dead credential.
+export function unavailable(
+  message: string,
+  requestId: string,
+  retryAfterMs = 5000,
+): Response {
+  return apiError(503, "UNAVAILABLE", message, requestId, {
     "retry-after": String(Math.max(1, Math.ceil(retryAfterMs / 1000))),
   });
 }

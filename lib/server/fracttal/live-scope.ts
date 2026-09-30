@@ -48,6 +48,7 @@ export interface ScopeFetchOptions {
   openMaxPages?: number;
   workMaxPages?: number;
   concurrency?: number;
+  itemIdToCode?: (id: number) => string | null;
 }
 
 export interface ItemFetch {
@@ -61,6 +62,12 @@ export interface WorkFetch {
   workOrders: number;
   workRequests: number;
   workMalformed: number;
+  // workMalformedReasons: `side: reason × n` histogram (top 5) so ops can
+  // tell a stable upstream quirk (empty-code task rows) from a schema drift
+  // without rerunning a dump. workRecovered counts rows saved by the
+  // id_item fallback (see buildWorkEvents).
+  workMalformedReasons: string[];
+  workRecovered: number;
   // Truncation is split because the two halves mean different things:
   // ordersTruncated threatens completeness (a truncated open sweep misses
   // old open work exactly like the window does) and must warn loudly, while
@@ -170,6 +177,11 @@ export async function fetchWorkSignals(
     openStatuses?: readonly string[];
     openMaxPages?: number;
     concurrency?: number;
+    // itemIdToCode feeds the work-order id_item fallback (see
+    // buildWorkEvents). The poller passes the previous cycle's equipment
+    // id map — items are fetched after work, and id/code mappings are
+    // stable across cycles.
+    itemIdToCode?: (id: number) => string | null;
   } = {},
 ): Promise<WorkFetch> {
   const maxPages = Math.max(
@@ -218,12 +230,31 @@ export async function fetchWorkSignals(
   // without overlap; even a mis-filtered duplicate merges idempotently
   // downstream (mergeEvent keeps the earliest date).
   const orderRows = orderPages.flatMap((p) => p.rows);
-  const built = buildWorkEvents(orderRows, requestPages.rows);
+  const requestRows = requestPages.rows;
+  const built = buildWorkEvents(orderRows, requestRows, {
+    itemIdToCode: opts.itemIdToCode,
+  });
+  // Reason histogram split by side (request indexes continue past the
+  // order rows, mirroring buildWorkEvents): top 5 only, the dump script
+  // owns full row-level detail.
+  const reasonCounts = new Map<string, number>();
+  for (const m of built.malformed) {
+    const key = `${
+      m.index < orderRows.length ? "orders" : "requests"
+    }: ${m.reason}`;
+    reasonCounts.set(key, (reasonCounts.get(key) ?? 0) + 1);
+  }
+  const workMalformedReasons = [...reasonCounts.entries()]
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 5)
+    .map(([reason, n]) => `${reason} ×${n}`);
   return {
     workEvents: resolverFor(built.events),
     workOrders: orderRows.length,
-    workRequests: requestPages.rows.length,
+    workRequests: requestRows.length,
     workMalformed: built.malformed.length,
+    workMalformedReasons,
+    workRecovered: built.recovered,
     ordersTruncated: orderPages.some((p) => p.rows.length < p.total),
     requestsTruncated: requestPages.rows.length < requestPages.total,
   };
@@ -246,6 +277,7 @@ export async function fetchScopeSignals(
     openStatuses: opts.openStatuses,
     openMaxPages: opts.openMaxPages,
     concurrency: opts.concurrency,
+    itemIdToCode: opts.itemIdToCode,
   });
   return {
     itemRows: items.itemRows,
@@ -255,6 +287,8 @@ export async function fetchScopeSignals(
     workOrders: work.workOrders,
     workRequests: work.workRequests,
     workMalformed: work.workMalformed,
+    workMalformedReasons: work.workMalformedReasons,
+    workRecovered: work.workRecovered,
     ordersTruncated: work.ordersTruncated,
     requestsTruncated: work.requestsTruncated,
   };

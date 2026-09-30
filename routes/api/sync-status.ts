@@ -8,6 +8,7 @@ import {
   notFound,
   rateLimited,
   unauthorized,
+  unavailable,
 } from "../../lib/server/errors.ts";
 
 import { readThrottle, routeClientKey } from "../../lib/server/throttle.ts";
@@ -42,7 +43,16 @@ export const handler = define.handlers({
         "Server misconfigured",
       );
     }
-    const dataAuth = await requireDataAuth(ctx.req);
+    let dataAuth;
+    try {
+      dataAuth = await requireDataAuth(ctx.req);
+    } catch (err) {
+      // Session-store outage (DB blip after the pool retry gave up): 503
+      // with Retry-After so the dashboard backs off instead of reading a
+      // 401 and dropping the user to login.
+      console.error(`[GET /api/sync-status] requestId=${requestId}`, err);
+      return unavailable("Auth store unreachable", requestId);
+    }
     if (!dataAuth.ok) {
       return dataAuth.anonymous
         ? notFound("not found", requestId)

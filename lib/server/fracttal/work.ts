@@ -143,15 +143,23 @@ export function workRequestSlot(wr: FracttalWorkRequest): WorkSlot | null {
 // buildWorkEvents folds raw order/request rows into per-code merged signals.
 // Malformed rows are listed (never thrown): one bad row must not kill the
 // batch, and the caller logs the count before the sync runs.
+// itemIdToCode is an optional fallback for open-sweep rows whose `code`
+// arrives empty (observed live: every such row still carries numeric
+// `id_item`). The caller builds it from the same cycle's equipment sweep
+// (or the previous cycle's — id/code mappings are stable); recovered rows
+// are counted separately so ops can tell fallback signal from direct joins.
 export function buildWorkEvents(
   orders: unknown[],
   requests: unknown[],
+  opts: { itemIdToCode?: (id: number) => string | null } = {},
 ): {
   events: Map<string, WorkEvents>;
   malformed: Array<{ index: number; reason: string }>;
+  recovered: number;
 } {
   const events = new Map<string, WorkEvents>();
   const malformed: Array<{ index: number; reason: string }> = [];
+  let recovered = 0;
   const blank = (): WorkEvents => ({
     urgent: null,
     planned: null,
@@ -165,9 +173,11 @@ export function buildWorkEvents(
   };
   orders.forEach((raw, i) => {
     try {
-      const wo = parseWorkOrder(raw);
+      const patched = withItemCode(raw, opts.itemIdToCode);
+      const wo = parseWorkOrder(patched.row);
       const slot = workOrderSlot(wo);
       if (!slot) return;
+      if (patched.recovered) recovered++;
       const acc = events.get(wo.code) ?? blank();
       if (slot.urgent) acc.urgent = mergeEvent(acc.urgent, slot.urgent);
       if (slot.planned) acc.planned = mergeEvent(acc.planned, slot.planned);
@@ -190,7 +200,31 @@ export function buildWorkEvents(
       bad(orders.length + i, err);
     }
   });
-  return { events, malformed };
+  return { events, malformed, recovered };
+}
+
+// withItemCode patches an order row whose `code` is empty from the
+// equipment id map (same-cycle or previous-cycle sweep). Returns the row to
+// parse plus whether the fallback fired; a fired fallback that still fails
+// to parse lands in malformed like any other bad row.
+function withItemCode(
+  raw: unknown,
+  itemIdToCode?: (id: number) => string | null,
+): { row: unknown; recovered: boolean } {
+  if (itemIdToCode === undefined) return { row: raw, recovered: false };
+  if (typeof raw !== "object" || raw === null) {
+    return { row: raw, recovered: false };
+  }
+  const row = raw as Record<string, unknown>;
+  if (typeof row.code === "string" && row.code !== "") {
+    return { row: raw, recovered: false };
+  }
+  if (typeof row.id_item !== "number") return { row: raw, recovered: false };
+  const code = itemIdToCode(row.id_item);
+  if (typeof code !== "string" || code === "") {
+    return { row: raw, recovered: false };
+  }
+  return { row: { ...row, code }, recovered: true };
 }
 
 // resolverFor adapts a merged map to the lookup runSync consumes.

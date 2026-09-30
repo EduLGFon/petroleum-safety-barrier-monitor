@@ -11,3 +11,4 @@ _fresh/
 .env*
 test/
 BARREIRAS-AUSENTES.md
+SYNC-ANOMALIES.md

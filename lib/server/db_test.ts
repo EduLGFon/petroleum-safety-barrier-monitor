@@ -42,3 +42,27 @@ Deno.test("tlsAttemptNeeded keeps TLS anywhere else", () => {
     true,
   );
 });
+
+Deno.test("isStaleConnection matches transport failures only", async () => {
+  const { isStaleConnection } = await import("./db.ts");
+  for (
+    const msg of [
+      "BrokenPipe: Broken pipe (os error 32)",
+      "Connection reset by peer (os error 104)",
+      "terminating connection due to administrator command",
+      "connection closed",
+    ]
+  ) {
+    assertStrictEquals(isStaleConnection(new Error(msg)), true);
+  }
+  assertStrictEquals(isStaleConnection(new Error("EPIPE")), true);
+  for (
+    const msg of [
+      'syntax error at or near "SELECT"',
+      "permission denied for table barriers",
+      "duplicate key value violates unique constraint",
+    ]
+  ) {
+    assertStrictEquals(isStaleConnection(new Error(msg)), false);
+  }
+});

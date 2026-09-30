@@ -90,17 +90,71 @@ function getPool(): Pool {
   return globalThis.__barrierPool;
 }
 
+// resetPool: drops the cached pool so the next query rebuilds it. The old
+// pool is ended best-effort (a broken socket may throw on close); a failed
+// end still drops the reference so stale connections are never reused.
+async function resetPool(): Promise<void> {
+  const old = globalThis.__barrierPool;
+  globalThis.__barrierPool = undefined;
+  if (old) {
+    try {
+      await old.end();
+    } catch {
+      // The sockets are already dead; dropping the reference is the fix.
+    }
+  }
+}
+
+// isStaleConnection: true for transport-level failures that mean the pooled
+// socket died server-side (idle timeout, restart, NAT cut) rather than a
+// query problem. Only these retry: a syntax/permission error would fail
+// identically on a fresh connection. Exported for unit tests.
+export function isStaleConnection(err: unknown): boolean {
+  const msg = err instanceof Error
+    ? `${err.message} ${(err as { code?: unknown }).code ?? ""} ${
+      String(err.cause ?? "")
+    }`
+    : String(err);
+  return /broken pipe|EPIPE|ECONNRESET|connection reset|terminating connection|connection (was )?closed|unexpected eof|EOF/i
+    .test(msg);
+}
+
 // Run a parameterized query and return typed rows. Values are always bound
 // as $1/$2 args - never string-concatenate user input into `text`.
+// Resilience: one retry on stale pooled connections (pool reset between
+// attempts). External Postgres kills idle sockets and the lazy pool hands
+// out dead ones; without the reset every poller/app tick would 500 until
+// restart. The retry logs one warn line, not a stack trace.
 export async function queryRows<T>(
   text: string,
   args: Array<unknown> = [],
 ): Promise<T[]> {
+  try {
+    return await runOnce<T>(text, args);
+  } catch (err) {
+    if (!isStaleConnection(err)) throw err;
+    const detail = err instanceof Error ? err.message : String(err);
+    console.warn(
+      `[db] pooled connection failed (${detail}), resetting pool and retrying once`,
+    );
+    await resetPool();
+    return await runOnce<T>(text, args);
+  }
+}
+
+// runOnce: single attempt - checkout, query, guarded release. Release is
+// best-effort because closing a dead connection can itself throw (the
+// EPIPE surfaces in Connection.end, not just query).
+async function runOnce<T>(text: string, args: Array<unknown>): Promise<T[]> {
   const client = await getPool().connect();
   try {
     const result = await client.queryObject<T>(text, args);
     return result.rows;
   } finally {
-    client.release();
+    try {
+      client.release();
+    } catch {
+      // Dead socket: the outer retry resets the pool when the query failed.
+    }
   }
 }

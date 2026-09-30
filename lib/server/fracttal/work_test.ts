@@ -112,3 +112,28 @@ Deno.test("buildWorkEvents merges per code keeping the first event", () => {
     "2026-09-09",
   );
 });
+
+Deno.test("buildWorkEvents recovers empty-code orders via itemIdToCode", () => {
+  const itemIdToCode = (id: number) => id === 15413228 ? "FAL-EQ-001" : null;
+  const built = buildWorkEvents(
+    [
+      { ...order(), code: "", id_item: 15413228 },
+      { ...order(), code: "", id_item: 999 },
+      { ...order(), code: "" },
+    ],
+    [],
+    { itemIdToCode },
+  );
+  assertStrictEquals(built.malformed.length, 2);
+  assertStrictEquals(built.recovered, 1);
+  assertStrictEquals(
+    built.events.get("FAL-EQ-001")?.planned?.source,
+    "OS - 9001: Sanar falha",
+  );
+});
+
+Deno.test("buildWorkEvents counts no recovery without the id map", () => {
+  const built = buildWorkEvents([{ ...order(), code: "", id_item: 1 }], []);
+  assertStrictEquals(built.malformed.length, 1);
+  assertStrictEquals(built.recovered, 0);
+});
