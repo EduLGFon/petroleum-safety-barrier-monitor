@@ -18,7 +18,6 @@ import {
   classifyRequest,
   criticalityLabelFor,
   earliestDate,
-  exclusionReason,
   IMPORT_NOTE,
   isClosedRequestStatus,
   isoDate,
@@ -297,8 +296,8 @@ async function main() {
 
   // ── Pass A: equipment ────────────────────────────────────────────────────
   // Builds the barrier set, the station set and the category set. Scope is
-  // fully open: every equipment row enters (empty codes and documented
-  // exclusions still drop with a report count).
+  // fully open: every equipment row enters (only empty codes drop); a
+  // mislabeled row enters mislabeled and is fixed upstream in Fracttal.
   const barriers = new Map<string, BarrierAcc>();
   // stations maps code -> display name (first canonical segment wins;
   // override segments yield null and never overwrite - the catalog row
@@ -307,7 +306,6 @@ async function main() {
   const categories = new Set<string>();
   let equipmentSeen = 0;
   let candidates = 0;
-  let excluded = 0;
   for await (const row of streamJsonArray(eqPath)) {
     equipmentSeen += 1;
     const code = str(row.code);
@@ -320,12 +318,6 @@ async function main() {
       groupsDescription,
       str(row.groups_2_description),
     );
-    // Known non-barriers match the scope by mislabel: skip with a report
-    // count, never silently (shared EXCLUDED_EXTERNAL_CODES).
-    if (exclusionReason(code) !== null) {
-      excluded += 1;
-      continue;
-    }
     candidates += 1;
     const description = str(row.description);
     const parentDescription = str(row.parent_description);
@@ -358,7 +350,7 @@ async function main() {
   }
   console.log(
     `Pass A (equipment): ${equipmentSeen} rows, ${candidates} barrier candidates, ` +
-      `${stations.size} stations, ${categories.size} categories, ${excluded} excluded`,
+      `${stations.size} stations, ${categories.size} categories`,
   );
   const disabledSeen = [...barriers.values()].filter((b) => !b.isActive).length;
   console.log(`  disabled upstream (active=false): ${disabledSeen}`);

@@ -110,8 +110,7 @@ export function scopeSources(
 }
 
 // STATION_OVERRIDES corrects L2 segments whose trailing " - CODE" token is
-// not a station (same precedent as EXCLUDED_EXTERNAL_CODES: documented,
-// evidence-backed, never guessed). Verified live 2026-09-20: "Base Seacrest
+// not a station (documented, evidence-backed, never guessed). Verified live 2026-09-20: "Base Seacrest
 // - São Mateus-ES" is the company base in the city of São Mateus (state of
 // Espírito Santo), so it maps to SM - the "-ES" is the state suffix, not a
 // station code. Keys are folded (case/accent-insensitive) full L2 segments;
@@ -411,15 +410,7 @@ export function resolveAvailability(
   };
 }
 
-// EXCLUDED_EXTERNAL_CODES lists source rows that match the keyword scope but
-// are known non-barriers. Entries are skipped with a report count, never
-// silently: the reason documents the evidence for each exclusion.
-export const EXCLUDED_EXTERNAL_CODES: Readonly<Record<string, string>> = {
-  "1013971":
-    "pressure transmitter PIT-3612-1210-027 mislabeled as 'Valvula' in groups_description",
-};
-
-// exclusionReason returns the documented reason when a code is excluded.
-export function exclusionReason(code: string): string | null {
-  return EXCLUDED_EXTERNAL_CODES[code] ?? null;
-}
+// Upstream rows enter the monitor 1:1 - there is intentionally no exclusion
+// list. A mislabeled row (wrong type, wrong station) shows up mislabeled
+// until the operator fixes it in Fracttal; the sync then picks up the
+// correction as a normal update. Curation happens at the source, never here.

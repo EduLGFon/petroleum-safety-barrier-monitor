@@ -288,8 +288,10 @@ Deno.test("mapAsset admits ESO-flagged rows outside the keyword scope", () => {
   assertStrictEquals(mapped.input.criticalityId, 0);
 });
 
-Deno.test("mapAsset skips excluded source rows with the reason", () => {
-  expectSkip(mapAsset(asset({ code: "1013971" }), ctx), "excluded asset");
+Deno.test("mapAsset admits formerly excluded rows like any other row", () => {
+  const mapped = mapAsset(asset({ code: "1013971" }), ctx);
+  if (!mapped.ok) throw new Error("expected ok: " + JSON.stringify(mapped));
+  assertStrictEquals(mapped.input.externalCode, "1013971");
 });
 
 Deno.test("catalogNeeds collects distinct categories and parent-derived stations", () => {
@@ -316,11 +318,15 @@ Deno.test("catalogNeeds collects distinct categories and parent-derived stations
 Deno.test("catalogNeeds falls back to location_code and skips unmappable rows", () => {
   const needs = catalogNeeds([
     asset({ code: "", groups_description: "Disjuntor" }),
-    asset({ code: "1013971", groups_description: "Disjuntor" }),
+    asset({
+      code: "1013971",
+      groups_description: "Disjuntor",
+      location_code: "",
+    }),
     asset({ code: "X-1", groups_description: "Bomba", location_code: "" }),
     asset({ code: "X-2", groups_description: "Bomba", location_code: "zzz" }),
   ]);
-  assertEquals(needs.categories, ["Bomba"]);
+  assertEquals(needs.categories.sort(), ["Bomba", "Disjuntor"]);
   assertEquals(needs.locations, [{
     code: "ZZZ",
     name: null,

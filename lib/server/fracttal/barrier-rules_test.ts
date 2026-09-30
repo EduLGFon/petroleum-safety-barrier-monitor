@@ -13,7 +13,6 @@ import {
   classifyRequest,
   criticalityLabelFor,
   earliestDate,
-  exclusionReason,
   foldText,
   isBarrierCandidate,
   isClosedRequestStatus,
@@ -269,9 +268,12 @@ Deno.test("resolveAvailability follows urgent, planned, stopped, flag, open", ()
   assertStrictEquals(open.note, "");
 });
 
-Deno.test("exclusion list documents the known mislabeled row", () => {
-  assertStrictEquals(exclusionReason("1013971") !== null, true);
-  assertStrictEquals(exclusionReason("1013959"), null);
+Deno.test("mislabelled rows are admitted, never excluded", () => {
+  // The monitor mirrors upstream 1:1: a transmitter tagged `Válvula`
+  // enters with that label until the operator fixes it in Fracttal.
+  // isBarrierCandidate still classifies the label (scope provenance),
+  // but nothing in the pipeline drops the row for it.
+  assertStrictEquals(isBarrierCandidate("Válvula"), true);
 });
 
 Deno.test("criticalityLabelFor ranks the TAG suffix letter", () => {

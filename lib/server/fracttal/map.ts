@@ -20,7 +20,6 @@ import {
   AVAILABILITY_UNAVAILABLE,
   categoryFor,
   criticalityLabelFor,
-  exclusionReason,
   isoDate,
   locationTypeOf,
   resolveAvailability,
@@ -125,10 +124,6 @@ export function mapAsset(
 ): MappedRow {
   const code = (asset.code ?? "").trim();
   if (code === "") return { ok: false, reason: "empty external_code" };
-  const excluded = exclusionReason(code);
-  if (excluded !== null) {
-    return { ok: false, reason: `excluded asset (${excluded})` };
-  }
 
   // Scope is fully open: every equipment row enters the monitor and the
   // admitting gates ride along as scope_source (keyword / eso /
@@ -243,15 +238,15 @@ export interface CatalogNeeds {
 // catalogNeeds: collect the distinct category labels and station entries a
 // batch of assets resolves to, using the exact derivation mapAsset applies
 // (parent L2 parse first, raw location_code fallback; first non-null
-// display name wins per station, mirroring the import). Rows that can never
-// map (empty code, documented exclusions, no station at all) are left out:
-// they stay listed as mapping skips, not catalog gaps.
+// display name wins per station, mirroring the import). Rows with no code
+// or no station at all are left out: they stay listed as mapping skips,
+// not catalog gaps.
 export function catalogNeeds(items: FracttalAsset[]): CatalogNeeds {
   const categories = new Set<string>();
   const locations = new Map<string, CatalogLocationNeed>();
   for (const asset of items) {
     const code = (asset.code ?? "").trim();
-    if (code === "" || exclusionReason(code) !== null) continue;
+    if (code === "") continue;
     categories.add(categoryFor(asset.groups_description));
     const stationLabel = stationCodeOf(asset.parent_description);
     if (stationLabel !== "") {
