@@ -50,7 +50,9 @@ export function BrandMark(
   const wave = light ? "#ffffff" : "#0a1628";
 
   if (variant === "adaptive") {
-    // Uses CSS currentColor - adapts to theme automatically
+    // Uses CSS currentColor - adapts to theme automatically.
+    // Fallbacks keep first paint (before styles.css loads) opaque with
+    // the dark-reference colors instead of transparent/invisible.
     return (
       <svg
         width={height}
@@ -63,11 +65,11 @@ export function BrandMark(
           width="323"
           height="322"
           rx={Math.round(323 * 0.1)}
-          fill="var(--bg-page)"
+          fill="var(--bg-page, #050a18)"
         />
         <g
           transform="translate(0,322) scale(0.1,-0.1)"
-          fill="var(--text-primary)"
+          fill="var(--text-primary, #ffffff)"
           stroke="none"
           // deno-lint-ignore react-no-danger
           dangerouslySetInnerHTML={{

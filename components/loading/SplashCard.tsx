@@ -2,7 +2,6 @@
 // This is why it exists: isolates the glass card markup so LoadingScreen stays
 // a slim composer with identical visuals and progress behavior.
 import { BrandMark } from "../ui/BrandMark.tsx";
-import { AURORA } from "../../lib/aurora.ts";
 
 interface SplashCardProps {
   progress: number;
@@ -12,6 +11,9 @@ interface SplashCardProps {
 }
 
 // SplashCard: glass brand card with staged progress bar and shimmer.
+// Every var() carries a fallback matching the comfortable/dark reference
+// so first paint (before styles.css loads) already has the final metrics:
+// no transparent card, no font-size/padding pop, no width growth.
 export function SplashCard(
   { progress, ready, msg, companyName }: SplashCardProps,
 ) {
@@ -23,13 +25,18 @@ export function SplashCard(
         display: "flex",
         flexDirection: "column",
         alignItems: "center",
-        padding: "var(--d-splash-pad)",
-        background: AURORA.card,
-        border: `1px solid ${AURORA.cardBorder}`,
-        borderRadius: "var(--d-splash-radius)",
+        boxSizing: "border-box",
+        // Fixed width reserves the final layout: the card no longer grows
+        // to fit the title once fonts/tokens arrive.
+        width: "min(92vw, 400px)",
+        padding: "var(--d-splash-pad, 48px 56px)",
+        background: "var(--au-card, rgba(255,255,255,.06))",
+        border: "1px solid var(--au-card-border, rgba(255,255,255,.1))",
+        borderRadius: "var(--d-splash-radius, 24px)",
         boxShadow: "0 32px 80px rgba(0,0,0,.55)",
-        minWidth: 360,
-        animation: "scaleIn .45s var(--ease-out) both",
+        flexShrink: 0,
+        animation:
+          "scaleIn .45s var(--ease-out, cubic-bezier(0.16,1,0.3,1)) both",
       }}
     >
       <div
@@ -48,7 +55,7 @@ export function SplashCard(
       {/* Logo */}
       <div
         style={{
-          marginBottom: "var(--d-splash-gap)",
+          marginBottom: "var(--d-splash-gap, 30px)",
           filter: "drop-shadow(0 4px 20px rgba(99,102,241,.35))",
         }}
       >
@@ -56,17 +63,17 @@ export function SplashCard(
       </div>
 
       {/* Brand text */}
-      <div style={{ textAlign: "center", marginBottom: 6 }}>
+      <div style={{ textAlign: "center", marginBottom: 6, maxWidth: "100%" }}>
         {companyName && (
           <div
             style={{
-              fontSize: "var(--d-micro)",
+              fontSize: "var(--d-micro, 10px)",
               fontWeight: 800,
               letterSpacing: "0.2em",
               textTransform: "uppercase",
-              marginBottom: "var(--d-opt-gap)",
+              marginBottom: "var(--d-opt-gap, 8px)",
               background:
-                "linear-gradient(90deg,var(--accent),var(--accent-2))",
+                "linear-gradient(90deg,var(--accent, #6366f1),var(--accent-2, #22d3ee))",
               WebkitBackgroundClip: "text",
               WebkitTextFillColor: "transparent",
               backgroundClip: "text",
@@ -77,11 +84,19 @@ export function SplashCard(
         )}
         <div
           style={{
-            fontSize: "var(--d-band-num)",
+            fontFamily:
+              'var(--font-sans, "Inter Tight","Inter",system-ui,sans-serif)',
+            fontSize: "var(--d-band-num, 20px)",
             fontWeight: 800,
             letterSpacing: "-0.025em",
-            color: AURORA.value,
+            color: "var(--au-value, #ffffff)",
             lineHeight: 1.25,
+            // Reserve exactly the two explicit lines so the swap from
+            // fallback to webfont never reflows, and keep words from
+            // wrapping mid-phrase on narrow viewports.
+            minHeight: "2.5em",
+            textWrap: "balance",
+            overflowWrap: "break-word",
           }}
         >
           Monitor de Barreiras<br />de Segurança
@@ -93,9 +108,9 @@ export function SplashCard(
         style={{
           width: "100%",
           height: 1,
-          margin: "var(--d-splash-div) 0",
+          margin: "var(--d-splash-div, 24px) 0",
           background:
-            "linear-gradient(90deg,transparent,var(--glow),transparent)",
+            "linear-gradient(90deg,transparent,var(--glow, rgba(99,102,241,.35)),transparent)",
         }}
       />
 
@@ -105,19 +120,30 @@ export function SplashCard(
           style={{
             display: "flex",
             justifyContent: "space-between",
-            fontSize: "var(--d-caption)",
+            gap: 12,
+            fontSize: "var(--d-caption, 11px)",
             fontWeight: 600,
-            color: AURORA.sub,
+            color: "var(--au-sub, #64748b)",
             letterSpacing: "0.06em",
-            marginBottom: "var(--d-opt-gap)",
+            marginBottom: "var(--d-opt-gap, 8px)",
           }}
         >
-          <span style={{ transition: "all .3s" }}>{msg}</span>
+          <span
+            style={{
+              transition: "all .3s",
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+              whiteSpace: "nowrap",
+            }}
+          >
+            {msg}
+          </span>
           <span
             className="tnum"
             style={{
-              color: ready ? "#34d399" : AURORA.sub,
+              color: ready ? "#34d399" : "var(--au-sub, #64748b)",
               transition: "color .3s",
+              flexShrink: 0,
             }}
           >
             {progress}%
@@ -128,7 +154,7 @@ export function SplashCard(
             width: "100%",
             height: 4,
             borderRadius: 2,
-            background: AURORA.track,
+            background: "var(--au-track, rgba(255,255,255,.1))",
             overflow: "hidden",
           }}
         >
@@ -136,10 +162,11 @@ export function SplashCard(
             style={{
               height: "100%",
               width: `${progress}%`,
-              background: AURORA.grad,
+              background:
+                "linear-gradient(90deg,var(--accent, #6366f1),var(--accent-2, #22d3ee))",
               borderRadius: 2,
               transition: "width .07s linear",
-              boxShadow: AURORA.auroraGlow,
+              boxShadow: "var(--glow, rgba(99,102,241,.35))",
               position: "relative",
             }}
           >
