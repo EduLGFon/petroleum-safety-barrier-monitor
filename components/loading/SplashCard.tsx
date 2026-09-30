@@ -35,8 +35,12 @@ export function SplashCard(
         borderRadius: "var(--d-splash-radius, 24px)",
         boxShadow: "0 32px 80px rgba(0,0,0,.55)",
         flexShrink: 0,
-        animation:
-          "scaleIn .45s var(--ease-out, cubic-bezier(0.16,1,0.3,1)) both",
+        // No entrance animation on purpose: the scaleIn transform used to
+        // rasterize this text mid-zoom (plus backdrop-blur compositing),
+        // which read as garbled/overlapping words until it settled.
+        // Inline blur too so arrival of styles.css changes nothing.
+        backdropFilter: "blur(12px)",
+        WebkitBackdropFilter: "blur(12px)",
       }}
     >
       <div
@@ -67,8 +71,9 @@ export function SplashCard(
         {companyName && (
           <div
             style={{
+              fontFamily: 'system-ui,-apple-system,"Segoe UI",sans-serif',
               fontSize: "var(--d-micro, 10px)",
-              fontWeight: 800,
+              fontWeight: 700,
               letterSpacing: "0.2em",
               textTransform: "uppercase",
               marginBottom: "var(--d-opt-gap, 8px)",
@@ -84,18 +89,22 @@ export function SplashCard(
         )}
         <div
           style={{
-            fontFamily:
-              'var(--font-sans, "Inter Tight","Inter",system-ui,sans-serif)',
+            // System stack on purpose: the webfont (Inter Tight) loads
+            // async via the media=print trick and swaps mid-splash, which
+            // rewrote these glyphs after first paint. System glyphs are
+            // final on first paint, so the text never rewrites itself.
+            // Weight 700: the heaviest Inter Tight weight actually
+            // shipped (800 was synthesized faux-bold, another source of
+            // crowded/overlapping glyphs).
+            fontFamily: 'system-ui,-apple-system,"Segoe UI",sans-serif',
             fontSize: "var(--d-band-num, 20px)",
-            fontWeight: 800,
-            letterSpacing: "-0.025em",
+            fontWeight: 700,
+            letterSpacing: "-0.01em",
             color: "var(--au-value, #ffffff)",
             lineHeight: 1.25,
-            // Reserve exactly the two explicit lines so the swap from
-            // fallback to webfont never reflows, and keep words from
-            // wrapping mid-phrase on narrow viewports.
+            // Reserve exactly the two explicit lines so nothing below
+            // shifts; plain wrapping (no balance) so no re-layout pass.
             minHeight: "2.5em",
-            textWrap: "balance",
             overflowWrap: "break-word",
           }}
         >
@@ -144,6 +153,7 @@ export function SplashCard(
               color: ready ? "#34d399" : "var(--au-sub, #64748b)",
               transition: "color .3s",
               flexShrink: 0,
+              fontVariantNumeric: "tabular-nums",
             }}
           >
             {progress}%

@@ -1,23 +1,68 @@
 # Barrier Monitor compose stack - Docker runtime for the integration.
-# This is why it exists: one `compose up` runs the dashboard (app) plus the
-# live Fracttal poll loop (poller) against the configured Postgres, with the
-# same image and the same boot path as local runs. Secrets live in the
+# This is why it exists: one `compose up` runs Postgres (db) + the dashboard
+# (app) plus the live Fracttal poll loop (poller) against that same DB, with
+# the same image and the same boot path as local runs. Secrets live in the
 # host-side `.env` (mounted read-only, never baked into the image).
 #
-# Fresh host:
-#   cp .env.example .env        # then set DATABASE_URL + FRACTTAL_* + ADMIN_TOKEN
-#   docker compose build
-#   docker compose run --rm tools deno run -A --env-file=.env scripts/migrate.ts
-#   docker compose up -d        # app + poller
+# Fresh host (Linux, macOS, Windows with Docker Desktop + WSL2 backend):
+#   cp .env.example .env        # defaults already point host->localhost, containers->db
+#   docker compose up -d --build # starts db first (health-gated), then app/poller/alerts
+#   docker compose run --rm tools deno run -A scripts/migrate.ts
+#   docker compose run --rm tools deno run -A scripts/seed.ts  # optional demo rows
 #   curl -s localhost:8000/api/health
+# External/prod DB instead of the bundled `db` service: set
+# DATABASE_URL_DOCKER in .env to the real URL and optionally
+# `docker compose up -d app poller alerts` (or remove `db` + depends_on).
 name: barrier-monitor
 
 services:
+  # Local Postgres (Windows-friendly default, also works on Linux/macOS).
+  # This is why it exists: Windows has no reliable local Postgres setup for
+  # this stack (native install = service/permission friction, WSL2 Postgres
+  # = data loss on distro moves), so one `compose up` provides the DB with
+  # zero host install. Named volume `pgdata` is intentional: bind-mounting
+  # PGDATA on Docker Desktop for Windows hits file-permission and fsync
+  # performance issues; a named volume stays inside the Linux VM and is fast.
+  # Credentials come from POSTGRES_* in .env (defaults below are dev-only).
+  # Host runs (`deno task db:migrate` on Windows) reach it via
+  # localhost:${POSTGRES_PORT:-5432}; containers reach it via hostname `db`
+  # (see DATABASE_URL_DOCKER below).
+  db:
+    image: postgres:16-alpine
+    # No env_file: only POSTGRES_* (interpolated below from host .env) are
+    # passed in. Mounting the full .env would leak DATABASE_URL/FRACTTAL_*
+    # into the DB container for no benefit.
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-barreiras}
+      POSTGRES_USER: ${POSTGRES_USER:-barrier}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-barrier}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER:-barrier} -d $${POSTGRES_DB:-barreiras}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 10s
+
   # Dashboard + API (Fresh production bundle, reads the mounted .env).
   app:
     build: .
     image: barrier-monitor:latest
     env_file: [.env]
+    # Inside containers `localhost` means the container itself, never the
+    # `db` service above - so the container URL must use hostname `db`.
+    # `environment` wins over `env_file`, so this overrides the host-side
+    # DATABASE_URL (which points at localhost) only inside the stack.
+    # External/prod DB: set DATABASE_URL_DOCKER in .env to the real URL.
+    environment:
+      DATABASE_URL: ${DATABASE_URL_DOCKER:-postgres://barrier:barrier@db:5432/barreiras?sslmode=disable}
+    depends_on:
+      db:
+        condition: service_healthy
     volumes:
       - ./.env:/app/.env:ro
     ports:
@@ -46,6 +91,11 @@ services:
     image: barrier-monitor:latest
     command: ["run", "-A", "scripts/fracttal-poll.ts"]
     env_file: [.env]
+    environment:
+      DATABASE_URL: ${DATABASE_URL_DOCKER:-postgres://barrier:barrier@db:5432/barreiras?sslmode=disable}
+    depends_on:
+      db:
+        condition: service_healthy
     volumes:
       - ./.env:/app/.env:ro
     restart: unless-stopped
@@ -60,6 +110,11 @@ services:
     image: barrier-monitor:latest
     command: ["run", "-A", "scripts/alerts-poll.ts"]
     env_file: [.env]
+    environment:
+      DATABASE_URL: ${DATABASE_URL_DOCKER:-postgres://barrier:barrier@db:5432/barreiras?sslmode=disable}
+    depends_on:
+      db:
+        condition: service_healthy
     volumes:
       - ./.env:/app/.env:ro
     restart: unless-stopped
@@ -70,9 +125,25 @@ services:
   #   docker compose run --rm tools deno run -A --env-file=.env scripts/migrate.ts
   #   docker compose run --rm -v /srv/dump:/dump tools \
   #     deno run -A --env-file=.env scripts/fracttal-import.ts --dir /dump --apply
+  # Note: --env-file=.env inside the container re-reads the host DATABASE_URL
+  # (localhost), which is wrong in-container. Prefer the compose-provided
+  # DATABASE_URL (db hostname) by dropping the flag:
+  #   docker compose run --rm tools deno run -A scripts/migrate.ts
   tools:
     image: barrier-monitor:latest
     profiles: ["tools"]
     env_file: [.env]
+    environment:
+      DATABASE_URL: ${DATABASE_URL_DOCKER:-postgres://barrier:barrier@db:5432/barreiras?sslmode=disable}
+    depends_on:
+      db:
+        condition: service_healthy
     volumes:
       - ./.env:/app/.env:ro
+
+volumes:
+  # Named volume (not a bind mount): required for Postgres on Docker Desktop
+  # for Windows (permissions + fsync performance). Lives inside the Docker
+  # Linux VM; manage with `docker volume ls/inspect` and
+  # `docker compose down -v` (deletes all DB data).
+  pgdata:
