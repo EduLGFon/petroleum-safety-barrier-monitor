@@ -163,14 +163,17 @@ barrier_status_history
 
 ### Lookup tables = contract with `lib/enums/`
 
-Every `id` in the lookup tables **must** mean exactly the same thing as the
-corresponding `id` in `lib/enums/` (`codes.ts`, `taxonomy.ts`,
+Every `id` in the **static** lookup tables **must** mean exactly the same
+thing as the corresponding `id` in `lib/enums/` (`codes.ts`, `taxonomy.ts`,
 `context.ts`) - it is this agreement that lets the frontend resolve
 `availability_id: 4` to `'Degradado'` without ever querying the DB for it.
 `db/seed_lookups.sql` populates these tables id-by-id from the same values
-(`ON CONFLICT(id) DO UPDATE`). If you add a new category/status/etc., add the
+(`ON CONFLICT(id) DO UPDATE`). If you add a new status/rank/etc., add the
 new row (with a new id) both to `lib/enums/` and `db/seed_lookups.sql` -
-never renumber an existing row while barriers reference that id. `ALL (0)` is
+never renumber an existing row while barriers reference that id.
+`locations` and `categories` are exempt: they mirror the live Fracttal
+taxonomy, start empty, and are filled by the sync (new labels per cycle)
+or a dump import (deterministic rebuild). `ALL (0)` is
 UI-only, never a row in `locations` (the seed removes `id = 0` if
 unreferenced); `ownerId = -1` means "no row" (`owner_id NULL`).
 
@@ -289,7 +292,7 @@ splitter that respects dollar-quoted bodies (`$$`), quotes, and comments
 | File                                 | Responsibility                                                                                                                                                                                                                     |
 | ------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `db/schema.sql`                      | Full DDL: tables, indexes, triggers (`trg_barriers_set_compliance`, `trg_barriers_updated_at`), functions (`barriers_set_compliance()`, `set_updated_at()`, `record_status_change()`)                                              |
-| `db/seed_lookups.sql`                | Populates the lookup tables from `lib/enums/` (idempotent)                                                                                                                                                                         |
+| `db/seed_lookups.sql`                | Populates the static lookups from `lib/enums/` (idempotent; locations/categories stay empty for the sync)                                                                                                                          |
 | `scripts/migrate.ts`                 | Applies the two files above against `DATABASE_URL` (pool size 1)                                                                                                                                                                   |
 | `scripts/check-migration-order.ts`   | Static guard: every index in `db/schema.sql` must follow its column (`CREATE TABLE` or an earlier `ALTER ... ADD COLUMN`), so a migration that works on a clean DB can never fail on a pre-existing one; runs in `deno task check` |
 | `scripts/seed.ts`                    | Populates `barriers`/`barrier_status_history` with mock data (batches of 500, `--force` truncates)                                                                                                                                 |

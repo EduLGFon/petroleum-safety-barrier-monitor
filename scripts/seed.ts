@@ -1,6 +1,10 @@
 // Seed - populates barriers + barrier_status_history with demo data.
 // This is why it exists: reuses the deterministic mock generator so local
 // Postgres matches mock mode. Run: deno task db:seed [-- --force]
+import { LOCATION_DIST_BY_ID, LOCATIONS } from "../lib/constants.ts";
+
+import { CATEGORY_CODES } from "../lib/enums.ts";
+
 import { getWireBarriers } from "../lib/data.ts";
 
 import { Pool } from "@db/postgres";
@@ -103,6 +107,106 @@ async function exec(text: string, args: unknown[] = []): Promise<void> {
   await queryRows(text, args);
 }
 
+// ensureMockCatalog: insert the locations/categories rows the demo data
+// references (mock ids: locations 1..8, categories 0..28). db:migrate no
+// longer seeds these tables - they mirror the live tenant - so the seed
+// brings its own rows. Labels that already exist keep their live ids (a
+// database the poller populated first); the returned maps translate
+// mock id -> live id for the barrier rows below. Never renumbers.
+async function ensureMockCatalog(): Promise<{
+  locations: Map<number, number>;
+  categories: Map<number, number>;
+}> {
+  const locNeeds = LOCATION_DIST_BY_ID.map((loc) => {
+    const known = LOCATIONS.find((l) => l.code === loc.code);
+    return {
+      id: loc.id,
+      code: loc.code,
+      type: known?.type ?? "Instalação",
+      name: known?.name ?? null,
+    };
+  });
+  const catNeeds = Object.entries(CATEGORY_CODES).map(([id, label]) => ({
+    id: Number(id),
+    label,
+  }));
+  const locations = await resolveCatalogIds(
+    "locations",
+    "code",
+    locNeeds.map((l) => ({ id: l.id, key: l.code })),
+    locNeeds.map((l) => [l.id, l.code, l.type, l.name]),
+  );
+  const categories = await resolveCatalogIds(
+    "categories",
+    "label",
+    catNeeds.map((c) => ({ id: c.id, key: c.label })),
+    catNeeds.map((c) => [c.id, c.label]),
+  );
+  return { locations, categories };
+}
+
+// resolveCatalogIds: map each needed mock id to the row id holding its
+// key, inserting missing keys (mock id first, max(id)+1 on collision).
+async function resolveCatalogIds(
+  table: "locations" | "categories",
+  keyCol: "code" | "label",
+  needs: Array<{ id: number; key: string }>,
+  insertCols: unknown[][],
+): Promise<Map<number, number>> {
+  const load = async () =>
+    await queryRows<{ id: number; key: string }>(
+      `select id, ${keyCol} as key from ${table}`,
+    );
+  let rows = await load();
+  const byKey = new Map(rows.map((r) => [r.key, r.id]));
+  const missing = needs.filter((n) => !byKey.has(n.key));
+  if (missing.length > 0) {
+    const cols = table === "locations"
+      ? "(id, code, type, name)"
+      : "(id, label)";
+    const wanted = new Map(insertCols.map((r) => [r[1], r]));
+    // One multi-row insert with the mock ids; conflicting rows skip.
+    const groups: string[] = [];
+    const args: unknown[] = [];
+    for (const m of missing) {
+      const row = wanted.get(m.key) ?? [m.id, m.key];
+      const cells: string[] = [];
+      for (const v of row) {
+        args.push(v);
+        cells.push(`$${args.length}`);
+      }
+      groups.push(`(${cells.join(", ")})`);
+    }
+    await exec(
+      `insert into ${table} ${cols} values ${groups.join(", ")} ` +
+        `on conflict do nothing`,
+      args,
+    );
+    rows = await load();
+    for (const r of rows) byKey.set(r.key, r.id);
+    const stillMissing = missing.filter((m) => !byKey.has(m.key));
+    if (stillMissing.length > 0) {
+      // Mock id collided with another key: allocate past max(id).
+      let next = rows.reduce((m, r) => Math.max(m, r.id), -1) + 1;
+      for (const m of stillMissing) {
+        const row = [...(wanted.get(m.key) ?? [next, m.key])];
+        row[0] = next++;
+        const cells = row.map((_, k) => `$${k + 1}`);
+        await exec(
+          `insert into ${table} ${cols} values (${cells.join(", ")}) ` +
+            `on conflict do nothing`,
+          row,
+        );
+      }
+      rows = await load();
+      for (const r of rows) byKey.set(r.key, r.id);
+    }
+  }
+  const mapped = new Map<number, number>();
+  for (const n of needs) mapped.set(n.id, byKey.get(n.key) ?? n.id);
+  return mapped;
+}
+
 async function main() {
   const countRows = await queryRows<{ count: string }>(
     "select count(*)::text as count from barriers",
@@ -126,8 +230,26 @@ async function main() {
   }
 
   console.log("-> generating mock barrier set...");
-  const barriers = getWireBarriers();
-  console.log(`  generated ${barriers.length} barriers`);
+  const allBarriers = getWireBarriers();
+  // external_code is UNIQUE in Postgres but the deterministic generator
+  // reuses codes across its 6800 rows: keep the first row per code so the
+  // demo insert never trips the constraint (mock mode is unaffected -
+  // in-memory rows have no uniqueness rule).
+  const seenCodes = new Set<string>();
+  const barriers = allBarriers.filter((b) => {
+    const code = b.externalCode ?? "";
+    if (code !== "" && seenCodes.has(code)) return false;
+    seenCodes.add(code);
+    return true;
+  });
+  console.log(
+    `  generated ${barriers.length} barriers (${allBarriers.length} before code dedupe)`,
+  );
+
+  // Mock ids are stable in the generator but the tables mirror the live
+  // tenant: translate mock location/category ids to the rows holding
+  // their labels (identity on a fresh database).
+  const catalog = await ensureMockCatalog();
 
   let inserted = 0;
   let historyInserted = 0;
@@ -138,10 +260,10 @@ async function main() {
     const barrierRows: BarrierInsert[] = chunk.map((b) => ({
       tag: b.tag,
       typology_id: b.typologyId,
-      location_id: b.locationId,
+      location_id: catalog.locations.get(b.locationId) ?? b.locationId,
       loc_desc_id: b.locDescId,
       criticality_id: b.criticalityId,
-      category_id: b.categoryId,
+      category_id: catalog.categories.get(b.categoryId) ?? b.categoryId,
       grouping_id: b.groupingId,
       owner_id: b.ownerId < 0 ? null : b.ownerId,
       availability_id: b.availabilityId,

@@ -1,64 +1,23 @@
 -- ═══════════════════════════════════════════════════════════════════════════
--- SEED - lookup tables, mirroring lib/enums.ts id-for-id
+-- SEED - static lookup tables, mirroring lib/enums.ts id-for-id
 -- ═══════════════════════════════════════════════════════════════════════════
 -- Idempotent: safe to re-run. Do not change existing ids once barriers
--- reference them - add new rows with new ids instead.
+-- reference them - add new rows with new ids instead. Only STATIC tables
+-- live here (statuses, ranks, groupings, typologies, owners, loc_descs,
+-- authors); locations/categories are dynamic (see below).
 --
--- locations and categories are DYNAMIC: they now mirror the real Fracttal
--- catalog imported by scripts/fracttal-import.ts (ids are deterministic:
--- locations 1..N sorted by station code, categories 0..N-1 sorted by label;
--- 0 = 'ALL' stays a UI-only sentinel that is never a row). Rebuilding them
--- from the live dump supersedes any hand-edits here.
+-- locations and categories are DYNAMIC: they mirror the live Fracttal
+-- taxonomy and start EMPTY. The live sync creates rows as new labels
+-- arrive (ids continue past max(id)); scripts/fracttal-import.ts --apply
+-- rebuilds them deterministically from a dump (ids sorted); 0 = 'ALL'
+-- stays a UI-only sentinel that is never a row. scripts/seed.ts inserts
+-- the mock rows its demo data needs by itself. Never hand-seed labels
+-- here: a fixed snapshot goes stale and the sync used to skip every asset
+-- outside it.
 
-insert into locations (id, code, type, name) values
-  (1, 'BIG', 'Instalação', 'Biguá'),
-  (2, 'CAB', 'Instalação', 'Cacimbas'),
-  (3, 'CCN', 'Instalação', 'Córrego Cedro Norte'),
-  (4, 'CCNS', 'Instalação', 'Corrego Cedro Norte Sul'),
-  (5, 'CD', 'Instalação', 'Córrego Dourado'),
-  (6, 'CG', 'Instalação', 'Campo Grande'),
-  (7, 'CJ DUTOS TERRESTRES - ÁREA CENTRO', 'Duto de Transferência', null),
-  (8, 'CJ DUTOS TERRESTRES - ÁREA NORTE', 'Duto de Transferência', null),
-  (9, 'CJ DUTOS TERRESTRES - ÁREA SUL', 'Duto de Transferência', null),
-  (10, 'CJ UNIDADE DE TESTE MÓVEL', 'Unidade Móvel', null),
-  (11, 'CNC', 'Instalação', 'Cancã'),
-  (12, 'CP', 'Instalação', 'Córrego das Pedras'),
-  (13, 'ES', 'Instalação', 'Base Seacrest - São Mateus'),
-  (14, 'FAL', 'Instalação', 'Fazenda Alegre'),
-  (15, 'FC', 'Instalação', 'Fazenda Cedro'),
-  (16, 'FQ', 'Instalação', 'Fazenda Queimadas'),
-  (17, 'FSJ', 'Instalação', 'Fazenda São Jorge'),
-  (18, 'FSL', 'Instalação', 'Fazenda Santa Luzia'),
-  (19, 'FSR', 'Instalação', 'Fazenda São Rafael'),
-  (20, 'GU', 'Instalação', 'Guriri'),
-  (21, 'IBU', 'Instalação', 'Inhambu'),
-  (22, 'JCT', 'Instalação', 'Jacutinga'),
-  (23, 'LB', 'Instalação', 'Lagoa Bonita'),
-  (24, 'LS', 'Instalação', 'Lagoa Suruaca'),
-  (25, 'MA', 'Instalação', 'Mariricu'),
-  (26, 'RI', 'Instalação', 'Rio Itaúnas'),
-  (27, 'RP', 'Instalação', 'Rio Preto'),
-  (28, 'RPO', 'Instalação', 'Rio Preto Oeste'),
-  (29, 'RPS', 'Instalação', 'Rio Preto Sul'),
-  (30, 'RSM', 'Instalação', 'Rio São Mateus'),
-  (31, 'SEI', 'Instalação', 'Seriema'),
-  (32, 'SM', 'Instalação', 'São Mateus'),
-  (33, 'SML', 'Instalação', 'São Mateus Leste'),
-  (34, 'TAB', 'Instalação', 'Tabuiaá'),
-  (35, 'UGV''S MÓVEIS - UGVM''S', 'Instalação', null),
-  -- Appended after the initial sorted load (never renumber existing rows):
-  -- FCN/MAN come from the inventory sheet TOTAL field list.
-  (36, 'FCN', 'Instalação', 'Fazenda Cedro Norte'),
-  (37, 'MAN', 'Instalação', 'Mariricu Norte')
--- Live imports rebuild this catalog with their own ids (see
--- scripts/fracttal-import.ts), so the seed must never renumber or fail on
--- existing rows: bare DO NOTHING skips any id- or code-conflicting row,
--- fills genuinely missing codes, and leaves live ids (and barrier FKs)
--- untouched.
-on conflict do nothing;
-
--- 'ALL' (id 0) is a UI filter sentinel, not a real installation: remove the
--- legacy row when nothing references it so no barrier can point at it.
+-- locations rows are created by the live sync / dump import, never seeded
+-- (see header). The legacy id-0 sentinel cleanup stays: no barrier may
+-- ever point at it.
 delete from locations where id = 0 and not exists (
   select 1 from barriers where location_id = 0
 );
@@ -95,78 +54,10 @@ insert into criticality_levels (id, label) values
   (1, 'A')
 on conflict (id) do update set label = excluded.label;
 
-insert into categories (id, label) values
-  (0, 'Buzina Alarme'),
-  (1, 'Compressor Gás MC-A- PSE'),
-  (2, 'DHSV Válvula Segurança Poço'),
-  (3, 'Detector'),
-  (4, 'Detector de Gás'),
-  (5, 'Detector de PIG'),
-  (6, 'Equipamento - Emergência'),
-  (7, 'Extintor'),
-  (8, 'Extintor ABC'),
-  (9, 'Extintor de incêndio'),
-  (10, 'Gasoduto'),
-  (11, 'Gerador Emergência'),
-  (12, 'Hidrante'),
-  (13, 'Linha Gás anular'),
-  (14, 'Linha de Gás'),
-  (15, 'Miscelânea Segurança'),
-  (16, 'PSV-C-RPO1-001'),
-  (17, 'Painel de Alarme'),
-  (18, 'Saída de Emergência'),
-  (19, 'Sirene'),
-  (20, 'Tampa - Alívio de Emergência'),
-  (21, 'Tampa emergência'),
-  (22, 'Valvula Segurança - GU-7'),
-  (23, 'Valvula de Segurança'),
-  (24, 'Válv. Segurança'),
-  (25, 'Válv. de Segurança'),
-  (26, 'Válvula'),
-  (27, 'Válvula Alívio'),
-  (28, 'Válvula Bloqueio'),
-  (29, 'Válvula Control Nível'),
-  (30, 'Válvula Controle'),
-  (31, 'Válvula Controle Nível'),
-  (32, 'Válvula Controle Pressão'),
-  (33, 'Válvula Controle Saída'),
-  (34, 'Válvula Controle de Pressão'),
-  (35, 'Válvula Corta Chamas'),
-  (36, 'Válvula Corta-Chama'),
-  (37, 'Válvula Corta-chamas'),
-  (38, 'Válvula Emergência'),
-  (39, 'Válvula Manual'),
-  (40, 'Válvula Manual Bloqueio'),
-  (41, 'Válvula On Off'),
-  (42, 'Válvula Portadora'),
-  (43, 'Válvula Pressão'),
-  (44, 'Válvula Reguladora'),
-  (45, 'Válvula Segurança'),
-  (46, 'Válvula Shutdown'),
-  (47, 'Válvula Solenóide'),
-  (48, 'Válvula XV'),
-  (49, 'Válvula de Bloqueio'),
-  (50, 'Válvula de Controle'),
-  (51, 'Válvula de Controle de Pressão'),
-  (52, 'Válvula de Emergência'),
-  (53, 'Válvula de Manobra'),
-  (54, 'Válvula de Pressão'),
-  (55, 'Válvula de Segurança'),
-  (56, 'Válvula de Segurança PSV'),
-  (57, 'Válvula de Vazão'),
-  (58, 'Válvula de alívio'),
-  (59, 'Válvula-XV'),
-  (60, 'Válvulas'),
-  (61, 'Válvulas Segurança'),
-  (62, 'Válvulas de segurança'),
-  (63, 'Válvulas segurança'),
-  (64, 'Válvulas- PSV'),
-  (65, 'Válvulassegurança'),
-  (66, 'Válvúla'),
-  (67, 'Válvula BIN')
--- Same rationale as locations above: the live import rebuilds categories
--- with its own ids, so the seed fills gaps without renumbering or failing.
-on conflict do nothing;
+-- categories rows are created by the live sync / dump import, never
+-- seeded (see header). scripts/seed.ts inserts the mock rows its
+-- demo data needs by itself.
+
 
 insert into groupings (id, label) values
   (0, 'Sistemas de Alívio'),

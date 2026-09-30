@@ -408,7 +408,7 @@ toWireQuery({ location: "FAL", availability: "Degradado", page: 1 });
 | `lib/dashboard/urgent.ts`            | `urgencyOf`/`isUrgent`/`compareUrgency`/`urgentBarriers` (fail-closed baseline = NcAlert)                     |
 | `islands/dashboard/vocabularies.ts`  | Client hook `useDashboardVocabularies` (mock mode only)                                                       |
 | `db/schema.sql`                      | DDL: lookup tables, `barriers`, `barrier_status_history`                                                      |
-| `db/seed_lookups.sql`                | Seeds the lookup tables, mirroring `lib/enums/`                                                               |
+| `db/seed_lookups.sql`                | Seeds the static lookups, mirroring `lib/enums/`                                                              |
 
 See **docs/DATABASE.md** for the full schema and setup walkthrough, and
 **docs/ARCHITECTURE.md** for the mock vs http flows and the island topology.

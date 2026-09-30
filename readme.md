@@ -241,7 +241,7 @@ compose.yml          app + poller + alerts + tools services
 compose.dev.yml      dev override: bind mounts, HMR, watch loops
 Dockerfile           single-stage Deno image, `task start` as the boot path
 db/schema.sql        full DDL: tables, indexes, triggers, functions
-db/seed_lookups.sql  idempotent lookup seed mirroring lib/enums
+db/seed_lookups.sql  idempotent static-lookup seed mirroring lib/enums
 routes/              SSR pages + JSON API only
 islands/             the only hydrated JS (dashboard root, login form, editor)
 components/          static presentational UI (no island logic)
