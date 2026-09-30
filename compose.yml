@@ -122,14 +122,18 @@ services:
 
   # One-off toolbox (migrate, seed, import, sync, alerts). Never started by
   # `compose up`; invoked explicitly, e.g.:
-  #   docker compose run --rm tools deno run -A --env-file=.env scripts/migrate.ts
-  #   docker compose run --rm -v /srv/dump:/dump tools \
-  #     deno run -A --env-file=.env scripts/fracttal-import.ts --dir /dump --apply
-  # Note: --env-file=.env inside the container re-reads the host DATABASE_URL
-  # (localhost), which is wrong in-container. Prefer the compose-provided
-  # DATABASE_URL (db hostname) by dropping the flag:
   #   docker compose run --rm tools deno run -A scripts/migrate.ts
+  #   docker compose run --rm -v /srv/dump:/dump tools \
+  #     deno run -A scripts/fracttal-import.ts --dir /dump --apply
+  # Note: do NOT add --env-file=.env here. It would re-read the host
+  # DATABASE_URL (localhost) inside the container, where it must be hostname
+  # `db` - the compose-provided DATABASE_URL above is already correct.
+  # The `build: .` below shares the prod image with `app`, so `run tools`
+  # works even on hosts that only ever built the `:dev` tag (the dev
+  # override does not touch this service, so without `build` Docker would
+  # try to pull `barrier-monitor:latest` from a registry and fail).
   tools:
+    build: .
     image: barrier-monitor:latest
     profiles: ["tools"]
     env_file: [.env]
