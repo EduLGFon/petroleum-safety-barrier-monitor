@@ -92,10 +92,10 @@ Criticidade filter. GERAL manual-barrier coverage measured by
 live).
 
 Count of equipment whose `groups_description` taxonomy label hits the
-keyword list (full pass, 18,272 rows): **3,523 rows** (~19%), minus 1
-documented exclusion (a pressure transmitter mislabeled `Válvula`, see
-`EXCLUDED_EXTERNAL_CODES`). The keyword list is kept only as scope
-provenance, not as a gate.
+keyword list (full pass, 18,272 rows): **3,523 rows** (~19%). The keyword
+list is kept only as scope provenance, not as a gate: every row enters
+(the one-time exclusion that used to sit here was removed; the monitor
+mirrors upstream 1:1 and mislabels are fixed in Fracttal).
 
 The filter runs on `groups_description` only (the asset-type taxonomy).
 Free-text `description` is NOT matched: it pulls in non-barrier types
