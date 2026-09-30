@@ -8,3 +8,14 @@ dist/
 .env
 *.dump
 tmp/
+# Test files are never bundled (no non-test source imports them; the one file
+# under routes/ is pure Deno.test with no route export). Excluding them keeps
+# `COPY . ./` cached while tests are edited, instead of re-running the ~20s
+# vite build for byte-identical output. (`**/` prefix required: a bare
+# `*_test.ts` only matches at the context root.)
+**/*_test.ts
+# Docs and editor state: never imported, only invalidate the build layer.
+docs/
+.vscode/
+*.md
+**/*.md

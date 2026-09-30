@@ -15,6 +15,10 @@
 services:
   # Dashboard via vite HMR (default port 5173, listens on 0.0.0.0 in Docker).
   app:
+    # Own tag: dev builds `target: base` (no bundle), so sharing prod's
+    # `barrier-monitor:latest` would clobber the production image on every
+    # `up --build`. Poller/alerts below reuse this same dev image.
+    image: barrier-monitor:dev
     build:
       context: .
       # Deps only, no `deno task build`: dev bind-mounts `./:/app` and runs
@@ -36,7 +40,9 @@ services:
       disable: true
 
   # Live poll loop, restarted on every watched-file change (scripts + lib).
+  # Same dev image as app (base stage + bind-mounted sources, no bundle).
   poller:
+    image: barrier-monitor:dev
     command: ["run", "--watch", "-A", "scripts/fracttal-poll.ts"]
     volumes:
       - ./:/app
@@ -48,6 +54,7 @@ services:
 
   # Alert digest loop, same watch treatment as the poller.
   alerts:
+    image: barrier-monitor:dev
     command: ["run", "--watch", "-A", "scripts/alerts-poll.ts"]
     volumes:
       - ./:/app
