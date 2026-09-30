@@ -71,6 +71,7 @@ export function buildImmediateEvent(
   statusId: number,
   immediate: boolean,
   labels?: ResolverLabels,
+  ruleId?: number | null,
 ): DetectedUrgent {
   const resolved = resolveBarrier(barrier, labels);
   const urgency = urgencyOf(resolved);
@@ -91,6 +92,7 @@ export function buildImmediateEvent(
       delivered: [],
       category: resolved.category,
       immediate,
+      ruleId: ruleId ?? null,
       ...extractDetail(barrier, transitionDate, statusId, labels),
     },
     urgency,
@@ -138,7 +140,12 @@ export async function maybeSendImmediate(
       categoryId: barrier.categoryId,
       statusId,
       criticalityId: barrier.criticalityId,
+      locationId: barrier.locationId,
+      typologyId: barrier.typologyId,
+      groupingId: barrier.groupingId,
+      ownerId: barrier.ownerId,
       compliant: resolved.compliance === "Conforme",
+      hasActionPlan: (barrier.actionPlan ?? "").trim() !== "",
     },
     rules,
     hasAnyRule,
@@ -155,6 +162,7 @@ export async function maybeSendImmediate(
     statusId,
     match.immediate,
     labels,
+    match.ruleId,
   );
   const enqueued = await store.enqueue([event]);
   logger(`[immediate] enqueued=${enqueued} ${event.dedupKey}`);
@@ -167,7 +175,10 @@ export async function maybeSendImmediate(
     return { matched: true, immediate: true, enqueued, emailed: 0 };
   }
   const critical = urgencyOf(resolved) === "critical" ? 1 : 0;
-  const subject = immediateSubject(1, critical, event.payload.tag);
+  const subject = immediateSubject(1, critical, event.payload.tag, {
+    criticality: event.payload.criticality,
+    newStatus: event.payload.availability,
+  });
   const runAt = now().toISOString();
   const mailOpts = dashboardUrl ? { brand, dashboardUrl } : { brand };
   const digestEvents = [{

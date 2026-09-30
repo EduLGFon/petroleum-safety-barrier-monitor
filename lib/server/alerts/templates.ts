@@ -68,35 +68,106 @@ export function shouldUseCompact(count: number): boolean {
   return count > COMPACT_THRESHOLD;
 }
 
-// urgentDigestSubject: counts in the subject so triage works from the inbox.
-// leadTag names the single barrier when the digest holds exactly one, so a
-// one-alert mail is actionable without opening it. Existing two-arg calls
-// keep the legacy shape.
+// SubjectLead: rank/status context for the subject line. criticality is
+// the single barrier's rank (ESO/A/B/C/D…); newStatus its landing status;
+// ranks lists every rank present in a multi-barrier digest. Callers that
+// omit it get the legacy [Barreiras] shape below.
+export interface SubjectLead {
+  criticality?: string;
+  newStatus?: string;
+  ranks?: string[];
+}
+
+// RANK_ORDER: severity order for the [A/B] prefix - most severe first.
+const RANK_ORDER = ["ESO", "A", "B", "C", "D"];
+
+function rankWeight(rank: string): number {
+  const i = RANK_ORDER.indexOf(rank.trim().toUpperCase());
+  return i >= 0 ? i : RANK_ORDER.length;
+}
+
+// formatDateBR: ISO (YYYY-MM-DD…) to the Brazilian default DD/MM/YYYY.
+// Falls back to the raw value when it doesn't parse, never throwing inside
+// a render path.
+export function formatDateBR(iso: string): string {
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(iso.slice(0, 10));
+  if (!m) return iso;
+  return `${m[3]}/${m[2]}/${m[1]}`;
+}
+
+// formatDateTimeBR: ISO instant to "DD/MM/YYYY, HH:mm UTC" (UTC-based so the
+// stamp reads the same in every inbox and test run).
+export function formatDateTimeBR(iso: string): string {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return iso;
+  const p = (n: number): string => String(n).padStart(2, "0");
+  return `${p(d.getUTCDate())}/${
+    p(d.getUTCMonth() + 1)
+  }/${d.getUTCFullYear()}, ` +
+    `${p(d.getUTCHours())}:${p(d.getUTCMinutes())} UTC`;
+}
+
+// rankPrefix: distinct ranks, most severe first, capped at three
+// ([A], [A/B], [ESO/A/B]…). Unknown values sort after the known ranks.
+function rankPrefix(ranks: string[]): string {
+  const distinct = [
+    ...new Set(ranks.map((r) => r.trim()).filter((r) => r !== "")),
+  ];
+  distinct.sort((a, b) => rankWeight(a) - rankWeight(b) || a.localeCompare(b));
+  return distinct.slice(0, 3).join("/");
+}
+
+// urgentDigestSubject: triage-ready subject. With rank info it leads with
+// the criticality - "[A] Atualização de barreira: PSV-2101 agora
+// Indisponível" for one barrier, "[A/B] Atualização de 3 barreiras
+// (1 crítica)" for a digest - so severity and scope read from the inbox.
+// Without rank info it keeps the legacy [Barreiras] shape.
 export function urgentDigestSubject(
   count: number,
   critical: number,
   leadTag?: string,
+  lead?: SubjectLead,
 ): string {
+  const tag = leadTag?.trim();
+  const ranks = lead?.ranks && lead.ranks.length > 0
+    ? lead.ranks
+    : lead?.criticality
+    ? [lead.criticality]
+    : [];
+  if (ranks.length > 0) {
+    const prefix = rankPrefix(ranks);
+    if (count === 1 && tag) {
+      const status = lead?.newStatus?.trim();
+      return `[${prefix}] Atualização de barreira: ${tag.slice(0, 40)}` +
+        (status ? ` agora ${status}` : "");
+    }
+    const what = count === 1
+      ? "Atualização de 1 barreira"
+      : `Atualização de ${count} barreiras`;
+    const crit = critical > 0
+      ? ` (${critical} crítica${critical > 1 ? "s" : ""})`
+      : "";
+    return `[${prefix}] ${what}${crit}`;
+  }
   const what = count === 1
     ? "1 barreira urgente"
     : `${count} barreiras urgentes`;
   const crit = critical > 0
     ? ` (${critical} crítica${critical > 1 ? "s" : ""})`
     : "";
-  const lead = count === 1 && leadTag && leadTag.trim() !== ""
-    ? ` — ${leadTag.trim().slice(0, 40)}`
-    : "";
-  return `[Barreiras] ${what}${crit}${lead}`;
+  const leadSuffix = count === 1 && tag ? `: ${tag.slice(0, 40)}` : "";
+  return `[Barreiras] ${what}${crit}${leadSuffix}`;
 }
 
-// immediateSubject: same counts as the digest, prefixed so inbox triage
+// immediateSubject: same subject as the digest, prefixed so inbox triage
 // tells at-once mail apart from the periodic digest.
 export function immediateSubject(
   count: number,
   critical: number,
   leadTag?: string,
+  lead?: SubjectLead,
 ): string {
-  return `[Imediato] ${urgentDigestSubject(count, critical, leadTag)}`;
+  return `[Imediato] ${urgentDigestSubject(count, critical, leadTag, lead)}`;
 }
 
 // changeLine: "Disponível → Indisponível" when the before side is known,
@@ -148,11 +219,13 @@ export function urgentDigestBody(
       const flag = e.urgency === "critical" ? "[CRÍTICA] " : "";
       lines.push(
         `• ${flag}${e.tag} (${e.location}): ${changeLine(e)} ` +
-          `desde ${e.transitionDate} · criticidade ${e.criticality}` +
+          `desde ${
+            formatDateBR(e.transitionDate)
+          } · criticidade ${e.criticality}` +
           (e.owner ? ` · ${e.owner}` : ""),
       );
     }
-    lines.push("", `Verificação: ${runAt}`);
+    lines.push("", `Verificação: ${formatDateTimeBR(runAt)}`);
     const link = barrierLink(opts, undefined);
     lines.push(
       link !== ""
@@ -165,7 +238,9 @@ export function urgentDigestBody(
     const flag = e.urgency === "critical" ? "[CRÍTICA] " : "";
     lines.push(
       `• ${flag}${e.tag} (${e.location}) - ${e.availability} ` +
-        `desde ${e.transitionDate} · criticidade ${e.criticality}`,
+        `desde ${
+          formatDateBR(e.transitionDate)
+        } · criticidade ${e.criticality}`,
     );
     lines.push(`  O que mudou: ${changeLine(e)}`);
     const comp = complianceLine(e);
@@ -181,18 +256,18 @@ export function urgentDigestBody(
     const origin = [
       e.source ? `origem ${e.source}` : "",
       e.author ? `por ${e.author}` : "",
-      e.previousDate ? `(antes desde ${e.previousDate})` : "",
+      e.previousDate ? `(antes desde ${formatDateBR(e.previousDate)})` : "",
     ].filter((s) => s !== "").join(" ");
     if (origin !== "") lines.push(`  Atualizado ${origin}`);
     if (e.note) lines.push(`  Nota: ${e.note}`);
     if (e.actionPlan) {
       lines.push(`  Plano de ação: ${e.actionPlan}`);
     } else {
-      lines.push(`  Plano de ação: (sem plano — registre no dashboard)`);
+      lines.push(`  Plano de ação: (sem plano de ação)`);
     }
     if (e.historyTrail && e.historyTrail.length > 0) {
       const trail = e.historyTrail.map((h) =>
-        `${h.date.slice(0, 10)} ${h.status}` +
+        `${formatDateBR(h.date)} ${h.status}` +
         (h.author ? ` (${h.author})` : "") +
         (h.note ? `: ${h.note}` : "")
       ).join("; ");
@@ -202,7 +277,7 @@ export function urgentDigestBody(
     if (link !== "") lines.push(`  Ver: ${link}`);
     lines.push("");
   }
-  lines.push(`Verificação: ${runAt}`);
+  lines.push(`Verificação: ${formatDateTimeBR(runAt)}`);
   const root = barrierLink(opts, undefined);
   lines.push(
     root !== ""
@@ -272,26 +347,24 @@ export function urgentDigestHtml(
     `<span style="display:inline-block;background:rgba(125,211,252,.14);` +
     `border:1px solid rgba(125,211,252,.35);color:#e0f2fe;font-size:12px;` +
     `font-weight:700;padding:4px 12px;border-radius:999px;">` +
-    `${events.length} no digest</span>` +
+    `${events.length} ${
+      events.length === 1 ? "barreira neste alerta" : "barreiras neste alerta"
+    }</span>` +
     (critical > 0
       ? ` <span style="display:inline-block;background:#b91c1c;color:#ffffff;` +
         `font-size:12px;font-weight:700;padding:4px 12px;border-radius:999px;">` +
         `${critical} crítica${critical === 1 ? "" : "s"}</span>`
       : "") +
     `</p></td></tr>`;
-  const footer = `<p style="margin:16px 0 0;font-size:12px;color:#64748b;` +
-    `line-height:1.6;">O que fazer agora: ` +
-    `1) abra o dashboard, 2) confira a nota e o responsável, ` +
-    `3) registre o plano de ação.</p>` +
+  const footer =
     (rootLink !== ""
-      ? `<p style="margin:12px 0 0;"><a href="${esc(rootLink)}" ` +
+      ? `<p style="margin:16px 0 0;"><a href="${esc(rootLink)}" ` +
         `style="display:inline-block;background:#0f2a44;color:#ffffff;` +
         `font-size:13px;font-weight:700;text-decoration:none;` +
         `padding:10px 20px;border-radius:10px;">Ver no dashboard</a></p>`
       : "") +
     `<p style="margin:12px 0 0;font-size:12px;color:#94a3b8;">` +
-    `Verificação: ${esc(runAt)} · ` +
-    `Regras e destinatários em Configurações → Alertas.</p>`;
+    `Verificado em ${esc(formatDateTimeBR(runAt))}.</p>`;
   const bodyInner = compact
     ? compactTable(events, options)
     : events.map((e) => premiumCard(e, options)).join("");
@@ -342,7 +415,7 @@ function accent(e: DigestEvent): string {
 function changeTable(e: DigestEvent): string {
   const esc = escapeHtml;
   const changed = e.oldAvailability && e.oldAvailability !== e.availability;
-  const oldV = e.oldAvailability ?? "—";
+  const oldV = e.oldAvailability ?? "-";
   const arrow = changed ? "→" : "·";
   const newColor = changed ? "#b91c1c" : "#0f172a";
   const comp = complianceLine(e);
@@ -360,7 +433,7 @@ function changeTable(e: DigestEvent): string {
       `<td style="padding:7px 10px 7px 0;color:#64748b;font-size:12px;` +
       `white-space:nowrap;vertical-align:top;">Antes desde</td>` +
       `<td style="padding:7px 0;font-size:13px;color:#475569;">` +
-      `${esc(e.previousDate)}</td></tr>`
+      `${esc(formatDateBR(e.previousDate))}</td></tr>`
     : "";
   return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" ` +
     `style="margin:12px 0 0;background:#f8fafc;border:1px solid #e2e8f0;` +
@@ -376,7 +449,9 @@ function changeTable(e: DigestEvent): string {
     };">${esc(oldV)}</span>` +
     ` <span style="color:#94a3b8;font-weight:700;">${arrow}</span> ` +
     `<strong style="color:${newColor};">${esc(e.availability)}</strong>` +
-    ` <span style="color:#64748b;">desde ${esc(e.transitionDate)}</span>` +
+    ` <span style="color:#64748b;">desde ${
+      esc(formatDateBR(e.transitionDate))
+    }</span>` +
     `</td></tr>` + compRow + sinceRow +
     `</table>`;
 }
@@ -410,7 +485,7 @@ function premiumCard(e: DigestEvent, opts: EmailOptions): string {
   const link = barrierLink(opts, e.barrierId);
   const attribution = (e.author || e.source)
     ? `<p style="margin:12px 0 0;font-size:13px;color:#334155;">` +
-      `Atualizado por: <strong>${esc(e.author ?? "—")}</strong>` +
+      `Atualizado por: <strong>${esc(e.author ?? "-")}</strong>` +
       (e.source
         ? ` <span style="color:#64748b;">· ${esc(e.source)}</span>`
         : "") +
@@ -423,7 +498,7 @@ function premiumCard(e: DigestEvent, opts: EmailOptions): string {
       `color:#64748b;padding:0 0 4px;">HISTÓRICO RECENTE</td></tr>` +
       e.historyTrail.map((h) =>
         `<tr><td style="padding:3px 0;font-size:12px;color:#475569;">` +
-        `• ${esc(h.date.slice(0, 10))} — <strong>${esc(h.status)}</strong>` +
+        `• ${esc(formatDateBR(h.date))} · <strong>${esc(h.status)}</strong>` +
         (h.author ? ` · ${esc(h.author)}` : "") +
         (h.note
           ? ` <span style="color:#64748b;">“${esc(h.note)}”</span>`
@@ -443,8 +518,7 @@ function premiumCard(e: DigestEvent, opts: EmailOptions): string {
       `<strong>Plano de ação:</strong> ${esc(e.actionPlan)}</div>`
     : `<div style="margin:12px 0 0;background:#fffbeb;border:1px solid #fde68a;` +
       `border-radius:10px;padding:10px 14px;font-size:13px;color:#92400e;">` +
-      `<strong>Sem plano de ação</strong> — registre o responsável e o prazo ` +
-      `no dashboard para dar baixa neste alerta.</div>`;
+      `<strong>Sem plano de ação.</strong></div>`;
   const cta = link !== ""
     ? `<p style="margin:14px 0 0;"><a href="${esc(link)}" ` +
       `style="display:inline-block;background:#0f2a44;color:#ffffff;` +
@@ -486,18 +560,18 @@ function compactTable(events: DigestEvent[], opts: EmailOptions): string {
       `<strong style="color:#0f172a;">${esc(e.tag)}</strong></td>` +
       `<td style="padding:9px 10px;border-top:1px solid #e2e8f0;font-size:12px;` +
       `color:#475569;">${esc(changeLine(e))}<br>` +
-      `<span style="color:#94a3b8;">${esc(e.transitionDate)} · ${
+      `<span style="color:#94a3b8;">${esc(formatDateBR(e.transitionDate))} · ${
         esc(e.criticality)
       }</span></td>` +
       `<td style="padding:9px 10px;border-top:1px solid #e2e8f0;font-size:12px;` +
-      `color:#475569;">${esc(e.owner ?? "—")}</td>` +
+      `color:#475569;">${esc(e.owner ?? "-")}</td>` +
       `</tr>`;
   }).join("");
   return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" ` +
     `style="margin:0 0 6px;background:#ffffff;border:1px solid #e2e8f0;` +
     `border-radius:14px;overflow:hidden;">` +
     `<tr><td style="padding:14px 18px 6px;font-size:11px;font-weight:800;` +
-    `letter-spacing:.1em;color:#64748b;">${events.length} BARREIRAS — ` +
+    `letter-spacing:.1em;color:#64748b;">${events.length} BARREIRAS: ` +
     `DETALHE COMPLETO NO DASHBOARD</td></tr>` +
     `<tr><td style="padding:0 8px 8px;">` +
     `<table role="presentation" width="100%" cellpadding="0" cellspacing="0">` +

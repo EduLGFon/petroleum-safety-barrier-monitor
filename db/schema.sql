@@ -380,6 +380,19 @@ create index if not exists idx_sessions_expires on sessions(expires_at);
 -- compliant status; stale_days adds a time-based trigger (barrier stays
 -- non-compliant for N days); notify_immediate sends at once instead of the
 -- periodic digest (hybrid mode).
+--
+-- Extended scope (nullable integer[] = "all"): category_ids, from_status_ids
+-- (transition source, null = any), to_status_ids (multi landing statuses),
+-- location_ids, criticality_ids (explicit ranks; critical_only = [ESO, A]
+-- when the array is null), typology_ids, grouping_ids, owner_ids.
+-- urgency gates the computed urgency ('any' | 'urgent' | 'critical');
+-- only_no_action_plan limits to barriers without an action plan;
+-- on_transition = false makes a stale-reminder-only rule. Anti-noise:
+-- cooldown_minutes (per barrier per rule), max_per_day, quiet hours
+-- (UTC hours, overnight ranges wrap), active_days (0 = Sunday), validity
+-- window (valid_from/valid_to), stale_repeat_days. priority orders
+-- first-match wins (higher first, then lower id). description documents
+-- intent; last_triggered_at records the last fire (best-effort).
 create table if not exists alert_rules (
   id                integer generated always as identity primary key,
   name              text        not null unique,
@@ -390,12 +403,74 @@ create table if not exists alert_rules (
   stale_days        integer     check (stale_days is null or stale_days > 0),
   notify_immediate  boolean     not null default false,
   active            boolean     not null default true,
+  description       text        not null default '',
+  category_ids      integer[],
+  from_status_ids   integer[],
+  to_status_ids     integer[],
+  location_ids      integer[],
+  criticality_ids   integer[],
+  typology_ids      integer[],
+  grouping_ids      integer[],
+  owner_ids         integer[],
+  urgency           text        not null default 'any'
+    check (urgency in ('any', 'urgent', 'critical')),
+  only_no_action_plan boolean   not null default false,
+  on_transition     boolean     not null default true,
+  cooldown_minutes  integer
+    check (cooldown_minutes is null or cooldown_minutes > 0),
+  max_per_day       integer
+    check (max_per_day is null or max_per_day > 0),
+  quiet_start_hour  integer
+    check (quiet_start_hour is null or (quiet_start_hour >= 0 and quiet_start_hour <= 23)),
+  quiet_end_hour    integer
+    check (quiet_end_hour is null or (quiet_end_hour >= 0 and quiet_end_hour <= 23)),
+  active_days       integer[],
+  priority          integer     not null default 0,
+  valid_from        date,
+  valid_to          date,
+  stale_repeat_days integer
+    check (stale_repeat_days is null or stale_repeat_days > 0),
+  last_triggered_at timestamptz,
   created_at        timestamptz not null default now(),
   updated_at        timestamptz not null default now()
 );
 
+alter table alert_rules add column if not exists description text not null default '';
+alter table alert_rules add column if not exists category_ids integer[];
+alter table alert_rules add column if not exists from_status_ids integer[];
+alter table alert_rules add column if not exists to_status_ids integer[];
+alter table alert_rules add column if not exists location_ids integer[];
+alter table alert_rules add column if not exists criticality_ids integer[];
+alter table alert_rules add column if not exists typology_ids integer[];
+alter table alert_rules add column if not exists grouping_ids integer[];
+alter table alert_rules add column if not exists owner_ids integer[];
+alter table alert_rules add column if not exists urgency text not null default 'any';
+alter table alert_rules add column if not exists only_no_action_plan boolean not null default false;
+alter table alert_rules add column if not exists on_transition boolean not null default true;
+alter table alert_rules add column if not exists cooldown_minutes integer;
+alter table alert_rules add column if not exists max_per_day integer;
+alter table alert_rules add column if not exists quiet_start_hour integer;
+alter table alert_rules add column if not exists quiet_end_hour integer;
+alter table alert_rules add column if not exists active_days integer[];
+alter table alert_rules add column if not exists priority integer not null default 0;
+alter table alert_rules add column if not exists valid_from date;
+alter table alert_rules add column if not exists valid_to date;
+alter table alert_rules add column if not exists stale_repeat_days integer;
+alter table alert_rules add column if not exists last_triggered_at timestamptz;
+
+do $$ begin
+  if not exists (
+    select 1 from pg_constraint where conname = 'alert_rules_urgency_check'
+  ) then
+    alter table alert_rules
+      add constraint alert_rules_urgency_check
+      check (urgency in ('any', 'urgent', 'critical'));
+  end if;
+end $$;
+
 create index if not exists idx_alert_rules_active on alert_rules(active);
 create index if not exists idx_alert_rules_category on alert_rules(category_id);
+create index if not exists idx_alert_rules_priority on alert_rules(priority desc, id);
 
 drop trigger if exists trg_alert_rules_updated_at on alert_rules;
 create trigger trg_alert_rules_updated_at

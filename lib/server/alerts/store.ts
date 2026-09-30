@@ -85,6 +85,13 @@ export interface AlertStore {
   markDelivered(id: number, email: string, complete: boolean): Promise<void>;
   markFailed(id: number, error: string, deadLetter: boolean): Promise<void>;
   reprocessDeadLetters(): Promise<number>;
+  // countRuleEvents: anti-noise helper (optional so fakes stay small).
+  // Counts events fired by a rule for a barrier since an ISO timestamp.
+  countRuleEvents?(
+    ruleId: number,
+    barrierId: number,
+    sinceIso: string,
+  ): Promise<number>;
 }
 
 // dedupKey: barrier:date:status, matching the alert_events comment.

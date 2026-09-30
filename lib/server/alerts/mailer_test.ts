@@ -8,6 +8,9 @@ import {
 
 import {
   escapeHtml,
+  formatDateBR,
+  formatDateTimeBR,
+  immediateSubject,
   urgentDigestBody,
   urgentDigestHtml,
   urgentDigestSubject,
@@ -163,8 +166,8 @@ Deno.test("urgentDigestBody lists events with flags and run stamp", () => {
     "2026-09-13T10:00:00Z",
   );
   assertStrictEquals(body.includes("[CRÍTICA] FAL-EQ-001 (FAL)"), true);
-  assertStrictEquals(body.includes("desde 2026-09-13"), true);
-  assertStrictEquals(body.includes("2026-09-13T10:00:00Z"), true);
+  assertStrictEquals(body.includes("desde 13/09/2026"), true);
+  assertStrictEquals(body.includes("13/09/2026, 10:00 UTC"), true);
 });
 
 Deno.test("urgentDigestBody appends detail lines and attribution when present", () => {
@@ -233,11 +236,39 @@ Deno.test("urgentDigestBody switches to compact mode above the threshold", () =>
 Deno.test("urgentDigestSubject names the single barrier", () => {
   assertStrictEquals(
     urgentDigestSubject(1, 1, "PSV-2101"),
-    "[Barreiras] 1 barreira urgente (1 crítica) — PSV-2101",
+    "[Barreiras] 1 barreira urgente (1 crítica): PSV-2101",
   );
   assertStrictEquals(
     urgentDigestSubject(2, 0),
     "[Barreiras] 2 barreiras urgentes",
+  );
+});
+
+Deno.test("urgentDigestSubject leads with criticality when ranked", () => {
+  assertStrictEquals(
+    urgentDigestSubject(1, 1, "PSV-2101", {
+      criticality: "A",
+      newStatus: "Indisponível",
+    }),
+    "[A] Atualização de barreira: PSV-2101 agora Indisponível",
+  );
+  assertStrictEquals(
+    urgentDigestSubject(3, 1, undefined, { ranks: ["B", "A", "B"] }),
+    "[A/B] Atualização de 3 barreiras (1 crítica)",
+  );
+  assertStrictEquals(
+    urgentDigestSubject(2, 0, undefined, { ranks: ["B"] }),
+    "[B] Atualização de 2 barreiras",
+  );
+});
+
+Deno.test("immediateSubject prefixes the ranked subject", () => {
+  assertStrictEquals(
+    immediateSubject(1, 1, "PSV-2101", {
+      criticality: "A",
+      newStatus: "Indisponível",
+    }),
+    "[Imediato] [A] Atualização de barreira: PSV-2101 agora Indisponível",
   );
 });
 
@@ -318,6 +349,38 @@ Deno.test("urgentDigestHtml omits attribution when absent and escapes markup", (
   assertStrictEquals(html.includes("&lt;img src=x&gt;"), true);
   assertStrictEquals(html.includes("Atualizado por:"), false);
   assertStrictEquals(html.includes("Monitor de Barreiras"), true);
+});
+
+Deno.test("email copy is pt-BR dated with no em dashes", () => {
+  assertStrictEquals(formatDateBR("2026-09-30"), "30/09/2026");
+  assertStrictEquals(
+    formatDateTimeBR("2026-09-30T14:16:02.463Z"),
+    "30/09/2026, 14:16 UTC",
+  );
+  const event = {
+    tag: "PSV-2101",
+    location: "FAL",
+    availability: "Indisponível",
+    criticality: "A",
+    transitionDate: "2026-09-30",
+    urgency: "critical" as const,
+    oldAvailability: "Disponível",
+    previousDate: "2026-09-12",
+    historyTrail: [{ date: "2026-09-12", status: "Disponível" }],
+  };
+  const body = urgentDigestBody([event], "2026-09-30T14:16:02.463Z");
+  const html = urgentDigestHtml([event], "2026-09-30T14:16:02.463Z", "Marca");
+  for (const out of [body, html]) {
+    assertStrictEquals(out.includes("2026-09-30"), false);
+    assertStrictEquals(out.includes("—"), false);
+  }
+  assertStrictEquals(body.includes("30/09/2026"), true);
+  assertStrictEquals(html.includes("30/09/2026"), true);
+  assertStrictEquals(html.includes("barreira neste alerta"), true);
+  assertStrictEquals(html.includes("no digest"), false);
+  assertStrictEquals(html.includes("O que fazer agora"), false);
+  assertStrictEquals(html.includes("registre o responsável"), false);
+  assertStrictEquals(html.includes("Sem plano de ação."), true);
 });
 
 Deno.test("escapeHtml quotes attribute-breaking characters", () => {

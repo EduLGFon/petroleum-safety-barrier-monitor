@@ -59,6 +59,7 @@ export const handler = define.handlers({
     try {
       const updated = await updateAlertRule(id, {
         name: body.name,
+        description: body.description,
         categoryId: body.categoryId,
         toStatusId: body.toStatusId,
         criticalOnly: body.criticalOnly,
@@ -66,16 +67,46 @@ export const handler = define.handlers({
         staleDays: body.staleDays,
         notifyImmediate: body.notifyImmediate,
         active: body.active,
+        categoryIds: body.categoryIds,
+        fromStatusIds: body.fromStatusIds,
+        toStatusIds: body.toStatusIds,
+        locationIds: body.locationIds,
+        criticalityIds: body.criticalityIds,
+        typologyIds: body.typologyIds,
+        groupingIds: body.groupingIds,
+        ownerIds: body.ownerIds,
+        urgency: body.urgency,
+        onlyNoActionPlan: body.onlyNoActionPlan,
+        onTransition: body.onTransition,
+        cooldownMinutes: body.cooldownMinutes,
+        maxPerDay: body.maxPerDay,
+        quietStartHour: body.quietStartHour,
+        quietEndHour: body.quietEndHour,
+        activeDays: body.activeDays,
+        priority: body.priority,
+        validFrom: body.validFrom,
+        validTo: body.validTo,
+        staleRepeatDays: body.staleRepeatDays,
       });
       if (!updated) return notFound("Rule not found", requestId);
       return Response.json(updated);
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       if (
-        message.includes("name") || message.includes("category") ||
-        message.includes("toStatus") || message.includes("critical") ||
+        message.includes("name") || message.includes("description") ||
+        message.includes("category") || message.includes("toStatus") ||
+        message.includes("fromStatus") || message.includes("critical") ||
         message.includes("includeRecovery") || message.includes("staleDays") ||
-        message.includes("notifyImmediate") || message.includes("active") ||
+        message.includes("staleRepeat") ||
+        message.includes("notifyImmediate") ||
+        message.includes("active") || message.includes("urgency") ||
+        message.includes("location") || message.includes("typology") ||
+        message.includes("grouping") || message.includes("owner") ||
+        message.includes("cooldown") || message.includes("maxPerDay") ||
+        message.includes("quiet") || message.includes("activeDays") ||
+        message.includes("priority") || message.includes("validFrom") ||
+        message.includes("validTo") || message.includes("actionPlan") ||
+        message.includes("onTransition") ||
         message.includes("nothing to update") ||
         message.includes("duplicate") ||
         message.includes("unique")

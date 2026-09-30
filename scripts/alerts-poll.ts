@@ -35,6 +35,8 @@ import { listStaleBarriers } from "../lib/server/sql/alert_rules.ts";
 
 import { listAlertRules } from "../lib/server/sql/alert_rules.ts";
 
+import { touchRuleTriggered } from "../lib/server/sql/alert_rules.ts";
+
 import type { StatusInfo } from "../lib/server/alerts/detect.ts";
 
 import { getBarriersByIds } from "../lib/server/sql/barriers.ts";
@@ -136,6 +138,9 @@ async function cycle(
       brand,
       dashboardUrl,
       statusInfo,
+      onRuleFired: (ruleId) => {
+        void touchRuleTriggered(ruleId).catch(() => {});
+      },
     });
     console.log(
       `[alerts-poll] done detected=${result.detected} ` +

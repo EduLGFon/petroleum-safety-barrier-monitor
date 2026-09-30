@@ -170,4 +170,19 @@ export const sqlAlertStore: AlertStore = {
     );
     return rows.length;
   },
+
+  async countRuleEvents(
+    ruleId: number,
+    barrierId: number,
+    sinceIso: string,
+  ): Promise<number> {
+    const rows = await queryRows<{ n: string }>(
+      `select count(*)::text as n from alert_events
+       where barrier_id = $1
+         and (payload->>'ruleId')::int = $2
+         and created_at >= $3::timestamptz`,
+      [barrierId, ruleId, sinceIso],
+    );
+    return Number(rows[0]?.n ?? 0);
+  },
 };

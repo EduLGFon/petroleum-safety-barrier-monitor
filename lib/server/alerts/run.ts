@@ -25,6 +25,8 @@ import { compareUrgency } from "../../dashboard/urgent.ts";
 
 import { isCriticalRankId } from "../../enums/codes.ts";
 
+import { matchesStaleScope, sortedRules } from "./rules.ts";
+
 import type { ResolverLabels } from "../../resolve.ts";
 
 import type { AlertRule } from "../sql/alert_rules.ts";
@@ -74,10 +76,12 @@ export interface AlertCycleOptions {
   // links, the email stays complete without them).
   // statusInfo: authoritative status labels/compliance (DB-backed when the
   // caller loads it) so reverted transitions still detect on their landing.
+  // onRuleFired: observability hook (scripts stamp last_triggered_at).
   labels?: ResolverLabels;
   brand?: string;
   dashboardUrl?: string;
   statusInfo?: StatusInfo;
+  onRuleFired?: (ruleId: number) => void;
 }
 
 export interface AlertCycleResult {
@@ -169,6 +173,37 @@ export function staleDedupKey(
   return `stale:${ruleId}:${barrierId}:${date}`;
 }
 
+// throttleAllows: per-rule anti-noise gate. cooldown_minutes suppresses a
+// barrier re-firing inside the window; max_per_day caps fires per UTC day.
+// Stores without countRuleEvents (unit fakes) allow everything.
+async function throttleAllows(
+  store: AlertStore,
+  rule: AlertRule,
+  barrierId: number,
+  at: Date,
+  onAllowed?: () => void,
+): Promise<boolean> {
+  void onAllowed;
+  if (!store.countRuleEvents) return true;
+  if (rule.cooldown_minutes !== null && rule.cooldown_minutes !== undefined) {
+    const since = new Date(at.getTime() - rule.cooldown_minutes * 60_000)
+      .toISOString();
+    if (await store.countRuleEvents(rule.id, barrierId, since) > 0) {
+      return false;
+    }
+  }
+  if (rule.max_per_day !== null && rule.max_per_day !== undefined) {
+    const dayStart = `${at.toISOString().slice(0, 10)}T00:00:00Z`;
+    if (
+      await store.countRuleEvents(rule.id, barrierId, dayStart) >=
+        rule.max_per_day
+    ) {
+      return false;
+    }
+  }
+  return true;
+}
+
 // runAlertCycle: one full pass. Reprocess first (clears dead flags so this
 // run picks them up), then watermark -> detect -> enqueue -> one digest per
 // recipient covering only what they haven't received -> mark.
@@ -230,7 +265,10 @@ export async function runAlertCycle(
   );
 
   // Stale sweep: one query per distinct stale_days among active rules.
-  // Candidates are filtered by the rule's own category scope before enqueue.
+  // Candidates are filtered by each rule's full scope (category, location,
+  // criticality, urgency, quiet hours, validity) before enqueue. Repeat
+  // cadence (stale_repeat_days) spaces reminders; cooldown/max_per_day
+  // throttle per barrier when the store supports counting.
   const staleEvents: typeof detected = [];
   if (listStale) {
     const days = [
@@ -239,7 +277,9 @@ export async function runAlertCycle(
           .map((r) => r.stale_days as number),
       ),
     ];
-    const today = now().toISOString().slice(0, 10);
+    const at = now();
+    const today = at.toISOString().slice(0, 10);
+    const ordered = sortedRules(rules);
     for (const d of days) {
       const cands = await listStale(d);
       const ids = cands.map((c) => c.id);
@@ -251,14 +291,45 @@ export async function runAlertCycle(
         ) continue;
         const wire = wires.get(c.id);
         if (!wire) continue;
-        for (const r of rules) {
+        const urgency = isCriticalRankId(wire.criticalityId)
+          ? "critical"
+          : "urgent";
+        for (const r of ordered) {
           if (!r.active || r.stale_days !== d) continue;
-          if (r.category_id !== null && r.category_id !== c.categoryId) {
-            continue;
-          }
-          if (r.critical_only && !isCriticalRankId(wire.criticalityId)) {
-            continue;
-          }
+          if (
+            !matchesStaleScope(
+              {
+                categoryId: c.categoryId,
+                criticalityId: wire.criticalityId,
+                locationId: wire.locationId,
+                typologyId: wire.typologyId,
+                groupingId: wire.groupingId,
+                ownerId: wire.ownerId,
+                urgency,
+                hasActionPlan: (wire.actionPlan ?? "").trim() !== "",
+              },
+              r,
+              at,
+            )
+          ) continue;
+          // Repeat cadence: first reminder at stale_days, then every
+          // stale_repeat_days (default 1 = daily via dedup key).
+          const daysSince = Math.floor(
+            (Date.parse(`${today}T00:00:00Z`) -
+              Date.parse(`${c.statusSince.slice(0, 10)}T00:00:00Z`)) /
+              86_400_000,
+          );
+          const repeat = r.stale_repeat_days ?? 1;
+          if (daysSince >= 0 && (daysSince - d) % repeat !== 0) continue;
+          if (
+            !(await throttleAllows(
+              store,
+              r,
+              c.id,
+              at,
+              () => options.onRuleFired?.(r.id),
+            ))
+          ) continue;
           staleEvents.push({
             barrierId: c.id,
             transitionDate: today,
@@ -270,9 +341,7 @@ export async function runAlertCycle(
               location: String(wire.locationId),
               availability: String(wire.availabilityId),
               criticality: String(wire.criticalityId),
-              urgency: isCriticalRankId(wire.criticalityId)
-                ? "critical"
-                : "urgent",
+              urgency,
               attempts: 0,
               lastError: null,
               deadLetter: false,
@@ -281,15 +350,38 @@ export async function runAlertCycle(
               immediate: r.notify_immediate,
               ...extractDetail(wire, today, wire.availabilityId, labels),
             },
-            urgency: isCriticalRankId(wire.criticalityId)
-              ? "critical"
-              : "urgent",
+            urgency,
           });
+          options.onRuleFired?.(r.id);
           break; // one stale event per barrier per run is enough
         }
       }
     }
     result.detected += staleEvents.length;
+  }
+
+  // Transition throttle: same per-rule cooldown / daily budget applied to
+  // freshly detected landings (ruleId rides the payload from detect.ts).
+  const throttled: typeof detected = [];
+  if (!dryRun) {
+    const at = now();
+    const byRule = new Map<number, AlertRule>();
+    for (const r of rules) byRule.set(r.id, r);
+    for (const e of detected) {
+      const ruleId = e.payload.ruleId ?? null;
+      const rule = ruleId !== null ? byRule.get(ruleId) : undefined;
+      if (!rule) {
+        throttled.push(e);
+        if (ruleId !== null) options.onRuleFired?.(ruleId);
+        continue;
+      }
+      if (await throttleAllows(store, rule, e.barrierId, at)) {
+        throttled.push(e);
+        options.onRuleFired?.(rule.id);
+      }
+    }
+  } else {
+    throttled.push(...detected);
   }
 
   if (dryRun) {
@@ -301,7 +393,7 @@ export async function runAlertCycle(
     return result;
   }
 
-  const toEnqueue = [...detected, ...staleEvents];
+  const toEnqueue = [...throttled, ...staleEvents];
   if (toEnqueue.length > 0) {
     result.enqueued = await store.enqueue(toEnqueue);
     logger(`[alerts] enqueued=${result.enqueued} (dedup skips the rest)`);
@@ -330,7 +422,19 @@ export async function runAlertCycle(
       e.payload.urgency === "critical"
     ).length;
     const leadTag = pending.length === 1 ? pending[0]!.payload.tag : undefined;
-    const subject = urgentDigestSubject(pending.length, critical, leadTag);
+    const lead = pending.length === 1
+      ? {
+        criticality: pending[0]!.payload.criticality,
+        newStatus: pending[0]!.payload.availability,
+        ranks: pending.map((e) => e.payload.criticality),
+      }
+      : { ranks: pending.map((e) => e.payload.criticality) };
+    const subject = urgentDigestSubject(
+      pending.length,
+      critical,
+      leadTag,
+      lead,
+    );
     const events = pending.map(toDigest);
     const runAt = now().toISOString();
     const mailOpts = dashboardUrl ? { brand, dashboardUrl } : { brand };

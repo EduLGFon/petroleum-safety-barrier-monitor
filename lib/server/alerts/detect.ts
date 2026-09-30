@@ -78,12 +78,35 @@ export async function detectUrgentTransitions(
     const urgency = !compliant
       ? (isCriticalRankId(wire.criticalityId) ? "critical" : "urgent")
       : "none";
+    // Transition source: previous history entry before this landing, so
+    // from -> to rules can narrow (e.g. only Degradado -> Indisponível).
+    let fromStatusId: number | null = null;
+    for (let i = wire.statusHistory.length - 1; i >= 0; i--) {
+      const h = wire.statusHistory[i]!;
+      if (h.date.slice(0, 10) < c.transitionDate.slice(0, 10)) {
+        fromStatusId = h.statusId;
+        break;
+      }
+      if (
+        h.date.slice(0, 10) === c.transitionDate.slice(0, 10) &&
+        h.statusId !== c.statusId
+      ) {
+        fromStatusId = h.statusId;
+      }
+    }
     const match = matchRules(
       {
         categoryId: wire.categoryId,
         statusId: c.statusId,
+        fromStatusId,
         criticalityId: wire.criticalityId,
+        locationId: wire.locationId,
+        typologyId: wire.typologyId,
+        groupingId: wire.groupingId,
+        ownerId: wire.ownerId,
         compliant,
+        urgency,
+        hasActionPlan: (wire.actionPlan ?? "").trim() !== "",
       },
       rules,
       hasAnyRule,
@@ -113,6 +136,7 @@ export async function detectUrgentTransitions(
         delivered: [],
         category: barrier.category,
         immediate: match.immediate,
+        ruleId: match.ruleId,
         ...detail,
       },
       urgency,

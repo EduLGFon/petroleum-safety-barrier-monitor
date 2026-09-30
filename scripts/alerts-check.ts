@@ -27,6 +27,8 @@ import { listStaleBarriers } from "../lib/server/sql/alert_rules.ts";
 
 import { listAlertRules } from "../lib/server/sql/alert_rules.ts";
 
+import { touchRuleTriggered } from "../lib/server/sql/alert_rules.ts";
+
 import { getBarriersByIds } from "../lib/server/sql/barriers.ts";
 
 import { listRecipients } from "../lib/server/sql/recipients.ts";
@@ -152,6 +154,9 @@ async function main(): Promise<void> {
       brand,
       dashboardUrl,
       statusInfo,
+      onRuleFired: (ruleId) => {
+        void touchRuleTriggered(ruleId).catch(() => {});
+      },
     });
     if (flags.json) console.log(JSON.stringify(result));
     else {
