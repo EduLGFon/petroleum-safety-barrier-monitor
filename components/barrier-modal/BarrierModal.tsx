@@ -124,9 +124,12 @@ export function BarrierModal(
         style={{
           position: "fixed",
           inset: 0,
-          zIndex: 990,
+          // Above SyncDetailsModal (990/991) so opening a barrier from the
+          // sync changes list blurs/dims the sync dialog too, not just the page.
+          zIndex: 992,
           background: "rgba(0,0,0,.55)",
           backdropFilter: "blur(6px)",
+          WebkitBackdropFilter: "blur(6px)",
           opacity: isOpen ? 1 : 0,
           pointerEvents: isOpen ? "auto" : "none",
           transition: "opacity .28s var(--ease-std)",
@@ -143,7 +146,7 @@ export function BarrierModal(
         style={{
           position: "fixed",
           inset: 0,
-          zIndex: 991,
+          zIndex: 993,
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
