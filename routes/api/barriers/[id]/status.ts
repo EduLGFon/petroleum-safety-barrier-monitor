@@ -178,6 +178,7 @@ export const handler = define.handlers({
           logger: (line) => console.log(`[status ${requestId}] ${line}`),
           labels,
           brand: Deno.env.get("COMPANY_NAME") || undefined,
+          dashboardUrl: Deno.env.get("APP_BASE_URL") || undefined,
         });
         if (fanout.matched) {
           console.log(

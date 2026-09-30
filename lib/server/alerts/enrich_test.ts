@@ -65,6 +65,48 @@ Deno.test("extractDetail attributes the matching transition author", () => {
   assertStrictEquals(detail.locationName, "Terminal Norte");
 });
 
+Deno.test("extractDetail exposes the before side and source", () => {
+  const detail = extractDetail(
+    wire({
+      statusHistory: [
+        { date: "2026-09-10", statusId: 0, authorId: 11, note: "" },
+        {
+          date: "2026-09-13",
+          statusId: 5,
+          authorId: 11,
+          note: "vazamento observado",
+        },
+      ],
+    }),
+    "2026-09-13",
+    5,
+    { authors: { 11: "Eduardo" } },
+  );
+  assertStrictEquals(detail.oldAvailability, "Disponível");
+  assertStrictEquals(detail.oldCompliance, "Conforme");
+  assertStrictEquals(detail.previousDate, "2026-09-10");
+  assertStrictEquals(detail.source, "Manual");
+  assertStrictEquals(detail.historyTrail?.length, 1);
+  assertStrictEquals(detail.historyTrail?.[0]?.status, "Disponível");
+});
+
+Deno.test("extractDetail marks sync rows as Fracttal source without author", () => {
+  const detail = extractDetail(
+    wire({
+      statusHistory: [
+        { date: "2026-09-10", statusId: 0, authorId: 11, note: "" },
+        { date: "2026-09-13", statusId: 5, authorId: 10, note: "" },
+      ],
+    }),
+    "2026-09-13",
+    5,
+    { authors: { 10: "Sincronização Fracttal", 11: "Eduardo" } },
+  );
+  assertStrictEquals(detail.author, undefined);
+  assertStrictEquals(detail.source, "Sincronização Fracttal");
+  assertStrictEquals(detail.oldAvailability, "Disponível");
+});
+
 Deno.test("extractDetail hides service and unknown authors", () => {
   const sync = extractDetail(
     wire({

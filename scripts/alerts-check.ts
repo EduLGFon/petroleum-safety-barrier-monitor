@@ -132,6 +132,7 @@ async function main(): Promise<void> {
     statusInfo = undefined;
   }
   const brand = Deno.env.get("COMPANY_NAME") || undefined;
+  const dashboardUrl = Deno.env.get("APP_BASE_URL") || undefined;
   try {
     const result = await runAlertCycle({
       store: sqlAlertStore,
@@ -149,6 +150,7 @@ async function main(): Promise<void> {
       listStale: (days) => listStaleBarriers(days),
       labels,
       brand,
+      dashboardUrl,
       statusInfo,
     });
     if (flags.json) console.log(JSON.stringify(result));

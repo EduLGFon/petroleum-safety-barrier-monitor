@@ -70,10 +70,13 @@ export interface AlertCycleOptions {
   listStale?: (staleDays: number) => Promise<StaleCandidate[]>;
   // labels: DB id->label maps (authors included) so enqueued payloads carry
   // real names instead of seed-enum sentinels. brand: COMPANY_NAME for mail.
+  // dashboardUrl: APP_BASE_URL for "Ver no dashboard" links (absent = no
+  // links, the email stays complete without them).
   // statusInfo: authoritative status labels/compliance (DB-backed when the
   // caller loads it) so reverted transitions still detect on their landing.
   labels?: ResolverLabels;
   brand?: string;
+  dashboardUrl?: string;
   statusInfo?: StatusInfo;
 }
 
@@ -147,6 +150,12 @@ function toDigest(e: UnsentAlert): DigestEvent {
     author: e.payload.author,
     note: e.payload.note,
     actionPlan: e.payload.actionPlan,
+    oldAvailability: e.payload.oldAvailability,
+    oldCompliance: e.payload.oldCompliance,
+    previousDate: e.payload.previousDate,
+    source: e.payload.source,
+    barrierId: e.barrierId ?? undefined,
+    historyTrail: e.payload.historyTrail,
   };
 }
 
@@ -181,6 +190,7 @@ export async function runAlertCycle(
     listStale,
     labels,
     brand,
+    dashboardUrl,
     statusInfo,
   } = options;
   const active = recipients.filter((r) => r.email !== "");
@@ -319,11 +329,13 @@ export async function runAlertCycle(
     const critical = pending.filter((e) =>
       e.payload.urgency === "critical"
     ).length;
-    const subject = urgentDigestSubject(pending.length, critical);
+    const leadTag = pending.length === 1 ? pending[0]!.payload.tag : undefined;
+    const subject = urgentDigestSubject(pending.length, critical, leadTag);
     const events = pending.map(toDigest);
     const runAt = now().toISOString();
-    const body = urgentDigestBody(events, runAt);
-    const html = urgentDigestHtml(events, runAt, brand);
+    const mailOpts = dashboardUrl ? { brand, dashboardUrl } : { brand };
+    const body = urgentDigestBody(events, runAt, mailOpts);
+    const html = urgentDigestHtml(events, runAt, mailOpts);
     try {
       await sendWithRetry(
         mailer,

@@ -90,6 +90,7 @@ async function cycle(
   notifiers: OpsNotifier[],
   startedAt: Date,
   brand: string | undefined,
+  dashboardUrl: string | undefined,
 ): Promise<void> {
   const fail = async (note: string): Promise<void> => {
     await notifyFailureToAll(notifiers, {
@@ -133,6 +134,7 @@ async function cycle(
       listStale: (days) => listStaleBarriers(days),
       labels,
       brand,
+      dashboardUrl,
       statusInfo,
     });
     console.log(
@@ -157,6 +159,7 @@ function main(): void {
     mailer = null;
   }
   const brand = Deno.env.get("COMPANY_NAME") || undefined;
+  const dashboardUrl = Deno.env.get("APP_BASE_URL") || undefined;
   console.log(
     `[alerts-poll] every ${seconds}s, mail=${
       mailer ? "smtp" : "dry-run (no relay)"
@@ -179,7 +182,7 @@ function main(): void {
   Deno.addSignalListener("SIGTERM", stop);
   (async () => {
     while (running) {
-      await cycle(mailer, notifiers, new Date(), brand);
+      await cycle(mailer, notifiers, new Date(), brand, dashboardUrl);
       if (running) await sleep(seconds * 1000);
     }
     Deno.exit(0);

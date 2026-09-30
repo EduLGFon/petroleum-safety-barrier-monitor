@@ -7,6 +7,15 @@
 // keeping rows enqueued before this change readable.
 import { resolveBarrier, type ResolverLabels } from "../../resolve.ts";
 import type { WireBarrier } from "../../wireTypes.ts";
+import { fromAvailabilityId } from "../../enums.ts";
+import { isCompliant } from "../../constants.ts";
+
+export interface HistoryTrailEntry {
+  date: string;
+  status: string;
+  author?: string;
+  note?: string;
+}
 
 export interface BarrierDetail {
   typology?: string;
@@ -18,6 +27,19 @@ export interface BarrierDetail {
   author?: string;
   note?: string;
   actionPlan?: string;
+  // Before/after snapshot (sync-change parity). oldAvailability is the
+  // status replaced by this transition (previous history entry); absent
+  // when there is no predecessor (first import, stale reminder). The new
+  // value is the payload's availability - the template pairs them.
+  oldAvailability?: string;
+  oldCompliance?: string;
+  previousDate?: string;
+  // source: who produced the transition. The sync service name is noise
+  // as an author but signal as a source, so it is kept here instead.
+  source?: "Manual" | "Sincronização Fracttal";
+  // historyTrail: up to 3 entries before the transition, newest last -
+  // audit depth (concept B) without dumping the whole history.
+  historyTrail?: HistoryTrailEntry[];
 }
 
 // nonEmpty: trims, maps "" to undefined so the template's presence checks
@@ -31,6 +53,8 @@ function nonEmpty(value: string | undefined): string | undefined {
 // author/note come from the latest history entry matching this transition
 // (date + status); when nothing matches (stale reminders, backfills) the
 // latest entry overall is used; barriers without history carry no author.
+// The previous entry (when any) provides the before side of the old → new
+// diff, and the raw author decides the source (sync service vs. human).
 export function extractDetail(
   wire: WireBarrier,
   transitionDate: string,
@@ -52,6 +76,11 @@ export function extractDetail(
     : history.length > 0
     ? history[history.length - 1]!
     : undefined;
+  const latestRaw = matchIdx >= 0
+    ? wire.statusHistory[matchIdx]
+    : wire.statusHistory.length > 0
+    ? wire.statusHistory[wire.statusHistory.length - 1]
+    : undefined;
   const author = nonEmpty(latest?.author);
   // Seed enums label unknown ids "Autor (n)" / sync rows carry the
   // "Sincronização Fracttal" service name - both are noise in an inbox,
@@ -61,6 +90,50 @@ export function extractDetail(
       author !== "Sincronização Fracttal"
     ? author
     : undefined;
+  // Before side: the entry replaced by this transition. Stale reminders
+  // reuse the latest entry as "latest", so their predecessor is still the
+  // entry before it - a reminder shows "segue <status>" instead of a flip.
+  const prevIdx = matchIdx >= 0 ? matchIdx - 1 : wire.statusHistory.length - 2;
+  const prevRaw = prevIdx >= 0 ? wire.statusHistory[prevIdx] : undefined;
+  const prevResolved = prevIdx >= 0 ? history[prevIdx] : undefined;
+  const oldAvailability = prevRaw !== undefined
+    ? fromAvailabilityId(prevRaw.statusId)
+    : undefined;
+  const oldCompliance = oldAvailability !== undefined
+    ? (isCompliant(oldAvailability) ? "Conforme" : "Não Conforme")
+    : undefined;
+  const previousDate = prevResolved?.date?.slice(0, 10);
+  const rawAuthor = (latestRaw !== undefined && labels?.authors !== undefined)
+    ? labels.authors[latestRaw.authorId]
+    : latest?.author;
+  const source: BarrierDetail["source"] = rawAuthor === "Sincronização Fracttal"
+    ? "Sincronização Fracttal"
+    : "Manual";
+  // Trail: up to 3 entries before the transition, oldest first.
+  const trailStart = Math.max(
+    0,
+    (matchIdx >= 0 ? matchIdx : history.length) - 3,
+  );
+  const trailEnd = matchIdx >= 0 ? matchIdx : history.length;
+  const historyTrail: HistoryTrailEntry[] | undefined =
+    trailEnd - trailStart > 0
+      ? history.slice(trailStart, trailEnd).map((h, i) => {
+        const raw = wire.statusHistory[trailStart + i];
+        void raw;
+        const a = nonEmpty(h.author);
+        const cleanAuthor = a !== undefined &&
+            !/^autor \(\d+\)$/i.test(a) &&
+            a !== "Sincronização Fracttal"
+          ? a
+          : undefined;
+        return {
+          date: h.date.slice(0, 10),
+          status: h.status,
+          ...(cleanAuthor !== undefined ? { author: cleanAuthor } : {}),
+          ...(h.note.trim() !== "" ? { note: h.note } : {}),
+        };
+      })
+      : undefined;
   return {
     typology: nonEmpty(resolved.typology),
     grouping: nonEmpty(resolved.grouping),
@@ -71,5 +144,10 @@ export function extractDetail(
     author: humanAuthor,
     note: nonEmpty(latest?.note),
     actionPlan: nonEmpty(resolved.actionPlan),
+    ...(oldAvailability !== undefined ? { oldAvailability } : {}),
+    ...(oldCompliance !== undefined ? { oldCompliance } : {}),
+    ...(previousDate !== undefined ? { previousDate } : {}),
+    source,
+    ...(historyTrail !== undefined ? { historyTrail } : {}),
   };
 }

@@ -48,6 +48,18 @@ export interface AlertPayload {
   author?: string;
   note?: string;
   actionPlan?: string;
+  // Before/after diff (sync-change parity, see enrich.ts). old* is the
+  // replaced status; the new side is availability/compliance above.
+  oldAvailability?: string;
+  oldCompliance?: string;
+  previousDate?: string;
+  source?: "Manual" | "Sincronização Fracttal";
+  historyTrail?: Array<{
+    date: string;
+    status: string;
+    author?: string;
+    note?: string;
+  }>;
 }
 
 export interface UnsentAlert {

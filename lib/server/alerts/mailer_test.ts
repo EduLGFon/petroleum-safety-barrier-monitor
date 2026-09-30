@@ -184,12 +184,64 @@ Deno.test("urgentDigestBody appends detail lines and attribution when present", 
     "2026-09-13T10:00:00Z",
   );
   assertStrictEquals(body.includes("categoria Válvulas"), true);
-  assertStrictEquals(body.includes("Atualizado por: Eduardo"), true);
+  assertStrictEquals(
+    body.includes("Atualizado") && body.includes("Eduardo"),
+    true,
+  );
   assertStrictEquals(body.includes("Nota: vazamento observado"), true);
   assertStrictEquals(body.includes("Plano de ação: trocar gaxeta"), true);
 });
 
-Deno.test("urgentDigestHtml renders premium cards with attribution", () => {
+Deno.test("urgentDigestBody shows old → new diff and missing-plan CTA", () => {
+  const body = urgentDigestBody(
+    [{
+      tag: "FAL-EQ-001",
+      location: "FAL",
+      availability: "Indisponível",
+      criticality: "A",
+      transitionDate: "2026-09-30",
+      urgency: "critical",
+      compliance: "Não Conforme",
+      oldAvailability: "Disponível",
+      oldCompliance: "Conforme",
+      previousDate: "2026-09-12",
+      source: "Manual",
+      author: "Eduardo",
+    }],
+    "2026-09-30T10:00:00Z",
+  );
+  assertStrictEquals(body.includes("Disponível → Indisponível"), true);
+  assertStrictEquals(body.includes("Conforme → Não Conforme"), true);
+  assertStrictEquals(body.includes("origem Manual"), true);
+  assertStrictEquals(body.includes("sem plano"), true);
+});
+
+Deno.test("urgentDigestBody switches to compact mode above the threshold", () => {
+  const events = Array.from({ length: 9 }, (_, i) => ({
+    tag: `TAG-${i}`,
+    location: "FAL",
+    availability: "Indisponível",
+    criticality: "A",
+    transitionDate: "2026-09-30",
+    urgency: "critical" as const,
+  }));
+  const body = urgentDigestBody(events, "2026-09-30T10:00:00Z");
+  assertStrictEquals(body.includes("Resumo: 9 barreiras"), true);
+  assertStrictEquals(body.includes("TAG-0"), true);
+});
+
+Deno.test("urgentDigestSubject names the single barrier", () => {
+  assertStrictEquals(
+    urgentDigestSubject(1, 1, "PSV-2101"),
+    "[Barreiras] 1 barreira urgente (1 crítica) — PSV-2101",
+  );
+  assertStrictEquals(
+    urgentDigestSubject(2, 0),
+    "[Barreiras] 2 barreiras urgentes",
+  );
+});
+
+Deno.test("urgentDigestHtml renders premium before/after card", () => {
   const html = urgentDigestHtml(
     [{
       tag: "FAL-EQ-001",
@@ -203,6 +255,11 @@ Deno.test("urgentDigestHtml renders premium cards with attribution", () => {
       author: "Eduardo",
       note: "vazamento observado",
       actionPlan: "trocar gaxeta",
+      oldAvailability: "Disponível",
+      oldCompliance: "Conforme",
+      compliance: "Não Conforme",
+      source: "Manual",
+      historyTrail: [{ date: "2026-09-10", status: "Disponível" }],
     }],
     "2026-09-13T10:00:00Z",
     "Seacrest Petróleo",
@@ -213,7 +270,36 @@ Deno.test("urgentDigestHtml renders premium cards with attribution", () => {
   assertStrictEquals(html.includes("Atualizado por:"), true);
   assertStrictEquals(html.includes("Eduardo"), true);
   assertStrictEquals(html.includes("Plano de ação:"), true);
+  assertStrictEquals(html.includes("O QUE MUDOU"), true);
+  assertStrictEquals(html.includes("Disponível"), true);
+  assertStrictEquals(html.includes("HISTÓRICO RECENTE"), true);
   assertStrictEquals(html.includes("multipart") === false, true);
+});
+
+Deno.test("urgentDigestHtml renders missing-plan CTA and compact table", () => {
+  const noPlan = urgentDigestHtml(
+    [{
+      tag: "FAL-EQ-002",
+      location: "FAL",
+      availability: "Degradado",
+      criticality: "B",
+      transitionDate: "2026-09-13",
+      urgency: "urgent",
+    }],
+    "2026-09-13T10:00:00Z",
+  );
+  assertStrictEquals(noPlan.includes("Sem plano de ação"), true);
+  const many = Array.from({ length: 9 }, (_, i) => ({
+    tag: `TAG-${i}`,
+    location: "FAL",
+    availability: "Indisponível",
+    criticality: "A",
+    transitionDate: "2026-09-13",
+    urgency: "urgent" as const,
+  }));
+  const compact = urgentDigestHtml(many, "2026-09-13T10:00:00Z");
+  assertStrictEquals(compact.includes("DETALHE COMPLETO NO DASHBOARD"), true);
+  assertStrictEquals(compact.includes("O QUE MUDOU"), false);
 });
 
 Deno.test("urgentDigestHtml omits attribution when absent and escapes markup", () => {

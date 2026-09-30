@@ -53,6 +53,7 @@ export interface ImmediateOptions {
   logger?: (line: string) => void;
   labels?: ResolverLabels;
   brand?: string;
+  dashboardUrl?: string;
 }
 
 export interface ImmediateResult {
@@ -129,6 +130,7 @@ export async function maybeSendImmediate(
     logger = () => {},
     labels,
     brand,
+    dashboardUrl,
   } = options;
   const resolved = resolveBarrier(barrier);
   const match = matchRules(
@@ -165,8 +167,9 @@ export async function maybeSendImmediate(
     return { matched: true, immediate: true, enqueued, emailed: 0 };
   }
   const critical = urgencyOf(resolved) === "critical" ? 1 : 0;
-  const subject = immediateSubject(1, critical);
+  const subject = immediateSubject(1, critical, event.payload.tag);
   const runAt = now().toISOString();
+  const mailOpts = dashboardUrl ? { brand, dashboardUrl } : { brand };
   const digestEvents = [{
     tag: event.payload.tag,
     location: event.payload.location,
@@ -183,9 +186,15 @@ export async function maybeSendImmediate(
     author: event.payload.author,
     note: event.payload.note,
     actionPlan: event.payload.actionPlan,
+    oldAvailability: event.payload.oldAvailability,
+    oldCompliance: event.payload.oldCompliance,
+    previousDate: event.payload.previousDate,
+    source: event.payload.source,
+    barrierId: event.barrierId,
+    historyTrail: event.payload.historyTrail,
   }];
-  const body = urgentDigestBody(digestEvents, runAt);
-  const html = urgentDigestHtml(digestEvents, runAt, brand);
+  const body = urgentDigestBody(digestEvents, runAt, mailOpts);
+  const html = urgentDigestHtml(digestEvents, runAt, mailOpts);
   // Fresh id lookup: a dedup-hit (enqueued 0) may already be delivered, in
   // which case there is nothing to send.
   const unsent = await store.listUnsent();
