@@ -195,8 +195,9 @@ All HTTPS; **no port appears in any URL**, so all of these are implicit 443.
 | `https://fonts.gstatic.com`            | Font files                                            | `routes/_app.tsx:52`                                                                                                                                                    |
 
 The Fracttal client applies a 15 s `AbortController` timeout, 3 retries,
-one-shot 401 refresh, 406/429 backoff honouring `ratelimit-reset`, and a
-shared token bucket of 150 req/min (`client.ts:24-32, 261-282, 291-335`).
+one-shot 401 refresh, 406/429 backoff honouring `ratelimit-reset`, and an
+adaptive token bucket (initial 180, max 190, burst 10; see
+`adaptive-rate.ts`).
 
 **Fracttal is never contacted from a route handler.** The only `fracttal`
 imports inside `routes/` are the SMTP notifier. All Fracttal traffic comes

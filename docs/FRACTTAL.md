@@ -64,9 +64,10 @@ normalizes `data: []` when missing. Neo limits: every query returns at most
   `Request-Call-Limit-Reset`. The client accepts both spellings on the 406
   path. Reset means seconds left in the current period; the remaining
   description contradicts itself, and window type (fixed vs sliding) is
-  undocumented - so the client paces itself with a token bucket at
-  `FRACTTAL_RATE_PER_MIN` (default 150/min, safe under either window
-  semantics) and treats 406/429/5xx with backoff as the server-side net.
+  undocumented - so the client paces itself with an adaptive token bucket
+  (initial 180/min, max 190, burst 10; `lib/server/fracttal/adaptive-rate.ts`):
+  clean traffic inches up, low `ratelimit-remaining` or 406/429/5xx cuts the
+  rate, so neither fixed nor sliding windows can 406 a sustained sweep.
 - Token life: 2h (`expires_in: 7200`), cached and refreshed once on `401`.
   A dead `refresh_token` grant falls back to `client_credentials` (and drops
   the stale refresh token) so one bad refresh can never wedge later cycles.
@@ -204,8 +205,8 @@ only the work pass stays eager so its failure aborts with zero writes).
   cycle continues next round. `stop()` waits for the in-flight run. The
   `syncScopeRunning` lock stays as the multi-instance overlap guard.
   `scripts/fracttal-poll.ts` wires it: pause between cycles
-  (`FRACTTAL_POLL_SECONDS`, default 300, min 5), throughput cap
-  (`FRACTTAL_RATE_PER_MIN`, default 150/min) and fetch fan-out
+  (`FRACTTAL_POLL_SECONDS`, default 300, min 5), adaptive throughput
+  (initial 180, max 190, burst 10) and fetch fan-out
   (`FRACTTAL_FETCH_CONCURRENCY`, default 4), graceful SIGINT/SIGTERM
   shutdown that waits in flight. The `done` line carries the cycle total, so
   the next tuning round measures instead of guessing. The poller runs the
@@ -311,16 +312,16 @@ envelope total (`FRACTTAL_SYNC_MAX_PAGES`, default 200 x 100 rows),
 after the guard. A truncated sweep or a work-endpoint failure aborts before
 `runSync` with zero writes; a too-small page cap fails loudly (raise the cap
 and rerun, never bypass the guard). Throughput for all of it is capped by
-the client's token bucket (`FRACTTAL_RATE_PER_MIN`, default 150/min).
+the client's adaptive token bucket (initial 180/min, max 190, burst 10).
 
 Rate math (one sweep): the tenant holds ~18,254 equipment items today
 (~183 pages), plus the open-status WO sweep (ot1 3,736 + ot2 883 = ~47
 pages) and the windowed WR pass (2 x `FRACTTAL_SYNC_WORK_MAX_PAGES`, 10 at
 the default 5), plus the occasional token refresh - roughly 240 requests
-per cycle. Every GET passes one client-side token bucket at
-`FRACTTAL_RATE_PER_MIN` (default 150/min, 75% of the 200 req/min/IP ceiling;
-the margin covers token refreshes, retries, manual scripts, and NAT-shared
-egress), so pages fetch concurrently (`FRACTTAL_FETCH_CONCURRENCY`, default
+per cycle. Every GET passes one adaptive bucket starting at 180/min (max
+190, floor 80, burst 10; the small burst plus spacing keeps both fixed and
+sliding server windows safe, and 406/429/5xx cut the rate as the
+server-side net), so pages fetch concurrently (`FRACTTAL_FETCH_CONCURRENCY`, default
 4, reassembled in page order) with no threat to the ceiling under either
 fixed or sliding server windows; the 406/429 backoff stays the server-side
 safety net. The fetch phase lands around 1-2 minutes, and with the default

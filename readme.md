@@ -175,26 +175,26 @@ See [Upstream integration](#upstream-maintenance-system-integration).
 All variables are documented with comments in `.env.example`. Placeholders only
 here.
 
-| Variable                                              | Default        | Purpose                                                                                                                     |
-| ----------------------------------------------------- | -------------- | --------------------------------------------------------------------------------------------------------------------------- |
-| `COMPANY_NAME`                                        | empty          | Operator name in the header, login card, splash, page title and exports. Empty = unbranded                                  |
-| `PUBLIC_API_MODE`                                     | `mock`         | `mock` = in-memory generator, `http` = Postgres-backed API routes                                                           |
-| `PUBLIC_API_BASE_URL`                                 | page origin    | API root for `http` mode. Empty (recommended) = same-origin, no CORS needed                                                 |
-| `DATABASE_URL`                                        | -              | libpq connection string for the app, migrations, seeds and scripts                                                          |
-| `ADMIN_TOKEN`                                         | -              | Bearer token (`Authorization: Bearer …`) accepted by admin routes and scripts. Generate with `openssl rand -hex 32`         |
-| `<VENDOR>_KEY` / `<VENDOR>_SECRET`                    | -              | Upstream OAuth2 client-credentials pair. Read-only use, never committed                                                     |
-| `<VENDOR>_BASE_URL`                                   | vendor default | Upstream API root, no trailing slash                                                                                        |
-| `<VENDOR>_POLL_SECONDS`                               | `300`          | Pause between sync cycles (min 5). Effective freshness = cycle + pause                                                      |
-| `<VENDOR>_SYNC_ITEM_TYPE`                             | `2`            | Upstream item type swept (2 = equipment)                                                                                    |
-| `<VENDOR>_SYNC_MAX_PAGES`                             | `200`          | Item pages per cycle (100 rows each). A sweep that needs more aborts loudly                                                 |
-| `<VENDOR>_SYNC_WORK_MAX_PAGES`                        | `5`            | Newest work pages per endpoint per cycle, or full sweep of open statuses                                                    |
-| `<VENDOR>_WORK_OPEN_ONLY`                             | `1`            | Sweep open work statuses to completion instead of the newest window                                                         |
-| `<VENDOR>_RATE_PER_MIN`                               | `150`          | Client-side token bucket for all upstream calls (vendor ceiling is 200/min)                                                 |
-| `<VENDOR>_FETCH_CONCURRENCY`                          | `4`            | Parallel page fetches, reassembled in page order, rate-capped                                                               |
-| `ALERTS_POLL_SECONDS`                                 | `900`          | Pause between alert digest cycles (min 60)                                                                                  |
-| `OPS_SMTP_HOST` / `OPS_SMTP_PORT` / `_USER` / `_PASS` | -              | Relay for alert digests and pipeline-failure mails. `MAIL_*` are aliases. Port 465 implies implicit TLS, otherwise STARTTLS |
-| `OPS_EMAIL_TO` / `OPS_EMAIL_FROM`                     | -              | Recipients and From address. `From` falls back to the authenticated user                                                    |
-| `CHROME_BIN`                                          | -              | Headless Chrome binary for the browser capture/smoke scripts                                                                |
+| Variable                                              | Default        | Purpose                                                                                                                              |
+| ----------------------------------------------------- | -------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
+| `COMPANY_NAME`                                        | empty          | Operator name in the header, login card, splash, page title and exports. Empty = unbranded                                           |
+| `PUBLIC_API_MODE`                                     | `mock`         | `mock` = in-memory generator, `http` = Postgres-backed API routes                                                                    |
+| `PUBLIC_API_BASE_URL`                                 | page origin    | API root for `http` mode. Empty (recommended) = same-origin, no CORS needed                                                          |
+| `DATABASE_URL`                                        | -              | libpq connection string for the app, migrations, seeds and scripts                                                                   |
+| `ADMIN_TOKEN`                                         | -              | Bearer token (`Authorization: Bearer …`) accepted by admin routes and scripts. Generate with `openssl rand -hex 32`                  |
+| `<VENDOR>_KEY` / `<VENDOR>_SECRET`                    | -              | Upstream OAuth2 client-credentials pair. Read-only use, never committed                                                              |
+| `<VENDOR>_BASE_URL`                                   | vendor default | Upstream API root, no trailing slash                                                                                                 |
+| `<VENDOR>_POLL_SECONDS`                               | `300`          | Pause between sync cycles (min 5). Effective freshness = cycle + pause                                                               |
+| `<VENDOR>_SYNC_ITEM_TYPE`                             | `2`            | Upstream item type swept (2 = equipment)                                                                                             |
+| `<VENDOR>_SYNC_MAX_PAGES`                             | `200`          | Item pages per cycle (100 rows each). A sweep that needs more aborts loudly                                                          |
+| `<VENDOR>_SYNC_WORK_MAX_PAGES`                        | `5`            | Newest work pages per endpoint per cycle, or full sweep of open statuses                                                             |
+| `<VENDOR>_WORK_OPEN_ONLY`                             | `1`            | Sweep open work statuses to completion instead of the newest window                                                                  |
+| `<VENDOR>_RATE_PER_MIN`                               | `180`          | Initial adaptive rate (climbs toward max when clean, cuts on 406/429). Max 190, floor 80, burst 10 via `<VENDOR>_RATE_MAX/MIN/BURST` |
+| `<VENDOR>_FETCH_CONCURRENCY`                          | `4`            | Parallel page fetches, reassembled in page order, rate-capped                                                                        |
+| `ALERTS_POLL_SECONDS`                                 | `900`          | Pause between alert digest cycles (min 60)                                                                                           |
+| `OPS_SMTP_HOST` / `OPS_SMTP_PORT` / `_USER` / `_PASS` | -              | Relay for alert digests and pipeline-failure mails. `MAIL_*` are aliases. Port 465 implies implicit TLS, otherwise STARTTLS          |
+| `OPS_EMAIL_TO` / `OPS_EMAIL_FROM`                     | -              | Recipients and From address. `From` falls back to the authenticated user                                                             |
+| `CHROME_BIN`                                          | -              | Headless Chrome binary for the browser capture/smoke scripts                                                                         |
 
 Boot fails closed: `http` mode without `DATABASE_URL` returns a `500` naming
 the variable; a missing upstream credential pair makes the poller exit with
