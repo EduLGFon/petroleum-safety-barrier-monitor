@@ -58,10 +58,26 @@ Deno.test("recordLimited cuts the rate multiplicatively", () => {
   assertStrictEquals(seen.length, 1);
 });
 
-Deno.test("low remaining backs off before a 406 happens", () => {
+Deno.test("low remaining clamps spending without cutting the rate", () => {
   const limiter = createAdaptiveRate({ initialRatePerMin: 180 });
-  limiter.recordSuccess(RATE_LOW_WATER);
-  assertStrictEquals(limiter.currentRate() < 180, true);
+  for (let r = RATE_LOW_WATER; r >= 0; r--) limiter.recordSuccess(r, 60);
+  assertStrictEquals(limiter.currentRate(), 180);
+});
+
+Deno.test("exhausted window holds takeToken until reset", async () => {
+  const limiter = createAdaptiveRate({
+    initialRatePerMin: 190,
+    maxRatePerMin: 190,
+    minRatePerMin: 190,
+    burst: 1,
+    maxWaitMs: 50,
+  });
+  await limiter.takeToken();
+  limiter.recordSuccess(0, 0.15);
+  const t0 = Date.now();
+  await limiter.takeToken();
+  assertStrictEquals(Date.now() - t0 >= 80, true);
+  assertStrictEquals(limiter.currentRate(), 190);
 });
 
 Deno.test("clean traffic inches the rate up to the cap", () => {
@@ -71,6 +87,17 @@ Deno.test("clean traffic inches the rate up to the cap", () => {
   });
   for (let i = 0; i < 250; i++) limiter.recordSuccess(null);
   assertStrictEquals(limiter.currentRate(), 182);
+});
+
+Deno.test("rate recovers quickly after a limit cut", () => {
+  const limiter = createAdaptiveRate({
+    initialRatePerMin: 180,
+    maxRatePerMin: 190,
+  });
+  limiter.recordLimited();
+  const cut = limiter.currentRate();
+  for (let i = 0; i < 500; i++) limiter.recordSuccess(null);
+  assertStrictEquals(limiter.currentRate() > cut, true);
 });
 
 Deno.test("rate never exceeds 200 even when misconfigured", () => {

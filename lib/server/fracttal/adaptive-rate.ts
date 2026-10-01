@@ -3,13 +3,17 @@
 // while 199/min bursts across a window boundary and 406s on retries, token
 // refreshes, or NAT-shared egress. This module owns the token bucket plus the
 // adaptation policy (additive increase on clean traffic, multiplicative
-// decrease on low remaining / 406 / 429 / 5xx) so client.ts stays a pager.
+// decrease only on real 406/429/5xx) so client.ts stays a pager. Low
+// `ratelimit-remaining` never cuts the sustained rate: the remaining count
+// naturally drains as we spend our own window, so the controller just stops
+// spending past a safety margin and pauses when the window is exhausted.
 export const DEFAULT_RATE_PER_MIN = 180;
 export const DEFAULT_RATE_MAX_PER_MIN = 190;
 export const DEFAULT_RATE_MIN_PER_MIN = 80;
 export const DEFAULT_RATE_BURST = 10;
 export const RATE_LOW_WATER = 15;
-export const RATE_INCREASE_EVERY = 100;
+export const RATE_HOLD = 5;
+export const RATE_INCREASE_EVERY = 25;
 
 export interface AdaptiveRateOptions {
   initialRatePerMin?: number;
@@ -24,7 +28,7 @@ export interface AdaptiveRateOptions {
 export interface AdaptiveRate {
   currentRate(): number;
   takeToken(): Promise<void>;
-  recordSuccess(remaining?: number | null): void;
+  recordSuccess(remaining?: number | null, resetSecs?: number): void;
   recordLimited(): void;
   recordServerError(): void;
 }
@@ -89,6 +93,7 @@ export function createAdaptiveRate(
   const onRateChange = opts.onRateChange;
   let tokens = burst;
   let refillAt = now();
+  let holdUntil = 0;
   let successes = 0;
 
   const setRate = (next: number): void => {
@@ -109,6 +114,12 @@ export function createAdaptiveRate(
   const takeToken = async (): Promise<void> => {
     for (;;) {
       refill();
+      if (now() < holdUntil) {
+        await new Promise<void>((r) =>
+          setTimeout(r, Math.min(holdUntil - now(), maxWaitMs))
+        );
+        continue;
+      }
       if (tokens >= 1) {
         tokens -= 1;
         return;
@@ -120,22 +131,34 @@ export function createAdaptiveRate(
     }
   };
 
-  // recordSuccess: additive increase (+1 per RATE_INCREASE_EVERY clean
-  // responses) unless the server says the window is nearly spent, in which
-  // case back off early instead of waiting for a 406.
-  const recordSuccess = (remaining?: number | null): void => {
-    if (
-      remaining !== null && remaining !== undefined &&
-      remaining <= RATE_LOW_WATER
-    ) {
-      tokens = Math.min(tokens, 0);
-      setRate(rate * 0.85);
-      return;
+  // recordSuccess: additive increase with a gap-proportional step (fast
+  // recovery far below max, fine tuning near it). Low remaining never cuts
+  // the sustained rate: the count drains as we spend our own window, so the
+  // controller clamps local spending to what the server has left (minus a
+  // safety margin) and pauses out the window when exhausted. Only real
+  // 406/429/5xx cut the rate.
+  const recordSuccess = (
+    remaining?: number | null,
+    resetSecs = 60,
+  ): void => {
+    if (remaining !== null && remaining !== undefined) {
+      if (remaining <= RATE_HOLD) {
+        const resetMs = Math.max(0, resetSecs) * 1000;
+        holdUntil = Math.max(holdUntil, now() + resetMs);
+        tokens = Math.min(tokens, 0);
+        successes = 0;
+        return;
+      }
+      if (remaining <= RATE_LOW_WATER) {
+        tokens = Math.min(tokens, Math.max(0, remaining - RATE_HOLD));
+        successes = 0;
+        return;
+      }
     }
     successes++;
     if (successes >= RATE_INCREASE_EVERY) {
       successes = 0;
-      setRate(rate + 1);
+      setRate(rate + Math.max(1, Math.floor((max - rate) / 10)));
     }
   };
 

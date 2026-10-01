@@ -281,7 +281,8 @@ export function createFracttalClient(
   // never exceed the ceiling no matter how many fetchers run. Retries
   // consume tokens too (they are requests). The 406/429 path below stays
   // the server-side net. With adaptive on, clean traffic inches the rate up
-  // toward maxRatePerMin and any limit signal cuts it multiplicatively.
+  // toward maxRatePerMin, real limit responses cut it, and low
+  // ratelimit-remaining only pauses spending (never cuts the rate).
   const limiter = createAdaptiveRate({
     initialRatePerMin: ratePerMin,
     maxRatePerMin: adaptive ? maxRatePerMin : ratePerMin,
@@ -293,7 +294,12 @@ export function createFracttalClient(
   });
   const takeToken = () => limiter.takeToken();
   const noteOk = (headers: Headers): void => {
-    if (adaptive) limiter.recordSuccess(parseRateLimitRemaining(headers));
+    if (adaptive) {
+      limiter.recordSuccess(
+        parseRateLimitRemaining(headers),
+        parseRateLimitReset(headers),
+      );
+    }
   };
   const noteLimited = (): void => {
     if (adaptive) limiter.recordLimited();
