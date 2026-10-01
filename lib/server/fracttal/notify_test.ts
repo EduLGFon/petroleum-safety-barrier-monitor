@@ -53,19 +53,29 @@ Deno.test("smtpEmailNotifier sends one email with the failure details", async ()
   assertStrictEquals(sent.length, 1);
   assertStrictEquals(
     sent[0]!.subject,
-    "[Barrier Monitor] Fracttal sync failed (fracttal-live:FAL)",
+    "[Barrier Monitor] Falha na sincronização Fracttal (fracttal-live:FAL)",
   );
   assertStrictEquals(
-    sent[0]!.body.includes("scope:    fracttal-live:FAL"),
+    sent[0]!.body.includes("escopo:    fracttal-live:FAL"),
     true,
   );
-  assertStrictEquals(sent[0]!.body.includes("runId:    7"), true);
-  assertStrictEquals(sent[0]!.body.includes("error: upstream error 500"), true);
+  assertStrictEquals(sent[0]!.body.includes("execução (runId): 7"), true);
+  assertStrictEquals(sent[0]!.body.includes("erro: upstream error 500"), true);
 });
 
 Deno.test("failureBody renders a null runId as not-recorded", () => {
   const body = failureBody({ ...info, runId: null });
-  assertStrictEquals(body.includes("(not recorded)"), true);
+  assertStrictEquals(body.includes("(não registrada)"), true);
+});
+
+Deno.test("failureBody adds a migration hint for a missing column", () => {
+  const body = failureBody({
+    scope: "alerts",
+    startedAt: "2026-10-01T01:41:07.417Z",
+    note: 'column "description" does not exist',
+    runId: null,
+  });
+  assertStrictEquals(body.includes("deno task db:migrate"), true);
 });
 
 Deno.test("smtpConfigFromEnv is null unless host and recipient are set", () => {

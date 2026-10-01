@@ -30,20 +30,61 @@ export const consoleNotifier: OpsNotifier = {
   },
 };
 
+// formatStartedPtBr: ISO start plus a pt-BR rendering for ops readers.
+// Pure and total: an unparsable ISO falls back to the raw value.
+function formatStartedPtBr(iso: string): string {
+  const time = Date.parse(iso);
+  if (Number.isNaN(time)) return iso;
+  const formatted = new Intl.DateTimeFormat("pt-BR", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: false,
+    timeZone: "UTC",
+  }).format(new Date(time));
+  return `${iso} (${formatted} UTC)`;
+}
+
+// hintForNote: short Portuguese cause/fix for known failure signatures.
+// Returns null when the error has no known pattern.
+function hintForNote(note: string): string | null {
+  if (/column .* does not exist/i.test(note)) {
+    return "Causa provável: banco sem a migração. Rode `deno task db:migrate` " +
+      "e confira a tabela (para o escopo alerts, a coluna description de alert_rules).";
+  }
+  return null;
+}
+
 // failureBody: the flat audit-style email body (plain text, CRLF-safe).
+// User-facing copy is pt-BR; identifiers (scope, runId, sync_state) stay in
+// English per docs/GLOSSARY.md.
 export function failureBody(info: SyncFailureInfo): string {
-  return [
-    "Fracttal sync run FAILED.",
+  const lines = [
+    "Falha na sincronização Fracttal.",
     "",
-    `scope:    ${info.scope}`,
-    `started:  ${info.startedAt}`,
-    `runId:    ${info.runId ?? "(not recorded)"}`,
+    `escopo:    ${info.scope}`,
+    `início:    ${formatStartedPtBr(info.startedAt)}`,
+    `execução (runId): ${info.runId ?? "(não registrada)"}`,
     "",
-    `error: ${info.note}`,
+    `erro: ${info.note}`,
+  ];
+  const hint = hintForNote(info.note);
+  if (hint !== null) lines.push("", hint);
+  lines.push(
     "",
-    "The run was recorded as failed in sync_state. The next poll will retry",
-    "this scope; investigate if it recurs.",
-  ].join("\n");
+    "A execução foi registrada como falha em sync_state. A próxima",
+    "verificação vai tentar este escopo de novo.",
+    "",
+    "Como investigar:",
+    "- últimas falhas: select scope, status, note, started_at, finished_at",
+    "  from sync_state where status = 'failed' order by id desc limit 10;",
+    "- logs do poller: docker compose logs poller",
+    "- investigue se o erro se repetir.",
+  );
+  return lines.join("\n");
 }
 
 // smtpEmailNotifier: optional channel; every failure sends one email. The
@@ -60,7 +101,8 @@ export function smtpEmailNotifier(
   return {
     name: "email",
     async syncFailed(info: SyncFailureInfo): Promise<void> {
-      const subject = `[Barrier Monitor] Fracttal sync failed (${info.scope})`;
+      const subject =
+        `[Barrier Monitor] Falha na sincronização Fracttal (${info.scope})`;
       await sendImpl(config, subject, failureBody(info));
     },
   };
