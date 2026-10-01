@@ -42,7 +42,7 @@ async function main(): Promise<void> {
     baseUrl: Deno.env.get("FRACTTAL_BASE_URL") ??
       "https://app.fracttal.com/api",
     credentials: { key, secret },
-    ratePerMin: 150,
+    ratePerMin: 180,
   });
 
   console.log("[dump] fetching work orders (open sweep)...");

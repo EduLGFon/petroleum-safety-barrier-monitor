@@ -12,7 +12,7 @@
 // --apply once triaged; unmapped categories never block (row-level, listed).
 //
 //   deno run -A --env-file=.env scripts/fracttal-audit-stations.ts [--json]
-//   [--pages N] [--item-type 2] [--rate-per-min 150] [--fetch-concurrency 4]
+//   [--pages N] [--item-type 2] [--rate-per-min 180] [--fetch-concurrency 4]
 import { fetchItemSignals } from "../lib/server/fracttal/live-scope.ts";
 
 import { createFracttalClient } from "../lib/server/fracttal/client.ts";
@@ -43,7 +43,7 @@ function parseFlags(argv: string[]): AuditFlags {
   const flags: AuditFlags = {
     itemType: 2,
     pages: 200,
-    ratePerMin: 150,
+    ratePerMin: 180,
     concurrency: 4,
     json: false,
   };
@@ -54,7 +54,7 @@ function parseFlags(argv: string[]): AuditFlags {
     } else if (arg === "--pages") {
       flags.pages = Math.min(400, Math.max(1, Number(argv[++i]) || 200));
     } else if (arg === "--rate-per-min") {
-      flags.ratePerMin = Math.max(1, Number(argv[++i]) || 150);
+      flags.ratePerMin = Math.max(1, Number(argv[++i]) || 180);
     } else if (arg === "--fetch-concurrency") {
       flags.concurrency = Math.max(1, Number(argv[++i]) || 4);
     } else if (arg === "--json") flags.json = true;

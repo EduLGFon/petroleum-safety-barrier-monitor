@@ -59,7 +59,7 @@ function parseFlags(argv: string[]): ForceFlags {
   const f: ForceFlags = {
     pages: 400,
     workPages: 5,
-    ratePerMin: 150,
+    ratePerMin: 180,
     concurrency: 4,
     itemType: 2,
     baseUrl: Deno.env.get("FRACTTAL_BASE_URL") ?? DEFAULT_BASE_URL,
@@ -75,7 +75,7 @@ function parseFlags(argv: string[]): ForceFlags {
     } else if (a === "--work-pages") {
       f.workPages = Math.min(40, Math.max(1, Number(argv[++i]) || 5));
     } else if (a === "--rate-per-min") {
-      f.ratePerMin = Math.max(1, Number(argv[++i]) || 150);
+      f.ratePerMin = Math.max(1, Number(argv[++i]) || 180);
     } else if (a === "--fetch-concurrency") {
       f.concurrency = Math.max(1, Number(argv[++i]) || 4);
     } else if (a === "--item-type") {

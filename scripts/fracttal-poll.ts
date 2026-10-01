@@ -21,10 +21,13 @@
 //                                        aborts loudly - raise it)
 //   FRACTTAL_SYNC_WORK_MAX_PAGES         newest work pages per endpoint per
 //                                        cycle (default 5 x 100, shared)
-//   FRACTTAL_RATE_PER_MIN                sustained request rate, token bucket
-//                                        shared by every request including
-//                                        parallel page fetches (default 150,
-//                                        75% of the 200 req/min/IP ceiling)
+//   FRACTTAL_RATE_PER_MIN                initial adaptive rate (default 180;
+//                                        climbs toward MAX when clean, cuts on
+//                                        406/429 or low ratelimit-remaining)
+//   FRACTTAL_RATE_MAX_PER_MIN            AIMD ceiling (default 190, never over
+//                                        200); FRACTTAL_RATE_MIN_PER_MIN floor
+//                                        (default 80); FRACTTAL_RATE_BURST
+//                                        instant burst cap (default 10)
 //   FRACTTAL_FETCH_CONCURRENCY           parallel page fetches
 //                                        (default 4, reassembled in order)
 //   FRACTTAL_WORK_OPEN_ONLY              0/false: newest window instead of
@@ -34,6 +37,13 @@
 //   OPS_EMAIL_TO / OPS_EMAIL_FROM        emails are optional; without them
 //                                         failures still log via [ops] console
 //                                         and persist as failed sync_state rows
+import {
+  DEFAULT_RATE_BURST,
+  DEFAULT_RATE_MAX_PER_MIN,
+  DEFAULT_RATE_MIN_PER_MIN,
+  DEFAULT_RATE_PER_MIN,
+} from "../lib/server/fracttal/adaptive-rate.ts";
+
 import {
   fetchItemSignals,
   fetchWorkSignals,
@@ -78,6 +88,9 @@ interface PollFlags {
   maxPages: number;
   workMaxPages: number;
   ratePerMin: number;
+  maxRatePerMin: number;
+  minRatePerMin: number;
+  rateBurst: number;
   concurrency: number;
   baseUrl: string;
 }
@@ -97,7 +110,32 @@ function parseFlags(): PollFlags {
     ),
     ratePerMin: Math.max(
       1,
-      Math.floor(Number(Deno.env.get("FRACTTAL_RATE_PER_MIN")) || 150),
+      Math.floor(
+        Number(Deno.env.get("FRACTTAL_RATE_PER_MIN")) || DEFAULT_RATE_PER_MIN,
+      ),
+    ),
+    maxRatePerMin: Math.min(
+      200,
+      Math.max(
+        1,
+        Math.floor(
+          Number(Deno.env.get("FRACTTAL_RATE_MAX_PER_MIN")) ||
+            DEFAULT_RATE_MAX_PER_MIN,
+        ),
+      ),
+    ),
+    minRatePerMin: Math.max(
+      1,
+      Math.floor(
+        Number(Deno.env.get("FRACTTAL_RATE_MIN_PER_MIN")) ||
+          DEFAULT_RATE_MIN_PER_MIN,
+      ),
+    ),
+    rateBurst: Math.max(
+      1,
+      Math.floor(
+        Number(Deno.env.get("FRACTTAL_RATE_BURST")) || DEFAULT_RATE_BURST,
+      ),
     ),
     concurrency: Math.max(
       1,
@@ -157,6 +195,11 @@ function main(): void {
     baseUrl: flags.baseUrl,
     credentials: { key, secret },
     ratePerMin: flags.ratePerMin,
+    maxRatePerMin: flags.maxRatePerMin,
+    minRatePerMin: flags.minRatePerMin,
+    rateBurst: flags.rateBurst,
+    onRateChange: (rate) =>
+      console.log(`[fracttal-poll] adaptive rate now ${rate}/min`),
   });
 
   // idToCode carries the previous cycle's equipment id map into the work
@@ -292,7 +335,8 @@ function main(): void {
   console.log(
     `[fracttal-poll] sweeping every ${flags.seconds}s ` +
       `(item_type=${flags.itemType}, max_pages=${flags.maxPages}, ` +
-      `work_pages=${flags.workMaxPages}, rate=${flags.ratePerMin}/min, ` +
+      `work_pages=${flags.workMaxPages}, rate=${flags.ratePerMin}/min ` +
+      `(max ${flags.maxRatePerMin}, min ${flags.minRatePerMin}, burst ${flags.rateBurst}), ` +
       `concurrency=${flags.concurrency})`,
   );
 }

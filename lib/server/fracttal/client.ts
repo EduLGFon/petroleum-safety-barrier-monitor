@@ -4,6 +4,16 @@
 // per-call timeout, exponential backoff, and honor of the 200 req/min limit
 // (pause on low `ratelimit-remaining`, wait out `ratelimit-reset` on 406).
 // Never imported by islands - lib/server only.
+import {
+  createAdaptiveRate,
+  DEFAULT_RATE_BURST,
+  DEFAULT_RATE_MAX_PER_MIN,
+  DEFAULT_RATE_MIN_PER_MIN,
+  DEFAULT_RATE_PER_MIN,
+  parseRateLimitRemaining,
+  parseRateLimitReset,
+} from "./adaptive-rate.ts";
+
 import type {
   FracttalAsset,
   FracttalListQuery,
@@ -26,10 +36,16 @@ export const DEFAULT_TIMEOUT_MS = 15_000;
 export const DEFAULT_MAX_RETRIES = 3;
 export const DEFAULT_RATE_WAIT_MS = 60_000;
 export const DEFAULT_TOKEN_URL = "https://one.fracttal.com/oauth/token";
-// DEFAULT_RATE_PER_MIN caps sustained throughput at 75% of the documented
-// 200 req/min/IP ceiling: margin for token refreshes, retries, manual
-// scripts, and NAT-shared egress IPs. Bursts may spend a minute's worth.
-export const DEFAULT_RATE_PER_MIN = 150;
+// Rate defaults live in adaptive-rate.ts: initial 180/min cruises near the
+// 200 req/min/IP ceiling, max 190 caps adaptation, burst 10 enforces spacing
+// under parallel page fetches. Re-exported here so existing imports keep
+// working.
+export {
+  DEFAULT_RATE_BURST,
+  DEFAULT_RATE_MAX_PER_MIN,
+  DEFAULT_RATE_MIN_PER_MIN,
+  DEFAULT_RATE_PER_MIN,
+};
 
 export interface FracttalClientOptions {
   baseUrl: string;
@@ -39,10 +55,17 @@ export interface FracttalClientOptions {
   maxRetries?: number;
   // maxRateWaitMs caps how long a 406/429 pause may last (tests shrink it).
   maxRateWaitMs?: number;
-  // ratePerMin/rateBurst size the token bucket shared by every GET this
-  // client issues (tests shrink both to observe spacing quickly).
+  // ratePerMin is the initial adaptive rate; maxRatePerMin/minRatePerMin
+  // bound the AIMD controller, rateBurst caps instant bursts so parallel
+  // page fetches stay spaced (tests shrink them to observe pacing quickly).
   ratePerMin?: number;
+  maxRatePerMin?: number;
+  minRatePerMin?: number;
   rateBurst?: number;
+  // adaptive false freezes the initial rate (no AIMD); onRateChange reports
+  // adaptations for logs and metrics.
+  adaptive?: boolean;
+  onRateChange?: (ratePerMin: number) => void;
   now?: () => number;
   fetchImpl?: typeof fetch;
 }
@@ -63,6 +86,7 @@ export interface FracttalClient {
   listRawWorkRequests(
     query: FracttalWorkQuery,
   ): Promise<{ rows: unknown[]; total: number }>;
+  currentRate(): number;
 }
 
 interface Envelope {
@@ -70,17 +94,6 @@ interface Envelope {
   message?: unknown;
   data: unknown;
   total?: unknown;
-}
-
-// rateLimitReset: seconds until the rate window resets. The rate-limit docs
-// contradict themselves across languages (Spanish ratelimit-* vs English
-// Request-Call-Limit-*), so both spellings are accepted; anything unknown
-// means the documented 60s wait.
-function rateLimitReset(headers: Headers): number {
-  const raw = headers.get("ratelimit-reset") ??
-    headers.get("Request-Call-Limit-Reset");
-  const seconds = Number(raw);
-  return Number.isFinite(seconds) && seconds > 0 ? seconds : 60;
 }
 
 // parseEnvelope: normalizes the wide documented envelope; a malformed body
@@ -212,7 +225,11 @@ export function createFracttalClient(
     maxRetries = DEFAULT_MAX_RETRIES,
     maxRateWaitMs = DEFAULT_RATE_WAIT_MS,
     ratePerMin = DEFAULT_RATE_PER_MIN,
-    rateBurst = ratePerMin,
+    maxRatePerMin = DEFAULT_RATE_MAX_PER_MIN,
+    minRatePerMin = DEFAULT_RATE_MIN_PER_MIN,
+    rateBurst = DEFAULT_RATE_BURST,
+    adaptive = true,
+    onRateChange,
     now = Date.now,
     fetchImpl = fetch,
   }: FracttalClientOptions,
@@ -250,35 +267,39 @@ export function createFracttalClient(
   const tokens = createTokenCache(cacheOpts);
 
   // waitPause: waits for a rate-limit window, capped at maxRateWaitMs.
-  const waitPause = (ms: number) =>
-    new Promise<void>((r) => setTimeout(r, Math.min(ms, maxRateWaitMs)));
+  // Jittered so parallel fetchers do not retry in lockstep after a 406.
+  const waitPause = (ms: number) => {
+    const jittered = ms * (0.9 + Math.random() * 0.2);
+    return new Promise<void>((r) =>
+      setTimeout(r, Math.min(jittered, maxRateWaitMs))
+    );
+  };
 
-  // Token bucket: the single pacing mechanism for every GET this client
-  // issues. Sequential callers barely notice it (API latency dominates);
-  // parallel page fetches share it, so adding concurrency can never exceed
-  // the ceiling no matter how many fetchers run. Retries consume tokens too
-  // (they are requests). The 406/429 path below stays the server-side net.
-  const bucketSize = Math.max(1, Math.floor(ratePerMin));
-  const bucketBurst = Math.max(1, Math.floor(rateBurst));
-  let bucketTokens = bucketBurst;
-  let bucketRefillAt = now();
-  const takeToken = async (): Promise<void> => {
-    for (;;) {
-      const t = now();
-      bucketTokens = Math.min(
-        bucketBurst,
-        bucketTokens + ((t - bucketRefillAt) / 60000) * bucketSize,
-      );
-      bucketRefillAt = t;
-      if (bucketTokens >= 1) {
-        bucketTokens -= 1;
-        return;
-      }
-      const waitMs = ((1 - bucketTokens) / bucketSize) * 60000;
-      await new Promise<void>((r) =>
-        setTimeout(r, Math.min(waitMs, maxRateWaitMs))
-      );
-    }
+  // Adaptive token bucket: the single pacing mechanism for every GET this
+  // client issues. Sequential callers barely notice it (API latency
+  // dominates); parallel page fetches share it, so adding concurrency can
+  // never exceed the ceiling no matter how many fetchers run. Retries
+  // consume tokens too (they are requests). The 406/429 path below stays
+  // the server-side net. With adaptive on, clean traffic inches the rate up
+  // toward maxRatePerMin and any limit signal cuts it multiplicatively.
+  const limiter = createAdaptiveRate({
+    initialRatePerMin: ratePerMin,
+    maxRatePerMin: adaptive ? maxRatePerMin : ratePerMin,
+    minRatePerMin: adaptive ? minRatePerMin : ratePerMin,
+    burst: rateBurst,
+    maxWaitMs: maxRateWaitMs,
+    now,
+    onRateChange,
+  });
+  const takeToken = () => limiter.takeToken();
+  const noteOk = (headers: Headers): void => {
+    if (adaptive) limiter.recordSuccess(parseRateLimitRemaining(headers));
+  };
+  const noteLimited = (): void => {
+    if (adaptive) limiter.recordLimited();
+  };
+  const noteServerError = (): void => {
+    if (adaptive) limiter.recordServerError();
   };
 
   // getJson: one authenticated GET with timeout, one 401 refresh retry,
@@ -318,8 +339,9 @@ export function createFracttalClient(
         continue;
       }
       const status = res.status;
-      const reset = rateLimitReset(res.headers);
+      const reset = parseRateLimitReset(res.headers);
       if (status === 406 || status === 429) {
+        noteLimited();
         if (attempt < maxRetries) {
           await waitPause(reset * 1000);
           continue;
@@ -327,6 +349,7 @@ export function createFracttalClient(
         throw new Error(`[fracttal] rate limited (HTTP ${status})`);
       }
       if (status >= 500) {
+        noteServerError();
         if (attempt < maxRetries) {
           await waitPause(100 * 2 ** attempt);
           continue;
@@ -334,6 +357,7 @@ export function createFracttalClient(
         throw new Error(`[fracttal] upstream error ${status}`);
       }
       if (!res.ok) throw new Error(`[fracttal] HTTP ${status} for ${path}`);
+      noteOk(res.headers);
       return await res.json() as unknown;
     }
     throw new Error("[fracttal] getJson exhausted");
@@ -453,5 +477,6 @@ export function createFracttalClient(
     collectAssets,
     listRawWorkOrders,
     listRawWorkRequests,
+    currentRate: () => limiter.currentRate(),
   };
 }

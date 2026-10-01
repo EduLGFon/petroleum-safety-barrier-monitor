@@ -427,3 +427,51 @@ Deno.test("fetchRawItem hits GET /items/{code} and tolerates absence", async () 
     true,
   );
 });
+
+Deno.test("client backs the adaptive rate off after a 406", async () => {
+  let hits = 0;
+  const fetchImpl = (input: RequestInfo | URL) => {
+    const url = String(input);
+    if (url.includes("/oauth/token")) {
+      return Promise.resolve(
+        new Response(
+          JSON.stringify({
+            access_token: "t",
+            refresh_token: "r",
+            expires_in: 7200,
+          }),
+          { status: 200 },
+        ),
+      );
+    }
+    hits++;
+    if (hits === 1) {
+      return Promise.resolve(
+        new Response("{}", {
+          status: 406,
+          headers: { "ratelimit-reset": "1" },
+        }),
+      );
+    }
+    return Promise.resolve(
+      new Response(JSON.stringify({ data: [asset()], total: 1 }), {
+        status: 200,
+        headers: { "ratelimit-remaining": "190" },
+      }),
+    );
+  };
+  const client = createFracttalClient({
+    baseUrl: DATA_URL,
+    credentials: { key: "k", secret: "s" },
+    ratePerMin: 180,
+    maxRatePerMin: 190,
+    minRatePerMin: 80,
+    rateBurst: 10,
+    maxRateWaitMs: 5,
+    fetchImpl,
+  });
+  const before = client.currentRate();
+  const page = await client.listAssets({});
+  assertEquals(page.items.length, 1);
+  assertStrictEquals(client.currentRate() < before, true);
+});

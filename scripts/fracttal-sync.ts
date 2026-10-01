@@ -74,7 +74,7 @@ function parseFlags(argv: string[]): SyncFlags {
     pages: 200,
     workPages: 5,
     workOpenOnly: true,
-    ratePerMin: 150,
+    ratePerMin: 180,
     fetchConcurrency: 4,
     baseUrl: Deno.env.get("FRACTTAL_BASE_URL") ?? DEFAULT_BASE_URL,
     apply: false,
@@ -95,7 +95,7 @@ function parseFlags(argv: string[]): SyncFlags {
     } else if (arg === "--work-open-only") base.workOpenOnly = true;
     else if (arg === "--work-windowed") base.workOpenOnly = false;
     else if (arg === "--rate-per-min") {
-      base.ratePerMin = Math.max(1, Number(argv[++i]) || 150);
+      base.ratePerMin = Math.max(1, Number(argv[++i]) || 180);
     } else if (arg === "--fetch-concurrency") {
       base.fetchConcurrency = Math.max(1, Number(argv[++i]) || 4);
     } else if (arg === "--base-url") base.baseUrl = argv[++i];
