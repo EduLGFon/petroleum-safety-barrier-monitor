@@ -1,5 +1,10 @@
 # Deploy on Windows Server 2022 / 2025
 
+> Never touched a Windows Server? Read `docs/WINDOWS-SERVER-START-HERE.md`
+> first — it explains RDP, admin terminals, the three commands, what success
+> looks like, and what to do when red text appears. This page is the
+> reference; that page is the walkthrough.
+
 Supported, tested target: **Windows Server 2022 and 2025, 64-bit, native
 deployment** (no Docker). A Docker path exists but is _not_ recommended on
 Windows Server (see path B).
