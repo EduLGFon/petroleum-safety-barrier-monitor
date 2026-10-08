@@ -75,8 +75,9 @@ dashboard island, the upstream sync loop and the alert digest loop. There is no
   dry-run by default, per-run audit rows, soft deletes, truncated-page guards.
 - Alert pipeline: rules, digest delivery, immediate sends, deduplication,
   retries and dead-letter parking.
-- Docker Compose stack (app + sync poller + alert loop + one-shot toolbox) and
-  a documented systemd alternative.
+- Docker Compose stack (app + sync poller + alert loop + one-shot toolbox),
+  a documented systemd alternative, and a native Windows Server 2022/2025
+  path (`docs/DEPLOY-WINDOWS.md`, `deploy/windows/`, `deno task doctor`).
 
 ## Stack
 
@@ -680,6 +681,9 @@ Files are named with the export date, one file per export.
   and `/api/health`.
 - The stack also runs without Docker: a systemd unit invoking `deno task start`,
   a second unit for the sync loop, and a cron entry for the digest.
+  On Windows Server 2022/2025 the equivalent is NSSM services + Task
+  Scheduler + Caddy (see `docs/DEPLOY-WINDOWS.md`); validate any host with
+  `deno task doctor` before serving.
 
 ## Conventions for contributors
 

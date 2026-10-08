@@ -462,7 +462,7 @@ Drills (acceptance):
   `docker compose up -d --force-recreate app` (the client returns to the
   deterministic generator; the DB is untouched).
 
-### Systemd runtime (alternative, no Docker)
+### Systemd runtime (alternative, no Docker; Windows Server: `docs/DEPLOY-WINDOWS.md`)
 
 Service (`deno task start` reads `.env`):
 
