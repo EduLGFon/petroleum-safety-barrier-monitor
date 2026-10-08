@@ -26,6 +26,10 @@ import { buildWhere, resolveOrderBy } from "./where.ts";
 import { queryRows } from "../db.ts";
 
 // Lists paged wire barriers + total for the given BarriersQuery filters.
+// Single round-trip: the total rides along as count(*) OVER() on every row,
+// so the page and the count share one filtered scan. Out-of-range pages
+// (zero rows past offset 0) fall back to one count query so totalPages
+// stays exact instead of reading 0.
 export async function listBarriers(
   q: BarriersQuery,
 ): Promise<BarriersResponse> {
@@ -42,22 +46,27 @@ export async function listBarriers(
   const limitIdx = where.args.length + 1;
   const offsetIdx = where.args.length + 2;
 
-  const [rows, countRows] = await Promise.all([
-    queryRows<BarrierRow>(
-      `select ${SELECT_COLUMNS} from barriers b
+  const rows = await queryRows<BarrierRow & { full_count: string }>(
+    `select ${SELECT_COLUMNS}, count(*) over () as full_count
+       from barriers b
        join locations loc on loc.id = b.location_id
        ${HISTORY_JOIN} ${where.text}
        order by ${orderBy} limit $${limitIdx} offset $${offsetIdx}`,
-      [...where.args, pageSize, offset],
-    ),
-    queryRows<{ count: string }>(
+    [...where.args, pageSize, offset],
+  );
+
+  // Empty page past the first means either zero matches or a page beyond
+  // the end. Zero matches need no second query; beyond-the-end pages take
+  // one cheap count so totalPages stays exact.
+  let total = rows.length > 0 ? Number(rows[0]?.full_count ?? 0) : 0;
+  if (rows.length === 0 && offset > 0) {
+    const countRows = await queryRows<{ count: string }>(
       `select count(*)::text as count from barriers b
        join locations loc on loc.id = b.location_id ${where.text}`,
       where.args,
-    ),
-  ]);
-
-  const total = Number(countRows[0]?.count ?? 0);
+    );
+    total = Number(countRows[0]?.count ?? 0);
+  }
 
   return {
     items: rows.map(toWireBarrier),
@@ -154,7 +163,7 @@ export async function getKpi(
   const scopeWhere = opts.scopeCounts
     ? buildWhere({ ...q, rowScope: "all" })
     : null;
-  const [rows, dispRows, confRows, critRows, ncCritRows] = await Promise.all([
+  const [rows, bucketRows] = await Promise.all([
     queryRows<{
       total: string;
       available: string;
@@ -185,36 +194,37 @@ export async function getKpi(
       from barriers b join locations loc on loc.id = b.location_id ${where.text}`,
       where.args,
     ),
-    queryRows<{ id: string; count: string }>(
-      `select b.availability_id::text as id, count(*)::text as count
-       ${from} group by b.availability_id`,
-      where.args,
-    ),
-    queryRows<{ id: string; count: string }>(
-      `select b.compliance_id::text as id, count(*)::text as count
-       ${from} group by b.compliance_id`,
-      where.args,
-    ),
-    queryRows<{ id: string; count: string }>(
-      `select b.criticality_id::text as id, count(*)::text as count
-       ${from} group by b.criticality_id`,
-      where.args,
-    ),
-    // Non-compliant count per criticality rank (fail-closed NC definition,
-    // same as the non_compliant fixed field above).
-    queryRows<{ id: string; count: string }>(
-      `select b.criticality_id::text as id, count(*)::text as count
-       ${from} and coalesce(b.compliance_id, 1) <> 0 group by b.criticality_id`,
-      // NOTE: ${from} already contains the WHERE clause; appending AND keeps
-      // the filter subset identical to the other buckets.
+    // One round-trip for all four dynamic buckets: each branch is the
+    // previous GROUP BY verbatim (same filter subset, same fail-closed NC
+    // definition), tagged and concatenated, grouped once outside.
+    // NOTE: ${from} already contains the WHERE clause; the fourth branch
+    // appends AND so its filter subset stays identical to the old query.
+    queryRows<{ grp: string; id: string; count: string }>(
+      `select grp, id, count(*)::text as count from (
+        select 'avail' as grp, b.availability_id::text as id
+        ${from}
+        union all
+        select 'conf' as grp, b.compliance_id::text as id
+        ${from}
+        union all
+        select 'crit' as grp, b.criticality_id::text as id
+        ${from}
+        union all
+        select 'nccrit' as grp, b.criticality_id::text as id
+        ${from} and coalesce(b.compliance_id, 1) <> 0
+      ) g group by grp, id`,
       where.args,
     ),
   ]);
+  const dispRows = bucketRows.filter((r) => r.grp === "avail");
+  const confRows = bucketRows.filter((r) => r.grp === "conf");
+  const critRows = bucketRows.filter((r) => r.grp === "crit");
+  const ncCritRows = bucketRows.filter((r) => r.grp === "nccrit");
 
   // Visibility scope counts (admin band segments only): live-but-disabled
   // rows plus soft-deleted rows over the unscoped filter subset. A separate
   // round-trip gated on the flag, so non-admin snapshots never observe
-  // hidden rows and exports keep their five-query shape.
+  // hidden rows.
   const scopeRows = scopeWhere
     ? await queryRows<{ inactive: string; deleted: string }>(
       `select
