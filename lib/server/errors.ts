@@ -9,6 +9,7 @@
 // credential), FORBIDDEN (403, authenticated but lacking the role), NOT_FOUND
 // (404, missing row or anonymous camouflage), RATE_LIMITED (429),
 // UNAVAILABLE (503, dependency outage), INTERNAL (500, never leaks details).
+import { log } from "./log.ts";
 export type ApiErrorCode =
   | "BAD_REQUEST"
   | "NOT_FOUND"
@@ -163,6 +164,6 @@ export function internal(
   requestId: string,
   publicMessage: string,
 ): Response {
-  console.error(`[${logLabel}] requestId=${requestId}`, err);
+  log.child({ scope: "api", requestId }).error(logLabel, { err });
   return apiError(500, "INTERNAL", publicMessage, requestId);
 }

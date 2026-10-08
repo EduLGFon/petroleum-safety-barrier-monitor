@@ -30,8 +30,10 @@ Deno.test("consoleNotifier emits a loud structured line", async () => {
     console.error = original;
   }
   assertStrictEquals(calls.length, 1);
-  assertStrictEquals(calls[0]!.includes("scope=fracttal-live:FAL"), true);
-  assertStrictEquals(calls[0]!.includes("note=upstream error 500"), true);
+  assertStrictEquals(calls[0]!.includes("ERROR"), true);
+  assertStrictEquals(calls[0]!.includes("[fracttal-live:FAL]"), true);
+  assertStrictEquals(calls[0]!.includes('note="upstream error 500"'), true);
+  assertStrictEquals(calls[0]!.includes("runId=7"), true);
 });
 
 Deno.test("smtpEmailNotifier sends one email with the failure details", async () => {

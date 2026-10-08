@@ -4,6 +4,8 @@
 // is enough. Only server code may import this (never an island).
 import { Pool } from "@db/postgres";
 
+import { log } from "./log.ts";
+
 declare global {
   var __barrierPool: Pool | undefined;
 }
@@ -24,9 +26,9 @@ function createPool(): Pool {
   }
   const url = parseDatabaseUrl(connectionString);
   if (url !== null && !tlsAttemptNeeded(url)) {
-    console.warn(
-      `[db] TLS disabled for ${url.hostname} (loopback or sslmode=disable); using plaintext Postgres`,
-    );
+    log.child({ scope: "db" }).warn("TLS disabled, using plaintext Postgres", {
+      hostname: url.hostname,
+    });
     return new Pool(
       {
         hostname: url.hostname,
@@ -134,8 +136,11 @@ export async function queryRows<T>(
   } catch (err) {
     if (!isStaleConnection(err)) throw err;
     const detail = err instanceof Error ? err.message : String(err);
-    console.warn(
-      `[db] pooled connection failed (${detail}), resetting pool and retrying once`,
+    log.child({ scope: "db" }).warn(
+      "pooled connection failed, resetting pool",
+      {
+        err: detail,
+      },
     );
     await resetPool();
     return await runOnce<T>(text, args);

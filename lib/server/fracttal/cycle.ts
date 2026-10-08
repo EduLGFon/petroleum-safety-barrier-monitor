@@ -15,13 +15,15 @@ import type {
 
 import { notifyFailureToAll } from "./notify.ts";
 
-import { isScopeBusy } from "./sync.ts";
-
 import type { OpsNotifier } from "./notify.ts";
 
 import type { SyncResult } from "./sync.ts";
 
+import { isScopeBusy } from "./sync.ts";
+
 import { pollOnce } from "./runner.ts";
+
+import { log } from "../log.ts";
 
 export interface CycleScope<Shared> {
   scope: string;
@@ -74,7 +76,7 @@ export function createCycleLoop<Shared>(
   let handle: unknown = null;
   let current: Promise<void> | null = null;
   const timers = opts.timers ?? defaultTimerSource;
-  const log = opts.onLog ?? ((line: string) => console.log(line));
+  const logLine = opts.onLog ?? log.child({ scope: "cycle" }).line("info");
   const now = opts.now ?? (() => new Date());
   const cycleScope = opts.cycleScope ?? "cycle";
 
@@ -85,14 +87,14 @@ export function createCycleLoop<Shared>(
   const tick = (): void => {
     if (stopped) return;
     if (running) {
-      log(`[cycle] previous cycle still running, skipped`);
+      logLine(`[cycle] previous cycle still running, skipped`);
       schedule();
       return;
     }
     running = true;
     attempt++;
     const n = attempt;
-    log(`[cycle] start attempt=${n} scopes=${opts.scopes.length}`);
+    logLine(`[cycle] start attempt=${n} scopes=${opts.scopes.length}`);
     current = (async () => {
       try {
         let shared: Shared;
@@ -110,7 +112,7 @@ export function createCycleLoop<Shared>(
             try {
               await opts.onCycleFailure(info);
             } catch (recordErr) {
-              log(
+              logLine(
                 `[cycle] failure record failed: ${
                   recordErr instanceof Error
                     ? recordErr.message
@@ -119,7 +121,7 @@ export function createCycleLoop<Shared>(
               );
             }
           }
-          log(`[cycle] shared fetch failed: ${note}`);
+          logLine(`[cycle] shared fetch failed: ${note}`);
           return;
         }
         let ok = 0;
@@ -153,11 +155,11 @@ export function createCycleLoop<Shared>(
           if (outcome.outcome === "ok") ok++;
           else if (outcome.outcome === "skipped") skipped++;
           else failed++;
-          log(
+          logLine(
             `[cycle] scope=${s.scope} ${outcome.outcome} ${Date.now() - s0}ms`,
           );
         }
-        log(
+        logLine(
           `[cycle] done attempt=${n} ok=${ok} skipped=${skipped} failed=${failed} ` +
             `${Date.now() - t0}ms next=${Math.round(opts.intervalMs / 1000)}s`,
         );
@@ -165,11 +167,9 @@ export function createCycleLoop<Shared>(
         // Last-resort guard: every step above already guards itself, so this
         // only fires on logger bugs. Report loudly and never reject: stop()
         // awaits this promise and must stay throw-free like createPollLoop.
-        console.error(
-          `[cycle] crashed: ${
-            err instanceof Error ? err.message : String(err)
-          }`,
-        );
+        log.child({ scope: "cycle" }).error("crashed", {
+          err: err instanceof Error ? err.message : String(err),
+        });
       } finally {
         running = false;
         current = null;

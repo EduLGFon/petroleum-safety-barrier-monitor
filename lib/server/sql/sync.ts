@@ -41,6 +41,8 @@ import { queryRows, type TxQuery, withTx } from "../db.ts";
 
 import { getResolverLabels } from "./vocabularies.ts";
 
+import { log } from "../log.ts";
+
 export const SYNC_AUTHOR_ID = 10; // authors.id, see db/seed_lookups.sql
 
 // Freshness windows for the status indicator, in minutes. A `running` row
@@ -110,7 +112,10 @@ export async function reapStaleRuns(
   );
   const n = rows[0]?.n ?? 0;
   if (n > 0) {
-    console.log(`[sync] reaped ${n} stale running row(s) scope=${scope}`);
+    log.child({ scope: "sync" }).info("reaped stale running rows", {
+      scope,
+      count: n,
+    });
   }
   return n;
 }
@@ -126,7 +131,7 @@ export async function touchSyncRun(runId: number): Promise<void> {
       [runId],
     );
   } catch (err) {
-    console.warn("sync: best-effort heartbeat failed", err);
+    log.child({ scope: "sync" }).warn("best-effort heartbeat failed", { err });
   }
 }
 
@@ -287,7 +292,10 @@ export const defaultSyncIo: SyncIo = {
     } catch (err) {
       // A reaping failure must never block the new run; the stale flag
       // below already ignores superseded orphans as a second defense.
-      console.warn("sync: best-effort reapStaleRuns failed", err);
+      log.child({ scope: "sync" }).warn("best-effort reapStaleRuns failed", {
+        scope,
+        err,
+      });
     }
     // Atomic claim: the INSERT only fires when no fresh lease exists, so
     // two processes racing past the pollOnce lock cannot both open a run.
@@ -318,7 +326,10 @@ export const defaultSyncIo: SyncIo = {
     if (!started) {
       throw new ScopeBusyError(`[sync] scope ${scope} already running`);
     }
-    console.log(`[sync] start scope=${scope} runId=${started.id}`);
+    log.child({ scope: "sync" }).info("run started", {
+      scope,
+      runId: started.id,
+    });
     return started.id;
   },
 
@@ -483,11 +494,15 @@ export const defaultSyncIo: SyncIo = {
     );
     // Finish line mirrors the audit row (counts plus the note head) so a
     // cycle is traceable in stderr alone when the DB is unreachable later.
-    console.log(
-      `[sync] finish runId=${runId} status=${status} ` +
-        `i=${counts.inserts} u=${counts.updates} d=${counts.deletes} ` +
-        `s=${counts.skips} note=${note.slice(0, 120)}`,
-    );
+    log.child({ scope: "sync" }).info("run finished", {
+      runId,
+      status,
+      inserts: counts.inserts,
+      updates: counts.updates,
+      deletes: counts.deletes,
+      skips: counts.skips,
+      note: note.slice(0, 120),
+    });
   },
 };
 
@@ -593,7 +608,11 @@ async function insertAuditBatch(
       args,
     );
   } catch (err) {
-    console.warn("[sync] audit batch failed, retrying per row", err);
+    log.child({ scope: "sync" }).warn("audit batch failed, retrying per row", {
+      runId,
+      count: audits.length,
+      err,
+    });
     for (const a of audits) {
       await recordBarrierChange(runId, {
         barrierId: a.barrierId,
@@ -850,7 +869,11 @@ export async function recordBarrierChange(
   } catch (err) {
     // Pre-migration databases have no sync_barrier_changes table yet; the
     // barrier write above already committed, so only warn.
-    console.warn("[sync] recordBarrierChange skipped", err);
+    log.child({ scope: "sync" }).warn("recordBarrierChange skipped", {
+      runId,
+      barrierId: change.barrierId,
+      err,
+    });
   }
 }
 
@@ -1379,7 +1402,8 @@ export async function recordSyncFailure(
   // Persistence confirmation: the cycle path already notifies via [ops],
   // but only this line proves the failed row actually landed in sync_state
   // (a DB outage between notify and insert would otherwise look recorded).
-  console.error(
-    `[sync] recorded failure scope=${scope} note=${note.slice(0, 200)}`,
-  );
+  log.child({ scope: "sync" }).error("recorded failure", {
+    scope,
+    note: note.slice(0, 200),
+  });
 }

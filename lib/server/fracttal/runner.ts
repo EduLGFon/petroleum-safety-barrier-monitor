@@ -5,9 +5,11 @@
 // cadence with start/stop semantics (stop is safe mid-run).
 import type { OpsNotifier, SyncFailureInfo } from "./notify.ts";
 
+import { isScopeBusy, type SyncResult } from "./sync.ts";
+
 import { notifyFailureToAll } from "./notify.ts";
 
-import { isScopeBusy, type SyncResult } from "./sync.ts";
+import { log } from "../log.ts";
 
 export interface ScopeLock {
   isRunning(scope: string): Promise<boolean>;
@@ -88,7 +90,7 @@ export function createPollLoop(
   let started = false;
   let handle: unknown = null;
   const timers = opts.timers ?? defaultTimerSource;
-  const log = opts.onLog ?? ((line: string) => console.log(line));
+  const logLine = opts.onLog ?? log.child({ scope: "poll" }).line("info");
 
   const tick = async (): Promise<void> => {
     if (stopped) return;
@@ -100,9 +102,9 @@ export function createPollLoop(
           syncFailed: (info) => notifyFailureToAll(opts.notifiers, info),
         },
       });
-      log(`[poll] scope=${scope} ${outcome.outcome}`);
+      logLine(`[poll] scope=${scope} ${outcome.outcome}`);
     } catch (err) {
-      log(
+      logLine(
         `[poll] scope=${scope} crashed: ${
           err instanceof Error ? err.message : String(err)
         }`,

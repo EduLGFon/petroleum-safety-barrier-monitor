@@ -6,6 +6,8 @@
 // sync path, so an unusable mail relay cannot take down the pipeline.
 import { sendMail, type SmtpConfig } from "./smtp.ts";
 
+import { log } from "../log.ts";
+
 export interface SyncFailureInfo {
   scope: string;
   startedAt: string; // ISO timestamp (run start)
@@ -22,10 +24,12 @@ export interface OpsNotifier {
 export const consoleNotifier: OpsNotifier = {
   name: "console",
   syncFailed(info: SyncFailureInfo): Promise<void> {
-    console.error(
-      `[ops] sync failed scope=${info.scope} runId=${info.runId ?? "-"} ` +
-        `startedAt=${info.startedAt} note=${info.note}`,
-    );
+    log.child({ scope: "ops" }).error("sync failed", {
+      scope: info.scope,
+      runId: info.runId,
+      startedAt: info.startedAt,
+      note: info.note,
+    });
     return Promise.resolve();
   },
 };
@@ -143,11 +147,11 @@ export async function notifyFailureToAll(
       try {
         await n.syncFailed(info);
       } catch (err) {
-        console.error(
-          `[ops] notifier ${n.name} failed: ${
-            err instanceof Error ? err.message : String(err)
-          }`,
-        );
+        log.child({ scope: "ops" }).error("notifier failed", {
+          notifier: n.name,
+          scope: info.scope,
+          err: err instanceof Error ? err.message : String(err),
+        });
       }
     }),
   );

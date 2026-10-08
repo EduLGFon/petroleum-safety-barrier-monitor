@@ -5,19 +5,21 @@
 // anonymous callers get 404 camouflage, invalid credentials get 401.
 // Fail-closed: no valid credential means denial.
 import {
-  getSessionTokenFromRequest,
-  hashSessionToken,
-} from "./auth/session.ts";
-
-import { getSessionUser, type SessionUser } from "./sql/sessions.ts";
-
-import {
   apiError,
   forbidden,
   notFound,
   unauthorized,
   unavailable,
 } from "./errors.ts";
+
+import {
+  getSessionTokenFromRequest,
+  hashSessionToken,
+} from "./auth/session.ts";
+
+import { getSessionUser, type SessionUser } from "./sql/sessions.ts";
+
+import { log } from "./log.ts";
 
 export type AdminRole = "admin";
 export type RequestRole = "admin" | "user";
@@ -158,7 +160,7 @@ export function authStoreUnavailable(
   err: unknown,
   requestId: string,
 ): Response {
-  console.error(`[${logLabel}] requestId=${requestId}`, err);
+  log.child({ scope: "auth", requestId }).error(logLabel, { err });
   return unavailable("Auth store unreachable", requestId);
 }
 
