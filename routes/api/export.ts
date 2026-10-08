@@ -8,11 +8,10 @@
 // anonymous gets 404 camouflage. Throttled tighter.
 import {
   badRequest,
+  forbidden,
   internal,
   newRequestId,
-  notFound,
   rateLimited,
-  unauthorized,
 } from "../../lib/server/errors.ts";
 
 import {
@@ -33,7 +32,11 @@ import { streamExportXlsx } from "../../lib/server/exportXlsx.ts";
 import { getCompanyName } from "../../lib/company.ts";
 import type { ExportScope } from "../../lib/server/exportRows.ts";
 import type { BarriersQuery } from "../../lib/wireTypes.ts";
-import { requireDataAuth } from "../../lib/server/auth.ts";
+import {
+  authStoreUnavailable,
+  denyDataAuth,
+  requireDataAuth,
+} from "../../lib/server/auth.ts";
 import { parseFilterQuery } from "./_params.ts";
 
 import { define } from "../../utils.ts";
@@ -119,12 +122,13 @@ async function stream(
   } catch (err) {
     return internal(where, err, requestId, "Server misconfigured");
   }
-  const dataAuth = await requireDataAuth(ctx.req);
-  if (!dataAuth.ok) {
-    return dataAuth.anonymous
-      ? notFound("not found", requestId)
-      : unauthorized(dataAuth.message, requestId);
+  let dataAuth;
+  try {
+    dataAuth = await requireDataAuth(ctx.req);
+  } catch (err) {
+    return authStoreUnavailable(where, err, requestId);
   }
+  if (!dataAuth.ok) return denyDataAuth(dataAuth, requestId);
 
   // A tab opened before a format migration still asks for its old key; it
   // resolves to the current format instead of failing the request.
@@ -148,7 +152,7 @@ async function stream(
     (query.rowScope === "deleted" || query.rowScope === "all") &&
     dataAuth.role !== "admin"
   ) {
-    return unauthorized("admin only", requestId);
+    return forbidden("admin only", requestId);
   }
 
   try {
