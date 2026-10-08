@@ -72,3 +72,18 @@ fails barrier writes.
 
 Verification: `deno fmt --check`, `deno check`, `deno task test`
 (576 passed; DB integration suites self-skip without DATABASE_URL).
+
+## D04 - Sync-changes list round-trip collapse (2026-10-08)
+
+Context: `listSyncChanges` ran a standalone count plus the page query
+sequentially (2 round-trips per header-page interaction).
+
+Decision: same `count(*) OVER()` treatment as D02. The page-to-barrier
+joins are all to-one, so the window total matches the old count exactly;
+out-of-range empty pages take the old count query so totalPages stays
+exact. Summary path (`summarizeAuditRows`) untouched: its three
+aggregations use different joins over a small per-run table and are
+already parallel, so a rewrite has no concrete benefit.
+
+Verification: `deno fmt --check`, `deno check`, `deno task test`
+(576 passed; DB integration suites self-skip without DATABASE_URL).

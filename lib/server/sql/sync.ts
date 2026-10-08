@@ -940,12 +940,9 @@ export async function listSyncChanges(
       conds.push(`b.tag ilike $${params.length} escape '\\'`);
     }
     const where = conds.length > 0 ? `where ${conds.join(" and ")}` : "";
-    const countRows = await queryRows<{ n: number }>(
-      `select count(*)::int as n from sync_barrier_changes c
-       join barriers b on b.id = c.barrier_id ${where}`,
-      params,
-    );
-    const total = countRows[0]?.n ?? 0;
+    // Single round-trip: the total rides along as count(*) OVER() so the
+    // page and the count share one filtered scan. Out-of-range pages take
+    // one cheap count query so totalPages stays exact.
     const rows = await queryRows<{
       barrier_id: number;
       tag: string;
@@ -959,12 +956,14 @@ export async function listSyncChanges(
       created_at: string;
       run_id: number;
       criticality_id: number | null;
+      full_count: string;
     }>(
       `select c.barrier_id, b.tag,
         coalesce(l.name, l.code, '') as location, c.kind,
         c.old_availability_id, c.new_availability_id,
         os.label as old_status, ns.label as new_status,
-        c.changed_fields, c.created_at, c.run_id, b.criticality_id
+        c.changed_fields, c.created_at, c.run_id, b.criticality_id,
+        count(*) over () as full_count
        from sync_barrier_changes c
        join barriers b on b.id = c.barrier_id
        left join locations l on l.id = b.location_id
@@ -974,6 +973,17 @@ export async function listSyncChanges(
        limit $${params.length + 1} offset $${params.length + 2}`,
       [...params, pageSize, offset],
     );
+    // The page-to-barrier joins are all to-one, so the window total matches
+    // the old standalone count exactly.
+    let total = rows.length > 0 ? Number(rows[0]?.full_count ?? 0) : 0;
+    if (rows.length === 0 && offset > 0) {
+      const countRows = await queryRows<{ n: number }>(
+        `select count(*)::int as n from sync_barrier_changes c
+         join barriers b on b.id = c.barrier_id ${where}`,
+        params,
+      );
+      total = countRows[0]?.n ?? 0;
+    }
     const items: SyncChangeItem[] = rows.map((r) => ({
       barrierId: r.barrier_id,
       tag: r.tag,
