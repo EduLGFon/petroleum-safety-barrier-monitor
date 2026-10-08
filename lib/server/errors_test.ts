@@ -2,8 +2,11 @@
 import {
   apiError,
   badRequest,
+  created,
+  forbidden,
   internal,
   notFound,
+  ok,
   rateLimited,
   unauthorized,
 } from "./errors.ts";
@@ -68,4 +71,27 @@ Deno.test("apiError exposes no stack or columns", async () => {
   const raw = await res.text();
   assertStrictEquals(raw.includes("stack"), false);
   assertStrictEquals(raw.includes("column"), false);
+});
+
+Deno.test("ok carries the domain body with the correlation header", async () => {
+  const res = ok({ items: [] }, "req-ok");
+  assertStrictEquals(res.status, 200);
+  assertStrictEquals(res.headers.get("x-request-id"), "req-ok");
+  const body = await res.json() as { items: unknown[] };
+  assertStrictEquals(body.items.length, 0);
+});
+
+Deno.test("created answers 201 with the correlation header", () => {
+  const res = created({ id: 1 }, "req-201");
+  assertStrictEquals(res.status, 201);
+  assertStrictEquals(res.headers.get("x-request-id"), "req-201");
+});
+
+Deno.test("forbidden answers 403 FORBIDDEN, never 401", async () => {
+  const res = forbidden("admin only", "req-403");
+  assertStrictEquals(res.status, 403);
+  assertStrictEquals(res.headers.get("x-request-id"), "req-403");
+  const b = await body(res);
+  assertStrictEquals(b.error, "admin only");
+  assertStrictEquals(b.code, "FORBIDDEN");
 });
