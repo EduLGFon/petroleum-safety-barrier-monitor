@@ -5,18 +5,6 @@
 // rows, and styles.xml is written last because the style registry only knows
 // the full set once the last row is in.
 import {
-  dataRow,
-  HEADER_ROWS,
-  headerBytes,
-  sheetClose,
-  sheetStyles,
-} from "./dataSheet.ts";
-import { EXPORT_HEADERS } from "../columns.ts";
-import { type Bytes, bytesOf, writeZip, type ZipEntry } from "./zip.ts";
-import { kpiStatsFrom, summaryRowsFrom } from "../summary.ts";
-import { row } from "../rows.ts";
-import { styleBook } from "./styles.ts";
-import {
   appProps,
   contentTypes,
   coreProps,
@@ -25,14 +13,35 @@ import {
   workbook,
   workbookRels,
 } from "./parts.ts";
-import { withBrand } from "../../company.ts";
+
+import {
+  dataRow,
+  HEADER_ROWS,
+  headerBytes,
+  sheetClose,
+  sheetStyles,
+} from "./dataSheet.ts";
+
+import { type Bytes, bytesOf, writeZip, type ZipEntry } from "./zip.ts";
+
 import { WIDTH_SAMPLE_ROWS, xlsxColWidths } from "./widths.ts";
+
+import { kpiStatsFrom, summaryRowsFrom } from "../summary.ts";
 
 import type { KpiSnapshot } from "../../types.ts";
 
+import { EXPORT_HEADERS } from "../columns.ts";
+
 import type { Barrier } from "../../types.ts";
 
+import { withBrand } from "../../company.ts";
+
+import { styleBook } from "./styles.ts";
+
+import { row } from "../rows.ts";
+
 import { ts } from "../html.ts";
+
 import { utf8 } from "./xml.ts";
 
 export interface XlsxMeta {

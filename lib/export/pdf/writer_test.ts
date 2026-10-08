@@ -2,8 +2,6 @@
 // The parser below reads the bytes the way a reader does (header, startxref,
 // xref entries, inflated streams), so a broken offset or stream fails here
 // rather than in a PDF viewer.
-import { assert, assertEquals, assertStrictEquals } from "jsr:@std/assert@^1";
-
 import {
   type Bytes,
   ContentBuilder,
@@ -12,6 +10,8 @@ import {
   pdfChunks,
   pdfText,
 } from "./writer.ts";
+
+import { assert, assertEquals, assertStrictEquals } from "jsr:@std/assert@^1";
 
 async function bytesOf(
   chunks: AsyncIterable<Bytes>,

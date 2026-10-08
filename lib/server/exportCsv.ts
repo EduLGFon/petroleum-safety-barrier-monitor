@@ -4,9 +4,13 @@
 // csvCell (quoting) and the same RESUMO rows. Only the transport differs:
 // here a ReadableStream of database batches instead of a browser Blob.
 import { CSV_HEADERS, csvCell } from "../export/csv.ts";
-import { summaryRowsFrom } from "../export/summary.ts";
-import { textStream } from "./exportStream.ts";
+
 import type { Barrier, KpiSnapshot } from "../types.ts";
+
+import { summaryRowsFrom } from "../export/summary.ts";
+
+import { textStream } from "./exportStream.ts";
+
 import { row } from "../export/rows.ts";
 
 // streamExportCsv: BOM + header, then the data rows (one chunk per batch),

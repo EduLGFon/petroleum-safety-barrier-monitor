@@ -14,16 +14,16 @@ import {
 } from "../../../lib/server/errors.ts";
 
 import {
-  hashPassword,
-  validateNewPassword,
-  verifyPassword,
-} from "../../../lib/server/auth/password.ts";
-
-import {
   authStoreUnavailable,
   denyByCredentials,
   requireAuthenticated,
 } from "../../../lib/server/auth.ts";
+
+import {
+  hashPassword,
+  validateNewPassword,
+  verifyPassword,
+} from "../../../lib/server/auth/password.ts";
 
 import {
   passwordThrottle,

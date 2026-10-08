@@ -9,8 +9,6 @@ import {
   requireAuthenticated,
 } from "../../lib/server/auth.ts";
 
-import { readThrottle, routeClientKey } from "../../lib/server/throttle.ts";
-
 import {
   internal,
   newRequestId,
@@ -18,11 +16,13 @@ import {
   rateLimited,
 } from "../../lib/server/errors.ts";
 
+import { readThrottle, routeClientKey } from "../../lib/server/throttle.ts";
+
 import { listAuthors } from "../../lib/server/sql/authors.ts";
 
-import { queryRows } from "../../lib/server/db.ts";
-
 import { loadServerConfig } from "../../lib/server/config.ts";
+
+import { queryRows } from "../../lib/server/db.ts";
 
 import { define } from "../../utils.ts";
 

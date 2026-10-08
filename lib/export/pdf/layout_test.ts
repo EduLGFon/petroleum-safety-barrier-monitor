@@ -1,7 +1,5 @@
 // Unit tests for the PDF pagination - page breaks are what keep every row
 // whole and the header repeated, so they are asserted, not eyeballed.
-import { assert, assertEquals, assertStrictEquals } from "jsr:@std/assert@^1";
-
 import {
   CONTENT_BOTTOM,
   CONTENT_TOP,
@@ -9,6 +7,8 @@ import {
   rowHeight,
   tableCaps,
 } from "./layout.ts";
+
+import { assert, assertEquals, assertStrictEquals } from "jsr:@std/assert@^1";
 
 Deno.test("rowHeight grows with wrapped lines", () => {
   assertStrictEquals(rowHeight(1), 6 * 1.15 + 3);

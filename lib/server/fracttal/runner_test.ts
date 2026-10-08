@@ -2,11 +2,11 @@
 // stop-safe cadence loop with injectable timers.
 import { createPollLoop, pollOnce, type TimerSource } from "./runner.ts";
 
+import { ScopeBusyError, type SyncResult } from "./sync.ts";
+
 import { assertStrictEquals } from "jsr:@std/assert@^1";
 
 import type { SyncFailureInfo } from "./notify.ts";
-
-import { ScopeBusyError, type SyncResult } from "./sync.ts";
 
 function okResult(): SyncResult {
   return {

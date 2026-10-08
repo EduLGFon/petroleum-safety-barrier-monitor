@@ -2,6 +2,12 @@
 // This is why it exists: the change-details modal pins "last sync" to an
 // explicit run id instead of guessing from history timestamps.
 import {
+  authStoreUnavailable,
+  denyDataAuth,
+  requireDataAuth,
+} from "../../lib/server/auth.ts";
+
+import {
   internal,
   newRequestId,
   okWithEtag,
@@ -13,12 +19,6 @@ import { readThrottle, routeClientKey } from "../../lib/server/throttle.ts";
 import { loadServerConfig } from "../../lib/server/config.ts";
 
 import { getSyncRuns } from "../../lib/server/sql/sync.ts";
-
-import {
-  authStoreUnavailable,
-  denyDataAuth,
-  requireDataAuth,
-} from "../../lib/server/auth.ts";
 
 import { define } from "../../utils.ts";
 

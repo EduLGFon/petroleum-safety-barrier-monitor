@@ -2,10 +2,11 @@
 // export column on the A4-landscape page, so they are asserted, not eyeballed.
 import { assert, assertEquals, assertStrictEquals } from "jsr:@std/assert@^1";
 
-import { colGeometry } from "./columns.ts";
-import { wrapText } from "./metrics.ts";
-
 import { EXPORT_HEADERS } from "../columns.ts";
+
+import { colGeometry } from "./columns.ts";
+
+import { wrapText } from "./metrics.ts";
 
 Deno.test("colGeometry covers the page exactly, once per export column", () => {
   const cols = colGeometry(785.3);

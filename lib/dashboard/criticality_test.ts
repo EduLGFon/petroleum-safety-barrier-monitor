@@ -1,7 +1,7 @@
 // Unit tests for the criticality rank ordering (pure helper, no DOM).
-import { assertEquals } from "jsr:@std/assert@^1";
-
 import { orderRankEntries, splitRankGroups } from "./criticality.ts";
+
+import { assertEquals } from "jsr:@std/assert@^1";
 
 Deno.test("orderRankEntries puts canonical ranks first in ESO-A-B-C-D order", () => {
   assertEquals(

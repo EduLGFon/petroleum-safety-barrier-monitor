@@ -10,17 +10,17 @@ import {
   rateLimited,
 } from "../../lib/server/errors.ts";
 
-import { readThrottle, routeClientKey } from "../../lib/server/throttle.ts";
-
-import { loadServerConfig } from "../../lib/server/config.ts";
-
-import { getChartData } from "../../lib/server/sql/chart.ts";
-
 import {
   authStoreUnavailable,
   denyDataAuth,
   requireDataAuth,
 } from "../../lib/server/auth.ts";
+
+import { readThrottle, routeClientKey } from "../../lib/server/throttle.ts";
+
+import { loadServerConfig } from "../../lib/server/config.ts";
+
+import { getChartData } from "../../lib/server/sql/chart.ts";
 
 import { parseFilterQuery } from "./_params.ts";
 

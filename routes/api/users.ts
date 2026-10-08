@@ -12,6 +12,12 @@ import {
 } from "../../lib/server/errors.ts";
 
 import {
+  authStoreUnavailable,
+  denyByCredentials,
+  requireAdminAuth,
+} from "../../lib/server/auth.ts";
+
+import {
   readThrottle,
   routeClientKey,
   writeThrottle,
@@ -27,12 +33,6 @@ import {
   listUsers,
   normalizeRole,
 } from "../../lib/server/sql/users.ts";
-
-import {
-  authStoreUnavailable,
-  denyByCredentials,
-  requireAdminAuth,
-} from "../../lib/server/auth.ts";
 
 import { loadServerConfig } from "../../lib/server/config.ts";
 

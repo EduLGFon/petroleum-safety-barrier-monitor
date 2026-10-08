@@ -12,25 +12,25 @@ import {
 } from "../../../lib/server/errors.ts";
 
 import {
-  hashPassword,
-  validateNewPassword,
-} from "../../../lib/server/auth/password.ts";
-
-import {
   authStoreUnavailable,
   denyByCredentials,
   requireAdminAuth,
 } from "../../../lib/server/auth.ts";
 
+import {
+  hashPassword,
+  validateNewPassword,
+} from "../../../lib/server/auth/password.ts";
+
 import { routeClientKey, writeThrottle } from "../../../lib/server/throttle.ts";
+
+import { parseIdParam, readJsonBody } from "../../../lib/server/validation.ts";
 
 import { deleteSessionsForUser } from "../../../lib/server/sql/sessions.ts";
 
 import { deleteUser, updateUser } from "../../../lib/server/sql/users.ts";
 
 import { loadServerConfig } from "../../../lib/server/config.ts";
-
-import { parseIdParam, readJsonBody } from "../../../lib/server/validation.ts";
 
 import { define } from "../../../utils.ts";
 

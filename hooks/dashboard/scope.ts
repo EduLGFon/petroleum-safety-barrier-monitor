@@ -3,9 +3,12 @@
 // shows, so the filter encoding is built once here instead of being restated
 // per caller (three copies drifted apart before).
 import type { QueryIdOverrides } from "../../lib/api/query.ts";
+
 import type { BarriersQuery } from "../../lib/wireTypes.ts";
-import { toWireQuery } from "../../lib/api/query.ts";
+
 import type { FilterState } from "../../lib/types.ts";
+
+import { toWireQuery } from "../../lib/api/query.ts";
 
 // scopeWireQuery: filters only, no paging. Paging is added by the caller that
 // needs it (the table), so every non-table consumer sees the whole scope.

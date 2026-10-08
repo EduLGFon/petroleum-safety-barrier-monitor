@@ -22,12 +22,6 @@ export {
   KEY,
 } from "./settings/presets.ts";
 
-export type {
-  AccentColor,
-  Density,
-  SettingsState,
-} from "./settings/presets.ts";
-
 import {
   useCallback,
   useContext,
@@ -35,6 +29,12 @@ import {
   useRef,
   useState,
 } from "preact/hooks";
+
+export type {
+  AccentColor,
+  Density,
+  SettingsState,
+} from "./settings/presets.ts";
 
 import { loadSettings, saveSettings } from "./settings/storage.ts";
 

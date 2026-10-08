@@ -13,17 +13,17 @@ import { exportToCSV, exportToPDF, exportToXlsx } from "../../lib/export.ts";
 
 import { useEffect, useMemo, useRef, useState } from "preact/hooks";
 
-import { FMTS } from "./ExportButtons.tsx";
+import type { Fmt } from "../../lib/export/format.ts";
 
 import type { Barrier } from "../../lib/types.ts";
 
 import { DownloadIcon } from "../ui/Icons.tsx";
 
-import type { Fmt } from "../../lib/export/format.ts";
-
 import { AURORA } from "../../lib/aurora.ts";
 
 import { createPortal } from "preact/compat";
+
+import { FMTS } from "./ExportButtons.tsx";
 
 import { fmt } from "../../lib/utils.ts";
 

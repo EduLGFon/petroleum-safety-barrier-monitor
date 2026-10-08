@@ -2,8 +2,9 @@
 // Why it exists: content types, relationships, the workbook itself and the
 // document properties never depend on the rows, so they are built once here
 // and the data sheet stays the only part that streams.
-import { NS_MAIN } from "./styles.ts";
 import { cellRef, escXml, inlineStr, rowXml, xmlDoc } from "./xml.ts";
+
+import { NS_MAIN } from "./styles.ts";
 
 const NS_PKG_REL =
   "http://schemas.openxmlformats.org/package/2006/relationships";

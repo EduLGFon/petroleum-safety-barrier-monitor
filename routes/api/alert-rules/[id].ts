@@ -11,21 +11,21 @@ import {
 } from "../../../lib/server/errors.ts";
 
 import {
-  deleteAlertRule,
-  updateAlertRule,
-} from "../../../lib/server/sql/alert_rules.ts";
-
-import {
   authStoreUnavailable,
   denyByCredentials,
   requireAdminAuth,
 } from "../../../lib/server/auth.ts";
 
+import {
+  deleteAlertRule,
+  updateAlertRule,
+} from "../../../lib/server/sql/alert_rules.ts";
+
 import { routeClientKey, writeThrottle } from "../../../lib/server/throttle.ts";
 
-import { loadServerConfig } from "../../../lib/server/config.ts";
-
 import { parseIdParam, readJsonBody } from "../../../lib/server/validation.ts";
+
+import { loadServerConfig } from "../../../lib/server/config.ts";
 
 import { define } from "../../../utils.ts";
 

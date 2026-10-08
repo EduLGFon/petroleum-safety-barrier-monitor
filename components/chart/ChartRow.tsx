@@ -7,9 +7,9 @@ import { truncateLabel } from "../../lib/dashboard/chart.ts";
 
 import type { CSSProperties } from "preact";
 
-import { px } from "./geometry.ts";
-
 import { fmt } from "../../lib/utils.ts";
+
+import { px } from "./geometry.ts";
 
 interface Props {
   d: CategoryCompliance;

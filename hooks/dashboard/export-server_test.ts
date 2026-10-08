@@ -8,12 +8,13 @@ import {
   assertStrictEquals,
 } from "jsr:@std/assert@^1";
 
-import { setupDom } from "../../scripts/test-dom.ts";
+import type { BarriersQuery } from "../../lib/wireTypes.ts";
 
 import type { Fmt } from "../../lib/export/format.ts";
+
 import { exportFromServer } from "./export-server.ts";
 
-import type { BarriersQuery } from "../../lib/wireTypes.ts";
+import { setupDom } from "../../scripts/test-dom.ts";
 
 interface Seen {
   url: string;

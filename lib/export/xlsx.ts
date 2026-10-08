@@ -5,15 +5,18 @@
 // OOXML, so Excel opens it natively: no extension warning, no HTML import
 // pass, and a crisp grid at any zoom level.
 import { EXPORT_MAX_ROWS, refusalMessage } from "./limits.ts";
-import { FMT_EXT, FMT_MIME } from "./format.ts";
+
 import { assertBrowser, download } from "./html.ts";
+
+import { FMT_EXT, FMT_MIME } from "./format.ts";
+
 import { xlsxBytes } from "./xlsx/workbook.ts";
+
+import type { Barrier } from "../types.ts";
 
 import { batchesOf } from "./batches.ts";
 
 import { computeKpi } from "../utils.ts";
-
-import type { Barrier } from "../types.ts";
 
 // One batch, so the browser path streams exactly like the server path.
 const BATCH = 5_000;

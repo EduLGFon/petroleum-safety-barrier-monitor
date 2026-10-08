@@ -16,9 +16,9 @@ import {
   TOP,
 } from "./chart/geometry.ts";
 
-import { useSettings } from "../context/SettingsContext.tsx";
-
 import { useElementWidth } from "../hooks/useElementWidth.ts";
+
+import { useSettings } from "../context/SettingsContext.tsx";
 
 import type { CategoryCompliance } from "../lib/types.ts";
 

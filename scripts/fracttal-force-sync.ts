@@ -21,13 +21,15 @@ import {
   fetchWorkSignals,
 } from "../lib/server/fracttal/live-scope.ts";
 
-import { OPEN_WORK_ORDER_STATUSES } from "../lib/server/fracttal/barrier-rules.ts";
-
 import {
   isScopeBusy,
   runSync,
   type SyncResult,
 } from "../lib/server/fracttal/sync.ts";
+
+import { OPEN_WORK_ORDER_STATUSES } from "../lib/server/fracttal/barrier-rules.ts";
+
+import { getSyncStatus, syncScopeRunning } from "../lib/server/sql/sync.ts";
 
 import { createFracttalClient } from "../lib/server/fracttal/client.ts";
 
@@ -36,8 +38,6 @@ import type { ItemTypeValue } from "../lib/server/fracttal/itemType.ts";
 import type { OpsNotifier } from "../lib/server/fracttal/notify.ts";
 
 import { loadSyncConfig } from "../lib/server/config.ts";
-
-import { getSyncStatus, syncScopeRunning } from "../lib/server/sql/sync.ts";
 
 const DEFAULT_BASE_URL = "https://app.fracttal.com/api";
 const SWEEP_SCOPE = "fracttal-live:all";

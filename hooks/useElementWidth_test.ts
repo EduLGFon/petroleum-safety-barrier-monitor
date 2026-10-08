@@ -4,9 +4,9 @@
 // the fallback width, never publishes a zero width, and tears down cleanly.
 import { assertStrictEquals } from "jsr:@std/assert@^1";
 
-import { renderHook } from "../scripts/test-dom.ts";
-
 import { useElementWidth } from "./useElementWidth.ts";
+
+import { renderHook } from "../scripts/test-dom.ts";
 
 Deno.test("useElementWidth starts on the fallback width", async () => {
   const hh = await renderHook(useElementWidth);

@@ -5,9 +5,12 @@
 // bytes, so the file opens in any reader with no extension warning, stays
 // crisp at any zoom, and carries no page URL.
 import { EXPORT_MAX_ROWS, refusalMessage } from "./limits.ts";
-import { FMT_EXT, FMT_MIME } from "./format.ts";
-import { assertBrowser, download } from "./html.ts";
+
 import { buildPdfDocument } from "./pdf/document.ts";
+
+import { assertBrowser, download } from "./html.ts";
+
+import { FMT_EXT, FMT_MIME } from "./format.ts";
 
 import type { Barrier } from "../types.ts";
 

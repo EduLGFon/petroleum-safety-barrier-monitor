@@ -1,9 +1,9 @@
 // SQL WHERE/ORDER helpers - whitelist sorting and filter building for barriers.
 // This is why it exists: keeps client-controlled sort/search from becoming SQL
 // by centralizing the fixed column map and bound-arg WHERE construction.
-import type { BarriersQuery } from "../../wireTypes.ts";
-
 import { CRITICALITY_A, CRITICALITY_ESO } from "../fracttal/barrier-rules.ts";
+
+import type { BarriersQuery } from "../../wireTypes.ts";
 
 // Maps frontend SortableColumn values (lib/types.ts) to fixed SQL.
 // Never derive this from user input.

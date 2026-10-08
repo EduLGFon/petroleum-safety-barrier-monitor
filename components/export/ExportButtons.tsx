@@ -6,10 +6,15 @@ import {
   FileSpreadsheetIcon,
   FileTextIcon,
 } from "../ui/Icons.tsx";
-import type { FunctionComponent } from "preact";
+
 import type { Fmt } from "../../lib/export/format.ts";
+
+import type { FunctionComponent } from "preact";
+
 import { AURORA } from "../../lib/aurora.ts";
+
 import { fmt } from "../../lib/utils.ts";
+
 type I = FunctionComponent<
   { size?: number; color?: string; strokeWidth?: number }
 >;

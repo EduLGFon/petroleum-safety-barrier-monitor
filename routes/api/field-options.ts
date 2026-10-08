@@ -3,16 +3,13 @@
 // barrier editor offers them; readers get seeded workbook values on a fresh
 // database without any admin action.
 import {
-  listFieldOptionSets,
-  upsertFieldOptionSet,
-} from "../../lib/server/sql/field-options.ts";
-import {
   authStoreUnavailable,
   denyByCredentials,
   denyDataAuth,
   requireAdminAuth,
   requireDataAuth,
 } from "../../lib/server/auth.ts";
+
 import {
   badRequest,
   internal,
@@ -21,13 +18,22 @@ import {
   okWithEtag,
   rateLimited,
 } from "../../lib/server/errors.ts";
+
+import {
+  listFieldOptionSets,
+  upsertFieldOptionSet,
+} from "../../lib/server/sql/field-options.ts";
+
 import {
   readThrottle,
   routeClientKey,
   writeThrottle,
 } from "../../lib/server/throttle.ts";
+
 import { isFieldKey, normalizeOptions } from "../../lib/field-options.ts";
+
 import { loadServerConfig } from "../../lib/server/config.ts";
+
 import { define } from "../../utils.ts";
 
 export const handler = define.handlers({

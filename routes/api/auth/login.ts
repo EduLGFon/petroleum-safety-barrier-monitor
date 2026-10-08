@@ -3,12 +3,6 @@
 // not the ops ADMIN_TOKEN. Returns the public user and sets an HttpOnly
 // session cookie; failures use one generic message to avoid enumeration.
 import {
-  buildSessionCookie,
-  createSessionToken,
-  hashSessionToken,
-} from "../../../lib/server/auth/session.ts";
-
-import {
   badRequest,
   internal,
   newRequestId,
@@ -16,6 +10,12 @@ import {
   rateLimited,
   unauthorized,
 } from "../../../lib/server/errors.ts";
+
+import {
+  buildSessionCookie,
+  createSessionToken,
+  hashSessionToken,
+} from "../../../lib/server/auth/session.ts";
 
 import {
   getUserByEmail,

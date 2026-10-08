@@ -4,9 +4,10 @@
 // KST rows (restoring any the live poller retired mid-run, like the P4T
 // drill) so parallel suites never observe them.
 import { listBarrierWindow, listBarrierWindowAfter } from "./barriers.ts";
-import type { WindowCursor } from "./barriers.ts";
 
 import { assertEquals, assertStrictEquals } from "jsr:@std/assert@^1";
+
+import type { WindowCursor } from "./barriers.ts";
 
 import { SORTABLE } from "./where.ts";
 

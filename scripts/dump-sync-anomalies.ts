@@ -4,17 +4,25 @@
 // context, and writes every anomalous asset to docs/SYNC-ANOMALIES.md:
 // work-malformed rows, item-malformed rows, mapping skips, mapping warnings.
 // Dry-run forever: no sync_state rows, no writes, only GETs + catalog reads.
-import { buildWorkEvents, resolverFor } from "../lib/server/fracttal/work.ts";
-import { fetchItemSignals } from "../lib/server/fracttal/live-scope.ts";
 import {
   OPEN_WORK_ORDER_STATUSES,
 } from "../lib/server/fracttal/barrier-rules.ts";
+
+import { buildWorkEvents, resolverFor } from "../lib/server/fracttal/work.ts";
+
+import { fetchItemSignals } from "../lib/server/fracttal/live-scope.ts";
+
 import { createFracttalClient } from "../lib/server/fracttal/client.ts";
-import { mapAsset } from "../lib/server/fracttal/map.ts";
-import { parsePage } from "../lib/server/fracttal/client.ts";
+
 import type { FracttalAsset } from "../lib/server/fracttal/types.ts";
-import { loadSyncConfig } from "../lib/server/config.ts";
+
+import { parsePage } from "../lib/server/fracttal/client.ts";
+
 import { defaultSyncIo } from "../lib/server/sql/sync.ts";
+
+import { mapAsset } from "../lib/server/fracttal/map.ts";
+
+import { loadSyncConfig } from "../lib/server/config.ts";
 
 const OUT = "docs/SYNC-ANOMALIES.md";
 const PAGE = 100;

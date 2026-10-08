@@ -2,7 +2,6 @@
 // The layout cases are the dead-space regression: the viewBox width must equal
 // the column width at every density, otherwise the browser scales the SVG and
 // leaves a gap above and below the plot (or margins at its sides).
-import { assert, assertEquals, assertStrictEquals } from "jsr:@std/assert@^1";
 import {
   buildTicks,
   COUNT_W,
@@ -11,6 +10,8 @@ import {
   MIN_PLOT_W,
   scaleW,
 } from "./geometry.ts";
+
+import { assert, assertEquals, assertStrictEquals } from "jsr:@std/assert@^1";
 
 Deno.test("buildTicks dedupes tiny maxima", () => {
   assertEquals(buildTicks(1), [0, 1]);

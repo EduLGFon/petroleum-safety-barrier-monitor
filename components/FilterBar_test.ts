@@ -1,11 +1,11 @@
 // Unit tests for the Criticidade combo mapping (pure helpers, no DOM).
-import { assertEquals, assertStrictEquals } from "jsr:@std/assert@^1";
-
 import {
   CRIT_ONLY_OPTION,
   critComboOpts,
   critComboValue,
 } from "./FilterBar.tsx";
+
+import { assertEquals, assertStrictEquals } from "jsr:@std/assert@^1";
 
 Deno.test("critComboOpts pins the gate then ESO-first ranks", () => {
   assertEquals(critComboOpts(["D", "B", "ESO", "A", "C"]), [

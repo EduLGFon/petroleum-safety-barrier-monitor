@@ -7,13 +7,13 @@ import { type AlertStore, dedupKey, type NewAlertEvent } from "./store.ts";
 
 import { resolveBarrier, type ResolverLabels } from "../../resolve.ts";
 
+import { fromAvailabilityId, isCriticalRankId } from "../../enums.ts";
+
 import type { AlertRule } from "../sql/alert_rules.ts";
 
 import type { WireBarrier } from "../../wireTypes.ts";
 
 import { isUrgent } from "../../dashboard/urgent.ts";
-
-import { fromAvailabilityId, isCriticalRankId } from "../../enums.ts";
 
 import { isCompliant } from "../../constants.ts";
 

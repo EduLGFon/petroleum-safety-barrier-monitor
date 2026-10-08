@@ -3,9 +3,9 @@ import { assert, assertStrictEquals } from "jsr:@std/assert@^1";
 
 import { EXPORT_MAX_ROWS } from "./limits.ts";
 
-import { normalizeFmt } from "./format.ts";
-
 import { refusalMessage } from "./limits.ts";
+
+import { normalizeFmt } from "./format.ts";
 
 Deno.test("refusalMessage names the ceiling and the real count", () => {
   const msg = refusalMessage("Exportação", EXPORT_MAX_ROWS + 1);

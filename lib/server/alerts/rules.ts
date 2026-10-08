@@ -3,9 +3,9 @@
 // scopes, urgency, transition source, anti-noise windows, priority) without
 // touching the database, so the cycle stays unit-testable and the SQL store
 // stays a thin persistence layer.
-import type { AlertRule } from "../sql/alert_rules.ts";
-
 import { isCriticalRankId } from "../../enums/codes.ts";
+
+import type { AlertRule } from "../sql/alert_rules.ts";
 
 export interface RuleTransition {
   categoryId: number;

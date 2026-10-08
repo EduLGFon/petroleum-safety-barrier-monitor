@@ -3,18 +3,25 @@
 // or a single array. This module turns the scope into bounded batches of
 // resolved Barrier objects, so the format streamers hold one batch at a time
 // and the client gets bytes while the rows are still arriving.
-import { EXPORT_MAX_ROWS, EXPORT_PAGE_ROWS } from "../export/limits.ts";
-import { getResolverLabels } from "./sql/vocabularies.ts";
 import {
   getKpi,
   listBarrierWindow,
   listBarrierWindowAfter,
 } from "./sql/barriers.ts";
-import type { WindowCursor } from "./sql/barriers.ts";
-import { resolveBarriers, resolveKpi } from "../resolve.ts";
-import type { ResolverLabels } from "../resolve.ts";
-import type { Barrier, KpiSnapshot } from "../types.ts";
+
+import { EXPORT_MAX_ROWS, EXPORT_PAGE_ROWS } from "../export/limits.ts";
+
 import type { BarriersQuery, WireBarrier } from "../wireTypes.ts";
+
+import { resolveBarriers, resolveKpi } from "../resolve.ts";
+
+import { getResolverLabels } from "./sql/vocabularies.ts";
+
+import type { Barrier, KpiSnapshot } from "../types.ts";
+
+import type { WindowCursor } from "./sql/barriers.ts";
+
+import type { ResolverLabels } from "../resolve.ts";
 
 export interface ExportScope {
   // Query the whole export runs over (filters, sort, optional id selection).

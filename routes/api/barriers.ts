@@ -11,21 +11,21 @@ import {
   rateLimited,
 } from "../../lib/server/errors.ts";
 
-import { parseFilterQuery, parseIntParam } from "./_params.ts";
-
-import { readThrottle, routeClientKey } from "../../lib/server/throttle.ts";
-
-import { listBarriers } from "../../lib/server/sql/barriers.ts";
-
-import { loadServerConfig } from "../../lib/server/config.ts";
-
-import type { BarriersQuery } from "../../lib/wireTypes.ts";
-
 import {
   authStoreUnavailable,
   denyDataAuth,
   requireDataAuth,
 } from "../../lib/server/auth.ts";
+
+import { readThrottle, routeClientKey } from "../../lib/server/throttle.ts";
+
+import { listBarriers } from "../../lib/server/sql/barriers.ts";
+
+import { parseFilterQuery, parseIntParam } from "./_params.ts";
+
+import { loadServerConfig } from "../../lib/server/config.ts";
+
+import type { BarriersQuery } from "../../lib/wireTypes.ts";
 
 import { define } from "../../utils.ts";
 

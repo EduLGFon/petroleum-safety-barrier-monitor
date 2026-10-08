@@ -3,9 +3,9 @@
 // formatted totals, so exports always match the dashboard KPI cards. Both
 // builders take a KpiSnapshot so the server can reuse an aggregate it
 // already computed instead of buffering every row just to count them.
-import { DISP_KNOWN_ORDER } from "../constants.ts";
-
 import type { Barrier, KpiSnapshot } from "../types.ts";
+
+import { DISP_KNOWN_ORDER } from "../constants.ts";
 
 import { computeKpi } from "../utils.ts";
 

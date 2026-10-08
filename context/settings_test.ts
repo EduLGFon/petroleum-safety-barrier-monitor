@@ -2,14 +2,6 @@
 // restore-defaults action. They exist because two setters called in one tick
 // used to build on the same render snapshot, so the second write silently
 // dropped the first and "Restaurar padrões" only ever applied half of itself.
-import { assertEquals, assertStrictEquals } from "jsr:@std/assert@^1";
-
-import { memoryStorage, setupDom } from "../scripts/test-dom.ts";
-
-import { act } from "preact/test-utils";
-
-import type { SettingsState } from "./settings/presets.ts";
-
 import {
   DEFAULTS,
   KEY,
@@ -17,7 +9,15 @@ import {
   useSettings,
 } from "./SettingsContext.tsx";
 
+import { assertEquals, assertStrictEquals } from "jsr:@std/assert@^1";
+
+import { memoryStorage, setupDom } from "../scripts/test-dom.ts";
+
+import type { SettingsState } from "./settings/presets.ts";
+
 import { createElement as h } from "preact";
+
+import { act } from "preact/test-utils";
 
 import { render } from "preact";
 

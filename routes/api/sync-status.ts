@@ -3,6 +3,12 @@
 // running, when the last one finished, and what it did - without exposing
 // sync internals. Authenticated GET (run notes name asset codes).
 import {
+  authStoreUnavailable,
+  denyDataAuth,
+  requireDataAuth,
+} from "../../lib/server/auth.ts";
+
+import {
   internal,
   newRequestId,
   okWithEtag,
@@ -14,12 +20,6 @@ import { readThrottle, routeClientKey } from "../../lib/server/throttle.ts";
 import { loadServerConfig } from "../../lib/server/config.ts";
 
 import { getSyncStatus } from "../../lib/server/sql/sync.ts";
-
-import {
-  authStoreUnavailable,
-  denyDataAuth,
-  requireDataAuth,
-} from "../../lib/server/auth.ts";
 
 import { define } from "../../utils.ts";
 

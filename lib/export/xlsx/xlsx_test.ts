@@ -3,23 +3,23 @@
 // path, so a broken data descriptor or CRC fails here rather than in Excel.
 import { assert, assertEquals, assertStrictEquals } from "jsr:@std/assert@^1";
 
-import { argb, styleBook, tint } from "./styles.ts";
-
-import type { Bytes } from "./zip.ts";
-
-import { bytesOf, crc32Update, writeZip } from "./zip.ts";
+import { alignmentOf, dataRow, sheetStyles } from "./dataSheet.ts";
 
 import { colName, escXml, inlineStr, utf8 } from "./xml.ts";
 
-import { alignmentOf, dataRow, sheetStyles } from "./dataSheet.ts";
+import { bytesOf, crc32Update, writeZip } from "./zip.ts";
 
-import { mkBarrier } from "../fixture.ts";
+import { argb, styleBook, tint } from "./styles.ts";
 
-import { row } from "../rows.ts";
+import { EXPORT_HEADERS } from "../columns.ts";
 
 import { xlsxColWidths } from "./widths.ts";
 
-import { EXPORT_HEADERS } from "../columns.ts";
+import { mkBarrier } from "../fixture.ts";
+
+import type { Bytes } from "./zip.ts";
+
+import { row } from "../rows.ts";
 
 // Minimal ZIP reader for the assertions below: walks the central directory and
 // inflates an entry, which is exactly what a spreadsheet application does.

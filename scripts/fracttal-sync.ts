@@ -26,15 +26,15 @@ import {
   fetchWorkSignals,
 } from "../lib/server/fracttal/live-scope.ts";
 
-import { OPEN_WORK_ORDER_STATUSES } from "../lib/server/fracttal/barrier-rules.ts";
-
-import { buildWorkEvents, resolverFor } from "../lib/server/fracttal/work.ts";
-
 import {
   isScopeBusy,
   runSync,
   type SyncResult,
 } from "../lib/server/fracttal/sync.ts";
+
+import { OPEN_WORK_ORDER_STATUSES } from "../lib/server/fracttal/barrier-rules.ts";
+
+import { buildWorkEvents, resolverFor } from "../lib/server/fracttal/work.ts";
 
 import type { WorkEventsResolver } from "../lib/server/fracttal/work.ts";
 

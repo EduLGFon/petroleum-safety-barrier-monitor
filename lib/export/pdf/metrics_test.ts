@@ -1,9 +1,9 @@
 // Unit tests for the PDF text metrics - encoding, measurement and wrap.
 // The width tables were dumped from pdf-lib's AFM data, so the spot-checks
 // below pin known Adobe values: a bad dump fails here, not in a reader.
-import { assert, assertEquals, assertStrictEquals } from "jsr:@std/assert@^1";
-
 import { encodeWinAnsi, textWidth, winAnsiByte, wrapText } from "./metrics.ts";
+
+import { assert, assertEquals, assertStrictEquals } from "jsr:@std/assert@^1";
 
 Deno.test("winAnsiByte maps ASCII, Latin-1 and the printable extras", () => {
   assertStrictEquals(winAnsiByte("A"), 0x41);

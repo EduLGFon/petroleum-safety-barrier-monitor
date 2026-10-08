@@ -2,8 +2,9 @@
 // This is why it exists: the export tests (row mapping, the three server
 // streamers) all need the same fully-populated Barrier, and the streamers take
 // batches plus a KPI snapshot instead of one array.
-import { batchesOf } from "./batches.ts";
 import type { Barrier, KpiSnapshot } from "../types.ts";
+
+import { batchesOf } from "./batches.ts";
 
 import { computeKpi } from "../utils.ts";
 

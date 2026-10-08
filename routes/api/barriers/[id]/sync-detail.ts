@@ -11,6 +11,12 @@ import {
 } from "../../../../lib/server/errors.ts";
 
 import {
+  authStoreUnavailable,
+  denyDataAuth,
+  requireDataAuth,
+} from "../../../../lib/server/auth.ts";
+
+import {
   readThrottle,
   routeClientKey,
 } from "../../../../lib/server/throttle.ts";
@@ -18,12 +24,6 @@ import {
 import { getBarrierSyncDetail } from "../../../../lib/server/sql/sync.ts";
 
 import { loadServerConfig } from "../../../../lib/server/config.ts";
-
-import {
-  authStoreUnavailable,
-  denyDataAuth,
-  requireDataAuth,
-} from "../../../../lib/server/auth.ts";
 
 import { parseIdParam } from "../../../../lib/server/validation.ts";
 

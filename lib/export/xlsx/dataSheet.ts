@@ -6,15 +6,6 @@
 // tinted by their status colour, criticality by its rank tier, the NC
 // duration centered in italic orange, and zebra banding for scanning.
 import {
-  argb,
-  NS_MAIN,
-  type StyleBook,
-  type StyleSpec,
-  tint,
-} from "./styles.ts";
-import { confColorFor, critColorFor, dispColorFor } from "../../constants.ts";
-import { EXPORT_HEADERS } from "../columns.ts";
-import {
   blankCell,
   cellRef,
   inlineStr,
@@ -24,7 +15,19 @@ import {
   xmlDoc,
 } from "./xml.ts";
 
+import {
+  argb,
+  NS_MAIN,
+  type StyleBook,
+  type StyleSpec,
+  tint,
+} from "./styles.ts";
+
+import { confColorFor, critColorFor, dispColorFor } from "../../constants.ts";
+
 import { isCriticalRankLabel } from "../../enums/codes.ts";
+
+import { EXPORT_HEADERS } from "../columns.ts";
 
 import type { KpiStats } from "../summary.ts";
 

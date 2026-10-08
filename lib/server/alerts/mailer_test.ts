@@ -1,12 +1,5 @@
 // Unit tests for the alert mailer + templates (P5).
 import {
-  type AlertMailer,
-  sendWithRetry,
-  smtpAlertConfigFromEnv,
-  smtpAlertMailer,
-} from "./mailer.ts";
-
-import {
   escapeHtml,
   formatDateBR,
   formatDateTimeBR,
@@ -15,6 +8,13 @@ import {
   urgentDigestHtml,
   urgentDigestSubject,
 } from "./templates.ts";
+
+import {
+  type AlertMailer,
+  sendWithRetry,
+  smtpAlertConfigFromEnv,
+  smtpAlertMailer,
+} from "./mailer.ts";
 
 import { assertStrictEquals } from "jsr:@std/assert@^1";
 

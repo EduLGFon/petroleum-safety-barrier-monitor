@@ -10,9 +10,9 @@ import type { WorkEventsResolver } from "./work.ts";
 
 import { parsePage } from "./client.ts";
 
-import { mapAsset } from "./map.ts";
-
 import { catalogNeeds } from "./map.ts";
+
+import { mapAsset } from "./map.ts";
 
 export interface LocalBarrier {
   id: number;

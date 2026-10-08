@@ -1,11 +1,11 @@
 // Unit tests for lib/export - row mapping, KPI/summary reconciliation, escaping.
 import { assert, assertEquals, assertStrictEquals } from "jsr:@std/assert@^1";
 
+import { browserTimeZone, escHtml, resolveTimeZone, ts } from "./html.ts";
+
 import { kpiStats, summaryRows } from "./summary.ts";
 
 import type { Barrier } from "../types.ts";
-
-import { browserTimeZone, escHtml, resolveTimeZone, ts } from "./html.ts";
 
 import { csvCell } from "./csv.ts";
 

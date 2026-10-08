@@ -4,9 +4,11 @@
 // The builder is the same one the browser download uses (lib/export/xlsx/), so
 // both files agree cell for cell, and the ZIP container is written as the
 // rows arrive, so nothing bigger than one batch is ever resident.
-import type { KpiSnapshot } from "../types.ts";
 import { xlsxChunks } from "../export/xlsx/workbook.ts";
+
 import type { Bytes } from "../export/xlsx/zip.ts";
+
+import type { KpiSnapshot } from "../types.ts";
 
 import type { Barrier } from "../types.ts";
 

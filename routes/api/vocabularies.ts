@@ -3,6 +3,12 @@
 // auto-refresh tick refetches them so new stations/categories appear
 // without a full page reload. Authenticated GET (labels leak stations).
 import {
+  authStoreUnavailable,
+  denyDataAuth,
+  requireDataAuth,
+} from "../../lib/server/auth.ts";
+
+import {
   internal,
   newRequestId,
   okWithEtag,
@@ -14,12 +20,6 @@ import { readThrottle, routeClientKey } from "../../lib/server/throttle.ts";
 import { getVocabularies } from "../../lib/server/sql/vocabularies.ts";
 
 import { loadServerConfig } from "../../lib/server/config.ts";
-
-import {
-  authStoreUnavailable,
-  denyDataAuth,
-  requireDataAuth,
-} from "../../lib/server/auth.ts";
 
 import { define } from "../../utils.ts";
 

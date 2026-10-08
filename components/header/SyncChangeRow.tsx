@@ -3,11 +3,11 @@
 // fetches exactly one barrier's before/after diff.
 import { useBarrierSyncDetail } from "../../hooks/dashboard/sync-barrier-detail.ts";
 
+import { syncFieldLabel, syncFieldValue } from "./sync-fields.ts";
+
 import { formatInstant } from "../../lib/sync-indicator.ts";
 
 import type { SyncChangeItem } from "../../lib/types.ts";
-
-import { syncFieldLabel, syncFieldValue } from "./sync-fields.ts";
 
 import { useState } from "preact/hooks";
 

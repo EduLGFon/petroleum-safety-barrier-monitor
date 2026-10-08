@@ -1,8 +1,9 @@
 // CSV export - ;-separated, quote-escaped, BOM for pt-BR Excel.
 // This is why it exists: the lightweight plain-text fallback when styled
 // spreadsheet or print output is overkill. Headers and pt-BR formatting only.
-import { EXPORT_HEADERS } from "./columns.ts";
 import { assertBrowser, download } from "./html.ts";
+
+import { EXPORT_HEADERS } from "./columns.ts";
 
 import type { Barrier } from "../types.ts";
 

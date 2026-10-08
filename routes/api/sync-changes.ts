@@ -3,6 +3,12 @@
 // (last run vs rolling 24h) with paged light rows, plus per-barrier detail
 // loaded on demand. Authenticated GET, read-only like /api/sync-status.
 import {
+  authStoreUnavailable,
+  denyDataAuth,
+  requireDataAuth,
+} from "../../lib/server/auth.ts";
+
+import {
   internal,
   newRequestId,
   okWithEtag,
@@ -14,12 +20,6 @@ import { readThrottle, routeClientKey } from "../../lib/server/throttle.ts";
 import { listSyncChanges } from "../../lib/server/sql/sync.ts";
 
 import { loadServerConfig } from "../../lib/server/config.ts";
-
-import {
-  authStoreUnavailable,
-  denyDataAuth,
-  requireDataAuth,
-} from "../../lib/server/auth.ts";
 
 import { define } from "../../utils.ts";
 

@@ -3,10 +3,13 @@
 // format arrives as a streamed file download. The selection travels in the
 // POST body, so an 18k-id selection never has to fit a URL. Every format
 // covers the same rows as the table (scope filters plus the selected ids).
-import { FMT_EXT } from "../../lib/export/format.ts";
-import { browserTimeZone } from "../../lib/export/html.ts";
 import type { BarriersQuery } from "../../lib/wireTypes.ts";
+
+import { browserTimeZone } from "../../lib/export/html.ts";
+
 import type { Fmt } from "../../lib/export/format.ts";
+
+import { FMT_EXT } from "../../lib/export/format.ts";
 
 export interface ServerExportRequest {
   baseUrl: string;

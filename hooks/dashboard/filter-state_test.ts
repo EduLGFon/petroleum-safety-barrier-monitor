@@ -2,9 +2,9 @@
 // validated restore, and hydrated flag - through the linkedom renderHook harness.
 import { assertEquals, assertStrictEquals } from "jsr:@std/assert@^1";
 
-import { FILTER_DEFAULTS_VERSION } from "../../lib/utils.ts";
-
 import { memoryStorage, renderHook } from "../../scripts/test-dom.ts";
+
+import { FILTER_DEFAULTS_VERSION } from "../../lib/utils.ts";
 
 import { useFilterState } from "./filter-state.ts";
 

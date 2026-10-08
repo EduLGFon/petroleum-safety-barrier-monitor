@@ -1,11 +1,12 @@
 // Unit tests for admin auth (P4) - fail-closed, Bearer only.
-import { assertStrictEquals } from "jsr:@std/assert@^1";
 import {
   authStoreUnavailable,
   checkAdminAuth,
   denyByCredentials,
   denyDataAuth,
 } from "./auth.ts";
+
+import { assertStrictEquals } from "jsr:@std/assert@^1";
 
 function req(authHeader?: string): Request {
   return new Request(

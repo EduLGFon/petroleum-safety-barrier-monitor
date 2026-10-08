@@ -3,13 +3,6 @@
 // only admins may list or change them (session or ADMIN_TOKEN on every
 // method, including GET - recipient addresses are admin data).
 import {
-  readThrottle,
-  routeClientKey,
-  type Throttle,
-  writeThrottle,
-} from "../../lib/server/throttle.ts";
-
-import {
   badRequest,
   created,
   internal,
@@ -19,15 +12,22 @@ import {
 } from "../../lib/server/errors.ts";
 
 import {
-  createRecipient,
-  listRecipients,
-} from "../../lib/server/sql/recipients.ts";
+  readThrottle,
+  routeClientKey,
+  type Throttle,
+  writeThrottle,
+} from "../../lib/server/throttle.ts";
 
 import {
   authStoreUnavailable,
   denyByCredentials,
   requireAdminAuth,
 } from "../../lib/server/auth.ts";
+
+import {
+  createRecipient,
+  listRecipients,
+} from "../../lib/server/sql/recipients.ts";
 
 import { loadServerConfig } from "../../lib/server/config.ts";
 

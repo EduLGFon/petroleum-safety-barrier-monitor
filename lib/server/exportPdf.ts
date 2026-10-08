@@ -5,10 +5,13 @@
 // (lib/export/pdf/document.ts), so both files agree cell for cell, and pages
 // go out as they are laid out, so nothing bigger than one page is ever
 // resident.
-import type { KpiSnapshot } from "../types.ts";
 import { pdfReportPages } from "../export/pdf/document.ts";
-import { pdfChunks } from "../export/pdf/writer.ts";
+
 import type { Bytes } from "../export/pdf/writer.ts";
+
+import { pdfChunks } from "../export/pdf/writer.ts";
+
+import type { KpiSnapshot } from "../types.ts";
 
 import type { Barrier } from "../types.ts";
 

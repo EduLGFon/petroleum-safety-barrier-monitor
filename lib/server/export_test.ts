@@ -1,12 +1,18 @@
 // Unit tests for the server export streamers - every format over the whole
 // selection, fed in database-sized batches exactly as /api/export does.
-import { streamExportCsv, streamToText } from "./exportCsv.ts";
 import { batchesOf, kpiOf, mkBarrier, mkCount } from "../export/fixture.ts";
+
 import { assert, assertStrictEquals } from "jsr:@std/assert@^1";
-import { streamExportXlsx } from "./exportXlsx.ts";
-import { streamExportPdf } from "./exportPdf.ts";
+
+import { streamExportCsv, streamToText } from "./exportCsv.ts";
+
 import { readPdf } from "../export/pdf/writer_test.ts";
+
+import { streamExportXlsx } from "./exportXlsx.ts";
+
 import type { Bytes } from "../export/xlsx/zip.ts";
+
+import { streamExportPdf } from "./exportPdf.ts";
 
 import type { Barrier } from "../types.ts";
 

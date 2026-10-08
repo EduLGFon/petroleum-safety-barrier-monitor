@@ -6,14 +6,18 @@
 import { assert, assertEquals, assertStrictEquals } from "jsr:@std/assert@^1";
 
 import { batchesOf, kpiOf, mkBarrier, mkCount } from "../fixture.ts";
-import { summarySheet } from "./parts.ts";
-import { xlsxBytes } from "./workbook.ts";
-import { xlsxColWidths } from "./widths.ts";
+
 import { EXPORT_HEADERS } from "../columns.ts";
 
-import type { Bytes } from "./zip.ts";
-
 import type { Barrier } from "../../types.ts";
+
+import { xlsxColWidths } from "./widths.ts";
+
+import { summarySheet } from "./parts.ts";
+
+import { xlsxBytes } from "./workbook.ts";
+
+import type { Bytes } from "./zip.ts";
 
 import * as XLSX from "xlsx";
 

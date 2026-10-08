@@ -10,11 +10,11 @@ import {
 
 import type { BarriersQuery, WireBarrier } from "../wireTypes.ts";
 
+import { fromLocationId, isCriticalRankId } from "../enums.ts";
+
 import { resolveBarriers } from "../resolve.ts";
 
 import type { BarriersApi } from "./types.ts";
-
-import { fromLocationId, isCriticalRankId } from "../enums.ts";
 
 import { getWireBarriers } from "../data.ts";
 

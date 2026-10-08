@@ -21,11 +21,11 @@ import {
 
 import { type AlertMailer, type RetryPolicy, sendWithRetry } from "./mailer.ts";
 
+import { matchesStaleScope, sortedRules } from "./rules.ts";
+
 import { compareUrgency } from "../../dashboard/urgent.ts";
 
 import { isCriticalRankId } from "../../enums/codes.ts";
-
-import { matchesStaleScope, sortedRules } from "./rules.ts";
 
 import type { ResolverLabels } from "../../resolve.ts";
 

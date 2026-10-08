@@ -5,8 +5,6 @@
 // with a repeated header, and a footer on every page from the same row()
 // mapping the other formats use, so all files agree cell for cell. Pages
 // yield one at a time, so a huge selection streams instead of materializing.
-import { colGeometry, type PdfColumn } from "./columns.ts";
-import { alignmentOf } from "../xlsx/dataSheet.ts";
 import {
   BRAND_H,
   CELL_PT,
@@ -24,7 +22,7 @@ import {
   rowHeight,
   tableCaps,
 } from "./layout.ts";
-import { type PdfFontName, textWidth, wrapText } from "./metrics.ts";
+
 import {
   ContentBuilder,
   hexToRgb,
@@ -32,22 +30,34 @@ import {
   type PdfColor,
   type PdfFontRef,
 } from "./writer.ts";
-import { tint } from "../xlsx/styles.ts";
 
 import { confColorFor, critColorFor, dispColorFor } from "../../constants.ts";
-import { isCriticalRankLabel } from "../../enums/codes.ts";
-import { EXPORT_HEADERS } from "../columns.ts";
+
+import { type PdfFontName, textWidth, wrapText } from "./metrics.ts";
+
 import { type KpiStats, kpiStatsFrom } from "../summary.ts";
-import { row } from "../rows.ts";
-import { ts } from "../html.ts";
 
-import { batchesOf } from "../batches.ts";
+import { colGeometry, type PdfColumn } from "./columns.ts";
 
-import { computeKpi } from "../../utils.ts";
+import { isCriticalRankLabel } from "../../enums/codes.ts";
 
 import type { Barrier, KpiSnapshot } from "../../types.ts";
 
+import { alignmentOf } from "../xlsx/dataSheet.ts";
+
+import { EXPORT_HEADERS } from "../columns.ts";
+
+import { computeKpi } from "../../utils.ts";
+
+import { batchesOf } from "../batches.ts";
+
+import { tint } from "../xlsx/styles.ts";
+
 import type { Bytes } from "./writer.ts";
+
+import { row } from "../rows.ts";
+
+import { ts } from "../html.ts";
 
 // Brand palette, shared with the HTML report and the spreadsheet.
 const BRAND_BG = "#0A1628";

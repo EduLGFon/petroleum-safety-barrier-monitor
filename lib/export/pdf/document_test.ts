@@ -1,10 +1,12 @@
 // Unit tests for the PDF report document - content, pagination and footer.
 // The writer test's byte-level parser reads the file back, so these assert
 // what a reader actually sees: brand once, every row, a footer per page.
+import { buildPdfDocument, pdfReportPages } from "./document.ts";
+
 import { assert, assertStrictEquals } from "jsr:@std/assert@^1";
 
 import { kpiOf, mkBarrier, mkCount } from "../fixture.ts";
-import { buildPdfDocument, pdfReportPages } from "./document.ts";
+
 import { readPdf } from "./writer_test.ts";
 
 import type { Bytes } from "./writer.ts";
