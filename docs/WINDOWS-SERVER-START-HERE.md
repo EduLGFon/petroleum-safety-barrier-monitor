@@ -24,7 +24,7 @@ Email whoever provisions the server (IT, hosting, the client) exactly this:
 ## 1. Five concepts, two minutes
 
 - **RDP**: an app (`mstsc` on Windows) that shows the server desktop.
-  Everything below happens *inside that window*, on the server.
+  Everything below happens _inside that window_, on the server.
 - **Administrator PowerShell**: the blue terminal, explicitly elevated
   (title bar says "Administrator"). Installing = writing to `C:\Program
   Files`, registering services — Windows demands elevation for that.
@@ -107,7 +107,7 @@ immediately — they are never shown again and never written to any log.
 
 ## 5. Answers to the scary questions
 
-- **Will this break other things on the server?** It only *adds*: three
+- **Will this break other things on the server?** It only _adds_: three
   folders (`C:\srv\barrier-monitor`, `C:\tools`, Postgres), four services,
   one firewall rule, one nightly task. It never modifies existing software.
   Ports used: 80 (website), 8000 (loopback only), 5432 (database, localhost
@@ -126,7 +126,7 @@ immediately — they are never shown again and never written to any log.
   nothing else changes.
 - **How do I update later?** Re-run command 3. That is the whole procedure.
 - **How do I undo everything?** `Uninstall-Production.ps1` removes services,
-  firewall rules and the backup task but *keeps data and code* by default,
+  firewall rules and the backup task but _keeps data and code_ by default,
   so you can reinstall right after. Deleting data needs extra typed
   confirmations plus takes a final backup first.
 
@@ -135,14 +135,14 @@ immediately — they are never shown again and never written to any log.
 1. Re-run the health script (section 4) and read only the FAIL lines.
 2. Match them here:
 
-| FAIL line says | Meaning | Fix |
-|---|---|---|
-| `service BarrierX: Stopped/Failed` | crashed or never started | open `C:\srv\barrier-monitor\logs\BarrierX-err.log`, read the last lines |
-| `/api/health: unreachable` | app not answering | is `BarrierApp` Running? did the install finish, or did the YES prompt time out? |
-| `db: query failed` | Postgres down or wrong password | is `postgresql-x64-16` Running? (`.env` untouched on re-runs — check for manual edits) |
-| `port 80: nothing listening` | Caddy missing/crashed | `logs\BarrierCaddy-err.log`; port 80 may be taken by IIS/Skype — stop it or uninstall it |
-| `backup: no dumps / EMPTY` | night task never ran or failed | run `Backup-Database.ps1` by hand once and read its error |
-| download/HEAD failures in `-CheckOnly` | no outbound internet / proxy | give the server internet or a proxy; nothing else proceeds without downloads |
+| FAIL line says                         | Meaning                         | Fix                                                                                      |
+| -------------------------------------- | ------------------------------- | ---------------------------------------------------------------------------------------- |
+| `service BarrierX: Stopped/Failed`     | crashed or never started        | open `C:\srv\barrier-monitor\logs\BarrierX-err.log`, read the last lines                 |
+| `/api/health: unreachable`             | app not answering               | is `BarrierApp` Running? did the install finish, or did the YES prompt time out?         |
+| `db: query failed`                     | Postgres down or wrong password | is `postgresql-x64-16` Running? (`.env` untouched on re-runs — check for manual edits)   |
+| `port 80: nothing listening`           | Caddy missing/crashed           | `logs\BarrierCaddy-err.log`; port 80 may be taken by IIS/Skype — stop it or uninstall it |
+| `backup: no dumps / EMPTY`             | night task never ran or failed  | run `Backup-Database.ps1` by hand once and read its error                                |
+| download/HEAD failures in `-CheckOnly` | no outbound internet / proxy    | give the server internet or a proxy; nothing else proceeds without downloads             |
 
 3. Still stuck? Copy the FAIL lines plus the last 20 lines of the relevant
    `logs\*-err.log` and send them to whoever supports you — that packet is
