@@ -49,8 +49,12 @@ export function httpAdapterFactory(
       headers: { "Accept": "application/json" },
       credentials: "same-origin",
     });
-    // 401 = dead session, 404 = camouflaged anonymous: both mean the caller
-    // no longer has a session, so redirect to login rather than erroring.
+    // 401 = dead session, 404 = camouflaged anonymous on collections
+    // (collection reads never 404 for missing data - they return empty
+    // pages - so any 404 here means the caller has no session). Both
+    // redirect to login rather than erroring. 403 (authenticated but
+    // forbidden, e.g. non-admin asking for deleted scope) and 503/500 fall
+    // through to the generic error below so the UI shows retry instead.
     if (res.status === 401 || res.status === 404) {
       throw new AuthExpiredError(res.status, path);
     }
@@ -75,17 +79,28 @@ export function httpAdapterFactory(
       const data = await fetchJson<BarriersResponse>(`/api/barriers?${qs}`);
       return resolveBarriers(data.items, labels);
     },
-    // HTTP getBarrierById: fetches wire row by id; null only on 404,
-    // other failures throw so callers can tell "missing" from "broken".
-    // Note: a row-level 404 stays null (deleted barrier), while collection
-    // 404s surface as AuthExpiredError via fetchJson and redirect to login.
+    // HTTP getBarrierById: fetches wire row by id; null only on a genuine
+    // row-level 404 ("Barrier not found"), other failures throw so callers
+    // can tell "missing" from "broken". Anonymous camouflage (envelope error
+    // exactly "not found") throws AuthExpiredError like the collections so
+    // logged-out callers redirect to login instead of seeing a null row.
     async getBarrierById(id) {
       const path = `/api/barriers/${id}`;
       const res = await fetch(`${baseUrl}${path}`, {
         headers: { "Accept": "application/json" },
         credentials: "same-origin",
       });
-      if (res.status === 404) return null;
+      if (res.status === 404) {
+        let camouflaged = false;
+        try {
+          const data = await res.clone().json() as { error?: unknown };
+          camouflaged = data.error === "not found";
+        } catch {
+          // Non-JSON 404 (proxy/CDN): treat as a missing row, not expiry.
+        }
+        if (camouflaged) throw new AuthExpiredError(404, path);
+        return null;
+      }
       if (res.status === 401) throw new AuthExpiredError(401, path);
       if (!res.ok) throw new Error(`API error ${res.status}: ${path}`);
       const w = await res.json() as WireBarrier;

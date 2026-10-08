@@ -42,7 +42,7 @@ Deno.test("fetchJson maps 401 and 404 to AuthExpiredError", async () => {
 
 Deno.test("getBarrierById keeps row-level 404 as null, 401 as expired", async () => {
   const api = httpAdapterFactory("http://x");
-  let restore = stubFetch(404, { error: "not found" });
+  let restore = stubFetch(404, { error: "Barrier not found" });
   try {
     assertStrictEquals(await api.getBarrierById(9), null);
   } finally {
@@ -54,6 +54,24 @@ Deno.test("getBarrierById keeps row-level 404 as null, 401 as expired", async ()
     throw new Error("unreachable");
   } catch (err) {
     assert(isAuthExpired(err));
+  } finally {
+    restore();
+  }
+});
+
+Deno.test("getBarrierById treats camouflaged 404 as expired", async () => {
+  const api = httpAdapterFactory("http://x");
+  const restore = stubFetch(404, {
+    error: "not found",
+    code: "NOT_FOUND",
+    requestId: "r",
+  });
+  try {
+    await api.getBarrierById(9);
+    throw new Error("unreachable");
+  } catch (err) {
+    assert(isAuthExpired(err));
+    assertStrictEquals((err as AuthExpiredError).status, 404);
   } finally {
     restore();
   }
