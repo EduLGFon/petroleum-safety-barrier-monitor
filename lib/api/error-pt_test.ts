@@ -31,3 +31,21 @@ Deno.test("toPtError passes through already-localized strings", () => {
   assertStrictEquals(toPtError("Erro 404"), "Erro 404");
   assertStrictEquals(toPtError("Falha ao carregar"), "Falha ao carregar");
 });
+
+Deno.test("toPtError maps ids, roles, and throttle to pt-BR", () => {
+  assertStrictEquals(toPtError("Invalid barrier id"), "Barreira inválida");
+  assertStrictEquals(toPtError("Barrier not found"), "Barreira não encontrada");
+  assertStrictEquals(toPtError("User not found"), "Usuário não encontrado");
+  assertStrictEquals(
+    toPtError("admin only"),
+    "Acesso restrito ao administrador",
+  );
+  assertStrictEquals(
+    toPtError("Auth store unreachable"),
+    "Banco indisponível, tente novamente",
+  );
+  assertStrictEquals(
+    toPtError("export rate limit exceeded"),
+    "Limite de exportação excedido, aguarde um minuto",
+  );
+});
