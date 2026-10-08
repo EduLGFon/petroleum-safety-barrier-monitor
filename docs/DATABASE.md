@@ -263,14 +263,22 @@ admin (or use `scripts/create-admin.ts`).
 
 ## Indexes
 
-`location_id`, `availability_id`, `compliance_id`, `category_id`, and
-`criticality_id` have simple indexes - exactly the fields that
-`BarriersQuery` filters on. `status_since` is also indexed, used by the
+`location_id`, `availability_id`, `compliance_id`, `category_id`,
+`criticality_id`, `typology_id`, and `owner_id` have simple indexes -
+the fields that `BarriersQuery` filters on plus the `SORTABLE` owner sort
+(`idx_barriers_typology`, `idx_barriers_owner`, see DECISIONS.md#D01).
+`status_since` is also indexed, used by the
 "most urgent first" ordering (`sortCol=statusSince`). `tag` has a simple btree
 (`idx_barriers_tag`): equality and prefix use the index, `%q%` does a
 seq-scan - trigram (`pg_trgm`) was deliberately left out so the extension is
 not required (the schema drops the legacy name `idx_barriers_tag_trgm`).
-History has `idx_history_barrier(barrier_id, date)`.
+History has `idx_history_barrier(barrier_id, date)` plus
+`idx_history_date_id(date desc, id desc)` for the alert date-ordered scan
+and `idx_history_sync_author`. Sync lock queries use
+`idx_sync_state_scope_status(scope, status, finished_at desc)` alongside
+the existing status index. Alert scans use
+`idx_alert_events_transition` and `idx_alert_events_barrier_created`.
+Throttle sweeps use `idx_throttle_reset`.
 
 ## Demo data seed
 

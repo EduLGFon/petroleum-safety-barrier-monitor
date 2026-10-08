@@ -182,6 +182,11 @@ create index if not exists idx_barriers_availability    on barriers(availability
 create index if not exists idx_barriers_compliance      on barriers(compliance_id);
 create index if not exists idx_barriers_category        on barriers(category_id);
 create index if not exists idx_barriers_criticality     on barriers(criticality_id);
+-- Filter/sort columns without an index were full scans as the table grows
+-- (typologyId filter in lib/server/sql/where.ts, owner sort in SORTABLE).
+-- Additive only, no query or contract change. See DECISIONS.md#D01.
+create index if not exists idx_barriers_typology        on barriers(typology_id);
+create index if not exists idx_barriers_owner           on barriers(owner_id);
 -- Plain btree on tag (equality + prefix LIKE). Named *_tag on purpose: a
 -- trigram GIN index would be needed for real %q% search (pg_trgm), which this
 -- schema deliberately does not require. Drops the legacy misleading name.
@@ -210,6 +215,9 @@ create index if not exists idx_history_barrier on barrier_status_history(barrier
 -- Sync card's "what changed" list filters by the sync author and orders by
 -- recency; this index keeps that read cheap as history grows.
 create index if not exists idx_history_sync_author on barrier_status_history(author_id, created_at desc);
+-- Alert scan in lib/server/sql/alerts.ts orders by (date, id) with no
+-- barrier filter. Additive only, result order unchanged. See DECISIONS.md#D01.
+create index if not exists idx_history_date_id on barrier_status_history(date desc, id desc);
 
 -- ─── updated_at maintenance ─────────────────────────────────────────────────
 
@@ -273,6 +281,10 @@ create table if not exists sync_state (
 );
 
 create index if not exists idx_sync_state_status on sync_state(status, started_at desc);
+-- Poll lock queries filter (scope, status, heartbeat finished_at) in
+-- lib/server/sql/sync.ts (syncScopeRunning, reapStaleRuns, getSyncStatus).
+-- Additive only, existing index kept. See DECISIONS.md#D01.
+create index if not exists idx_sync_state_scope_status on sync_state(scope, status, finished_at desc);
 
 -- ─── Per-barrier sync changes (what changed, per run, per barrier) ─────────
 -- One row per barrier touched by a run (insert / update / restore / delete).
@@ -322,6 +334,12 @@ create table if not exists alert_events (
 
 create index if not exists idx_alert_events_unsent
   on alert_events(kind, sent_at) where sent_at is null;
+-- watermark() takes max(transition_date); countRuleEvents() filters
+-- (barrier_id, created_at). Additive only, no query change. See DECISIONS.md#D01.
+create index if not exists idx_alert_events_transition
+  on alert_events(transition_date desc);
+create index if not exists idx_alert_events_barrier_created
+  on alert_events(barrier_id, created_at desc);
 
 -- Alert recipients (P5): who gets the urgent digest. Managed through the
 -- auth-guarded /api/recipients routes; the send path only reads active rows.
@@ -489,6 +507,8 @@ create table if not exists throttle_buckets (
   reset_at  timestamptz not null,
   primary key (bucket, key)
 );
+-- Sweeps filter on reset_at. Additive only. See DECISIONS.md#D01.
+create index if not exists idx_throttle_reset on throttle_buckets(reset_at);
 
 -- ─── Field option sets (admin-curated answers for sheet questions) ─────────
 -- One row per barrier details field: admins settle default options in
