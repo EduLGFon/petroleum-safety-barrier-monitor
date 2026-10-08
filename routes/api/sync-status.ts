@@ -5,10 +5,8 @@
 import {
   internal,
   newRequestId,
-  notFound,
+  ok,
   rateLimited,
-  unauthorized,
-  unavailable,
 } from "../../lib/server/errors.ts";
 
 import { readThrottle, routeClientKey } from "../../lib/server/throttle.ts";
@@ -17,7 +15,11 @@ import { loadServerConfig } from "../../lib/server/config.ts";
 
 import { getSyncStatus } from "../../lib/server/sql/sync.ts";
 
-import { requireDataAuth } from "../../lib/server/auth.ts";
+import {
+  authStoreUnavailable,
+  denyDataAuth,
+  requireDataAuth,
+} from "../../lib/server/auth.ts";
 
 import { define } from "../../utils.ts";
 
@@ -50,17 +52,12 @@ export const handler = define.handlers({
       // Session-store outage (DB blip after the pool retry gave up): 503
       // with Retry-After so the dashboard backs off instead of reading a
       // 401 and dropping the user to login.
-      console.error(`[GET /api/sync-status] requestId=${requestId}`, err);
-      return unavailable("Auth store unreachable", requestId);
+      return authStoreUnavailable("GET /api/sync-status", err, requestId);
     }
-    if (!dataAuth.ok) {
-      return dataAuth.anonymous
-        ? notFound("not found", requestId)
-        : unauthorized(dataAuth.message, requestId);
-    }
+    if (!dataAuth.ok) return denyDataAuth(dataAuth, requestId);
 
     try {
-      return Response.json(await getSyncStatus());
+      return ok(await getSyncStatus(), requestId);
     } catch (err) {
       return internal(
         "GET /api/sync-status",

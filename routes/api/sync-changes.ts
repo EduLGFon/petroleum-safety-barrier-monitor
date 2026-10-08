@@ -5,9 +5,8 @@
 import {
   internal,
   newRequestId,
-  notFound,
+  ok,
   rateLimited,
-  unauthorized,
 } from "../../lib/server/errors.ts";
 
 import { readThrottle, routeClientKey } from "../../lib/server/throttle.ts";
@@ -16,7 +15,11 @@ import { listSyncChanges } from "../../lib/server/sql/sync.ts";
 
 import { loadServerConfig } from "../../lib/server/config.ts";
 
-import { requireDataAuth } from "../../lib/server/auth.ts";
+import {
+  authStoreUnavailable,
+  denyDataAuth,
+  requireDataAuth,
+} from "../../lib/server/auth.ts";
 
 import { define } from "../../utils.ts";
 
@@ -60,12 +63,13 @@ export const handler = define.handlers({
         "Server misconfigured",
       );
     }
-    const dataAuth = await requireDataAuth(ctx.req);
-    if (!dataAuth.ok) {
-      return dataAuth.anonymous
-        ? notFound("not found", requestId)
-        : unauthorized(dataAuth.message, requestId);
+    let dataAuth;
+    try {
+      dataAuth = await requireDataAuth(ctx.req);
+    } catch (err) {
+      return authStoreUnavailable("GET /api/sync-changes", err, requestId);
     }
+    if (!dataAuth.ok) return denyDataAuth(dataAuth, requestId);
 
     const url = new URL(ctx.req.url);
     const params = url.searchParams;
@@ -96,7 +100,7 @@ export const handler = define.handlers({
           status: c.status,
           changedAt: c.changedAt,
         }));
-        return Response.json({ changes });
+        return ok({ changes }, requestId);
       }
       const result = await listSyncChanges({
         runId: Number.isInteger(runId) && (runId as number) > 0 ? runId : null,
@@ -114,7 +118,7 @@ export const handler = define.handlers({
       });
       // When runId is absent and scope is last-run, listSyncChanges resolves
       // the latest finished run internally.
-      return Response.json(result);
+      return ok(result, requestId);
     } catch (err) {
       return internal(
         "GET /api/sync-changes",

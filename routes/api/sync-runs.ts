@@ -4,9 +4,8 @@
 import {
   internal,
   newRequestId,
-  notFound,
+  ok,
   rateLimited,
-  unauthorized,
 } from "../../lib/server/errors.ts";
 
 import { readThrottle, routeClientKey } from "../../lib/server/throttle.ts";
@@ -15,7 +14,11 @@ import { loadServerConfig } from "../../lib/server/config.ts";
 
 import { getSyncRuns } from "../../lib/server/sql/sync.ts";
 
-import { requireDataAuth } from "../../lib/server/auth.ts";
+import {
+  authStoreUnavailable,
+  denyDataAuth,
+  requireDataAuth,
+} from "../../lib/server/auth.ts";
 
 import { define } from "../../utils.ts";
 
@@ -37,12 +40,13 @@ export const handler = define.handlers({
         "Server misconfigured",
       );
     }
-    const dataAuth = await requireDataAuth(ctx.req);
-    if (!dataAuth.ok) {
-      return dataAuth.anonymous
-        ? notFound("not found", requestId)
-        : unauthorized(dataAuth.message, requestId);
+    let dataAuth;
+    try {
+      dataAuth = await requireDataAuth(ctx.req);
+    } catch (err) {
+      return authStoreUnavailable("GET /api/sync-runs", err, requestId);
     }
+    if (!dataAuth.ok) return denyDataAuth(dataAuth, requestId);
     let take = 10;
     try {
       const raw = new URL(ctx.req.url).searchParams.get("limit");
@@ -53,7 +57,7 @@ export const handler = define.handlers({
       // Malformed URL: fall back to the default limit.
     }
     try {
-      return Response.json({ runs: await getSyncRuns(take) });
+      return ok({ runs: await getSyncRuns(take) }, requestId);
     } catch (err) {
       return internal(
         "GET /api/sync-runs",

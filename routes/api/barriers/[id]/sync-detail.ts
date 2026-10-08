@@ -6,8 +6,8 @@ import {
   internal,
   newRequestId,
   notFound,
+  ok,
   rateLimited,
-  unauthorized,
 } from "../../../../lib/server/errors.ts";
 
 import {
@@ -19,7 +19,13 @@ import { getBarrierSyncDetail } from "../../../../lib/server/sql/sync.ts";
 
 import { loadServerConfig } from "../../../../lib/server/config.ts";
 
-import { requireDataAuth } from "../../../../lib/server/auth.ts";
+import {
+  authStoreUnavailable,
+  denyDataAuth,
+  requireDataAuth,
+} from "../../../../lib/server/auth.ts";
+
+import { parseIdParam } from "../../../../lib/server/validation.ts";
 
 import { define } from "../../../../utils.ts";
 
@@ -42,14 +48,19 @@ export const handler = define.handlers({
         "Server misconfigured",
       );
     }
-    const dataAuth = await requireDataAuth(ctx.req);
-    if (!dataAuth.ok) {
-      return dataAuth.anonymous
-        ? notFound("not found", requestId)
-        : unauthorized(dataAuth.message, requestId);
+    let dataAuth;
+    try {
+      dataAuth = await requireDataAuth(ctx.req);
+    } catch (err) {
+      return authStoreUnavailable(
+        `GET /api/barriers/${ctx.params.id}/sync-detail`,
+        err,
+        requestId,
+      );
     }
-    const barrierId = Number(ctx.params.id);
-    if (!Number.isInteger(barrierId) || barrierId <= 0) {
+    if (!dataAuth.ok) return denyDataAuth(dataAuth, requestId);
+    const barrierId = parseIdParam(ctx.params.id);
+    if (barrierId === undefined) {
       return badRequest("Invalid barrier id", requestId);
     }
     const params = new URL(ctx.req.url).searchParams;
@@ -62,7 +73,7 @@ export const handler = define.handlers({
         sinceHours: runRaw !== null ? null : scope === "last-day" ? 24 : null,
       });
       if (!detail) return notFound("No sync change found", requestId);
-      return Response.json({ detail });
+      return ok({ detail }, requestId);
     } catch (err) {
       return internal(
         `GET /api/barriers/${ctx.params.id}/sync-detail`,
