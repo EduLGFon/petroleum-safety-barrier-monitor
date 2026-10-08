@@ -62,7 +62,23 @@ APP_BASE_URL=https://barreiras.example.com
 > `python -c "import secrets;print(secrets.token_hex(32))"` or
 > `[Convert]::ToHexString((1..32 | ForEach-Object { Get-Random -Max 256 }))`.
 
-Or run the guided installer (idempotent):
+Full production install in one invocation (recommended: installs Deno,
+PostgreSQL 16, NSSM, Caddy, code, `.env` with generated secrets, services,
+firewall, nightly backups, then smoke-tests; idempotent, fails hard on any
+gate — see its header for all parameters):
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\deploy\windows\Setup-Production.ps1 `
+  -Hostname barreiras.example.com -CompanyName "Seacrest Petróleo" `
+  -AdminEmail you@example.com -RepoUrl https://github.com/org/repo.git
+```
+
+Omit `-Hostname` for a loopback-only host (Caddy and 80/443 stay off; add a
+proxy later). Any secret you omit is generated and printed once at the end.
+Re-runs pull, rebuild, migrate and restart without rotating `.env`.
+
+Lighter alternative (prerequisites only — Postgres/services/Caddy stay
+manual) when you want step-by-step control:
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\deploy\windows\Install-BarrierMonitor.ps1 -InstallDir C:\srv\barrier-monitor
