@@ -680,12 +680,29 @@ export async function getSyncStatus(): Promise<SyncStatus> {
   // A stale candidate superseded by a newer finished run is an orphan,
   // not an in-flight stuck sync (see isStaleActive).
   const staleRunning = isStaleActive(staleRow, latest);
+  // The driver returns timestamptz as Date; the SyncStatus contract is ISO
+  // strings (wire JSON serializes Dates identically, so this changes only
+  // the in-process shape, never the bytes).
+  const run = running[0] ?? null;
   return toSyncStatus({
-    latest,
-    running: running[0] ?? null,
+    latest: latest === null ? null : {
+      ...latest,
+      started_at: asIsoString(latest.started_at),
+      finished_at: asIsoString(latest.finished_at),
+    },
+    running: run === null ? null : {
+      scope: run.scope,
+      started_at: asIsoString(run.started_at),
+    },
     staleRunning,
     barriers: counted[0]?.n ?? 0,
   });
+}
+
+// asIsoString: normalizes a driver timestamp (Date) or string to the ISO
+// form the SyncStatus/SyncRun contracts declare.
+function asIsoString(v: string | Date): string {
+  return v instanceof Date ? v.toISOString() : String(v);
 }
 
 // HistoryTouch: raw join shape for the recent-changes list below.

@@ -116,3 +116,22 @@ behavior drift against the no-limits rule.
   database is reachable in this session and `.env` secrets are
   off-limits. Run on staging before and after: list, KPI, export,
   and one `--apply` sync drill.
+
+## D06 - Sync-status timestamp contract fix (2026-10-08)
+
+Context: the DB integration suite finally ran against a populated
+database (docker `db` service, one-shot tools container with the working
+tree bind-mounted since `*.test.ts` never ships in the image). It exposed
+a pre-existing failure no empty DB could show:
+`sync-status_test.ts:114` expects `lastRun.finishedAt` to be a string,
+but the driver returns `timestamptz` as a `Date`.
+
+Decision: normalize to ISO strings in `getSyncStatus` (new `asIsoString`
+helper). The `SyncStatus` contract already declares strings, and wire
+JSON serializes `Date` to the same ISO form, so bytes on the wire are
+unchanged; only the in-process shape now matches the type. Untouched:
+`getLatestFinishedRun` / `getSyncRuns` carry the same driver-level lie
+but are wire-serialized and covered by no failing test.
+
+Verification: targeted DB suites plus full `deno task test` equivalent
+in the tools container, 576 passed, 0 failed, against the docker DB.
