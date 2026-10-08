@@ -656,6 +656,11 @@ Files are named with the export date, one file per export.
 
 - Every API handler mints a request id that appears in the response body, the
   `x-request-id` header and the server log line, so a user report maps to a log.
+- Server logs go through `lib/server/log.ts`: timestamped single lines with
+  level, scope and request id (`LOG_LEVEL=debug|info|warn|error`, default
+  `info`; `LOG_FORMAT=text|json`, default `text`). `debug`/`info` go to
+  stdout, `warn`/`error` to stderr. Secret-bearing keys (tokens, passwords,
+  connection strings) redact to `[REDACTED]`, and log emissions never throw.
 - Failure logs are loud, success logs are quiet. Skipped mappings, malformed
   rows, truncated windows and unknown vocabulary are listed, never dropped.
 - `/api/health` is the liveness probe and deliberately does not touch the

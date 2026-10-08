@@ -233,3 +233,31 @@ audit-once, lease-busy; self-skip without DATABASE_URL), `deno task
 check`, full `deno task test` on host and against the migrated docker
 DB. Docs updated in the same change (`docs/DATABASE.md`,
 `docs/ARCHITECTURE.md`, `readme.md`).
+
+## D10 - Central structured server logger (2026-10-08)
+
+Context: logging was scattered `console.*` calls with ad-hoc prefixes
+(`[db]`, `[sync]`, `[poll]`, `[ops]`), no levels, no timestamps, no
+consistent request correlation, and no secret redaction.
+
+Decision: new `lib/server/log.ts` (no new dependencies) as the single
+server logging contract. Levels `debug/info/warn/error` plus `audit`
+(greppable info with `audit=true`), `LOG_LEVEL` (default `info`) and
+`LOG_FORMAT=text|json` env controls (`.env.example`), timestamp plus
+scope plus `requestId` on every line, `debug/info` to stdout and
+`warn/error` to stderr, key-based secret redaction (`[REDACTED]`,
+narrow list so `author` never matches) plus `postgres://` value
+redaction, truncation, circular-guard, and never-throw emits. `child()`
+binds scope/request context; `line()` adapts legacy
+`(line: string) => void` callbacks; `forRequest()` binds the same id
+the error envelope and `x-request-id` header carry. Migrated the
+server core (`errors.ts`, `auth.ts`, `db.ts`, `sql/sync.ts`,
+`fracttal/{notify,runner,cycle}.ts`), request-scoped logging in the
+two barrier write routes plus `auth/me`, and structured line loggers
+in `alerts-poll`/`alerts-check`. CLI result output (`--json`,
+summaries) stays plain `console.log` for piping. Browser
+`console.warn` calls (query mapping) untouched.
+
+Verification: new `log_test.ts` (15 cases: parsing, filtering, sinks,
+redaction, error/circular safety, child/line/audit, request binding),
+`deno task check`, full `deno task test`.
