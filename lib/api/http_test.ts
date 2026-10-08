@@ -102,17 +102,21 @@ Deno.test("fetchJson revalidates with ETag and serves 304 from memory", async ()
     withoutActionPlan: 0,
     pctCompliant: 50,
   };
-  globalThis.fetch = (async (_url: unknown, init?: { headers?: unknown }) => {
+  globalThis.fetch = ((_url: unknown, init?: { headers?: unknown }) => {
     seen.push({ ...(init?.headers as Record<string, string>) });
     if (
       (init?.headers as Record<string, string>)?.["If-None-Match"] === tag
     ) {
-      return new Response(null, { status: 304, headers: { etag: tag } });
+      return Promise.resolve(
+        new Response(null, { status: 304, headers: { etag: tag } }),
+      );
     }
-    return new Response(JSON.stringify(snapshot), {
-      status: 200,
-      headers: { etag: tag },
-    });
+    return Promise.resolve(
+      new Response(JSON.stringify(snapshot), {
+        status: 200,
+        headers: { etag: tag },
+      }),
+    );
   }) as typeof fetch;
   try {
     // First call: no tag sent, body cached under the returned ETag.
@@ -133,7 +137,7 @@ Deno.test("fetchJson refreshes the cache when the ETag changes", async () => {
   const api = httpAdapterFactory("http://y");
   const prev = globalThis.fetch;
   let tag = '"v1"';
-  globalThis.fetch = (async () =>
+  globalThis.fetch = (() =>
     Promise.resolve(
       new Response(JSON.stringify({ total: tag === '"v1"' ? 1 : 2 }), {
         status: 200,
