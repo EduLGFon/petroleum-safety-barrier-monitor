@@ -23,11 +23,11 @@ import {
 
 import { getResolverLabels } from "../lib/server/sql/vocabularies.ts";
 
+import { touchRuleTriggered } from "../lib/server/sql/alert_rules.ts";
+
 import { listStaleBarriers } from "../lib/server/sql/alert_rules.ts";
 
 import { listAlertRules } from "../lib/server/sql/alert_rules.ts";
-
-import { touchRuleTriggered } from "../lib/server/sql/alert_rules.ts";
 
 import { getBarriersByIds } from "../lib/server/sql/barriers.ts";
 
@@ -40,6 +40,8 @@ import { sqlAlertStore } from "../lib/server/sql/alerts.ts";
 import { runAlertCycle } from "../lib/server/alerts/run.ts";
 
 import { queryRows } from "../lib/server/db.ts";
+
+import { log } from "../lib/server/log.ts";
 
 interface Flags {
   apply: boolean;
@@ -146,7 +148,7 @@ async function main(): Promise<void> {
         : [flags.onlyBarrier],
       dryRun,
       reprocess: flags.reprocess,
-      logger: (line) => console.log(line),
+      logger: log.child({ scope: "alerts" }).line("info"),
       rules: rules!,
       hasAnyRule: (rules?.length ?? 0) > 0,
       listStale: (days) => listStaleBarriers(days),

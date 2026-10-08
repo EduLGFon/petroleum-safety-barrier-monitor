@@ -31,11 +31,11 @@ import {
 
 import { getResolverLabels } from "../lib/server/sql/vocabularies.ts";
 
+import { touchRuleTriggered } from "../lib/server/sql/alert_rules.ts";
+
 import { listStaleBarriers } from "../lib/server/sql/alert_rules.ts";
 
 import { listAlertRules } from "../lib/server/sql/alert_rules.ts";
-
-import { touchRuleTriggered } from "../lib/server/sql/alert_rules.ts";
 
 import type { StatusInfo } from "../lib/server/alerts/detect.ts";
 
@@ -48,6 +48,8 @@ import { sqlAlertStore } from "../lib/server/sql/alerts.ts";
 import { runAlertCycle } from "../lib/server/alerts/run.ts";
 
 import { queryRows } from "../lib/server/db.ts";
+
+import { log } from "../lib/server/log.ts";
 
 const seconds = Math.max(
   60,
@@ -130,7 +132,7 @@ async function cycle(
         { name: "none" as const, send: () => Promise.resolve() },
       recipients,
       dryRun,
-      logger: (line) => console.log(line),
+      logger: log.child({ scope: "alerts" }).line("info"),
       rules,
       hasAnyRule: rules.length > 0,
       listStale: (days) => listStaleBarriers(days),
