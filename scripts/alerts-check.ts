@@ -148,7 +148,7 @@ async function main(): Promise<void> {
         : [flags.onlyBarrier],
       dryRun,
       reprocess: flags.reprocess,
-      logger: log.child({ scope: "alerts" }).line("info"),
+      logger: log.line("info"),
       rules: rules!,
       hasAnyRule: (rules?.length ?? 0) > 0,
       listStale: (days) => listStaleBarriers(days),

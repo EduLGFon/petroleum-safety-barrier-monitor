@@ -283,6 +283,9 @@ export function forRequest(requestId: string, scope?: string): Logger {
 // toLineLogger: adapter for legacy `logger?: (line: string) => void`
 // callbacks (alert cycles, poll loops). New code passes a Logger directly;
 // call sites that still take a line callback receive logger.line("info").
+// Keep the adapter unscoped (root logger, or forRequest without scope)
+// when the lines already carry their own [tag] prefix: a scoped adapter
+// would print doubled brackets like `[alerts] [alerts] ...`.
 export function toLineLogger(
   logger: Logger,
   level: LogLevel = "info",

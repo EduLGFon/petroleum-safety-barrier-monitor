@@ -90,7 +90,9 @@ export function createPollLoop(
   let started = false;
   let handle: unknown = null;
   const timers = opts.timers ?? defaultTimerSource;
-  const logLine = opts.onLog ?? log.child({ scope: "poll" }).line("info");
+  // Legacy lines already carry their own [poll] prefix, so the adapter
+  // stays unscoped: a child scope here would print doubled brackets.
+  const logLine = opts.onLog ?? log.line("info");
 
   const tick = async (): Promise<void> => {
     if (stopped) return;

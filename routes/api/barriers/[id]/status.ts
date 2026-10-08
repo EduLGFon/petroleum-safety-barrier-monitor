@@ -197,7 +197,7 @@ export const handler = define.handlers({
           hasAnyRule: rules.length > 0,
           mailer,
           recipients,
-          logger: reqLog.line("info"),
+          logger: forRequest(requestId).line("info"),
           labels,
           brand: Deno.env.get("COMPANY_NAME") || undefined,
           dashboardUrl: Deno.env.get("APP_BASE_URL") || undefined,

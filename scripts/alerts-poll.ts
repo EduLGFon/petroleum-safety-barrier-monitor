@@ -132,7 +132,7 @@ async function cycle(
         { name: "none" as const, send: () => Promise.resolve() },
       recipients,
       dryRun,
-      logger: log.child({ scope: "alerts" }).line("info"),
+      logger: log.line("info"),
       rules,
       hasAnyRule: rules.length > 0,
       listStale: (days) => listStaleBarriers(days),

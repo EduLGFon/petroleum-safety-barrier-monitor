@@ -76,7 +76,9 @@ export function createCycleLoop<Shared>(
   let handle: unknown = null;
   let current: Promise<void> | null = null;
   const timers = opts.timers ?? defaultTimerSource;
-  const logLine = opts.onLog ?? log.child({ scope: "cycle" }).line("info");
+  // Legacy lines already carry their own [cycle] prefix, so the adapter
+  // stays unscoped: a child scope here would print doubled brackets.
+  const logLine = opts.onLog ?? log.line("info");
   const now = opts.now ?? (() => new Date());
   const cycleScope = opts.cycleScope ?? "cycle";
 
