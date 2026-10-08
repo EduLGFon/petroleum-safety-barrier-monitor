@@ -4,7 +4,7 @@
 import {
   internal,
   newRequestId,
-  ok,
+  okWithEtag,
   rateLimited,
 } from "../../lib/server/errors.ts";
 
@@ -57,7 +57,7 @@ export const handler = define.handlers({
       // Malformed URL: fall back to the default limit.
     }
     try {
-      return ok({ runs: await getSyncRuns(take) }, requestId);
+      return okWithEtag(ctx.req, { runs: await getSyncRuns(take) }, requestId);
     } catch (err) {
       return internal(
         "GET /api/sync-runs",

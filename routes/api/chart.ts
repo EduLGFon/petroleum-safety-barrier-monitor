@@ -6,7 +6,7 @@ import {
   forbidden,
   internal,
   newRequestId,
-  ok,
+  okWithEtag,
   rateLimited,
 } from "../../lib/server/errors.ts";
 
@@ -66,7 +66,7 @@ export const handler = define.handlers({
 
     try {
       const rows = await getChartData(filter);
-      return ok(rows, requestId);
+      return okWithEtag(ctx.req, rows, requestId);
     } catch (err) {
       return internal(
         "GET /api/chart",

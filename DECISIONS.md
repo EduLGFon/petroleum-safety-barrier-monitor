@@ -102,9 +102,6 @@ behavior drift against the no-limits rule.
 - `getVocabularies` / `getResolverLabels` caching: per-request data
   behind auth and admin rowScope gating. A shared cache needs an ADR
   proving no cross-session leak plus live poll verification.
-- Export OFFSET to keyset: must cover every SORTABLE key with identical
-  ordering and be proven at 200k rows against a live DB. Current
-  5000-row pages under the 200000 ceiling stay as documented.
 - `loadLocal` OR-split: measured on the docker DB (18k barriers):
   PK scan plus filter in 6.6ms once per cycle. Technically index-defeating,
   practically negligible next to minutes of upstream fetch. Left as-is;
@@ -117,8 +114,9 @@ behavior drift against the no-limits rule.
   idempotent; author creates are rare admin actions). Left as-is.
 - Upstream fetch-concurrency tuning: needs live rate-limit observation
   across full sweeps; the adaptive bucket already governs the ceiling.
-- HTTP `ETag` / aggregate dashboard endpoint: new contract surface.
-  Needs ADR plus browser-verified poll behavior.
+- HTTP `ETag` (server emission): DONE, see D08. Aggregate dashboard
+  endpoint and client 304 handling remain: new contract surface, needs
+  browser-verified poll behavior.
 - Export OFFSET to keyset: DONE, see D07 (65s tag-sorted export at 13k
   rows was the concrete trigger).
 - `EXPLAIN (ANALYZE, BUFFERS)` baseline and load test: not run. No
@@ -167,3 +165,26 @@ identical sequences, tag pages ~70-250ms (65s to under 2s total).
 Permanent `export_window_test.ts` (12 KST rows incl. null owners,
 limit 5, all sorts) passes against the docker DB. Full suite: 577
 passed, 0 failed.
+
+## D08 - Conditional GETs with body-hash ETags (2026-10-08)
+
+Context: dashboard polls re-download unchanged JSON on every tick
+(sync-status every 60s/15s, barriers/KPI/chart/vocabularies every
+5 minutes). No cache headers existed, so even the browser HTTP cache
+could not help.
+
+Decision: `okWithEtag(req, data, requestId)` in `lib/server/errors.ts`
+(SHA-256 over the exact response bytes, `Cache-Control: private,
+no-cache`, `304` with no body on matching `If-None-Match`), used by all
+17 GET JSON handlers. Write responses, the export streams, and the
+time-varying `/api/health` liveness probe are untouched. `private`
+keeps authenticated bodies out of shared caches; per-request server
+validation keeps role-gated data correct, so no feature is limited or
+removed and callers that never send the header see byte-identical
+responses. Client `If-None-Match` sending plus 304 handling in
+`lib/api/http.ts` is the follow-up that turns the headers into saved
+bytes.
+
+Verification: new `errors_test.ts` cases (stable tag, exact/weak/list/
+wildcard match, foreign tag, changed bytes), `deno task check`, full
+`deno task test` on host and against the docker DB.

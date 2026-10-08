@@ -7,6 +7,7 @@ import {
   newRequestId,
   notFound,
   ok,
+  okWithEtag,
   rateLimited,
 } from "../../../lib/server/errors.ts";
 
@@ -110,7 +111,7 @@ export const handler = define.handlers({
         includeDeleted: dataAuth.role === "admin",
       });
       if (!barrier) return notFound("Barrier not found", requestId);
-      return ok(barrier, requestId);
+      return okWithEtag(ctx.req, barrier, requestId);
     } catch (err) {
       return internal(
         `GET /api/barriers/${ctx.params.id}`,

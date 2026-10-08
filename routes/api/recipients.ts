@@ -14,7 +14,7 @@ import {
   created,
   internal,
   newRequestId,
-  ok,
+  okWithEtag,
   rateLimited,
 } from "../../lib/server/errors.ts";
 
@@ -75,7 +75,7 @@ export const handler = define.handlers({
     if (denied) return denied;
     try {
       const activeOnly = ctx.url.searchParams.get("activeOnly") === "1";
-      return ok(await listRecipients(activeOnly), requestId);
+      return okWithEtag(ctx.req, await listRecipients(activeOnly), requestId);
     } catch (err) {
       return internal(
         "GET /api/recipients",

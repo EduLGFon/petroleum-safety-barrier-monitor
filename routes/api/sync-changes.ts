@@ -5,7 +5,7 @@
 import {
   internal,
   newRequestId,
-  ok,
+  okWithEtag,
   rateLimited,
 } from "../../lib/server/errors.ts";
 
@@ -100,7 +100,7 @@ export const handler = define.handlers({
           status: c.status,
           changedAt: c.changedAt,
         }));
-        return ok({ changes }, requestId);
+        return okWithEtag(ctx.req, { changes }, requestId);
       }
       const result = await listSyncChanges({
         runId: Number.isInteger(runId) && (runId as number) > 0 ? runId : null,
@@ -118,7 +118,7 @@ export const handler = define.handlers({
       });
       // When runId is absent and scope is last-run, listSyncChanges resolves
       // the latest finished run internally.
-      return ok(result, requestId);
+      return okWithEtag(ctx.req, result, requestId);
     } catch (err) {
       return internal(
         "GET /api/sync-changes",

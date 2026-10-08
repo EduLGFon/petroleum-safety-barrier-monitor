@@ -8,7 +8,7 @@ import {
   forbidden,
   internal,
   newRequestId,
-  ok,
+  okWithEtag,
   rateLimited,
 } from "../../lib/server/errors.ts";
 
@@ -67,7 +67,7 @@ export const handler = define.handlers({
       const snapshot = await getKpi(filter, {
         scopeCounts: dataAuth.role === "admin",
       });
-      return ok(snapshot, requestId);
+      return okWithEtag(ctx.req, snapshot, requestId);
     } catch (err) {
       return internal(
         "GET /api/kpi",

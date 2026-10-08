@@ -14,7 +14,7 @@ import {
 import {
   internal,
   newRequestId,
-  ok,
+  okWithEtag,
   rateLimited,
 } from "../../../lib/server/errors.ts";
 
@@ -89,7 +89,7 @@ export const handler = define.handlers({
 
     try {
       const data = await listBarriers(query);
-      return ok(data, requestId);
+      return okWithEtag(ctx.req, data, requestId);
     } catch (err) {
       return internal(
         "GET /api/barriers/deleted",

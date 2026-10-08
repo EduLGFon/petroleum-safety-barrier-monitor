@@ -7,7 +7,7 @@ import {
   badRequest,
   internal,
   newRequestId,
-  ok,
+  okWithEtag,
   rateLimited,
 } from "../../../lib/server/errors.ts";
 
@@ -113,7 +113,7 @@ export const handler = define.handlers({
         `select b.tag from barriers b ${where} order by b.id limit 5`,
         args,
       );
-      return ok({
+      return okWithEtag(ctx.req, {
         count: Number(counted[0]?.n ?? 0),
         tags: sample.map((r) => r.tag),
       }, requestId);

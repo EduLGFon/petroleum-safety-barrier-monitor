@@ -6,7 +6,7 @@ import {
   internal,
   newRequestId,
   notFound,
-  ok,
+  okWithEtag,
   rateLimited,
 } from "../../../../lib/server/errors.ts";
 
@@ -73,7 +73,7 @@ export const handler = define.handlers({
         sinceHours: runRaw !== null ? null : scope === "last-day" ? 24 : null,
       });
       if (!detail) return notFound("No sync change found", requestId);
-      return ok({ detail }, requestId);
+      return okWithEtag(ctx.req, { detail }, requestId);
     } catch (err) {
       return internal(
         `GET /api/barriers/${ctx.params.id}/sync-detail`,

@@ -9,7 +9,7 @@ import {
 import {
   internal,
   newRequestId,
-  ok,
+  okWithEtag,
   rateLimited,
   unauthorized,
   unavailable,
@@ -48,7 +48,7 @@ export const handler = define.handlers({
     try {
       const user = await getSessionUser(await hashSessionToken(raw));
       if (!user) return unauthorized("not authenticated", requestId);
-      return ok(user, requestId);
+      return okWithEtag(ctx.req, user, requestId);
     } catch (err) {
       console.error(`[GET /api/auth/me] requestId=${requestId}`, err);
       return unavailable("Auth store unreachable", requestId);

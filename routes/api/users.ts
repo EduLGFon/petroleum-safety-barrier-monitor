@@ -7,7 +7,7 @@ import {
   created,
   internal,
   newRequestId,
-  ok,
+  okWithEtag,
   rateLimited,
 } from "../../lib/server/errors.ts";
 
@@ -74,7 +74,7 @@ export const handler = define.handlers({
     const denied = await guardAdmin(ctx.req, requestId, "GET /api/users");
     if (denied) return denied;
     try {
-      return ok(await listUsers(), requestId);
+      return okWithEtag(ctx.req, await listUsers(), requestId);
     } catch (err) {
       return internal(
         "GET /api/users",

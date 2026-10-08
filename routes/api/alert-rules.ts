@@ -7,7 +7,7 @@ import {
   created,
   internal,
   newRequestId,
-  ok,
+  okWithEtag,
   rateLimited,
 } from "../../lib/server/errors.ts";
 
@@ -61,7 +61,7 @@ export const handler = define.handlers({
     if (!auth.ok) return denyByCredentials(ctx.req, auth.message, requestId);
     try {
       const activeOnly = ctx.url.searchParams.get("activeOnly") === "1";
-      return ok(await listAlertRules(activeOnly), requestId);
+      return okWithEtag(ctx.req, await listAlertRules(activeOnly), requestId);
     } catch (err) {
       return internal(
         "GET /api/alert-rules",

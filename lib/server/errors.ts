@@ -48,6 +48,57 @@ export function created(data: unknown, requestId: string): Response {
   return ok(data, requestId, { status: 201 });
 }
 
+// etagOf: strong validator over the exact response bytes (same
+// serialization Response.json uses, so equal bodies hash equal).
+async function etagOf(body: string): Promise<string> {
+  const digest = await crypto.subtle.digest(
+    "SHA-256",
+    new TextEncoder().encode(body),
+  );
+  const hex = [...new Uint8Array(digest)]
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("");
+  return `"${hex}"`;
+}
+
+// matchesEtag: true when If-None-Match carries our tag (exact, weak, list,
+// or wildcard). A tag from another response never matches, so a 304 below
+// can only confirm bytes the client already holds.
+function matchesEtag(req: Request, etag: string): boolean {
+  const header = req.headers.get("if-none-match");
+  if (header === null) return false;
+  return header.split(",").some((tag) => {
+    const t = tag.trim().replace(/^W\//, "");
+    return t === "*" || t === etag;
+  });
+}
+
+// okWithEtag: ok() plus conditional-request support for GET handlers.
+// Every 200 carries an ETag over its bytes plus private/no-cache (shared
+// caches never store authenticated bodies; clients revalidate instead of
+// reusing blindly). A matching If-None-Match answers 304 with no body.
+// Safe by construction: the tag hashes the actual output, so a 304 fires
+// only when the bytes would be identical, and callers that never send the
+// header see exactly what ok() always sent.
+export async function okWithEtag(
+  req: Request,
+  data: unknown,
+  requestId: string,
+  init: ResponseInit = {},
+): Promise<Response> {
+  const etag = await etagOf(JSON.stringify(data));
+  if (matchesEtag(req, etag)) {
+    return new Response(null, {
+      status: 304,
+      headers: { etag, "x-request-id": requestId },
+    });
+  }
+  const res = ok(data, requestId, init);
+  res.headers.set("etag", etag);
+  res.headers.set("cache-control", "private, no-cache");
+  return res;
+}
+
 // apiError: builds the JSON envelope with the correlation header.
 export function apiError(
   status: number,

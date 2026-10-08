@@ -18,6 +18,7 @@ import {
   internal,
   newRequestId,
   ok,
+  okWithEtag,
   rateLimited,
 } from "../../lib/server/errors.ts";
 import {
@@ -55,7 +56,7 @@ export const handler = define.handlers({
     }
     if (!auth.ok) return denyDataAuth(auth, requestId);
     try {
-      return ok(await listFieldOptionSets(), requestId);
+      return okWithEtag(ctx.req, await listFieldOptionSets(), requestId);
     } catch (err) {
       return internal(
         "GET /api/field-options",

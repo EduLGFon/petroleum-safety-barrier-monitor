@@ -247,7 +247,12 @@ Every failure responds with the `{ error, code, requestId }` envelope + the
 a stack or column - the public message is fixed per route and the detail goes
 to the log with the `requestId`). Every JSON success also carries
 `x-request-id` (`ok()` / `created()` in `lib/server/errors.ts`), so a client
-report always correlates with a server log line. The pipeline order is fixed
+report always correlates with a server log line. Every GET JSON success
+additionally carries an `ETag` (SHA-256 over the exact response bytes) plus
+`Cache-Control: private, no-cache`, and answers `304` with no body when
+`If-None-Match` matches (`okWithEtag()` in `lib/server/errors.ts`) - shared
+caches never store authenticated bodies, and clients that revalidate skip
+re-downloading unchanged polls. The pipeline order is fixed
 everywhere: throttle -> `loadServerConfig` -> auth -> validation -> DB.
 
 Login => Dashboard: **dashboard GETs require auth** (`barriers`, `:id`,

@@ -5,7 +5,7 @@
 import {
   internal,
   newRequestId,
-  ok,
+  okWithEtag,
   rateLimited,
 } from "../../lib/server/errors.ts";
 
@@ -54,7 +54,7 @@ export const handler = define.handlers({
     if (!dataAuth.ok) return denyDataAuth(dataAuth, requestId);
 
     try {
-      return ok(await getVocabularies(), requestId);
+      return okWithEtag(ctx.req, await getVocabularies(), requestId);
     } catch (err) {
       return internal(
         "GET /api/vocabularies",

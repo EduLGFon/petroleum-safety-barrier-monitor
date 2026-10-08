@@ -7,6 +7,7 @@ import {
   internal,
   notFound,
   ok,
+  okWithEtag,
   rateLimited,
   unauthorized,
 } from "./errors.ts";
@@ -94,4 +95,51 @@ Deno.test("forbidden answers 403 FORBIDDEN, never 401", async () => {
   const b = await body(res);
   assertStrictEquals(b.error, "admin only");
   assertStrictEquals(b.code, "FORBIDDEN");
+});
+
+function getWithEtag(ifNoneMatch: string | null) {
+  return new Request(
+    "https://x.test/api/kpi",
+    ifNoneMatch === null ? {} : { headers: { "if-none-match": ifNoneMatch } },
+  );
+}
+
+Deno.test("okWithEtag tags the bytes and revalidates", async () => {
+  const first = await okWithEtag(getWithEtag(null), { total: 3 }, "req-e1");
+  assertStrictEquals(first.status, 200);
+  const etag = first.headers.get("etag") ?? "";
+  assertStrictEquals(etag.startsWith('"'), true);
+  assertStrictEquals(
+    first.headers.get("cache-control"),
+    "private, no-cache",
+  );
+  assertStrictEquals(first.headers.get("x-request-id"), "req-e1");
+  // Same bytes hash stable across calls.
+  const again = await okWithEtag(getWithEtag(null), { total: 3 }, "req-e2");
+  assertStrictEquals(again.headers.get("etag"), etag);
+  // Exact, weak, listed, and wildcard tags all confirm.
+  for (
+    const tag of [etag, `W/${etag}`, `"other", ${etag}`, "*"]
+  ) {
+    const res = await okWithEtag(getWithEtag(tag), { total: 3 }, "req-e3");
+    assertStrictEquals(res.status, 304);
+    assertStrictEquals(res.headers.get("etag"), etag);
+    assertStrictEquals(res.headers.get("x-request-id"), "req-e3");
+    assertStrictEquals(await res.text(), "");
+  }
+  // Foreign tags and changed bytes stay 200 with a new tag.
+  const foreign = await okWithEtag(
+    getWithEtag('"deadbeef"'),
+    { total: 3 },
+    "req-e4",
+  );
+  assertStrictEquals(foreign.status, 200);
+  assertStrictEquals(foreign.headers.get("etag"), etag);
+  const changed = await okWithEtag(
+    getWithEtag(etag),
+    { total: 4 },
+    "req-e5",
+  );
+  assertStrictEquals(changed.status, 200);
+  assertStrictEquals(changed.headers.get("etag") === etag, false);
 });

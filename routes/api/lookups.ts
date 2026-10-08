@@ -14,7 +14,7 @@ import { readThrottle, routeClientKey } from "../../lib/server/throttle.ts";
 import {
   internal,
   newRequestId,
-  ok,
+  okWithEtag,
   rateLimited,
 } from "../../lib/server/errors.ts";
 
@@ -85,7 +85,7 @@ export const handler = define.handlers({
         ),
         listAuthors(),
       ]);
-      return ok({
+      return okWithEtag(ctx.req, {
         availabilities,
         categories,
         locations,
