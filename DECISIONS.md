@@ -87,3 +87,32 @@ already parallel, so a rewrite has no concrete benefit.
 
 Verification: `deno fmt --check`, `deno check`, `deno task test`
 (576 passed; DB integration suites self-skip without DATABASE_URL).
+
+## D05 - Assessed and deferred (2026-10-08)
+
+The following were investigated and deliberately NOT changed. Each needs
+a live Postgres and/or running app to verify, and live runs need owner
+authorization (agents.md section 12). Doing them blind would risk silent
+behavior drift against the no-limits rule.
+
+- `getSyncStatus` 4 parallel lookups: all are `LIMIT 1` index scans
+  already parallel, so folding saves checkouts only. No concrete benefit.
+- `summarizeAuditRows` 3 parallel aggs: different joins per aggregation
+  over a small per-run table. Same verdict as above.
+- `getVocabularies` / `getResolverLabels` caching: per-request data
+  behind auth and admin rowScope gating. A shared cache needs an ADR
+  proving no cross-session leak plus live poll verification.
+- Export OFFSET to keyset: must cover every SORTABLE key with identical
+  ordering and be proven at 200k rows against a live DB. Current
+  5000-row pages under the 200000 ceiling stay as documented.
+- `loadLocal` OR-split, `ensureCatalog` sequence use, `authors` identity
+  change: sync write-path changes. Prove against a disposable DB with a
+  full `--apply` drill, never prod, with owner sign-off first.
+- Alert `countRuleEvents` batching and upstream fetch-concurrency
+  tuning: needs live alert cycles and rate-limit observation.
+- HTTP `ETag` / aggregate dashboard endpoint: new contract surface.
+  Needs ADR plus browser-verified poll behavior.
+- `EXPLAIN (ANALYZE, BUFFERS)` baseline and load test: not run. No
+  database is reachable in this session and `.env` secrets are
+  off-limits. Run on staging before and after: list, KPI, export,
+  and one `--apply` sync drill.
