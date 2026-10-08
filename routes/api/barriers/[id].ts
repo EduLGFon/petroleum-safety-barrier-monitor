@@ -6,8 +6,8 @@ import {
   internal,
   newRequestId,
   notFound,
+  ok,
   rateLimited,
-  unauthorized,
 } from "../../../lib/server/errors.ts";
 
 import {
@@ -23,7 +23,9 @@ import {
 } from "../../../lib/server/sql/barriers.ts";
 
 import {
+  authStoreUnavailable,
   denyByCredentials,
+  denyDataAuth,
   requireAdminAuth,
   requireDataAuth,
 } from "../../../lib/server/auth.ts";
@@ -47,6 +49,8 @@ import { listRecipients } from "../../../lib/server/sql/recipients.ts";
 import { sqlAlertStore } from "../../../lib/server/sql/alerts.ts";
 
 import { loadServerConfig } from "../../../lib/server/config.ts";
+
+import { parseIdParam, readJsonBody } from "../../../lib/server/validation.ts";
 
 import { define } from "../../../utils.ts";
 
@@ -82,15 +86,20 @@ export const handler = define.handlers({
         "Server misconfigured",
       );
     }
-    const dataAuth = await requireDataAuth(ctx.req);
-    if (!dataAuth.ok) {
-      return dataAuth.anonymous
-        ? notFound("not found", requestId)
-        : unauthorized(dataAuth.message, requestId);
+    let dataAuth;
+    try {
+      dataAuth = await requireDataAuth(ctx.req);
+    } catch (err) {
+      return authStoreUnavailable(
+        `GET /api/barriers/${ctx.params.id}`,
+        err,
+        requestId,
+      );
     }
+    if (!dataAuth.ok) return denyDataAuth(dataAuth, requestId);
 
-    const barrierId = Number(ctx.params.id);
-    if (!Number.isInteger(barrierId) || barrierId <= 0) {
+    const barrierId = parseIdParam(ctx.params.id);
+    if (barrierId === undefined) {
       return badRequest("Invalid barrier id", requestId);
     }
 
@@ -101,7 +110,7 @@ export const handler = define.handlers({
         includeDeleted: dataAuth.role === "admin",
       });
       if (!barrier) return notFound("Barrier not found", requestId);
-      return Response.json(barrier);
+      return ok(barrier, requestId);
     } catch (err) {
       return internal(
         `GET /api/barriers/${ctx.params.id}`,
@@ -119,8 +128,6 @@ export const handler = define.handlers({
     if (!limit.allowed) {
       return rateLimited("too many requests", requestId, limit.retryAfterMs);
     }
-    const auth = await requireAdminAuth(ctx.req);
-    if (!auth.ok) return denyByCredentials(ctx.req, auth.message, requestId);
     try {
       loadServerConfig();
     } catch (err) {
@@ -131,18 +138,26 @@ export const handler = define.handlers({
         "Server misconfigured",
       );
     }
+    let auth;
+    try {
+      auth = await requireAdminAuth(ctx.req);
+    } catch (err) {
+      return authStoreUnavailable(
+        `PATCH /api/barriers/${ctx.params.id}`,
+        err,
+        requestId,
+      );
+    }
+    if (!auth.ok) return denyByCredentials(ctx.req, auth.message, requestId);
 
-    const barrierId = Number(ctx.params.id);
-    if (!Number.isInteger(barrierId) || barrierId <= 0) {
+    const barrierId = parseIdParam(ctx.params.id);
+    if (barrierId === undefined) {
       return badRequest("Invalid barrier id", requestId);
     }
 
-    let body: Record<string, unknown>;
-    try {
-      body = await ctx.req.json();
-    } catch {
-      return badRequest("Invalid JSON body", requestId);
-    }
+    const parsed = await readJsonBody(ctx.req);
+    if (!parsed.ok) return badRequest("Invalid JSON body", requestId);
+    const body = parsed.body;
 
     try {
       const existing = await getBarrierById(barrierId);
@@ -270,7 +285,7 @@ export const handler = define.handlers({
         }
       }
 
-      return Response.json(updated ?? existing);
+      return ok(updated ?? existing, requestId);
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       if (

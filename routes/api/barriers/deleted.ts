@@ -14,10 +14,12 @@ import {
 import {
   internal,
   newRequestId,
+  ok,
   rateLimited,
 } from "../../../lib/server/errors.ts";
 
 import {
+  authStoreUnavailable,
   denyByCredentials,
   requireAdminAuth,
 } from "../../../lib/server/auth.ts";
@@ -44,8 +46,6 @@ export const handler = define.handlers({
         limit.retryAfterMs,
       );
     }
-    const auth = await requireAdminAuth(ctx.req);
-    if (!auth.ok) return denyByCredentials(ctx.req, auth.message, requestId);
     try {
       loadServerConfig();
     } catch (err) {
@@ -56,6 +56,17 @@ export const handler = define.handlers({
         "Server misconfigured",
       );
     }
+    let auth;
+    try {
+      auth = await requireAdminAuth(ctx.req);
+    } catch (err) {
+      return authStoreUnavailable(
+        "GET /api/barriers/deleted",
+        err,
+        requestId,
+      );
+    }
+    if (!auth.ok) return denyByCredentials(ctx.req, auth.message, requestId);
 
     const sp = ctx.url.searchParams;
     const query: BarriersQuery = {
@@ -78,7 +89,7 @@ export const handler = define.handlers({
 
     try {
       const data = await listBarriers(query);
-      return Response.json(data);
+      return ok(data, requestId);
     } catch (err) {
       return internal(
         "GET /api/barriers/deleted",

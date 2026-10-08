@@ -7,6 +7,7 @@ import {
   internal,
   newRequestId,
   notFound,
+  ok,
   rateLimited,
 } from "../../../../lib/server/errors.ts";
 
@@ -21,6 +22,7 @@ import {
 } from "../../../../lib/server/sql/barriers.ts";
 
 import {
+  authStoreUnavailable,
   denyByCredentials,
   requireAdminAuth,
 } from "../../../../lib/server/auth.ts";
@@ -46,6 +48,11 @@ import { sqlAlertStore } from "../../../../lib/server/sql/alerts.ts";
 
 import { loadServerConfig } from "../../../../lib/server/config.ts";
 
+import {
+  parseIdParam,
+  readJsonBody,
+} from "../../../../lib/server/validation.ts";
+
 import { define } from "../../../../utils.ts";
 
 interface StatusBody {
@@ -68,8 +75,6 @@ export const handler = define.handlers({
         limit.retryAfterMs,
       );
     }
-    const auth = await requireAdminAuth(ctx.req);
-    if (!auth.ok) return denyByCredentials(ctx.req, auth.message, requestId);
     try {
       loadServerConfig();
     } catch (err) {
@@ -80,19 +85,27 @@ export const handler = define.handlers({
         "Server misconfigured",
       );
     }
+    let auth;
+    try {
+      auth = await requireAdminAuth(ctx.req);
+    } catch (err) {
+      return authStoreUnavailable(
+        `PATCH /api/barriers/${ctx.params.id}/status`,
+        err,
+        requestId,
+      );
+    }
+    if (!auth.ok) return denyByCredentials(ctx.req, auth.message, requestId);
 
-    const barrierId = Number(ctx.params.id);
+    const barrierId = parseIdParam(ctx.params.id);
 
-    if (!Number.isInteger(barrierId) || barrierId <= 0) {
+    if (barrierId === undefined) {
       return badRequest("Invalid barrier id", requestId);
     }
 
-    let body: StatusBody;
-    try {
-      body = await ctx.req.json() as StatusBody;
-    } catch {
-      return badRequest("Invalid JSON body", requestId);
-    }
+    const parsed = await readJsonBody(ctx.req);
+    if (!parsed.ok) return badRequest("Invalid JSON body", requestId);
+    const body = parsed.body as StatusBody;
 
     const { statusId, note } = body;
     let authorId = body.authorId;
@@ -192,7 +205,7 @@ export const handler = define.handlers({
           err,
         );
       }
-      return Response.json(updated);
+      return ok(updated, requestId);
     } catch (err) {
       return internal(
         `PATCH /api/barriers/${ctx.params.id}/status`,
