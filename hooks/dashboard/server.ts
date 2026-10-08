@@ -303,6 +303,8 @@ export function useServerDashboard(
   // Detail resolves from the current page; when the id is not on this page
   // (e.g. opened from the sync-changes modal), fetch it on demand so the
   // modal still opens. The fetched row clears on page hit or close.
+  // reloadKey is a dep so a post-sync refresh re-resolves an off-page row
+  // instead of leaving a stale snapshot open.
   const [fetchedBarrier, setFetchedBarrier] = useState<Barrier | null>(null);
   const pageHit = openId ? items.find((b) => b.id === openId) ?? null : null;
   useEffect(() => {
@@ -319,7 +321,7 @@ export function useServerDashboard(
     return () => {
       cancelled = true;
     };
-  }, [adapter, openId, pageHit]);
+  }, [adapter, openId, pageHit, reloadKey]);
   const openBarrier = pageHit ?? fetchedBarrier;
 
   // Split loading into initial vs refresh so row updates (filter/page/search/
@@ -332,6 +334,42 @@ export function useServerDashboard(
   // Retries the current scope after a fetch failure.
   const retry = useCallback(() => setReloadKey((k) => k + 1), []);
 
+  // Best-effort vocabulary refresh (station counts + filter options). Shared
+  // by the cadence timer and post-sync refreshAll so tabs/counts never stay
+  // stale after a run while the table already reloaded.
+  const refreshVocab = useCallback(() => {
+    if (!baseUrl) return;
+    fetch(`${baseUrl}/api/vocabularies`, {
+      headers: { "Accept": "application/json" },
+      credentials: "same-origin",
+    }).then((res) => {
+      if (res.status === 401 || res.status === 404) {
+        toLoginWithReturn();
+        return;
+      }
+      if (!res.ok) return;
+      return res.json() as Promise<Vocabularies>;
+    }).then((v) => {
+      if (!v) return;
+      // Keep object identity when the payload is unchanged so the adapter
+      // memo (and its data effect) does not refetch a second time on top of
+      // the reloadKey bump above.
+      setLiveVocab((prev) =>
+        prev !== null && JSON.stringify(prev) === JSON.stringify(v) ? prev : v
+      );
+    }).catch(() => {
+      // Vocabulary refresh is best-effort; the data reload above stands.
+    });
+  }, [baseUrl]);
+
+  // Full post-sync refresh: page + KPI + chart (via reloadKey) together with
+  // vocabularies, so every number on the monitor moves at once without a
+  // page reload. Call this when a sync run finishes.
+  const refreshAll = useCallback(() => {
+    setReloadKey((k) => k + 1);
+    refreshVocab();
+  }, [refreshVocab]);
+
   // Cadence refresh: re-fires data + vocabulary on an interval; hidden tabs
   // skip the tick (no background churn) and refetch on return via reload.
   useEffect(() => {
@@ -339,25 +377,10 @@ export function useServerDashboard(
     const timer = setInterval(() => {
       if (typeof document !== "undefined" && document.hidden) return;
       setReloadKey((k) => k + 1);
-      if (!baseUrl) return;
-      fetch(`${baseUrl}/api/vocabularies`, {
-        headers: { "Accept": "application/json" },
-        credentials: "same-origin",
-      }).then((res) => {
-        if (res.status === 401 || res.status === 404) {
-          toLoginWithReturn();
-          return;
-        }
-        if (!res.ok) return;
-        return res.json() as Promise<Vocabularies>;
-      }).then((v) => {
-        if (v) setLiveVocab(v);
-      }).catch(() => {
-        // Vocabulary refresh is best-effort; the data reload above stands.
-      });
+      refreshVocab();
     }, refreshMs);
     return () => clearInterval(timer);
-  }, [refreshMs, hydrated, baseUrl]);
+  }, [refreshMs, hydrated, refreshVocab]);
 
   // Exports the whole selection through /api/export: every format covers
   // every selected barrier as one file download (the server streams the
@@ -414,6 +437,8 @@ export function useServerDashboard(
     isRefreshing,
     error,
     retry,
+    refreshVocab,
+    refreshAll,
     exportServer,
     // Live vocabulary (SSR seed, refreshed on cadence) for tabs and counts.
     liveVocabularies: liveVocab,

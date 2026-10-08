@@ -48,6 +48,8 @@ export type Dash =
     isRefreshing?: boolean;
     error?: string | null;
     retry?: () => void;
+    refreshVocab?: () => void;
+    refreshAll?: () => void;
   };
 
 interface SectionsProps {
@@ -324,7 +326,10 @@ export function DashboardSections(
       <DashboardOverlays
         openBarrier={openBarrier}
         onCloseBarrier={() => setOpenId(null)}
-        onBarrierSaved={() => dash.retry?.()}
+        onBarrierSaved={() => {
+          if (typeof dash.refreshAll === "function") dash.refreshAll();
+          else dash.retry?.();
+        }}
         settingsOpen={settingsOpen}
         onCloseSettings={() => setSettingsOpen(false)}
         sessionUser={sessionUser}

@@ -13,7 +13,7 @@ import { LoadingScreen } from "../../components/LoadingScreen.tsx";
 
 import { useSettings } from "../../context/SettingsContext.tsx";
 
-import { useCallback, useEffect, useState } from "preact/hooks";
+import { useCallback, useEffect, useRef, useState } from "preact/hooks";
 
 import { useDashboardVocabularies } from "./vocabularies.ts";
 
@@ -141,6 +141,7 @@ function ServerView(
     rows,
     liveVocabularies,
     exportServer,
+    refreshAll,
   } = dash;
   // Live vocabulary wins once the cadence refreshes it; the SSR seed covers
   // the first paint so tabs never flash empty.
@@ -148,6 +149,38 @@ function ServerView(
   // Sync indicator polls every minute with a 15s fast lane while a run is
   // in flight (HTTP mode only; mock mode has no sync to report).
   const syncStatus = useSyncStatus(baseUrl, 60_000, 15_000, true);
+
+  // Post-sync refresh: the data hook only refetches on scope/filter change
+  // or the 5-minute cadence, so without this the table, KPI cards, chart,
+  // and station counts stay stale after a run until a manual reload. When a
+  // new finished run lands (or a syncing -> idle flip is seen), reload page
+  // + KPI + chart + vocabularies together. The first polled status only sets
+  // the baseline so mount never fires a duplicate fetch.
+  const prevSyncRef = useRef<{
+    initialized: boolean;
+    syncing: boolean;
+    finishedAt: string | null;
+  }>({ initialized: false, syncing: false, finishedAt: null });
+  useEffect(() => {
+    if (syncStatus === null) return;
+    const finishedAt = syncStatus.lastRun?.finishedAt ?? null;
+    const syncing = syncStatus.state === "syncing";
+    const prev = prevSyncRef.current;
+    if (!prev.initialized) {
+      prev.initialized = true;
+      prev.syncing = syncing;
+      prev.finishedAt = finishedAt;
+      return;
+    }
+    const newRunFinished = finishedAt !== null && finishedAt !== prev.finishedAt;
+    const justStoppedSyncing = prev.syncing && !syncing;
+    prev.syncing = syncing;
+    prev.finishedAt = finishedAt;
+    if (newRunFinished || justStoppedSyncing) {
+      if (typeof refreshAll === "function") refreshAll();
+      else retry();
+    }
+  }, [syncStatus, refreshAll, retry]);
 
   // Fade the shell in once the first scope resolves; later refetches keep
   // showing stale data instead of flashing the splash on every keystroke,
