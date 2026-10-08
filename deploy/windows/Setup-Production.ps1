@@ -12,16 +12,29 @@
   migrate or smoke errors, because this is the production path.
   Secrets are generated when omitted, printed once at the end, and never
   written to logs. Re-runs never rotate an existing .env.
+  No domain? Omit -Hostname for IP mode: plain HTTP on port 80 for the
+  office LAN (optionally scoped with -AllowedLanRanges); re-run with
+  -Hostname later for automatic https. First time on a server? Run with
+  -CheckOnly first: it probes the host and prints the full plan without
+  changing anything. Without -Unattended the real run asks for a typed YES
+  before touching anything.
 .EXAMPLE
   powershell -ExecutionPolicy Bypass -File .\deploy\windows\Setup-Production.ps1 `
     -Hostname barreiras.example.com -CompanyName "Seacrest Petróleo" `
     -AdminEmail you@example.com -RepoUrl https://github.com/org/repo.git
+.EXAMPLE
+  IP-only office server (no domain), LAN-scoped plain HTTP on port 80.
+  powershell -ExecutionPolicy Bypass -File .\deploy\windows\Setup-Production.ps1 `
+    -CompanyName "Seacrest Petróleo" -AdminEmail you@example.com `
+    -AllowedLanRanges '10.0.0.0/8','192.168.0.0/16' -SourceZip C:\temp\repo.zip
 #>
 param(
   [string]$InstallDir = 'C:\srv\barrier-monitor',
   [string]$ToolsDir = 'C:\tools',
   [string]$BackupDir = 'D:\backups\barreiras',
   [string]$Hostname = '',
+  [string]$ServerIp = '',
+  [string[]]$AllowedLanRanges = @(),
   [string]$CompanyName = '',
   [string]$AdminEmail = '',
   [string]$AdminPassword = '',
@@ -50,7 +63,9 @@ param(
   [switch]$SkipCaddy,
   [switch]$SkipBackup,
   [switch]$SkipFirewall,
-  [switch]$AllowLanAppPort
+  [switch]$AllowLanAppPort,
+  [switch]$Unattended,
+  [switch]$CheckOnly
 )
 
 $ErrorActionPreference = 'Stop'
@@ -116,6 +131,58 @@ if ($Hostname) {
   } catch {
     Write-Warning "DNS: $Hostname does not resolve yet. Caddy cannot issue its certificate until it does (it retries automatically); fix the A record and re-run if https stays down."
   }
+}
+$lanIps = Get-NetIPAddress -AddressFamily IPv4 -ErrorAction SilentlyContinue |
+  Where-Object { $_.IPAddress -notlike '127.*' -and $_.IPAddress -notlike '169.254.*' } |
+  Select-Object -ExpandProperty IPAddress
+if (-not $ServerIp) { $ServerIp = $lanIps | Select-Object -First 1 }
+if (-not $Hostname) {
+  if (-not $ServerIp) { $ServerIp = 'SERVER-IP'; Write-Warning 'no LAN address detected; fix the URL in the summary below.' }
+  Write-Warning "IP mode: users will open http://${ServerIp} in plain HTTP (no encryption possible without a domain). Keep port 80 reachable from the trusted office network/VPN only - never the internet. Re-run with -Hostname once a domain exists to get automatic https."
+}
+
+# ── 0b. Readiness report: say what WOULD happen, change nothing ─────
+function Test-ListenPort([int]$p) {
+  try { $null -ne (Get-NetTCPConnection -LocalPort $p -State Listen -ErrorAction Stop) }
+  catch { $false }
+}
+if ($CheckOnly) {
+  Write-Step 'Readiness report (nothing installed, nothing changed)'
+  $drive = Split-Path -Qualifier $InstallDir
+  $freeGB = [math]::Round((Get-PSDrive $drive.TrimEnd(':')).Free / 1GB, 1)
+  if ($freeGB -ge 10) { Write-Host "PASS disk: $freeGB GB free on $drive (need ~2 GB + backups)." -ForegroundColor Green }
+  else { Write-Host "WARN disk: only $freeGB GB free on $drive." -ForegroundColor Yellow }
+  foreach ($p in @(80, 443, 8000, 5432)) {
+    if (Test-ListenPort $p) { Write-Host "WARN port ${p}: already in use (setup continues; 5432 busy = Postgres already here)." -ForegroundColor Yellow }
+    else { Write-Host "PASS port ${p}: free." -ForegroundColor Green }
+  }
+  foreach ($s in @('BarrierApp', 'BarrierPoller', 'BarrierAlerts', 'BarrierCaddy', 'postgresql-x64-16')) {
+    if (Get-Service $s -ErrorAction SilentlyContinue) { Write-Host "INFO service ${s}: already exists (setup will refresh it)." }
+  }
+  if (Test-Path "$InstallDir\deno.jsonc") { Write-Host 'INFO code: already present (setup will pull latest).' }
+  else { Write-Host 'INFO code: will be fetched (zip/clone, no git required for zip).' }
+  if (Test-Path "$InstallDir\.env") { Write-Host 'INFO .env: exists and will be left untouched.' }
+  else { Write-Host 'INFO .env: will be created with generated secrets (shown once).' }
+  foreach ($u in @("https://github.com", $PostgresInstallerUrl, "https://nssm.cc", "https://github.com/caddyserver/caddy")) {
+    try { Invoke-WebRequest -Uri $u -Method Head -TimeoutSec 15 -UseBasicParsing | Out-Null; Write-Host "PASS net: reachable $u" -ForegroundColor Green }
+    catch { Write-Host "WARN net: cannot reach $u (proxy? downloads will fail)." -ForegroundColor Yellow }
+  }
+  Write-Host ''
+  Write-Host 'PLAN (what a real run would do):'
+  Write-Host "  install Deno $DenoVersion to $ToolsDir\deno (machine PATH)"
+  Write-Host "  install or reuse PostgreSQL 16 on port $PgPort; ensure role $DbUser + db $DbName"
+  Write-Host "  register services BarrierApp/Poller/Alerts$(if (-not $SkipCaddy) { ' + BarrierCaddy (port 80)' } else { ' (no proxy)' })"
+  Write-Host "  firewall: TCP $(if ($Hostname -or -not $SkipCaddy) { '80+443' } else { 'unchanged' })$(if ($AllowedLanRanges.Count) { " scoped to $($AllowedLanRanges -join ', ')" } else { ' (whole network: pass -AllowedLanRanges to scope)' })"
+  Write-Host "  nightly backup task BarrierBackup at 02:00 -> $BackupDir"
+  Write-Host "  users would open: $(if ($Hostname) { "https://$Hostname" } else { "http://$ServerIp" })"
+  Write-Host 'Re-run without -CheckOnly to do it. Nothing was changed.'
+  return
+}
+if (-not $Unattended) {
+  Write-Host ''
+  Write-Host "About to install Barrier Monitor into $InstallDir (Postgres role $DbUser, app port $AppPort, proxy port 80)."
+  $answer = Read-Host 'Type YES in capitals to continue, anything else aborts (nothing changes until then)'
+  if ($answer -cne 'YES') { Write-Host 'aborted by operator; nothing was changed.'; return }
 }
 
 # ── 1. Deno (machine-wide so LocalSystem services see it) ────────────
@@ -243,7 +310,7 @@ if (-not (Test-Path $nssmExe)) {
   if (-not (Test-Path $nssmExe)) { Write-Need 'NSSM layout unexpected after extract.' }
 }
 $caddyExe = Join-Path $ToolsDir 'caddy\caddy.exe'
-$caddyWanted = (-not $SkipCaddy) -and (-not [string]::IsNullOrWhiteSpace($Hostname))
+$caddyWanted = -not $SkipCaddy
 if ($caddyWanted -and -not (Test-Path $caddyExe)) {
   $zip = "$env:TEMP\caddy-setup.zip"
   Invoke-Download "https://github.com/caddyserver/caddy/releases/download/$CaddyVersion/caddy_${CaddyVersion}_windows_amd64.zip" $zip
@@ -251,7 +318,7 @@ if ($caddyWanted -and -not (Test-Path $caddyExe)) {
   Expand-Archive -Path $zip -DestinationPath (Split-Path $caddyExe) -Force
   Remove-Item $zip -Force -ErrorAction SilentlyContinue
 }
-if (-not $caddyWanted) { Write-Host 'Caddy skipped (no -Hostname or -SkipCaddy): app stays loopback-only.' }
+if (-not $caddyWanted) { Write-Host 'Caddy skipped per -SkipCaddy: port 80 stays closed; app answers on loopback only.' }
 
 # ── 5. .env (created once, never rotated on re-run) ─────────────────
 Write-Step 'Ensuring .env (created once; existing files are never overwritten)'
@@ -265,6 +332,7 @@ if (-not (Test-Path $envFile)) {
   Set-DotEnvKey $envFile 'ADMIN_TOKEN' (New-RandomHex 32)
   Set-DotEnvKey $envFile 'COMPANY_NAME' $CompanyName
   if ($Hostname) { Set-DotEnvKey $envFile 'APP_BASE_URL' "https://$Hostname" }
+  else { Set-DotEnvKey $envFile 'APP_BASE_URL' "http://$ServerIp" }
   if ($FracttalKey) { Set-DotEnvKey $envFile 'FRACTTAL_KEY' $FracttalKey }
   if ($FracttalSecret) { Set-DotEnvKey $envFile 'FRACTTAL_SECRET' $FracttalSecret }
   if ($SmtpHost) { Set-DotEnvKey $envFile 'OPS_SMTP_HOST' $SmtpHost }
@@ -310,10 +378,11 @@ if ($caddyWanted) {
   New-Item -ItemType Directory -Force -Path $caddyDir | Out-Null
   New-Item -ItemType Directory -Force -Path "$InstallDir\logs" | Out-Null
   $logPath = Join-Path $InstallDir 'logs\caddy-access.log'
+  $site = if ($Hostname) { $Hostname } else { ':80' }
   Set-Content -Path "$caddyDir\Caddyfile" -Encoding UTF8 -Value @"
 # Generated by Setup-Production.ps1. Do not edit by hand: re-run the setup
 # script to regenerate (template: deploy/windows/Caddyfile).
-$Hostname {
+$site {
 	reverse_proxy 127.0.0.1:$AppPort
 	header {
 		X-Content-Type-Options nosniff
@@ -346,14 +415,21 @@ $Hostname {
 # ── 8. Firewall ─────────────────────────────────────────────────────
 if (-not $SkipFirewall) {
   Write-Step 'Configuring Windows Firewall'
+  $fwScope = @{}
+  if ($AllowedLanRanges.Count -gt 0) { $fwScope['RemoteAddress'] = $AllowedLanRanges }
   if ($caddyWanted) {
-    foreach ($port in @('80', '443')) {
+    $webPorts = @('80')
+    if ($Hostname) { $webPorts += '443' }
+    foreach ($port in $webPorts) {
       $rule = "Barrier Monitor web ($port)"
       if (-not (Get-NetFirewallRule -DisplayName $rule -ErrorAction SilentlyContinue)) {
-        New-NetFirewallRule -DisplayName $rule -Direction Inbound -Protocol TCP -LocalPort $port -Action Allow | Out-Null
+        New-NetFirewallRule -DisplayName $rule -Direction Inbound -Protocol TCP -LocalPort $port -Action Allow @fwScope | Out-Null
       }
     }
-    Write-Host 'inbound TCP 80+443 open; app port stays loopback-only.'
+    if ($AllowedLanRanges.Count -gt 0) { Write-Host "inbound TCP $($webPorts -join '+') open, scoped to $($AllowedLanRanges -join ', '); app port stays loopback-only." }
+    elseif ($Hostname) { Write-Host 'inbound TCP 80+443 open; app port stays loopback-only.' }
+    else { Write-Warning 'inbound TCP 80 is open to the whole network in plain HTTP: pass -AllowedLanRanges (e.g. office subnets) to scope it. Never forward this port from the internet router.' }
+  } elseif ($AllowLanAppPort) {
   } elseif ($AllowLanAppPort) {
     $rule = "Barrier Monitor app ($AppPort)"
     if (-not (Get-NetFirewallRule -DisplayName $rule -ErrorAction SilentlyContinue)) {
@@ -403,7 +479,7 @@ Code: $InstallDir (branch $Branch)
 Deno: $(& $denoExe --version | Select-Object -First 1)
 DB: ${DbUser}@localhost:${PgPort}/${DbName}
 App: http://127.0.0.1:$AppPort (service BarrierApp)
-Public: $(if ($Hostname) { "https://$Hostname (service BarrierCaddy)" } else { 'loopback-only (no hostname given)' })
+Public: $(if ($Hostname) { "https://$Hostname (service BarrierCaddy)" } elseif ($caddyWanted) { "http://$ServerIp via BarrierCaddy (plain HTTP: trusted LAN/VPN only)" } else { 'loopback-only (no proxy installed)' })
 Backup task: BarrierBackup daily 02:00 -> $BackupDir
 Logs: $InstallDir\logs
 "@
@@ -415,4 +491,8 @@ Write-Host 'STORE THESE NOW (shown once, never logged):' -ForegroundColor Yellow
 if ($generatedAdmin) { Write-Host "  admin login: $AdminEmail / $AdminPassword  (change it after first login)" -ForegroundColor Yellow }
 if ($pgPassOwn) { Write-Host "  postgres superuser password: $PostgresSuperPassword  (store in vault)" -ForegroundColor Yellow }
 Write-Host ''
-Write-Host 'Next: point DNS at this host, confirm https serves, log in, set FRACTTAL_* + recipients if skipped.'
+if ($Hostname) {
+  Write-Host 'Next: confirm https serves, log in, set FRACTTAL_* + recipients if skipped.'
+} else {
+  Write-Host "Next: from any office PC open http://$ServerIp and log in. When a domain exists, re-run with -Hostname for automatic https (nothing else changes)."
+}
