@@ -109,6 +109,14 @@ if ([string]::IsNullOrWhiteSpace($AdminEmail) -or $AdminEmail -notlike '*@*') {
 if ($AdminPassword -and $AdminPassword.Length -lt 12) { Write-Need 'AdminPassword must be 12+ characters.' }
 $generatedAdmin = $false
 if (-not $AdminPassword) { $AdminPassword = New-RandomPassword 20; $generatedAdmin = $true }
+if ($Hostname) {
+  try {
+    $resolved = (Resolve-DnsName $Hostname -Type A -ErrorAction Stop).IPAddress -join ', '
+    Write-Host "DNS: $Hostname -> $resolved"
+  } catch {
+    Write-Warning "DNS: $Hostname does not resolve yet. Caddy cannot issue its certificate until it does (it retries automatically); fix the A record and re-run if https stays down."
+  }
+}
 
 # ── 1. Deno (machine-wide so LocalSystem services see it) ────────────
 Write-Step "Ensuring Deno $DenoVersion (machine PATH)"
