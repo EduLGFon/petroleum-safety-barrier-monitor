@@ -135,3 +135,26 @@ but are wire-serialized and covered by no failing test.
 
 Verification: targeted DB suites plus full `deno task test` equivalent
 in the tools container, 576 passed, 0 failed, against the docker DB.
+
+## D07 - Keyset export paging (2026-10-08)
+
+Context: measured a full-scope export walk on the docker DB (13k rows):
+tag-ordered pages took ~22s each (65s total) from OFFSET rescans plus a
+full sort per page; id order took 0.9s.
+
+Decision: new `listBarrierWindowAfter` (keyset cursor: sort value plus
+`b.id` tiebreaker) with row predicates that keep the exact ORDER BY
+semantics of the OFFSET walk, including NULL placement for the only
+nullable sort column (`owner`: ASC NULLS LAST, DESC NULLS FIRST).
+`exportBatches` full walks page by cursor; offset windows keep the stable
+OFFSET walk so print slices stay addressable. `listBarrierWindow` kept
+for those callers. A first version missed the DESC NULL-to-value
+crossing and an unused bind param; both were caught before commit (the
+former by the new test, the latter by Postgres param typing).
+
+Verification: temporary walk-equality script over all 10 sortable
+columns x both directions x unknown-column fallback on 13k live rows:
+identical sequences, tag pages ~70-250ms (65s to under 2s total).
+Permanent `export_window_test.ts` (12 KST rows incl. null owners,
+limit 5, all sorts) passes against the docker DB. Full suite: 577
+passed, 0 failed.

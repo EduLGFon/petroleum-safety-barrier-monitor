@@ -5,11 +5,16 @@
 // and the client gets bytes while the rows are still arriving.
 import { EXPORT_MAX_ROWS, EXPORT_PAGE_ROWS } from "../export/limits.ts";
 import { getResolverLabels } from "./sql/vocabularies.ts";
-import { getKpi, listBarrierWindow } from "./sql/barriers.ts";
+import {
+  getKpi,
+  listBarrierWindow,
+  listBarrierWindowAfter,
+} from "./sql/barriers.ts";
+import type { WindowCursor } from "./sql/barriers.ts";
 import { resolveBarriers, resolveKpi } from "../resolve.ts";
 import type { ResolverLabels } from "../resolve.ts";
 import type { Barrier, KpiSnapshot } from "../types.ts";
-import type { BarriersQuery } from "../wireTypes.ts";
+import type { BarriersQuery, WireBarrier } from "../wireTypes.ts";
 
 export interface ExportScope {
   // Query the whole export runs over (filters, sort, optional id selection).
@@ -30,7 +35,9 @@ export async function resolveExportScope(
 // exportBatches: yields the scope's barriers in EXPORT_PAGE_ROWS batches,
 // resolved to display labels. Honours a window (print parts fetch only their
 // slice) and stops at EXPORT_MAX_ROWS, past which the file stops being a
-// download.
+// download. Full walks (no offset) page by keyset cursor so large sorted
+// scopes stream without OFFSET rescans; offset windows keep the stable
+// OFFSET walk so slices stay addressable.
 export async function* exportBatches(
   scope: ExportScope,
   window: { offset?: number; limit?: number } = {},
@@ -39,12 +46,21 @@ export async function* exportBatches(
   const limit = Math.max(0, window.limit ?? EXPORT_MAX_ROWS);
   const labels: ResolverLabels = await getResolverLabels();
   let at = offset;
+  let cursor: WindowCursor | null = null;
+  const keyset = offset === 0;
   let yielded = 0;
   while (yielded < limit) {
     const size = Math.min(EXPORT_PAGE_ROWS, limit - yielded);
-    const rows = await listBarrierWindow(scope.query, size, at);
+    let rows: WireBarrier[];
+    if (keyset) {
+      const page = await listBarrierWindowAfter(scope.query, size, cursor);
+      rows = page.rows;
+      cursor = page.cursor;
+    } else {
+      rows = await listBarrierWindow(scope.query, size, at);
+      at += rows.length;
+    }
     if (rows.length === 0) return;
-    at += rows.length;
     yielded += rows.length;
     yield resolveBarriers(rows, labels);
     // Short page: the scope ends here, no point asking again.

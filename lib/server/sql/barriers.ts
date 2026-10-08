@@ -22,7 +22,7 @@ export {
 } from "./mappers.ts";
 export { buildWhere, escapeLike, resolveOrderBy, SORTABLE } from "./where.ts";
 export type { BarrierRow, HistoryEntry } from "./mappers.ts";
-import { buildWhere, resolveOrderBy } from "./where.ts";
+import { buildWhere, resolveOrderBy, SORTABLE } from "./where.ts";
 import { queryRows } from "../db.ts";
 
 // Lists paged wire barriers + total for the given BarriersQuery filters.
@@ -109,6 +109,104 @@ export async function listBarrierWindow(
     [...where.args, Math.max(0, limit), Math.max(0, offset)],
   );
   return rows.map(toWireBarrier);
+}
+
+// WindowCursor: keyset position for export paging - the previous page's
+// last row (its sort value plus the unique id tiebreaker).
+export interface WindowCursor {
+  sortVal: string | number | null;
+  id: number;
+}
+
+// Cursor value expression and bind cast per sortable key. statusSince
+// travels as YYYY-MM-DD text (driver Dates never cross the boundary);
+// owner is the only nullable sort column and gets NULL-aware predicates.
+function cursorSelect(sortKey: string): string {
+  if (sortKey === "statusSince") {
+    return `to_char(b.status_since, 'YYYY-MM-DD') as cursor_val`;
+  }
+  return `${SORTABLE[sortKey]} as cursor_val`;
+}
+
+// Builds the keyset predicate for the sort key and direction. Row
+// comparisons keep the exact ORDER BY semantics of listBarrierWindow
+// (same whitelist, same b.id tiebreaker, same NULL placement), so the
+// keyset walk returns the identical sequence without OFFSET rescans.
+function cursorPredicate(
+  sortKey: string,
+  dir: "asc" | "desc",
+  valIdx: number,
+  idIdx: number,
+): string {
+  const cast = sortKey === "statusSince"
+    ? "date"
+    : sortKey === "tag" || sortKey === "location"
+    ? "text"
+    : "int";
+  if (sortKey === "id") return ""; // handled inline (id-only bind)
+  const expr = SORTABLE[sortKey];
+  const cmp = dir === "asc" ? ">" : "<";
+  if (sortKey !== "owner") {
+    return `(${expr} ${cmp} $${valIdx}::${cast} or ` +
+      `(${expr} = $${valIdx}::${cast} and b.id > $${idIdx}))`;
+  }
+  // Nullable owner: ASC sorts NULLS LAST, DESC sorts NULLS FIRST. The
+  // DESC null branch both continues within the leading NULLs and crosses
+  // from them into the values below (every non-null row sorts after NULL).
+  return dir === "asc"
+    ? `((b.owner_id > $${valIdx}::int) or ` +
+      `(b.owner_id = $${valIdx}::int and b.id > $${idIdx}) or ` +
+      `(b.owner_id is null and ($${valIdx}::int is not null or b.id > $${idIdx})))`
+    : `((b.owner_id < $${valIdx}::int) or ` +
+      `(b.owner_id = $${valIdx}::int and b.id > $${idIdx}) or ` +
+      `(b.owner_id is null and $${valIdx}::int is null and b.id > $${idIdx}) or ` +
+      `($${valIdx}::int is null and b.owner_id is not null))`;
+}
+
+// listBarrierWindowAfter: keyset version of listBarrierWindow for full
+// export walks. Same rows in the same order, but each page is an
+// index-range scan past the previous page's cursor instead of an OFFSET
+// rescan, so large sorted scopes (tag order) stream instead of stalling.
+// Returns the rows plus the cursor for the next page (null on empty).
+export async function listBarrierWindowAfter(
+  q: BarriersQuery,
+  limit: number,
+  after: WindowCursor | null,
+): Promise<{ rows: WireBarrier[]; cursor: WindowCursor | null }> {
+  const sortKey = q.sortCol && SORTABLE[q.sortCol] ? q.sortCol : "id";
+  const dir = q.sortDir === "desc" ? "desc" : "asc";
+  const where = buildWhere(q);
+  const orderBy = `${resolveOrderBy(q.sortCol, q.sortDir)}, b.id asc`;
+  let text = `select ${SELECT_COLUMNS}, ${cursorSelect(sortKey)} from barriers b
+     join locations loc on loc.id = b.location_id
+     ${HISTORY_JOIN} ${where.text}`;
+  let args: unknown[] = [...where.args];
+  if (after !== null) {
+    // NOTE: id binds only the id (no sort value), so every bound param is
+    // referenced - Postgres rejects statements with uninferrable params.
+    if (sortKey === "id") {
+      const idIdx = args.length + 1;
+      text += dir === "asc" ? ` and b.id > $${idIdx}` : ` and b.id < $${idIdx}`;
+      args = [...args, after.id];
+    } else {
+      const valIdx = args.length + 1;
+      const idIdx = args.length + 2;
+      text += ` and ${cursorPredicate(sortKey, dir, valIdx, idIdx)}`;
+      args = [...args, after.sortVal, after.id];
+    }
+  }
+  const rows = await queryRows<BarrierRow & { cursor_val: unknown }>(
+    `${text} order by ${orderBy} limit $${args.length + 1}`,
+    [...args, Math.max(0, limit)],
+  );
+  const last = rows[rows.length - 1];
+  return {
+    rows: rows.map(toWireBarrier),
+    cursor: last === undefined ? null : {
+      sortVal: last.cursor_val as string | number | null,
+      id: last.id,
+    },
+  };
 }
 
 // getBarriersByIds: batch version of getBarrierById (the alert detector
