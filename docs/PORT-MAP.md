@@ -138,8 +138,10 @@ Postgres, Fracttal, and SMTP and never accept any. Note that `docker ps` shows
 **No PostgreSQL service exists in this repository.** There is no `postgres`
 image, no DB `depends_on`, and no DB volume in either compose file. The DB is
 external — `docs/DATABASE.md:11` tells the operator to start one themselves
-("local, Docker, RDS, Supabase, whatever you prefer"). Every container reaches
-it over the public internet at `167.234.249.7:5432`.
+("local, Docker, RDS, Supabase, whatever you prefer"). The bundled `db`
+service (`postgres:16-alpine`, named volume `pgdata`, health-gated) is the
+default: host runs reach it at `localhost:${POSTGRES_PORT:-5432}`,
+containers as hostname `db` via `DATABASE_URL_DOCKER`.
 
 **TLS behaviour** (`lib/server/db.ts:57-70`): TLS is attempted for any host
 that is not `localhost` / `127.0.0.1` / `::1` / `[::1]` and has no
@@ -209,23 +211,26 @@ from the `poller` service and the `tools` one-offs.
 
 ### 5.1 `compose.yml` (production)
 
-| Service  | Image                                | Command                           | Published ports         | Healthcheck                      |
-| -------- | ------------------------------------ | --------------------------------- | ----------------------- | -------------------------------- |
-| `app`    | `barrier-monitor:latest` (build `.`) | image `CMD` → `deno task start`   | **`8000:8000`** (`:24`) | yes, `localhost:8000` (`:26-36`) |
-| `poller` | same                                 | `run -A scripts/fracttal-poll.ts` | **none**                | no                               |
-| `alerts` | same                                 | `run -A scripts/alerts-poll.ts`   | **none**                | no                               |
-| `tools`  | same                                 | image `CMD`, invoked explicitly   | **none**                | no                               |
+| Service  | Image                                           | Command                           | Published ports               | Healthcheck                      |
+| -------- | ----------------------------------------------- | --------------------------------- | ----------------------------- | -------------------------------- |
+| `db`     | `postgres:16-alpine` (bundled, `pgdata` volume) | — (no command)                    | **`5432:5432`** (host-mapped) | yes, `pg_isready`                |
+| `app`    | `barrier-monitor:latest` (build `.`)            | image `CMD` → `deno task start`   | **`8000:8000`** (`:24`)       | yes, `localhost:8000` (`:26-36`) |
+| `poller` | same                                            | `run -A scripts/fracttal-poll.ts` | **none**                      | no                               |
+| `alerts` | same                                            | `run -A scripts/alerts-poll.ts`   | **none**                      | no                               |
+| `tools`  | same                                            | image `CMD`, invoked explicitly   | **none**                      | no                               |
 
 - Project name `barrier-monitor` (`compose.yml:13`) → network
   `barrier-monitor_default`, containers `barrier-monitor-app-1`,
   `-poller-1`, `-alerts-1`, `-tools-1`.
 - `tools` is gated behind `profiles: ["tools"]` (`:68`) so `compose up` never
   starts it.
-- `env_file: [.env]` and `./.env:/app/.env:ro` on **all four** services.
+- `env_file: [.env]` and `./.env:/app/.env:ro` on the four app services
+  (`db` only gets `POSTGRES_*` interpolation, never the full file).
 - `restart: unless-stopped` on `app`/`poller`/`alerts`; not on `tools`.
-- No `networks:`, `network_mode:`, `expose:`, `depends_on:`, or `links:` in
-  either file — everything is on the implicit default bridge and no service
-  talks to another over the network.
+- No `networks:`, `network_mode:`, or `expose:` in either file — everything
+  is on the implicit default bridge. `app`/`poller`/`alerts`/`tools` declare
+  `depends_on: db` with a health gate; no service talks to another over the
+  network besides that gate.
 
 ### 5.2 `compose.dev.yml` (dev override)
 
@@ -235,10 +240,9 @@ from the `poller` service and the `tools` one-offs.
 | `poller` | `run --watch -A scripts/fracttal-poll.ts` | **none**                | same 4                                                              | no                      |
 | `alerts` | `run --watch -A scripts/alerts-poll.ts`   | **none**                | same 4                                                              | no                      |
 
-- Only the dev file declares a named volume: `deno-dir` (`:53-54`), real name
-  `barrier-monitor_deno-dir`, mounted at `DENO_DIR: /deno-dir`. Keeps the Deno
-  cache warm across `down`/`up`. Production uses no named volume at all — the
-  cache lives in the container's writable layer and is lost on recreate.
+- Named volumes: `pgdata` (prod Postgres data — kept as a volume, never a
+  bind mount, for Docker Desktop Windows compat) plus `deno-dir` (dev-only
+  Deno cache, real name `barrier-monitor_deno-dir`).
 - The anonymous volumes `/app/node_modules` and `/app/_fresh` stop the
   `./:/app` bind mount from hiding the image-installed deps and the
   build-time Fresh bundle.
@@ -528,8 +532,8 @@ container.
 - No `server.port` block in `vite.config.ts`.
 - No `networks:`, `network_mode:`, `expose:`, `depends_on:`, or `links:` in
   either compose file.
-- No reverse proxy (nginx / Caddy / Traefik / proxy_pass) config.
-- No PostgreSQL (or any database) service in Docker.
+- No reverse proxy (nginx / Caddy / Traefik / proxy_pass) config in the repo
+  (Windows hosts get one at `deploy/windows/Caddyfile`).
 - No SSE, `EventSource`, or `text/event-stream`.
 - No application WebSocket; the only two are CDP clients in scripts.
 - No CI workflow or port matrix.
