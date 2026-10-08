@@ -131,7 +131,7 @@ Full inventory: `barriers`, `barriers/deleted`,
     column; `since`/`until` = `YYYY-MM-DD` over
     `status_since`; `rowScope` = `active` (default: enabled live rows),
     `inactive` (upstream-disabled), `deleted` or `all` (both admin-only,
-    non-admins get `401`); `page` default 1 (floor, min 1); `pageSize` default 25
+    non-admins get `403`); `page` default 1 (floor, min 1); `pageSize` default 25
     (clamped `1..100000`); `sortCol` whitelist
     (`id/tag/location/typology/criticality/category/owner/availability/compliance/statusSince`,
     default `id`); strict parsers in `routes/api/_params.ts`; `{ error, code,
@@ -243,17 +243,25 @@ Full inventory: `barriers`, `barriers/deleted`,
 
 Every failure responds with the `{ error, code, requestId }` envelope + the
 `x-request-id` header (`code`: `BAD_REQUEST` / `NOT_FOUND` / `UNAUTHORIZED` /
-`RATE_LIMITED` / `INTERNAL`; `500` never leaks a stack or column - the public
-message is fixed per route and the detail goes to the log with the `requestId`).
+`FORBIDDEN` / `RATE_LIMITED` / `UNAVAILABLE` / `INTERNAL`; `500` never leaks
+a stack or column - the public message is fixed per route and the detail goes
+to the log with the `requestId`). Every JSON success also carries
+`x-request-id` (`ok()` / `created()` in `lib/server/errors.ts`), so a client
+report always correlates with a server log line. The pipeline order is fixed
+everywhere: throttle -> `loadServerConfig` -> auth -> validation -> DB.
 
 Login => Dashboard: **dashboard GETs require auth** (`barriers`, `:id`,
 `kpi`, `chart`, `export`, `vocabularies`, `field-options`) - session cookie
 or `ADMIN_TOKEN`. Anonymous callers get `404` camouflage (`NOT_FOUND`, same
-shape as a missing route); dead credentials get `401`. **Writes and admin
-data require admin** (session cookie or `ADMIN_TOKEN`): `PATCH
-.../status`, `PATCH .../:id`, `PUT .../field-options`, recipients, users,
-alert-rules, `GET /api/barriers/deleted`, `GET /api/lookups`.
-`403` never leaks existence; `admin only` when a non-admin session calls.
+shape as a missing route); dead credentials get `401`. A throwing session
+store (DB blip) answers `503 UNAVAILABLE` + `Retry-After`, never `401`, so
+the dashboard backs off instead of dropping the user to login.
+**Writes and admin data require admin** (session cookie or `ADMIN_TOKEN`):
+`PATCH .../status`, `PATCH .../:id`, `PUT .../field-options`, recipients,
+users, alert-rules, `GET /api/barriers/deleted`, `GET /api/lookups`.
+An authenticated non-admin on an admin-only scope gets `403 FORBIDDEN`
+(`admin only`), never `401`, so clients show "restricted" instead of
+redirecting to login in a loop.
 Pages: `/login` is the only public route - `/` redirects logged-out
 sessions to `/login?next=`. Admin management lives in the settings
 sidepanel Admin tab (admin role only); the admin APIs below stay
