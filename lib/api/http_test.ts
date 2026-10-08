@@ -81,3 +81,70 @@ Deno.test("isAuthExpired rejects ordinary errors", () => {
   assert(!isAuthExpired(new Error("API error 500: /api/kpi")));
   assert(!isAuthExpired(null));
 });
+
+Deno.test("fetchJson revalidates with ETag and serves 304 from memory", async () => {
+  const api = httpAdapterFactory("http://x");
+  const seen: Array<Record<string, string>> = [];
+  const prev = globalThis.fetch;
+  const tag = '"abc123"';
+  const snapshot = {
+    total: 2,
+    available: 1,
+    outOfService: 0,
+    contingencyOutage: 0,
+    degradedContingency: 0,
+    degraded: 0,
+    unavailable: 0,
+    other: 1,
+    compliant: 1,
+    nonCompliant: 1,
+    criticalNonCompliant: 0,
+    withoutActionPlan: 0,
+    pctCompliant: 50,
+  };
+  globalThis.fetch = (async (_url: unknown, init?: { headers?: unknown }) => {
+    seen.push({ ...(init?.headers as Record<string, string>) });
+    if (
+      (init?.headers as Record<string, string>)?.["If-None-Match"] === tag
+    ) {
+      return new Response(null, { status: 304, headers: { etag: tag } });
+    }
+    return new Response(JSON.stringify(snapshot), {
+      status: 200,
+      headers: { etag: tag },
+    });
+  }) as typeof fetch;
+  try {
+    // First call: no tag sent, body cached under the returned ETag.
+    const first = await api.getKpi({});
+    assertStrictEquals(first.total, 2);
+    assertStrictEquals(seen[0]?.["If-None-Match"], undefined);
+    // Second call: tag revalidated, 304 served from memory.
+    const second = await api.getKpi({});
+    assertStrictEquals(second.total, 2);
+    assertStrictEquals(seen[1]?.["If-None-Match"], tag);
+    assertStrictEquals(seen.length, 2);
+  } finally {
+    globalThis.fetch = prev;
+  }
+});
+
+Deno.test("fetchJson refreshes the cache when the ETag changes", async () => {
+  const api = httpAdapterFactory("http://y");
+  const prev = globalThis.fetch;
+  let tag = '"v1"';
+  globalThis.fetch = (async () =>
+    Promise.resolve(
+      new Response(JSON.stringify({ total: tag === '"v1"' ? 1 : 2 }), {
+        status: 200,
+        headers: { etag: tag },
+      }),
+    )) as typeof fetch;
+  try {
+    assertStrictEquals((await api.getKpi({})).total, 1);
+    tag = '"v2"';
+    assertStrictEquals((await api.getKpi({})).total, 2);
+  } finally {
+    globalThis.fetch = prev;
+  }
+});

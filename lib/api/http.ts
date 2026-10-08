@@ -36,6 +36,12 @@ export function isAuthExpired(err: unknown): boolean {
   return err instanceof AuthExpiredError;
 }
 
+// Revalidation cache size: last ETag-tagged bodies per URL, so unchanged
+// polls answer from memory after a 304 instead of re-downloading and
+// re-parsing. Dashboard filter combinations are small; entries refresh on
+// every 200 and drop when the server stops tagging.
+const MAX_CACHED_URLS = 50;
+
 // Creates an HTTP BarriersApi bound to the given backend baseUrl. labels
 // carries dynamic station/category id->label maps so imported values beyond
 // the seed enums still resolve for display.
@@ -43,12 +49,26 @@ export function httpAdapterFactory(
   baseUrl: string,
   labels?: ResolverLabels,
 ): BarriersApi {
+  // Per-adapter URL cache (never shared: different baseUrls must never
+  // serve each other's bytes).
+  const etagCache = new Map<string, { etag: string; body: unknown }>();
   // GETs JSON path from baseUrl; throws on non-OK status.
   async function fetchJson<T>(path: string): Promise<T> {
+    const cached = etagCache.get(path);
     const res = await fetch(`${baseUrl}${path}`, {
-      headers: { "Accept": "application/json" },
+      headers: {
+        "Accept": "application/json",
+        ...(cached ? { "If-None-Match": cached.etag } : {}),
+      },
       credentials: "same-origin",
     });
+    // 304 confirms the cached bytes are current - return them without
+    // re-parsing. Untagged 304s (no cache entry) are an error: the server
+    // only confirms tags it issued.
+    if (res.status === 304) {
+      if (cached) return cached.body as T;
+      throw new Error(`API error ${res.status}: ${path}`);
+    }
     // 401 = dead session, 404 = camouflaged anonymous on collections
     // (collection reads never 404 for missing data - they return empty
     // pages - so any 404 here means the caller has no session). Both
@@ -59,7 +79,18 @@ export function httpAdapterFactory(
       throw new AuthExpiredError(res.status, path);
     }
     if (!res.ok) throw new Error(`API error ${res.status}: ${path}`);
-    return res.json() as Promise<T>;
+    const body = await res.json() as T;
+    const etag = res.headers.get("etag");
+    if (etag) {
+      if (etagCache.size >= MAX_CACHED_URLS && !etagCache.has(path)) {
+        const oldest = etagCache.keys().next();
+        if (!oldest.done) etagCache.delete(oldest.value);
+      }
+      etagCache.set(path, { etag, body });
+    } else {
+      etagCache.delete(path);
+    }
+    return body;
   }
 
   return {

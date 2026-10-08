@@ -183,8 +183,14 @@ validation keeps role-gated data correct, so no feature is limited or
 removed and callers that never send the header see byte-identical
 responses. Client `If-None-Match` sending plus 304 handling in
 `lib/api/http.ts` is the follow-up that turns the headers into saved
-bytes.
+bytes. Update: client half DONE in the same release line - `fetchJson`
+revalidates per URL from a bounded (50 entries) per-adapter memory
+cache and serves 304s from memory; caches never cross adapters.
 
 Verification: new `errors_test.ts` cases (stable tag, exact/weak/list/
-wildcard match, foreign tag, changed bytes), `deno task check`, full
-`deno task test` on host and against the docker DB.
+wildcard match, foreign tag, changed bytes), new `http_test.ts` cases
+(revalidate-then-304, tag-change refresh), `deno task check`, full
+`deno task test` on host and against the docker DB. Live HTTP 304 round
+trips were not exercised end to end (no valid credential available
+without touching secrets); the deployed dashboard exercises them on
+the next deploy.

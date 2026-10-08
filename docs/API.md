@@ -252,7 +252,10 @@ additionally carries an `ETag` (SHA-256 over the exact response bytes) plus
 `Cache-Control: private, no-cache`, and answers `304` with no body when
 `If-None-Match` matches (`okWithEtag()` in `lib/server/errors.ts`) - shared
 caches never store authenticated bodies, and clients that revalidate skip
-re-downloading unchanged polls. The pipeline order is fixed
+re-downloading unchanged polls. The HTTP adapter (`lib/api/http.ts`)
+revalidates per URL from a bounded per-adapter memory cache and serves
+`304` answers from memory, so steady-state polls cost a header round-trip
+instead of full JSON bodies. The pipeline order is fixed
 everywhere: throttle -> `loadServerConfig` -> auth -> validation -> DB.
 
 Login => Dashboard: **dashboard GETs require auth** (`barriers`, `:id`,
