@@ -4,9 +4,10 @@
 // route never self-registers, even on an empty table.
 import {
   badRequest,
+  created,
   internal,
   newRequestId,
-  notFound,
+  ok,
   rateLimited,
 } from "../../lib/server/errors.ts";
 
@@ -27,25 +28,33 @@ import {
   normalizeRole,
 } from "../../lib/server/sql/users.ts";
 
-import { hasCredentials, requireAdminAuth } from "../../lib/server/auth.ts";
+import {
+  authStoreUnavailable,
+  denyByCredentials,
+  requireAdminAuth,
+} from "../../lib/server/auth.ts";
 
 import { loadServerConfig } from "../../lib/server/config.ts";
 
-import { unauthorized } from "../../lib/server/errors.ts";
+import { readJsonBody } from "../../lib/server/validation.ts";
 
 import { define } from "../../utils.ts";
 
+// guardAdmin: shared admin gate with the caller's requestId (never a fresh
+// one, so denied responses correlate with the handler's log line). Returns
+// null when authorized, otherwise the denial response.
 async function guardAdmin(
-  ctx: unknown,
   req: Request,
+  requestId: string,
+  logLabel: string,
 ): Promise<Response | null> {
-  const auth = await requireAdminAuth(req);
-  if (!auth.ok) {
-    // Anonymous callers cannot probe user management.
-    if (!hasCredentials(req)) return notFound("not found", newRequestId());
-    return unauthorized(auth.message, newRequestId());
+  let auth;
+  try {
+    auth = await requireAdminAuth(req);
+  } catch (err) {
+    return authStoreUnavailable(logLabel, err, requestId);
   }
-  void ctx;
+  if (!auth.ok) return denyByCredentials(req, auth.message, requestId);
   return null;
 }
 
@@ -57,15 +66,15 @@ export const handler = define.handlers({
     if (!limit.allowed) {
       return rateLimited("too many requests", requestId, limit.retryAfterMs);
     }
-    const denied = await guardAdmin(ctx, ctx.req);
-    if (denied) return denied;
     try {
       loadServerConfig();
     } catch (err) {
       return internal("GET /api/users", err, requestId, "Server misconfigured");
     }
+    const denied = await guardAdmin(ctx.req, requestId, "GET /api/users");
+    if (denied) return denied;
     try {
-      return Response.json(await listUsers());
+      return ok(await listUsers(), requestId);
     } catch (err) {
       return internal(
         "GET /api/users",
@@ -84,29 +93,36 @@ export const handler = define.handlers({
     if (!limit.allowed) {
       return rateLimited("too many requests", requestId, limit.retryAfterMs);
     }
-    const denied = await guardAdmin(ctx, ctx.req);
+    try {
+      loadServerConfig();
+    } catch (err) {
+      return internal(
+        "POST /api/users",
+        err,
+        requestId,
+        "Server misconfigured",
+      );
+    }
+    const denied = await guardAdmin(ctx.req, requestId, "POST /api/users");
     if (denied) return denied;
-    let body: {
+    const parsed = await readJsonBody(ctx.req);
+    if (!parsed.ok) return badRequest("Invalid JSON body", requestId);
+    const body = parsed.body as {
       email?: unknown;
       name?: unknown;
       password?: unknown;
       role?: unknown;
     };
     try {
-      body = await ctx.req.json();
-    } catch {
-      return badRequest("Invalid JSON body", requestId);
-    }
-    try {
       const password = validateNewPassword(body.password);
       const role = normalizeRole(body.role ?? "user");
-      const created = await createUser({
+      const user = await createUser({
         email: body.email as string,
         name: (body.name as string | undefined) ?? "",
         passwordHash: await hashPassword(password),
         role,
       });
-      return Response.json(created, { status: 201 });
+      return created(user, requestId);
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       if (

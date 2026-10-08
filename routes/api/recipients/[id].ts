@@ -4,6 +4,7 @@ import {
   internal,
   newRequestId,
   notFound,
+  ok,
   rateLimited,
 } from "../../../lib/server/errors.ts";
 
@@ -13,6 +14,7 @@ import {
 } from "../../../lib/server/sql/recipients.ts";
 
 import {
+  authStoreUnavailable,
   denyByCredentials,
   requireAdminAuth,
 } from "../../../lib/server/auth.ts";
@@ -20,6 +22,8 @@ import {
 import { routeClientKey, writeThrottle } from "../../../lib/server/throttle.ts";
 
 import { loadServerConfig } from "../../../lib/server/config.ts";
+
+import { parseIdParam, readJsonBody } from "../../../lib/server/validation.ts";
 
 import { define } from "../../../utils.ts";
 
@@ -31,28 +35,39 @@ export const handler = define.handlers({
     if (!limit.allowed) {
       return rateLimited("too many requests", requestId, limit.retryAfterMs);
     }
-    const auth = await requireAdminAuth(ctx.req);
-    if (!auth.ok) return denyByCredentials(ctx.req, auth.message, requestId);
     try {
       loadServerConfig();
     } catch (err) {
-      return internal("recipients/:id", err, requestId, "Server misconfigured");
+      return internal(
+        "PATCH /api/recipients/:id",
+        err,
+        requestId,
+        "Server misconfigured",
+      );
     }
+    let auth;
+    try {
+      auth = await requireAdminAuth(ctx.req);
+    } catch (err) {
+      return authStoreUnavailable(
+        "PATCH /api/recipients/:id",
+        err,
+        requestId,
+      );
+    }
+    if (!auth.ok) return denyByCredentials(ctx.req, auth.message, requestId);
 
-    const id = Number(ctx.params.id);
-    if (!Number.isInteger(id) || id <= 0) {
+    const id = parseIdParam(ctx.params.id);
+    if (id === undefined) {
       return badRequest("Invalid recipient id", requestId);
     }
-    let body: { name?: unknown; active?: unknown };
-    try {
-      body = await ctx.req.json();
-    } catch {
-      return badRequest("Invalid JSON body", requestId);
-    }
+    const parsed = await readJsonBody(ctx.req);
+    if (!parsed.ok) return badRequest("Invalid JSON body", requestId);
+    const body = parsed.body as { name?: unknown; active?: unknown };
     try {
       const updated = await updateRecipient(id, body);
       if (!updated) return notFound("Recipient not found", requestId);
-      return Response.json(updated);
+      return ok(updated, requestId);
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       if (
@@ -77,22 +92,36 @@ export const handler = define.handlers({
     if (!limit.allowed) {
       return rateLimited("too many requests", requestId, limit.retryAfterMs);
     }
-    const auth = await requireAdminAuth(ctx.req);
-    if (!auth.ok) return denyByCredentials(ctx.req, auth.message, requestId);
     try {
       loadServerConfig();
     } catch (err) {
-      return internal("recipients/:id", err, requestId, "Server misconfigured");
+      return internal(
+        "DELETE /api/recipients/:id",
+        err,
+        requestId,
+        "Server misconfigured",
+      );
     }
+    let auth;
+    try {
+      auth = await requireAdminAuth(ctx.req);
+    } catch (err) {
+      return authStoreUnavailable(
+        "DELETE /api/recipients/:id",
+        err,
+        requestId,
+      );
+    }
+    if (!auth.ok) return denyByCredentials(ctx.req, auth.message, requestId);
 
-    const id = Number(ctx.params.id);
-    if (!Number.isInteger(id) || id <= 0) {
+    const id = parseIdParam(ctx.params.id);
+    if (id === undefined) {
       return badRequest("Invalid recipient id", requestId);
     }
     try {
       const removed = await deleteRecipient(id);
       if (!removed) return notFound("Recipient not found", requestId);
-      return Response.json({ ok: true });
+      return ok({ ok: true }, requestId);
     } catch (err) {
       return internal(
         "DELETE /api/recipients/:id",

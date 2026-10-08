@@ -7,6 +7,8 @@ import {
   internal,
   newRequestId,
   notFound,
+  ok,
+  rateLimited,
 } from "../../../lib/server/errors.ts";
 
 import {
@@ -15,6 +17,7 @@ import {
 } from "../../../lib/server/auth/password.ts";
 
 import {
+  authStoreUnavailable,
   denyByCredentials,
   requireAdminAuth,
 } from "../../../lib/server/auth.ts";
@@ -27,7 +30,7 @@ import { deleteUser, updateUser } from "../../../lib/server/sql/users.ts";
 
 import { loadServerConfig } from "../../../lib/server/config.ts";
 
-import { rateLimited } from "../../../lib/server/errors.ts";
+import { parseIdParam, readJsonBody } from "../../../lib/server/validation.ts";
 
 import { define } from "../../../utils.ts";
 
@@ -39,8 +42,6 @@ export const handler = define.handlers({
     if (!limit.allowed) {
       return rateLimited("too many requests", requestId, limit.retryAfterMs);
     }
-    const auth = await requireAdminAuth(ctx.req);
-    if (!auth.ok) return denyByCredentials(ctx.req, auth.message, requestId);
     try {
       loadServerConfig();
     } catch (err) {
@@ -51,21 +52,25 @@ export const handler = define.handlers({
         "Server misconfigured",
       );
     }
-    const id = Number(ctx.params.id);
-    if (!Number.isInteger(id) || id <= 0) {
+    let auth;
+    try {
+      auth = await requireAdminAuth(ctx.req);
+    } catch (err) {
+      return authStoreUnavailable("PATCH /api/users/:id", err, requestId);
+    }
+    if (!auth.ok) return denyByCredentials(ctx.req, auth.message, requestId);
+    const id = parseIdParam(ctx.params.id);
+    if (id === undefined) {
       return badRequest("Invalid user id", requestId);
     }
-    let body: {
+    const parsed = await readJsonBody(ctx.req);
+    if (!parsed.ok) return badRequest("Invalid JSON body", requestId);
+    const body = parsed.body as {
       name?: unknown;
       role?: unknown;
       active?: unknown;
       password?: unknown;
     };
-    try {
-      body = await ctx.req.json();
-    } catch {
-      return badRequest("Invalid JSON body", requestId);
-    }
     try {
       let passwordHash: string | undefined;
       if (body.password !== undefined) {
@@ -81,7 +86,7 @@ export const handler = define.handlers({
       if (passwordHash !== undefined) {
         await deleteSessionsForUser(id);
       }
-      return Response.json(updated);
+      return ok(updated, requestId);
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       if (
@@ -108,8 +113,6 @@ export const handler = define.handlers({
     if (!limit.allowed) {
       return rateLimited("too many requests", requestId, limit.retryAfterMs);
     }
-    const auth = await requireAdminAuth(ctx.req);
-    if (!auth.ok) return denyByCredentials(ctx.req, auth.message, requestId);
     try {
       loadServerConfig();
     } catch (err) {
@@ -120,14 +123,21 @@ export const handler = define.handlers({
         "Server misconfigured",
       );
     }
-    const id = Number(ctx.params.id);
-    if (!Number.isInteger(id) || id <= 0) {
+    let auth;
+    try {
+      auth = await requireAdminAuth(ctx.req);
+    } catch (err) {
+      return authStoreUnavailable("DELETE /api/users/:id", err, requestId);
+    }
+    if (!auth.ok) return denyByCredentials(ctx.req, auth.message, requestId);
+    const id = parseIdParam(ctx.params.id);
+    if (id === undefined) {
       return badRequest("Invalid user id", requestId);
     }
     try {
       const removed = await deleteUser(id);
       if (!removed) return notFound("User not found", requestId);
-      return Response.json({ ok: true });
+      return ok({ ok: true }, requestId);
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       if (message.includes("last active admin")) {

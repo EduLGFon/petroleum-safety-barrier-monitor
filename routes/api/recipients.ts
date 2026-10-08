@@ -11,8 +11,10 @@ import {
 
 import {
   badRequest,
+  created,
   internal,
   newRequestId,
+  ok,
   rateLimited,
 } from "../../lib/server/errors.ts";
 
@@ -21,9 +23,15 @@ import {
   listRecipients,
 } from "../../lib/server/sql/recipients.ts";
 
-import { denyByCredentials, requireAdminAuth } from "../../lib/server/auth.ts";
+import {
+  authStoreUnavailable,
+  denyByCredentials,
+  requireAdminAuth,
+} from "../../lib/server/auth.ts";
 
 import { loadServerConfig } from "../../lib/server/config.ts";
+
+import { readJsonBody } from "../../lib/server/validation.ts";
 
 import { define } from "../../utils.ts";
 
@@ -32,18 +40,24 @@ async function guard(
   req: Request,
   bucket: Throttle,
   requestId: string,
+  logLabel: string,
 ): Promise<Response | null> {
   const limit = bucket.check(routeClientKey(ctx));
   if (!limit.allowed) {
     return rateLimited("too many requests", requestId, limit.retryAfterMs);
   }
-  const auth = await requireAdminAuth(req);
-  if (!auth.ok) return denyByCredentials(req, auth.message, requestId);
   try {
     loadServerConfig();
   } catch (err) {
-    return internal("recipients", err, requestId, "Server misconfigured");
+    return internal(logLabel, err, requestId, "Server misconfigured");
   }
+  let auth;
+  try {
+    auth = await requireAdminAuth(req);
+  } catch (err) {
+    return authStoreUnavailable(logLabel, err, requestId);
+  }
+  if (!auth.ok) return denyByCredentials(req, auth.message, requestId);
   return null;
 }
 
@@ -51,11 +65,17 @@ export const handler = define.handlers({
   // GET the recipient list (activeOnly=1 filters).
   async GET(ctx) {
     const requestId = newRequestId();
-    const denied = await guard(ctx, ctx.req, readThrottle, requestId);
+    const denied = await guard(
+      ctx,
+      ctx.req,
+      readThrottle,
+      requestId,
+      "GET /api/recipients",
+    );
     if (denied) return denied;
     try {
       const activeOnly = ctx.url.searchParams.get("activeOnly") === "1";
-      return Response.json(await listRecipients(activeOnly));
+      return ok(await listRecipients(activeOnly), requestId);
     } catch (err) {
       return internal(
         "GET /api/recipients",
@@ -69,20 +89,23 @@ export const handler = define.handlers({
   // POST { email, name? } - creates or revives (upsert on email).
   async POST(ctx) {
     const requestId = newRequestId();
-    const denied = await guard(ctx, ctx.req, writeThrottle, requestId);
+    const denied = await guard(
+      ctx,
+      ctx.req,
+      writeThrottle,
+      requestId,
+      "POST /api/recipients",
+    );
     if (denied) return denied;
-    let body: { email?: unknown; name?: unknown };
+    const parsed = await readJsonBody(ctx.req);
+    if (!parsed.ok) return badRequest("Invalid JSON body", requestId);
+    const body = parsed.body as { email?: unknown; name?: unknown };
     try {
-      body = await ctx.req.json();
-    } catch {
-      return badRequest("Invalid JSON body", requestId);
-    }
-    try {
-      const created = await createRecipient(
+      const createdRecipient = await createRecipient(
         body.email as string,
         (body.name as string | undefined) ?? "",
       );
-      return Response.json(created, { status: 201 });
+      return created(createdRecipient, requestId);
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       if (message.startsWith("invalid email") || message.includes("name")) {
