@@ -45,7 +45,12 @@ try {
 } finally {
   Remove-Item Env:\PGPASSWORD -ErrorAction SilentlyContinue
 }
-Write-Host "OK: $out ($([math]::Round((Get-Item $out).Length / 1MB, 1)) MB)"
+$sizeMB = [math]::Round((Get-Item $out).Length / 1MB, 1)
+if ((Get-Item $out).Length -eq 0) {
+  Remove-Item $out -Force
+  throw "backup is EMPTY ($out); task will report failure so the gap is noticed."
+}
+Write-Host "OK: $out ($sizeMB MB)"
 
 Get-ChildItem $BackupDir -Filter 'barreiras-*.dump' |
   Where-Object { $_.LastWriteTime -lt (Get-Date).AddDays(-$RetainDays) } |
