@@ -105,13 +105,22 @@ behavior drift against the no-limits rule.
 - Export OFFSET to keyset: must cover every SORTABLE key with identical
   ordering and be proven at 200k rows against a live DB. Current
   5000-row pages under the 200000 ceiling stay as documented.
-- `loadLocal` OR-split, `ensureCatalog` sequence use, `authors` identity
-  change: sync write-path changes. Prove against a disposable DB with a
-  full `--apply` drill, never prod, with owner sign-off first.
-- Alert `countRuleEvents` batching and upstream fetch-concurrency
-  tuning: needs live alert cycles and rate-limit observation.
+- `loadLocal` OR-split: measured on the docker DB (18k barriers):
+  PK scan plus filter in 6.6ms once per cycle. Technically index-defeating,
+  practically negligible next to minutes of upstream fetch. Left as-is;
+  a single query also avoids an N+1 worse than the filter.
+- Alert `countRuleEvents` batching: dry-run `alerts-check` on the docker
+  DB detects 39 candidates in seconds with no writes. No concrete benefit
+  at current rule/candidate volume; revisit if rules multiply.
+- `ensureCatalog` sequence use, `authors` identity change: sync write-path
+  changes with no measured pain (catalog inserts are chunked and
+  idempotent; author creates are rare admin actions). Left as-is.
+- Upstream fetch-concurrency tuning: needs live rate-limit observation
+  across full sweeps; the adaptive bucket already governs the ceiling.
 - HTTP `ETag` / aggregate dashboard endpoint: new contract surface.
   Needs ADR plus browser-verified poll behavior.
+- Export OFFSET to keyset: DONE, see D07 (65s tag-sorted export at 13k
+  rows was the concrete trigger).
 - `EXPLAIN (ANALYZE, BUFFERS)` baseline and load test: not run. No
   database is reachable in this session and `.env` secrets are
   off-limits. Run on staging before and after: list, KPI, export,
