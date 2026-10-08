@@ -11,7 +11,13 @@ import {
 
 import { getSessionUser, type SessionUser } from "./sql/sessions.ts";
 
-import { apiError } from "./errors.ts";
+import {
+  apiError,
+  forbidden,
+  notFound,
+  unauthorized,
+  unavailable,
+} from "./errors.ts";
 
 export type AdminRole = "admin";
 export type RequestRole = "admin" | "user";
@@ -110,7 +116,9 @@ export function hasCredentials(req: Request): boolean {
 
 // denyByCredentials: 404 camouflage ("not found", same shape as a missing
 // route) for callers who presented nothing, 401 with the real reason for
-// callers with dead credentials. Use at every guarded route so anonymous
+// callers with dead credentials, 403 when an authenticated non-admin hits an
+// admin-only route ("admin only" must not read as a dead session, or clients
+// redirect to login in a loop). Use at every guarded route so anonymous
 // visitors cannot map the API surface.
 export function denyByCredentials(
   req: Request,
@@ -120,12 +128,39 @@ export function denyByCredentials(
   if (!hasCredentials(req)) {
     return apiError(404, "NOT_FOUND", "not found", requestId);
   }
+  if (message === "admin only") return forbidden(message, requestId);
   return apiError(401, "UNAUTHORIZED", message, requestId);
 }
 
 export type DataAuth =
   | { ok: true; role: RequestRole; user: SessionUser | null }
   | { ok: false; anonymous: boolean; message: string };
+
+// denyDataAuth: shared denial for dashboard data reads guarded by
+// requireDataAuth. Anonymous callers get 404 camouflage, dead credentials
+// get 401 with the real reason. One helper so every data route denies the
+// same way instead of re-branching on `anonymous`.
+export function denyDataAuth(dataAuth: DataAuth, requestId: string): Response {
+  if (!dataAuth.ok) {
+    return dataAuth.anonymous
+      ? notFound("not found", requestId)
+      : unauthorized(dataAuth.message, requestId);
+  }
+  throw new Error("denyDataAuth called with ok auth");
+}
+
+// authStoreUnavailable: shared 503 for a throwing auth store (DB blip after
+// the pool retry gave up). A dead database must read as 503 with Retry-After,
+// never as 401 that logs the user out. Call inside `catch` around
+// requireDataAuth / requireAdminAuth / requireAuthenticated.
+export function authStoreUnavailable(
+  logLabel: string,
+  err: unknown,
+  requestId: string,
+): Response {
+  console.error(`[${logLabel}] requestId=${requestId}`, err);
+  return unavailable("Auth store unreachable", requestId);
+}
 
 // requireDataAuth: guard for dashboard data reads (barriers, KPI, chart,
 // export, vocabularies). Accepts ADMIN_TOKEN or any active session so ops
