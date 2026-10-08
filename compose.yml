@@ -42,7 +42,10 @@ services:
       - pgdata:/var/lib/postgresql/data
     restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER:-barrier} -d $${POSTGRES_DB:-barreiras}"]
+      test: [
+        "CMD-SHELL",
+        "pg_isready -U $${POSTGRES_USER:-barrier} -d $${POSTGRES_DB:-barreiras}",
+      ]
       interval: 5s
       timeout: 3s
       retries: 10
