@@ -62,20 +62,27 @@ APP_BASE_URL=https://barreiras.example.com
 > `python -c "import secrets;print(secrets.token_hex(32))"` or
 > `[Convert]::ToHexString((1..32 | ForEach-Object { Get-Random -Max 256 }))`.
 
-Full production install in one invocation (recommended: installs Deno,
-PostgreSQL 16, NSSM, Caddy, code, `.env` with generated secrets, services,
-firewall, nightly backups, then smoke-tests; idempotent, fails hard on any
-gate — see its header for all parameters):
+True one-command path (no git needed on the server — download, unpack, launch):
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File .\deploy\windows\Setup-Production.ps1 `
-  -Hostname barreiras.example.com -CompanyName "Seacrest Petróleo" `
-  -AdminEmail you@example.com -RepoUrl https://github.com/org/repo.git
+# In an Administrator PowerShell on the server:
+mkdir C:\srv\barrier-monitor; cd C:\srv\barrier-monitor
+Invoke-WebRequest https://github.com/ORG/REPO/archive/refs/heads/master.zip -OutFile repo.zip
+Expand-Archive repo.zip .; Copy-Item repo-master\* . -Recurse -Force
+.\deploy\windows\Setup.cmd -Hostname barreiras.example.com -CompanyName "Seacrest Petróleo" -AdminEmail you@example.com
 ```
 
-Omit `-Hostname` for a loopback-only host (Caddy and 80/443 stay off; add a
-proxy later). Any secret you omit is generated and printed once at the end.
-Re-runs pull, rebuild, migrate and restart without rotating `.env`.
+`Setup.cmd` self-elevates and bypasses the execution policy for that run,
+then `Setup-Production.ps1` does the whole chain: Deno, PostgreSQL 16, NSSM,
+Caddy, code, `.env` with generated secrets, services, firewall, nightly
+backups, smoke tests. Idempotent and fails hard on any gate. Omit
+`-Hostname` for a loopback-only host; any secret you omit is generated and
+printed once at the end; re-runs pull, rebuild, migrate and restart without
+rotating `.env`. (Replace `ORG/REPO` with the real repo path, or ship the
+folder by any other means — only `deno.jsonc` at the target root matters.)
+
+Need the exotic knobs (`-DbUser`, `-SmtpHost`, `-SourceZip`, …)? Call
+`Setup-Production.ps1` directly — same parameters, no wrapper in the way.
 
 Lighter alternative (prerequisites only — Postgres/services/Caddy stay
 manual) when you want step-by-step control:
