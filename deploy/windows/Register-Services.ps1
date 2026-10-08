@@ -33,7 +33,10 @@ if (-not (Test-Path "$InstallDir\_fresh\server.js")) {
 
 function Register-NssmService([string]$Name, [string]$Args, [string]$Desc) {
   $existing = Get-Service -Name $Name -ErrorAction SilentlyContinue
-  if ($existing) { & $NssmExe stop $Name | Out-Null }
+  if ($existing) {
+    & $NssmExe stop $Name | Out-Null
+    & $NssmExe remove $Name confirm | Out-Null
+  }
   & $NssmExe install $Name "`"$DenoExe`"" $Args | Out-Null
   & $NssmExe set $Name AppDirectory $InstallDir | Out-Null
   & $NssmExe set $Name Description $Desc | Out-Null
