@@ -9,6 +9,7 @@ import {
 import {
   internal,
   newRequestId,
+  ok,
   rateLimited,
 } from "../../../lib/server/errors.ts";
 
@@ -17,6 +18,8 @@ import { routeClientKey, writeThrottle } from "../../../lib/server/throttle.ts";
 import { hashSessionToken } from "../../../lib/server/auth/session.ts";
 
 import { deleteSession } from "../../../lib/server/sql/sessions.ts";
+
+import { loadServerConfig } from "../../../lib/server/config.ts";
 
 import { define } from "../../../utils.ts";
 
@@ -29,9 +32,19 @@ export const handler = define.handlers({
       return rateLimited("too many requests", requestId, limit.retryAfterMs);
     }
     try {
+      loadServerConfig();
+    } catch (err) {
+      return internal(
+        "POST /api/auth/logout",
+        err,
+        requestId,
+        "Server misconfigured",
+      );
+    }
+    try {
       const raw = getSessionTokenFromRequest(ctx.req);
       if (raw) await deleteSession(await hashSessionToken(raw));
-      return Response.json({ ok: true }, {
+      return ok({ ok: true }, requestId, {
         headers: { "set-cookie": buildExpiredCookie() },
       });
     } catch (err) {

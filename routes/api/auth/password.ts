@@ -8,6 +8,7 @@ import {
   badRequest,
   internal,
   newRequestId,
+  ok,
   rateLimited,
   unauthorized,
 } from "../../../lib/server/errors.ts";
@@ -19,6 +20,7 @@ import {
 } from "../../../lib/server/auth/password.ts";
 
 import {
+  authStoreUnavailable,
   denyByCredentials,
   requireAuthenticated,
 } from "../../../lib/server/auth.ts";
@@ -36,6 +38,8 @@ import { buildExpiredCookie } from "../../../lib/server/auth/session.ts";
 
 import { loadServerConfig } from "../../../lib/server/config.ts";
 
+import { readJsonBody } from "../../../lib/server/validation.ts";
+
 import { define } from "../../../utils.ts";
 
 export const handler = define.handlers({
@@ -47,11 +51,6 @@ export const handler = define.handlers({
     if (!limit.allowed) {
       return rateLimited("too many requests", requestId, limit.retryAfterMs);
     }
-    const auth = await requireAuthenticated(ctx.req);
-    if (!auth.ok) return denyByCredentials(ctx.req, auth.message, requestId);
-    if (auth.via !== "session" || !auth.user) {
-      return unauthorized("session required", requestId);
-    }
     try {
       loadServerConfig();
     } catch (err) {
@@ -62,12 +61,26 @@ export const handler = define.handlers({
         "Server misconfigured",
       );
     }
-    let body: { currentPassword?: unknown; newPassword?: unknown };
+    let auth;
     try {
-      body = await ctx.req.json();
-    } catch {
-      return badRequest("Invalid JSON body", requestId);
+      auth = await requireAuthenticated(ctx.req);
+    } catch (err) {
+      return authStoreUnavailable(
+        "POST /api/auth/password",
+        err,
+        requestId,
+      );
     }
+    if (!auth.ok) return denyByCredentials(ctx.req, auth.message, requestId);
+    if (auth.via !== "session" || !auth.user) {
+      return unauthorized("session required", requestId);
+    }
+    const parsed = await readJsonBody(ctx.req);
+    if (!parsed.ok) return badRequest("Invalid JSON body", requestId);
+    const body = parsed.body as {
+      currentPassword?: unknown;
+      newPassword?: unknown;
+    };
     if (
       typeof body.currentPassword !== "string" || body.currentPassword === ""
     ) {
@@ -93,7 +106,7 @@ export const handler = define.handlers({
       // Every session dies, including this one: a hijacked cookie must not
       // survive the change. The expired cookie below clears the browser.
       await deleteSessionsForUser(row.id);
-      return Response.json({ ok: true }, {
+      return ok({ ok: true }, requestId, {
         headers: { "set-cookie": buildExpiredCookie() },
       });
     } catch (err) {

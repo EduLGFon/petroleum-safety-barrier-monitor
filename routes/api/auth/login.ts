@@ -12,6 +12,7 @@ import {
   badRequest,
   internal,
   newRequestId,
+  ok,
   rateLimited,
   unauthorized,
 } from "../../../lib/server/errors.ts";
@@ -38,6 +39,8 @@ import { verifyPassword } from "../../../lib/server/auth/password.ts";
 
 import { loadServerConfig } from "../../../lib/server/config.ts";
 
+import { readJsonBody } from "../../../lib/server/validation.ts";
+
 import { define } from "../../../utils.ts";
 
 export const handler = define.handlers({
@@ -58,21 +61,21 @@ export const handler = define.handlers({
         "Server misconfigured",
       );
     }
-    let body: { email?: unknown; password?: unknown };
-    try {
-      body = await ctx.req.json();
-    } catch {
-      return badRequest("Invalid JSON body", requestId);
-    }
+    const parsedLogin = await readJsonBody(ctx.req);
+    if (!parsedLogin.ok) return badRequest("Invalid JSON body", requestId);
+    const body = parsedLogin.body as {
+      email?: unknown;
+      password?: unknown;
+    };
     try {
       const email = normalizeEmail(body.email);
       if (typeof body.password !== "string" || body.password === "") {
         return badRequest("email and password are required", requestId);
       }
       const user = await getUserByEmail(email);
-      const ok = user !== null && user.active &&
+      const credentialsOk = user !== null && user.active &&
         await verifyPassword(body.password, user.password_hash);
-      if (!ok || !user) {
+      if (!credentialsOk || !user) {
         return unauthorized("invalid credentials", requestId);
       }
       const token = createSessionToken();
@@ -83,7 +86,7 @@ export const handler = define.handlers({
       } catch {
         // Sweep is opportunistic; a failure must not block login.
       }
-      return Response.json(toPublicUser(user), {
+      return ok(toPublicUser(user), requestId, {
         headers: {
           "set-cookie": buildSessionCookie(
             token,
