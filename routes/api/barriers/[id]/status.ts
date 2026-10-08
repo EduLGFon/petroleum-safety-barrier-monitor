@@ -53,6 +53,8 @@ import { sqlAlertStore } from "../../../../lib/server/sql/alerts.ts";
 
 import { loadServerConfig } from "../../../../lib/server/config.ts";
 
+import { forRequest } from "../../../../lib/server/log.ts";
+
 import { define } from "../../../../utils.ts";
 
 interface StatusBody {
@@ -67,6 +69,7 @@ export const handler = define.handlers({
   // explicit authorId contract.
   async PATCH(ctx) {
     const requestId = newRequestId();
+    const reqLog = forRequest(requestId, "status");
     const limit = writeThrottle.check(routeClientKey(ctx));
     if (!limit.allowed) {
       return rateLimited(
@@ -194,22 +197,23 @@ export const handler = define.handlers({
           hasAnyRule: rules.length > 0,
           mailer,
           recipients,
-          logger: (line) => console.log(`[status ${requestId}] ${line}`),
+          logger: reqLog.line("info"),
           labels,
           brand: Deno.env.get("COMPANY_NAME") || undefined,
           dashboardUrl: Deno.env.get("APP_BASE_URL") || undefined,
         });
         if (fanout.matched) {
-          console.log(
-            `[PATCH /api/barriers/${ctx.params.id}/status] requestId=${requestId} ` +
-              `immediate enqueued=${fanout.enqueued} emailed=${fanout.emailed}`,
-          );
+          reqLog.info("immediate fan-out finished", {
+            barrierId,
+            enqueued: fanout.enqueued,
+            emailed: fanout.emailed,
+          });
         }
       } catch (err) {
-        console.error(
-          `[PATCH /api/barriers/${ctx.params.id}/status] requestId=${requestId} immediate fan-out failed`,
+        reqLog.error("immediate fan-out failed", {
+          barrierId,
           err,
-        );
+        });
       }
       return ok(updated, requestId);
     } catch (err) {

@@ -2,11 +2,6 @@
 // This is why it exists: islands cannot read the session cookie directly,
 // so the client fetches this endpoint to learn its role and gate admin UI.
 import {
-  getSessionTokenFromRequest,
-  hashSessionToken,
-} from "../../../lib/server/auth/session.ts";
-
-import {
   internal,
   newRequestId,
   okWithEtag,
@@ -15,11 +10,18 @@ import {
   unavailable,
 } from "../../../lib/server/errors.ts";
 
+import {
+  getSessionTokenFromRequest,
+  hashSessionToken,
+} from "../../../lib/server/auth/session.ts";
+
 import { readThrottle, routeClientKey } from "../../../lib/server/throttle.ts";
 
 import { getSessionUser } from "../../../lib/server/sql/sessions.ts";
 
 import { loadServerConfig } from "../../../lib/server/config.ts";
+
+import { forRequest } from "../../../lib/server/log.ts";
 
 import { define } from "../../../utils.ts";
 
@@ -50,7 +52,7 @@ export const handler = define.handlers({
       if (!user) return unauthorized("not authenticated", requestId);
       return okWithEtag(ctx.req, user, requestId);
     } catch (err) {
-      console.error(`[GET /api/auth/me] requestId=${requestId}`, err);
+      forRequest(requestId, "auth").error("GET /api/auth/me", { err });
       return unavailable("Auth store unreachable", requestId);
     }
   },

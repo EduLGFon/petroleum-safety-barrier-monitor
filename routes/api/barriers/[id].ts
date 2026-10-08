@@ -2,6 +2,14 @@
 // This is why it exists: authenticated GET returns full barrier metadata;
 // admin PATCH updates editable core and sheet fields with input validation.
 import {
+  authStoreUnavailable,
+  denyByCredentials,
+  denyDataAuth,
+  requireAdminAuth,
+  requireDataAuth,
+} from "../../../lib/server/auth.ts";
+
+import {
   badRequest,
   internal,
   newRequestId,
@@ -24,18 +32,12 @@ import {
 } from "../../../lib/server/sql/barriers.ts";
 
 import {
-  authStoreUnavailable,
-  denyByCredentials,
-  denyDataAuth,
-  requireAdminAuth,
-  requireDataAuth,
-} from "../../../lib/server/auth.ts";
-
-import {
   readThrottle,
   routeClientKey,
   writeThrottle,
 } from "../../../lib/server/throttle.ts";
+
+import { parseIdParam, readJsonBody } from "../../../lib/server/validation.ts";
 
 import { maybeSendImmediate } from "../../../lib/server/alerts/immediate.ts";
 
@@ -51,7 +53,7 @@ import { sqlAlertStore } from "../../../lib/server/sql/alerts.ts";
 
 import { loadServerConfig } from "../../../lib/server/config.ts";
 
-import { parseIdParam, readJsonBody } from "../../../lib/server/validation.ts";
+import { forRequest } from "../../../lib/server/log.ts";
 
 import { define } from "../../../utils.ts";
 
@@ -125,6 +127,7 @@ export const handler = define.handlers({
   // PATCH - updates editable barrier fields; admin only.
   async PATCH(ctx) {
     const requestId = newRequestId();
+    const reqLog = forRequest(requestId, "barrier");
     const limit = writeThrottle.check(routeClientKey(ctx));
     if (!limit.allowed) {
       return rateLimited("too many requests", requestId, limit.retryAfterMs);
@@ -273,16 +276,13 @@ export const handler = define.handlers({
             hasAnyRule: rules.length > 0,
             mailer,
             recipients,
-            logger: (line) => console.log(`[barrier ${requestId}] ${line}`),
+            logger: reqLog.line("info"),
             labels,
             brand: Deno.env.get("COMPANY_NAME") || undefined,
             dashboardUrl: Deno.env.get("APP_BASE_URL") || undefined,
           });
         } catch (err) {
-          console.error(
-            `[PATCH /api/barriers/${ctx.params.id}] requestId=${requestId} immediate fan-out failed`,
-            err,
-          );
+          reqLog.error("immediate fan-out failed", { barrierId, err });
         }
       }
 
