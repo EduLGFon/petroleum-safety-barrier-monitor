@@ -5,18 +5,22 @@
 // never disagrees with the grid.
 // Authenticated GET (session or ADMIN_TOKEN); anonymous gets 404.
 import {
+  forbidden,
   internal,
   newRequestId,
-  notFound,
+  ok,
   rateLimited,
-  unauthorized,
 } from "../../lib/server/errors.ts";
 
 import { readThrottle, routeClientKey } from "../../lib/server/throttle.ts";
 
 import { loadServerConfig } from "../../lib/server/config.ts";
 
-import { requireDataAuth } from "../../lib/server/auth.ts";
+import {
+  authStoreUnavailable,
+  denyDataAuth,
+  requireDataAuth,
+} from "../../lib/server/auth.ts";
 
 import { getKpi } from "../../lib/server/sql/barriers.ts";
 
@@ -41,19 +45,20 @@ export const handler = define.handlers({
     } catch (err) {
       return internal("GET /api/kpi", err, requestId, "Server misconfigured");
     }
-    const dataAuth = await requireDataAuth(ctx.req);
-    if (!dataAuth.ok) {
-      return dataAuth.anonymous
-        ? notFound("not found", requestId)
-        : unauthorized(dataAuth.message, requestId);
+    let dataAuth;
+    try {
+      dataAuth = await requireDataAuth(ctx.req);
+    } catch (err) {
+      return authStoreUnavailable("GET /api/kpi", err, requestId);
     }
+    if (!dataAuth.ok) return denyDataAuth(dataAuth, requestId);
 
     const filter = parseFilterQuery(ctx.url.searchParams);
     if (
       (filter.rowScope === "deleted" || filter.rowScope === "all") &&
       dataAuth.role !== "admin"
     ) {
-      return unauthorized("admin only", requestId);
+      return forbidden("admin only", requestId);
     }
 
     try {
@@ -62,7 +67,7 @@ export const handler = define.handlers({
       const snapshot = await getKpi(filter, {
         scopeCounts: dataAuth.role === "admin",
       });
-      return Response.json(snapshot);
+      return ok(snapshot, requestId);
     } catch (err) {
       return internal(
         "GET /api/kpi",

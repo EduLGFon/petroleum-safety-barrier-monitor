@@ -4,11 +4,11 @@
 // Authenticated GET (session or ADMIN_TOKEN); anonymous gets 404
 // camouflage, invalid credentials get 401. Throttled, envelope errors.
 import {
+  forbidden,
   internal,
   newRequestId,
-  notFound,
+  ok,
   rateLimited,
-  unauthorized,
 } from "../../lib/server/errors.ts";
 
 import { parseFilterQuery, parseIntParam } from "./_params.ts";
@@ -21,7 +21,11 @@ import { loadServerConfig } from "../../lib/server/config.ts";
 
 import type { BarriersQuery } from "../../lib/wireTypes.ts";
 
-import { requireDataAuth } from "../../lib/server/auth.ts";
+import {
+  authStoreUnavailable,
+  denyDataAuth,
+  requireDataAuth,
+} from "../../lib/server/auth.ts";
 
 import { define } from "../../utils.ts";
 
@@ -47,12 +51,13 @@ export const handler = define.handlers({
         "Server misconfigured",
       );
     }
-    const dataAuth = await requireDataAuth(ctx.req);
-    if (!dataAuth.ok) {
-      return dataAuth.anonymous
-        ? notFound("not found", requestId)
-        : unauthorized(dataAuth.message, requestId);
+    let dataAuth;
+    try {
+      dataAuth = await requireDataAuth(ctx.req);
+    } catch (err) {
+      return authStoreUnavailable("GET /api/barriers", err, requestId);
     }
+    if (!dataAuth.ok) return denyDataAuth(dataAuth, requestId);
 
     const sp = ctx.url.searchParams;
     const query: BarriersQuery = {
@@ -63,17 +68,17 @@ export const handler = define.handlers({
       sortDir: sp.get("sortDir") === "desc" ? "desc" : "asc",
     };
     // Deleted/audit scopes are admin-only; authenticated non-admins get a
-    // 401 instead of the rows.
+    // 403 instead of the rows.
     if (
       (query.rowScope === "deleted" || query.rowScope === "all") &&
       dataAuth.role !== "admin"
     ) {
-      return unauthorized("admin only", requestId);
+      return forbidden("admin only", requestId);
     }
 
     try {
       const data = await listBarriers(query);
-      return Response.json(data);
+      return ok(data, requestId);
     } catch (err) {
       return internal(
         "GET /api/barriers",

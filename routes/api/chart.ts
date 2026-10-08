@@ -3,11 +3,11 @@
 // chart honors the same filter subset as the table so it never disagrees
 // with the grid. Authenticated GET (session or ADMIN_TOKEN); throttled.
 import {
+  forbidden,
   internal,
   newRequestId,
-  notFound,
+  ok,
   rateLimited,
-  unauthorized,
 } from "../../lib/server/errors.ts";
 
 import { readThrottle, routeClientKey } from "../../lib/server/throttle.ts";
@@ -16,7 +16,11 @@ import { loadServerConfig } from "../../lib/server/config.ts";
 
 import { getChartData } from "../../lib/server/sql/chart.ts";
 
-import { requireDataAuth } from "../../lib/server/auth.ts";
+import {
+  authStoreUnavailable,
+  denyDataAuth,
+  requireDataAuth,
+} from "../../lib/server/auth.ts";
 
 import { parseFilterQuery } from "./_params.ts";
 
@@ -44,24 +48,25 @@ export const handler = define.handlers({
         "Server misconfigured",
       );
     }
-    const dataAuth = await requireDataAuth(ctx.req);
-    if (!dataAuth.ok) {
-      return dataAuth.anonymous
-        ? notFound("not found", requestId)
-        : unauthorized(dataAuth.message, requestId);
+    let dataAuth;
+    try {
+      dataAuth = await requireDataAuth(ctx.req);
+    } catch (err) {
+      return authStoreUnavailable("GET /api/chart", err, requestId);
     }
+    if (!dataAuth.ok) return denyDataAuth(dataAuth, requestId);
 
     const filter = parseFilterQuery(ctx.url.searchParams);
     if (
       (filter.rowScope === "deleted" || filter.rowScope === "all") &&
       dataAuth.role !== "admin"
     ) {
-      return unauthorized("admin only", requestId);
+      return forbidden("admin only", requestId);
     }
 
     try {
       const rows = await getChartData(filter);
-      return Response.json(rows);
+      return ok(rows, requestId);
     } catch (err) {
       return internal(
         "GET /api/chart",

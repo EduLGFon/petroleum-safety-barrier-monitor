@@ -5,9 +5,8 @@
 import {
   internal,
   newRequestId,
-  notFound,
+  ok,
   rateLimited,
-  unauthorized,
 } from "../../lib/server/errors.ts";
 
 import { readThrottle, routeClientKey } from "../../lib/server/throttle.ts";
@@ -16,7 +15,11 @@ import { getVocabularies } from "../../lib/server/sql/vocabularies.ts";
 
 import { loadServerConfig } from "../../lib/server/config.ts";
 
-import { requireDataAuth } from "../../lib/server/auth.ts";
+import {
+  authStoreUnavailable,
+  denyDataAuth,
+  requireDataAuth,
+} from "../../lib/server/auth.ts";
 
 import { define } from "../../utils.ts";
 
@@ -42,15 +45,16 @@ export const handler = define.handlers({
         "Server misconfigured",
       );
     }
-    const dataAuth = await requireDataAuth(ctx.req);
-    if (!dataAuth.ok) {
-      return dataAuth.anonymous
-        ? notFound("not found", requestId)
-        : unauthorized(dataAuth.message, requestId);
+    let dataAuth;
+    try {
+      dataAuth = await requireDataAuth(ctx.req);
+    } catch (err) {
+      return authStoreUnavailable("GET /api/vocabularies", err, requestId);
     }
+    if (!dataAuth.ok) return denyDataAuth(dataAuth, requestId);
 
     try {
-      return Response.json(await getVocabularies());
+      return ok(await getVocabularies(), requestId);
     } catch (err) {
       return internal(
         "GET /api/vocabularies",
