@@ -172,7 +172,8 @@ function ServerView(
       prev.finishedAt = finishedAt;
       return;
     }
-    const newRunFinished = finishedAt !== null && finishedAt !== prev.finishedAt;
+    const newRunFinished = finishedAt !== null &&
+      finishedAt !== prev.finishedAt;
     const justStoppedSyncing = prev.syncing && !syncing;
     prev.syncing = syncing;
     prev.finishedAt = finishedAt;
