@@ -6,6 +6,8 @@ import {
   internal,
   newRequestId,
   notFound,
+  ok,
+  rateLimited,
 } from "../../../lib/server/errors.ts";
 
 import {
@@ -14,6 +16,7 @@ import {
 } from "../../../lib/server/sql/alert_rules.ts";
 
 import {
+  authStoreUnavailable,
   denyByCredentials,
   requireAdminAuth,
 } from "../../../lib/server/auth.ts";
@@ -22,7 +25,7 @@ import { routeClientKey, writeThrottle } from "../../../lib/server/throttle.ts";
 
 import { loadServerConfig } from "../../../lib/server/config.ts";
 
-import { rateLimited } from "../../../lib/server/errors.ts";
+import { parseIdParam, readJsonBody } from "../../../lib/server/validation.ts";
 
 import { define } from "../../../utils.ts";
 
@@ -34,8 +37,6 @@ export const handler = define.handlers({
     if (!limit.allowed) {
       return rateLimited("too many requests", requestId, limit.retryAfterMs);
     }
-    const auth = await requireAdminAuth(ctx.req);
-    if (!auth.ok) return denyByCredentials(ctx.req, auth.message, requestId);
     try {
       loadServerConfig();
     } catch (err) {
@@ -46,16 +47,24 @@ export const handler = define.handlers({
         "Server misconfigured",
       );
     }
-    const id = Number(ctx.params.id);
-    if (!Number.isInteger(id) || id <= 0) {
+    let auth;
+    try {
+      auth = await requireAdminAuth(ctx.req);
+    } catch (err) {
+      return authStoreUnavailable(
+        "PATCH /api/alert-rules/:id",
+        err,
+        requestId,
+      );
+    }
+    if (!auth.ok) return denyByCredentials(ctx.req, auth.message, requestId);
+    const id = parseIdParam(ctx.params.id);
+    if (id === undefined) {
       return badRequest("Invalid rule id", requestId);
     }
-    let body: Record<string, unknown>;
-    try {
-      body = await ctx.req.json();
-    } catch {
-      return badRequest("Invalid JSON body", requestId);
-    }
+    const parsed = await readJsonBody(ctx.req);
+    if (!parsed.ok) return badRequest("Invalid JSON body", requestId);
+    const body = parsed.body;
     try {
       const updated = await updateAlertRule(id, {
         name: body.name,
@@ -89,7 +98,7 @@ export const handler = define.handlers({
         staleRepeatDays: body.staleRepeatDays,
       });
       if (!updated) return notFound("Rule not found", requestId);
-      return Response.json(updated);
+      return ok(updated, requestId);
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       if (
@@ -129,8 +138,6 @@ export const handler = define.handlers({
     if (!limit.allowed) {
       return rateLimited("too many requests", requestId, limit.retryAfterMs);
     }
-    const auth = await requireAdminAuth(ctx.req);
-    if (!auth.ok) return denyByCredentials(ctx.req, auth.message, requestId);
     try {
       loadServerConfig();
     } catch (err) {
@@ -141,14 +148,25 @@ export const handler = define.handlers({
         "Server misconfigured",
       );
     }
-    const id = Number(ctx.params.id);
-    if (!Number.isInteger(id) || id <= 0) {
+    let auth;
+    try {
+      auth = await requireAdminAuth(ctx.req);
+    } catch (err) {
+      return authStoreUnavailable(
+        "DELETE /api/alert-rules/:id",
+        err,
+        requestId,
+      );
+    }
+    if (!auth.ok) return denyByCredentials(ctx.req, auth.message, requestId);
+    const id = parseIdParam(ctx.params.id);
+    if (id === undefined) {
       return badRequest("Invalid rule id", requestId);
     }
     try {
       const removed = await deleteAlertRule(id);
       if (!removed) return notFound("Rule not found", requestId);
-      return Response.json({ ok: true });
+      return ok({ ok: true }, requestId);
     } catch (err) {
       return internal(
         "DELETE /api/alert-rules/:id",

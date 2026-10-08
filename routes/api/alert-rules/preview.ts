@@ -7,10 +7,12 @@ import {
   badRequest,
   internal,
   newRequestId,
+  ok,
   rateLimited,
 } from "../../../lib/server/errors.ts";
 
 import {
+  authStoreUnavailable,
   denyByCredentials,
   requireAdminAuth,
 } from "../../../lib/server/auth.ts";
@@ -39,8 +41,6 @@ export const handler = define.handlers({
     if (!limit.allowed) {
       return rateLimited("too many requests", requestId, limit.retryAfterMs);
     }
-    const auth = await requireAdminAuth(ctx.req);
-    if (!auth.ok) return denyByCredentials(ctx.req, auth.message, requestId);
     try {
       loadServerConfig();
     } catch (err) {
@@ -51,6 +51,17 @@ export const handler = define.handlers({
         "Server misconfigured",
       );
     }
+    let auth;
+    try {
+      auth = await requireAdminAuth(ctx.req);
+    } catch (err) {
+      return authStoreUnavailable(
+        "GET /api/alert-rules/preview",
+        err,
+        requestId,
+      );
+    }
+    if (!auth.ok) return denyByCredentials(ctx.req, auth.message, requestId);
     try {
       const q = ctx.url.searchParams;
       const categoryIds = parseIds(q.get("categoryIds"));
@@ -102,10 +113,10 @@ export const handler = define.handlers({
         `select b.tag from barriers b ${where} order by b.id limit 5`,
         args,
       );
-      return Response.json({
+      return ok({
         count: Number(counted[0]?.n ?? 0),
         tags: sample.map((r) => r.tag),
-      });
+      }, requestId);
     } catch (err) {
       return internal(
         "GET /api/alert-rules/preview",

@@ -7,7 +7,9 @@ import {
   upsertFieldOptionSet,
 } from "../../lib/server/sql/field-options.ts";
 import {
+  authStoreUnavailable,
   denyByCredentials,
+  denyDataAuth,
   requireAdminAuth,
   requireDataAuth,
 } from "../../lib/server/auth.ts";
@@ -15,6 +17,7 @@ import {
   badRequest,
   internal,
   newRequestId,
+  ok,
   rateLimited,
 } from "../../lib/server/errors.ts";
 import {
@@ -34,8 +37,6 @@ export const handler = define.handlers({
     if (!limit.allowed) {
       return rateLimited("too many requests", requestId, limit.retryAfterMs);
     }
-    const auth = await requireDataAuth(ctx.req);
-    if (!auth.ok) return denyByCredentials(ctx.req, auth.message, requestId);
     try {
       loadServerConfig();
     } catch (err) {
@@ -46,8 +47,15 @@ export const handler = define.handlers({
         "Server misconfigured",
       );
     }
+    let auth;
     try {
-      return Response.json(await listFieldOptionSets());
+      auth = await requireDataAuth(ctx.req);
+    } catch (err) {
+      return authStoreUnavailable("GET /api/field-options", err, requestId);
+    }
+    if (!auth.ok) return denyDataAuth(auth, requestId);
+    try {
+      return ok(await listFieldOptionSets(), requestId);
     } catch (err) {
       return internal(
         "GET /api/field-options",
@@ -65,8 +73,6 @@ export const handler = define.handlers({
     if (!limit.allowed) {
       return rateLimited("too many requests", requestId, limit.retryAfterMs);
     }
-    const auth = await requireAdminAuth(ctx.req);
-    if (!auth.ok) return denyByCredentials(ctx.req, auth.message, requestId);
     try {
       loadServerConfig();
     } catch (err) {
@@ -77,6 +83,13 @@ export const handler = define.handlers({
         "Server misconfigured",
       );
     }
+    let auth;
+    try {
+      auth = await requireAdminAuth(ctx.req);
+    } catch (err) {
+      return authStoreUnavailable("PUT /api/field-options", err, requestId);
+    }
+    if (!auth.ok) return denyByCredentials(ctx.req, auth.message, requestId);
     const field = ctx.url.searchParams.get("field");
     if (!isFieldKey(field)) {
       return badRequest("Unknown field", requestId);
@@ -90,7 +103,7 @@ export const handler = define.handlers({
     try {
       const options = normalizeOptions(body.options);
       const saved = await upsertFieldOptionSet(field, options, "admin");
-      return Response.json(saved);
+      return ok(saved, requestId);
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       if (message.includes("options")) return badRequest(message, requestId);

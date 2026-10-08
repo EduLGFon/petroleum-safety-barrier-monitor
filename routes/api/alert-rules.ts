@@ -4,8 +4,10 @@
 // immediate vs digest delivery. The detector reads active rows.
 import {
   badRequest,
+  created,
   internal,
   newRequestId,
+  ok,
   rateLimited,
 } from "../../lib/server/errors.ts";
 
@@ -20,9 +22,15 @@ import {
   listAlertRules,
 } from "../../lib/server/sql/alert_rules.ts";
 
-import { denyByCredentials, requireAdminAuth } from "../../lib/server/auth.ts";
+import {
+  authStoreUnavailable,
+  denyByCredentials,
+  requireAdminAuth,
+} from "../../lib/server/auth.ts";
 
 import { loadServerConfig } from "../../lib/server/config.ts";
+
+import { readJsonBody } from "../../lib/server/validation.ts";
 
 import { define } from "../../utils.ts";
 
@@ -34,8 +42,6 @@ export const handler = define.handlers({
     if (!limit.allowed) {
       return rateLimited("too many requests", requestId, limit.retryAfterMs);
     }
-    const auth = await requireAdminAuth(ctx.req);
-    if (!auth.ok) return denyByCredentials(ctx.req, auth.message, requestId);
     try {
       loadServerConfig();
     } catch (err) {
@@ -46,9 +52,16 @@ export const handler = define.handlers({
         "Server misconfigured",
       );
     }
+    let auth;
+    try {
+      auth = await requireAdminAuth(ctx.req);
+    } catch (err) {
+      return authStoreUnavailable("GET /api/alert-rules", err, requestId);
+    }
+    if (!auth.ok) return denyByCredentials(ctx.req, auth.message, requestId);
     try {
       const activeOnly = ctx.url.searchParams.get("activeOnly") === "1";
-      return Response.json(await listAlertRules(activeOnly));
+      return ok(await listAlertRules(activeOnly), requestId);
     } catch (err) {
       return internal(
         "GET /api/alert-rules",
@@ -66,8 +79,6 @@ export const handler = define.handlers({
     if (!limit.allowed) {
       return rateLimited("too many requests", requestId, limit.retryAfterMs);
     }
-    const auth = await requireAdminAuth(ctx.req);
-    if (!auth.ok) return denyByCredentials(ctx.req, auth.message, requestId);
     try {
       loadServerConfig();
     } catch (err) {
@@ -78,14 +89,18 @@ export const handler = define.handlers({
         "Server misconfigured",
       );
     }
-    let body: Record<string, unknown>;
+    let auth;
     try {
-      body = await ctx.req.json();
-    } catch {
-      return badRequest("Invalid JSON body", requestId);
+      auth = await requireAdminAuth(ctx.req);
+    } catch (err) {
+      return authStoreUnavailable("POST /api/alert-rules", err, requestId);
     }
+    if (!auth.ok) return denyByCredentials(ctx.req, auth.message, requestId);
+    const parsed = await readJsonBody(ctx.req);
+    if (!parsed.ok) return badRequest("Invalid JSON body", requestId);
+    const body = parsed.body;
     try {
-      const created = await createAlertRule({
+      const rule = await createAlertRule({
         name: body.name,
         description: body.description,
         categoryId: body.categoryId,
@@ -116,7 +131,7 @@ export const handler = define.handlers({
         validTo: body.validTo,
         staleRepeatDays: body.staleRepeatDays,
       });
-      return Response.json(created, { status: 201 });
+      return created(rule, requestId);
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       if (
