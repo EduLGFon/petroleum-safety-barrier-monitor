@@ -158,3 +158,44 @@ async function runOnce<T>(text: string, args: Array<unknown>): Promise<T[]> {
     }
   }
 }
+
+// TxQuery: query function bound to one transaction connection.
+export type TxQuery = <U>(
+  text: string,
+  args?: Array<unknown>,
+) => Promise<U[]>;
+
+// withTx: runs fn inside one BEGIN/COMMIT transaction on a single pooled
+// connection, rolling back and rethrowing on error. No stale retry:
+// replaying a half-applied transaction on a fresh connection is unsafe,
+// so a transport failure surfaces to the caller instead.
+export async function withTx<T>(
+  fn: (query: TxQuery) => Promise<T>,
+): Promise<T> {
+  const client = await getPool().connect();
+  try {
+    await client.queryObject("BEGIN", []);
+    try {
+      const query: TxQuery = <U>(
+        text: string,
+        args: Array<unknown> = [],
+      ): Promise<U[]> => client.queryObject<U>(text, args).then((r) => r.rows);
+      const out = await fn(query);
+      await client.queryObject("COMMIT", []);
+      return out;
+    } catch (err) {
+      try {
+        await client.queryObject("ROLLBACK", []);
+      } catch {
+        // Rollback on a dead socket throws; the original error matters.
+      }
+      throw err;
+    }
+  } finally {
+    try {
+      client.release();
+    } catch {
+      // Dead socket: dropping it is the fix, same as runOnce.
+    }
+  }
+}

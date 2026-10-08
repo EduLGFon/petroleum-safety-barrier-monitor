@@ -35,3 +35,40 @@ through `record_status_change()` semantics, per-chunk transactions) with
 docs updated in the same commit.
 
 Verification: `deno task check` (includes migration-order guard).
+
+## D02 - Read round-trip collapse (2026-10-08)
+
+Context: dashboard fan-out runs list+count (2 scans), KPI (5-6 scans),
+chart, vocabularies on every poll. No contract change allowed.
+
+Decision: `listBarriers` carries the total as `count(*) OVER()` on each
+row (one scan; out-of-range empty pages take one count query so
+totalPages stays exact). `getKpi` runs the fixed-field aggregate plus one
+tagged `UNION ALL` bucket query (2 round-trips, 3 with admin scopeCounts)
+with the same filter subset and fail-closed NC definition per branch.
+Wire shapes, pageSize clamp, and scope gating unchanged.
+
+Verification: `deno fmt --check`, `deno check`, `deno task test`
+(576 passed; DB integration suites self-skip without DATABASE_URL).
+
+## D03 - Atomic chunked sync apply with batched audit (2026-10-08)
+
+Context: `applyPlan` ran N barriers x 2-3 sequential statements in
+autocommit, so a crash left half-applied runs and every audit row cost a
+round-trip. Bulk `UNNEST` rewrites were rejected: they would bypass the
+sanctioned `record_status_change()` path semantics and cannot be verified
+without a live Postgres here.
+
+Decision: new `withTx` helper in `lib/server/db.ts` (single-connection
+BEGIN/COMMIT/ROLLBACK, guarded release, no stale retry since replaying a
+partial tx is unsafe). `applyPlan` commits in `SYNC_APPLY_CHUNK=200`
+transactions with identical per-row SQL (same UPDATE text, same
+`record_status_change()` calls, same UNIQUE-conflict skip counting).
+Audit rows collect per chunk and insert in one multi-row statement after
+commit (best-effort preserved: empty/null skips, warn on missing table,
+per-row `recordBarrierChange` fallback so one bad row never drops the
+rest). Barrier-write failure still fails the run; audit failure never
+fails barrier writes.
+
+Verification: `deno fmt --check`, `deno check`, `deno task test`
+(576 passed; DB integration suites self-skip without DATABASE_URL).

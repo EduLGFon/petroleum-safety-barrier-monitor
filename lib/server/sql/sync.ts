@@ -26,7 +26,7 @@ import type {
 
 import type { CatalogNeeds, MapContext } from "../fracttal/map.ts";
 
-import { queryRows } from "../db.ts";
+import { queryRows, type TxQuery, withTx } from "../db.ts";
 
 import { getResolverLabels } from "./vocabularies.ts";
 
@@ -48,6 +48,10 @@ export const SYNC_AUTHOR_ID = 10; // authors.id, see db/seed_lookups.sql
 // SYNC_STALE_MINUTES means the poller likely crashed mid-run.
 export const SYNC_FRESH_MINUTES = 10;
 export const SYNC_STALE_MINUTES = 15;
+
+// Apply chunk: barriers committed per transaction. Bounds tx length and
+// the audit batch (8 params per row) well under protocol limits.
+export const SYNC_APPLY_CHUNK = 200;
 
 // syncScopeRunning: poll lock - true while a run for the scope is still
 // 'running'. A crashed run would block polls forever, so the lock is stale
@@ -294,118 +298,128 @@ export const defaultSyncIo: SyncIo = {
     runId?: number | null,
   ): Promise<PlanCounts> {
     const counts: PlanCounts = { inserts: 0, updates: 0, deletes: 0, skips: 0 };
-    for (const entry of entries) {
-      if (entry.kind === "skip") {
-        counts.skips++;
-        continue;
-      }
-      if (entry.kind === "delete") {
-        await queryRows(
-          `update barriers set deleted_at = now()
-           where id = $1 and deleted_at is null`,
-          [entry.local.id],
-        );
-        counts.deletes++;
-        await recordBarrierChange(runId ?? null, {
-          barrierId: entry.local.id,
-          kind: "removed",
-          oldAvailabilityId: entry.local.availabilityId,
-          newAvailabilityId: null,
-          changedFields: [],
-          oldSnapshot: entry.local.fields
-            ? snapshotOf(entry.local.fields, entry.local.availabilityId)
-            : { availabilityId: entry.local.availabilityId },
-          newSnapshot: {},
-        });
-        continue;
-      }
-      const input = entry.input;
-      if (entry.kind === "insert") {
-        const id = await insertBarrier(input);
-        if (id !== null) {
-          // Stamp the initial history row so the transition timeline is not
-          // empty for a freshly imported barrier.
-          await queryRows(
-            "select record_status_change($1, $2, $3, $4)",
+    const rid = runId ?? null;
+    // Chunked transactions: a crash leaves whole chunks applied or not,
+    // never half a chunk. Audit rows batch after each commit (best-effort,
+    // same as before) so a missing audit table never fails barrier writes.
+    for (let at = 0; at < entries.length; at += SYNC_APPLY_CHUNK) {
+      const audits: AuditRow[] = [];
+      await withTx(async (tx) => {
+        for (const entry of entries.slice(at, at + SYNC_APPLY_CHUNK)) {
+          if (entry.kind === "skip") {
+            counts.skips++;
+            continue;
+          }
+          if (entry.kind === "delete") {
+            await tx(
+              `update barriers set deleted_at = now()
+               where id = $1 and deleted_at is null`,
+              [entry.local.id],
+            );
+            counts.deletes++;
+            audits.push({
+              barrierId: entry.local.id,
+              kind: "removed",
+              oldAvailabilityId: entry.local.availabilityId,
+              newAvailabilityId: null,
+              changedFields: [],
+              oldSnapshot: entry.local.fields
+                ? snapshotOf(entry.local.fields, entry.local.availabilityId)
+                : { availabilityId: entry.local.availabilityId },
+              newSnapshot: {},
+            });
+            continue;
+          }
+          const input = entry.input;
+          if (entry.kind === "insert") {
+            const id = await insertBarrier(input, tx);
+            if (id !== null) {
+              // Stamp the initial history row so the transition timeline is
+              // not empty for a freshly imported barrier.
+              await tx(
+                "select record_status_change($1, $2, $3, $4)",
+                [
+                  id,
+                  input.availabilityId,
+                  SYNC_AUTHOR_ID,
+                  "Importado do Fracttal",
+                ],
+              );
+              counts.inserts++;
+              audits.push({
+                barrierId: id,
+                kind: "new",
+                oldAvailabilityId: null,
+                newAvailabilityId: input.availabilityId,
+                changedFields: [],
+                oldSnapshot: {},
+                newSnapshot: snapshotOf(input, input.availabilityId),
+              });
+            } else {
+              // Race: the unique external_code constraint won - another run
+              // inserted this row first. Count as a skip, not an error.
+              counts.skips++;
+            }
+            continue;
+          }
+          // update / restore: same field write (location included, so
+          // station moves persist); restore clears deleted_at.
+          await tx(
+            `update barriers set
+               tag = $2, location_id = $3, typology_id = $4, loc_desc_id = $5,
+               criticality_id = $6, category_id = $7, grouping_id = $8,
+               owner_id = $9, comments = $10, action_plan = $11,
+               source_updated_at = $12, scope_source = $13, is_active = $14,
+               deleted_at = case when $15 then null else deleted_at end
+             where id = $1`,
             [
-              id,
-              input.availabilityId,
-              SYNC_AUTHOR_ID,
-              "Importado do Fracttal",
+              entry.local.id,
+              input.tag,
+              input.locationId,
+              input.typologyId,
+              input.locDescId,
+              input.criticalityId,
+              input.categoryId,
+              input.groupingId,
+              input.ownerId,
+              input.comments,
+              input.actionPlan,
+              input.sourceUpdatedAt,
+              input.scopeSource,
+              input.isActive,
+              entry.kind === "restore",
             ],
           );
-          counts.inserts++;
-          await recordBarrierChange(runId ?? null, {
-            barrierId: id,
-            kind: "new",
-            oldAvailabilityId: null,
+          if (entry.statusChanged) {
+            await tx(
+              "select record_status_change($1, $2, $3, $4)",
+              [
+                entry.local.id,
+                input.availabilityId,
+                SYNC_AUTHOR_ID,
+                "Sincronização Fracttal",
+              ],
+            );
+          }
+          counts.updates++;
+          audits.push({
+            barrierId: entry.local.id,
+            kind: entry.kind === "restore" ? "restored" : "updated",
+            oldAvailabilityId: entry.local.availabilityId,
             newAvailabilityId: input.availabilityId,
-            changedFields: [],
-            oldSnapshot: {},
+            changedFields: diffSignatureFields(
+              entry.local.fields,
+              input,
+              entry.statusChanged,
+            ),
+            oldSnapshot: entry.local.fields
+              ? snapshotOf(entry.local.fields, entry.local.availabilityId)
+              : { availabilityId: entry.local.availabilityId },
             newSnapshot: snapshotOf(input, input.availabilityId),
           });
-        } else {
-          // Race: the unique external_code constraint won - another run
-          // inserted this row first. Count as a skip, not an error.
-          counts.skips++;
         }
-        continue;
-      }
-      // update / restore: same field write (location included, so station
-      // moves persist); restore clears deleted_at.
-      await queryRows(
-        `update barriers set
-           tag = $2, location_id = $3, typology_id = $4, loc_desc_id = $5,
-           criticality_id = $6, category_id = $7, grouping_id = $8,
-           owner_id = $9, comments = $10, action_plan = $11,
-           source_updated_at = $12, scope_source = $13, is_active = $14,
-           deleted_at = case when $15 then null else deleted_at end
-         where id = $1`,
-        [
-          entry.local.id,
-          input.tag,
-          input.locationId,
-          input.typologyId,
-          input.locDescId,
-          input.criticalityId,
-          input.categoryId,
-          input.groupingId,
-          input.ownerId,
-          input.comments,
-          input.actionPlan,
-          input.sourceUpdatedAt,
-          input.scopeSource,
-          input.isActive,
-          entry.kind === "restore",
-        ],
-      );
-      if (entry.statusChanged) {
-        await queryRows(
-          "select record_status_change($1, $2, $3, $4)",
-          [
-            entry.local.id,
-            input.availabilityId,
-            SYNC_AUTHOR_ID,
-            "Sincronização Fracttal",
-          ],
-        );
-      }
-      counts.updates++;
-      await recordBarrierChange(runId ?? null, {
-        barrierId: entry.local.id,
-        kind: entry.kind === "restore" ? "restored" : "updated",
-        oldAvailabilityId: entry.local.availabilityId,
-        newAvailabilityId: input.availabilityId,
-        changedFields: diffSignatureFields(
-          entry.local.fields,
-          input,
-          entry.statusChanged,
-        ),
-        oldSnapshot: entry.local.fields
-          ? snapshotOf(entry.local.fields, entry.local.availabilityId)
-          : { availabilityId: entry.local.availabilityId },
-        newSnapshot: snapshotOf(input, input.availabilityId),
       });
+      await insertAuditBatch(rid, audits);
     }
     return counts;
   },
@@ -443,7 +457,8 @@ export const defaultSyncIo: SyncIo = {
 
 // insertBarrier: the create path, guarded by the UNIQUE external_code
 // constraint (dedup is DB-enforced, not app logic). Returns the new id when
-// the row was actually inserted, null on a race-conflict.
+// the row was actually inserted, null on a race-conflict. Runs on the
+// given query (transaction connection in applyPlan, pool otherwise).
 async function insertBarrier(input: {
   externalCode: string;
   tag: string;
@@ -460,8 +475,8 @@ async function insertBarrier(input: {
   comments: string;
   actionPlan: string;
   sourceUpdatedAt: string | null;
-}): Promise<number | null> {
-  const rows = await queryRows<{ id: number }>(
+}, query: TxQuery = queryRows): Promise<number | null> {
+  const rows = await query<{ id: number }>(
     `insert into barriers
        (external_code, tag, location_id, typology_id, loc_desc_id,
         criticality_id, category_id, grouping_id, owner_id,
@@ -489,6 +504,69 @@ async function insertBarrier(input: {
     ],
   );
   return rows[0]?.id ?? null;
+}
+
+// AuditRow: one sync_barrier_changes row per touched barrier.
+interface AuditRow {
+  barrierId: number;
+  kind: string;
+  oldAvailabilityId: number | null;
+  newAvailabilityId: number | null;
+  changedFields: string[];
+  oldSnapshot: Record<string, unknown>;
+  newSnapshot: Record<string, unknown>;
+}
+
+// insertAuditBatch: one multi-row INSERT per apply chunk instead of one
+// statement per barrier. Best-effort like recordBarrierChange: empty
+// batches and null runs skip, a missing table warns, and a rejected batch
+// falls back to per-row inserts so one bad row never drops the rest.
+async function insertAuditBatch(
+  runId: number | null,
+  audits: AuditRow[],
+): Promise<void> {
+  if (runId === null || runId === undefined || audits.length === 0) return;
+  const values: string[] = [];
+  const args: unknown[] = [];
+  for (const a of audits) {
+    args.push(
+      runId,
+      a.barrierId,
+      a.kind,
+      a.oldAvailabilityId,
+      a.newAvailabilityId,
+      JSON.stringify(a.changedFields),
+      JSON.stringify(a.oldSnapshot),
+      JSON.stringify(a.newSnapshot),
+    );
+    const b = args.length - 8;
+    values.push(
+      `($${b + 1}, $${b + 2}, $${b + 3}, $${b + 4}, $${b + 5}, ` +
+        `$${b + 6}::jsonb, $${b + 7}::jsonb, $${b + 8}::jsonb)`,
+    );
+  }
+  try {
+    await queryRows(
+      `insert into sync_barrier_changes
+        (run_id, barrier_id, kind, old_availability_id, new_availability_id,
+         changed_fields, old_snapshot, new_snapshot)
+       values ${values.join(", ")}`,
+      args,
+    );
+  } catch (err) {
+    console.warn("[sync] audit batch failed, retrying per row", err);
+    for (const a of audits) {
+      await recordBarrierChange(runId, {
+        barrierId: a.barrierId,
+        kind: a.kind,
+        oldAvailabilityId: a.oldAvailabilityId,
+        newAvailabilityId: a.newAvailabilityId,
+        changedFields: a.changedFields,
+        oldSnapshot: a.oldSnapshot,
+        newSnapshot: a.newSnapshot,
+      });
+    }
+  }
 }
 
 // SyncStatusRow: the raw sync_state shape the status indicator reads.
