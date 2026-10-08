@@ -8,21 +8,27 @@ import type {
   WireBarrier,
   WireKpiSnapshot,
 } from "../../wireTypes.ts";
+
 import {
   type BarrierRow,
   HISTORY_JOIN,
   SELECT_COLUMNS,
   toWireBarrier,
 } from "./mappers.ts";
+
 export {
   HISTORY_JOIN,
   SELECT_COLUMNS,
   toHistory,
   toWireBarrier,
 } from "./mappers.ts";
+
 export { buildWhere, escapeLike, resolveOrderBy, SORTABLE } from "./where.ts";
-export type { BarrierRow, HistoryEntry } from "./mappers.ts";
+
 import { buildWhere, resolveOrderBy, SORTABLE } from "./where.ts";
+
+export type { BarrierRow, HistoryEntry } from "./mappers.ts";
+
 import { queryRows } from "../db.ts";
 
 // Lists paged wire barriers + total for the given BarriersQuery filters.
@@ -370,13 +376,18 @@ export async function getKpi(
 
 // The one write path: calls record_status_change() (see db/schema.sql),
 // which updates availability_id + status_since and appends history.
-// Never UPDATE availability_id directly from application code.
+// Never UPDATE availability_id directly from application code (the DB
+// guard trigger rejects it). No-op when the status already matches, so
+// retried PATCHes never duplicate history rows or re-fire alerts.
 export async function transitionBarrierStatus(
   barrierId: number,
   statusId: number,
   authorId: number,
   note = "",
 ): Promise<WireBarrier | null> {
+  const current = await getBarrierById(barrierId);
+  if (!current) return null;
+  if (current.availabilityId === statusId) return current;
   await queryRows("select record_status_change($1, $2, $3, $4)", [
     barrierId,
     statusId,

@@ -121,7 +121,11 @@ create table if not exists barriers (
 
   -- Provenance + soft delete (Fracttal sync, P3). external_code is the
   -- stable upstream business key used for upsert matching - never renumber.
-  external_code       text        unique,
+  -- NOT NULL: every barrier row must carry its upstream key so reconcile
+  -- can match it (NULLs would be invisible to loadLocal and could
+  -- duplicate on the next sync). Local-only rows do not exist yet; if one
+  -- is ever added it needs a stable synthetic code, not NULL.
+  external_code       text        not null unique,
   source_updated_at   timestamptz,          -- best-available remote timestamp; null when upstream exposes none
   deleted_at          timestamptz,          -- set by sync when the upstream row disappears; row stays for audit
 
@@ -161,6 +165,12 @@ alter table barriers add column if not exists extra_comments text;
 -- existing databases gain it on the next migrate (default true = enabled).
 alter table barriers add column if not exists is_active boolean not null default true;
 create index if not exists idx_barriers_is_active on barriers(is_active);
+
+-- Pre-existing databases created external_code as nullable: enforce the
+-- NOT NULL contract idempotently. Fail-closed when legacy NULL rows
+-- exist (Postgres raises naming the column) so the owner resolves them
+-- with stable synthetic codes instead of silently duplicating later.
+alter table barriers alter column external_code set not null;
 
 create or replace function barriers_set_compliance() returns trigger as $$
 begin
@@ -247,6 +257,10 @@ create or replace function record_status_change(
   p_note       text default ''
 ) returns void as $$
 begin
+  -- Marks this transaction as a sanctioned status write so the guard
+  -- trigger below lets the UPDATE through. Transaction-local: it never
+  -- leaks past COMMIT/ROLLBACK.
+  perform set_config('app.status_write', 'on', true);
   update barriers
      set availability_id = p_status_id,
          status_since    = current_date
@@ -260,6 +274,28 @@ begin
   values (p_barrier_id, current_date, p_status_id, p_author_id, p_note);
 end;
 $$ language plpgsql;
+
+-- ─── Status write guard - DB enforcement of the one write path ──────────
+-- Rejects any direct UPDATE of barriers.availability_id that did not go
+-- through record_status_change() (which sets app.status_write first).
+-- Without this the "only sanctioned way" rule is convention only, and a
+-- future code path could move availability without stamping status_since
+-- or history. INSERTs are unaffected (trigger is UPDATE-only), as are
+-- sync field writes (they never touch availability_id). Manual repair
+-- remains possible by setting the GUC first in the same transaction.
+create or replace function guard_availability_write() returns trigger as $$
+begin
+  if current_setting('app.status_write', true) is distinct from 'on' then
+    raise exception 'direct UPDATE of barriers.availability_id forbidden; use record_status_change()';
+  end if;
+  return new;
+end;
+$$ language plpgsql;
+
+drop trigger if exists trg_guard_availability_write on barriers;
+create trigger trg_guard_availability_write
+  before update of availability_id on barriers
+  for each row execute function guard_availability_write();
 
 -- ─── Sync state + alert events (Fracttal import, P3) ───────────────────────
 
@@ -285,6 +321,23 @@ create index if not exists idx_sync_state_status on sync_state(status, started_a
 -- lib/server/sql/sync.ts (syncScopeRunning, reapStaleRuns, getSyncStatus).
 -- Additive only, existing index kept. See DECISIONS.md#D01.
 create index if not exists idx_sync_state_scope_status on sync_state(scope, status, finished_at desc);
+
+-- Single running lease per scope, DB-enforced: two racing pollers must not
+-- both open a run. startRun() still checks first (fast path to ScopeBusy
+-- without an error), and the index turns the race into a unique violation
+-- which startRun maps to ScopeBusyError. Superseded duplicates (keeps the
+-- newest) are failed first so the index builds on pre-existing DBs.
+update sync_state set status = 'failed',
+  finished_at = now(),
+  note = 'dedup: superseded running row (uniqueness migration)'
+  where id in (
+    select id from (
+      select id, row_number() over (partition by scope order by id desc) as rn
+        from sync_state where status = 'running'
+    ) s where rn > 1
+  );
+create unique index if not exists uniq_sync_state_running_scope
+  on sync_state(scope) where status = 'running';
 
 -- ─── Per-barrier sync changes (what changed, per run, per barrier) ─────────
 -- One row per barrier touched by a run (insert / update / restore / delete).
@@ -315,6 +368,15 @@ create table if not exists sync_barrier_changes (
 create index if not exists idx_sync_changes_run on sync_barrier_changes(run_id, barrier_id);
 create index if not exists idx_sync_changes_barrier on sync_barrier_changes(barrier_id, created_at desc);
 create index if not exists idx_sync_changes_created on sync_barrier_changes(created_at desc);
+
+-- One audit row per (run, barrier): retries of the same run must not
+-- double-insert. insertAuditBatch/recordBarrierChange rely on this with
+-- ON CONFLICT DO NOTHING. The DELETE removes legacy duplicates (keeps
+-- the earliest row) so the unique index builds on pre-existing DBs.
+delete from sync_barrier_changes a using sync_barrier_changes b
+  where a.run_id = b.run_id and a.barrier_id = b.barrier_id and a.id > b.id;
+create unique index if not exists uniq_sync_changes_run_barrier
+  on sync_barrier_changes(run_id, barrier_id);
 
 -- Barrier alert dedup: one row per (barrier, transition date, status) so a
 -- re-fired event can never double-notify. sent_at null = pending send; the

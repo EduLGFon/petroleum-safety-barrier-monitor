@@ -15,6 +15,17 @@ import {
   type SyncIo,
 } from "../fracttal/sync.ts";
 
+import {
+  fromAvailabilityId,
+  fromCategoryId,
+  fromCriticalityId,
+  fromGroupingId,
+  fromLocationId,
+  fromLocDescId,
+  fromOwnerId,
+  fromTypologyId,
+} from "../../enums.ts";
+
 import type {
   SyncBarrierDetail,
   SyncChange,
@@ -30,17 +41,6 @@ import { queryRows, type TxQuery, withTx } from "../db.ts";
 
 import { getResolverLabels } from "./vocabularies.ts";
 
-import {
-  fromAvailabilityId,
-  fromCategoryId,
-  fromCriticalityId,
-  fromGroupingId,
-  fromLocationId,
-  fromLocDescId,
-  fromOwnerId,
-  fromTypologyId,
-} from "../../enums.ts";
-
 export const SYNC_AUTHOR_ID = 10; // authors.id, see db/seed_lookups.sql
 
 // Freshness windows for the status indicator, in minutes. A `running` row
@@ -52,6 +52,19 @@ export const SYNC_STALE_MINUTES = 15;
 // Apply chunk: barriers committed per transaction. Bounds tx length and
 // the audit batch (8 params per row) well under protocol limits.
 export const SYNC_APPLY_CHUNK = 200;
+
+// isUniqueViolation: true for Postgres unique violations (SQLSTATE 23505,
+// including the uniq_sync_state_running_scope race loser). The Deno
+// postgres driver surfaces the code either as err.code or inside the
+// message, so both shapes are accepted.
+export function isUniqueViolation(err: unknown): boolean {
+  if (err !== null && typeof err === "object" && "code" in err) {
+    if ((err as { code?: unknown }).code === "23505") return true;
+  }
+  const msg = err instanceof Error ? err.message : String(err);
+  return /23505|duplicate key|unique constraint|uniq_sync_state_running_scope/i
+    .test(msg);
+}
 
 // syncScopeRunning: poll lock - true while a run for the scope is still
 // 'running'. A crashed run would block polls forever, so the lock is stale
@@ -125,49 +138,61 @@ export const defaultSyncIo: SyncIo = {
   // ON CONFLICT DO NOTHING keeps reruns and racing cycles idempotent.
   // Display names are write-once (first non-null wins, mirroring the
   // import): an operator hand-edit to a name is never overwritten here.
+  // Concurrency: max(id)+1 allocation is serialized per table with a
+  // transaction-scoped advisory lock, so two racing cycles cannot pick
+  // the same next id (the UNIQUE label/code constraint is the backstop).
   async ensureCatalog(needs: CatalogNeeds): Promise<void> {
-    if (needs.categories.length > 0) {
-      const have = await queryRows<{ id: number }>(
-        `select id from categories`,
-      );
-      let next = have.reduce((m, r) => Math.max(m, r.id), -1) + 1;
-      for (let i = 0; i < needs.categories.length; i += 500) {
-        const chunk = needs.categories.slice(i, i + 500);
-        const placeholders = chunk
-          .map((_, k) => `($${2 * k + 1}, $${2 * k + 2})`)
-          .join(", ");
-        const args: unknown[] = [];
-        for (const label of chunk) args.push(next++, label);
-        await queryRows(
-          `insert into categories (id, label) values ${placeholders} ` +
-            `on conflict (label) do nothing`,
-          args,
-        );
-      }
+    if (needs.categories.length === 0 && needs.locations.length === 0) {
+      return;
     }
-    if (needs.locations.length > 0) {
-      const have = await queryRows<{ id: number }>(
-        `select id from locations`,
-      );
-      let next = have.reduce((m, r) => Math.max(m, r.id), 0) + 1;
-      for (let i = 0; i < needs.locations.length; i += 200) {
-        const chunk = needs.locations.slice(i, i + 200);
-        const placeholders = chunk
-          .map((_, k) =>
-            `($${4 * k + 1}, $${4 * k + 2}, $${4 * k + 3}, $${4 * k + 4})`
-          )
-          .join(", ");
-        const args: unknown[] = [];
-        for (const loc of chunk) {
-          args.push(next++, loc.code, loc.type, loc.name);
+    await withTx(async (tx) => {
+      if (needs.categories.length > 0) {
+        await tx(`select pg_advisory_xact_lock(hashtext('categories'))`, []);
+        const have = await tx<{ id: number }>(
+          `select id from categories`,
+          [],
+        );
+        let next = have.reduce((m, r) => Math.max(m, r.id), -1) + 1;
+        for (let i = 0; i < needs.categories.length; i += 500) {
+          const chunk = needs.categories.slice(i, i + 500);
+          const placeholders = chunk
+            .map((_, k) => `($${2 * k + 1}, $${2 * k + 2})`)
+            .join(", ");
+          const args: unknown[] = [];
+          for (const label of chunk) args.push(next++, label);
+          await tx(
+            `insert into categories (id, label) values ${placeholders} ` +
+              `on conflict (label) do nothing`,
+            args,
+          );
         }
-        await queryRows(
-          `insert into locations (id, code, type, name) values ${placeholders} ` +
-            `on conflict (code) do nothing`,
-          args,
-        );
       }
-    }
+      if (needs.locations.length > 0) {
+        await tx(`select pg_advisory_xact_lock(hashtext('locations'))`, []);
+        const have = await tx<{ id: number }>(
+          `select id from locations`,
+          [],
+        );
+        let next = have.reduce((m, r) => Math.max(m, r.id), 0) + 1;
+        for (let i = 0; i < needs.locations.length; i += 200) {
+          const chunk = needs.locations.slice(i, i + 200);
+          const placeholders = chunk
+            .map((_, k) =>
+              `($${4 * k + 1}, $${4 * k + 2}, $${4 * k + 3}, $${4 * k + 4})`
+            )
+            .join(", ");
+          const args: unknown[] = [];
+          for (const loc of chunk) {
+            args.push(next++, loc.code, loc.type, loc.name);
+          }
+          await tx(
+            `insert into locations (id, code, type, name) values ${placeholders} ` +
+              `on conflict (code) do nothing`,
+            args,
+          );
+        }
+      }
+    });
   },
   async buildMapContext(): Promise<MapContext> {
     const [locRows, catRows, critRows] = await Promise.all([
@@ -267,8 +292,13 @@ export const defaultSyncIo: SyncIo = {
     // Atomic claim: the INSERT only fires when no fresh lease exists, so
     // two processes racing past the pollOnce lock cannot both open a run.
     // The loser gets ScopeBusyError (mapped to `skipped`, never a failure).
-    const rows = await queryRows<{ id: number }>(
-      `insert into sync_state (scope, status, started_at, finished_at)
+    // The uniq_sync_state_running_scope partial index is the backstop for
+    // the check-then-insert race: under READ COMMITTED both racers can
+    // pass NOT EXISTS, and the loser hits a unique violation instead.
+    let rows: Array<{ id: number }>;
+    try {
+      rows = await queryRows<{ id: number }>(
+        `insert into sync_state (scope, status, started_at, finished_at)
        select $1, 'running', now(), now()
        where not exists (
          select 1 from sync_state
@@ -276,8 +306,14 @@ export const defaultSyncIo: SyncIo = {
            and finished_at >= now() - make_interval(mins => $2)
        )
        returning id`,
-      [scope, SYNC_FRESH_MINUTES],
-    );
+        [scope, SYNC_FRESH_MINUTES],
+      );
+    } catch (err) {
+      if (isUniqueViolation(err)) {
+        throw new ScopeBusyError(`[sync] scope ${scope} already running`);
+      }
+      throw err;
+    }
     const started = rows[0];
     if (!started) {
       throw new ScopeBusyError(`[sync] scope ${scope} already running`);
@@ -521,6 +557,8 @@ interface AuditRow {
 // statement per barrier. Best-effort like recordBarrierChange: empty
 // batches and null runs skip, a missing table warns, and a rejected batch
 // falls back to per-row inserts so one bad row never drops the rest.
+// Idempotent: ON CONFLICT DO NOTHING on uniq_sync_changes_run_barrier,
+// so retrying the same run never double-inserts.
 async function insertAuditBatch(
   runId: number | null,
   audits: AuditRow[],
@@ -550,7 +588,8 @@ async function insertAuditBatch(
       `insert into sync_barrier_changes
         (run_id, barrier_id, kind, old_availability_id, new_availability_id,
          changed_fields, old_snapshot, new_snapshot)
-       values ${values.join(", ")}`,
+       values ${values.join(", ")}
+        on conflict (run_id, barrier_id) do nothing`,
       args,
     );
   } catch (err) {
@@ -795,7 +834,8 @@ export async function recordBarrierChange(
       `insert into sync_barrier_changes
         (run_id, barrier_id, kind, old_availability_id, new_availability_id,
          changed_fields, old_snapshot, new_snapshot)
-       values ($1, $2, $3, $4, $5, $6::jsonb, $7::jsonb, $8::jsonb)`,
+       values ($1, $2, $3, $4, $5, $6::jsonb, $7::jsonb, $8::jsonb)
+        on conflict (run_id, barrier_id) do nothing`,
       [
         runId,
         change.barrierId,

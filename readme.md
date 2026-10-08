@@ -437,13 +437,16 @@ Invariants worth knowing before touching the schema:
   table, so it cannot drift even under a manual query.
 - **One write path for status.** `record_status_change(barrier_id, status_id,
   author_id, note)` updates availability plus status date and appends history
-  atomically. Direct `UPDATE barriers SET availability_id = ...` is never
-  correct.
-- **Provenance and soft deletes.** `external_code` is the unique upsert match
-  key from upstream; `deleted_at` retires a row without losing history; all
-  normal queries filter it out.
+  atomically. Direct `UPDATE barriers SET availability_id = ...` is rejected
+  by the `trg_guard_availability_write` trigger. Same-status writes are a
+  no-op (no history row, no alert).
+- **Provenance and soft deletes.** `external_code` is the unique, non-null
+  upsert match key from upstream; `deleted_at` retires a row without losing
+  history; all normal queries filter it out.
 - **Alert deduplication lives in the schema.** `alert_events.dedup_key` is
-  unique, so re-running a cycle enqueues nothing new.
+  unique, so re-running a cycle enqueues nothing new. Sync audit rows carry
+  `UNIQUE(run_id, barrier_id)` and one `running` lease per scope is enforced
+  by a partial unique index.
 - Indexes cover the fields the API filters and sorts on. Substring search is a
   sequential scan by design: `pg_trgm` is not required by this schema.
 

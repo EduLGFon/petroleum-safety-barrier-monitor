@@ -12,6 +12,12 @@ import {
 } from "../../../../lib/server/errors.ts";
 
 import {
+  authStoreUnavailable,
+  denyByCredentials,
+  requireAdminAuth,
+} from "../../../../lib/server/auth.ts";
+
+import {
   type AlertMailer,
   smtpAlertConfigFromEnv,
 } from "../../../../lib/server/alerts/mailer.ts";
@@ -22,15 +28,14 @@ import {
 } from "../../../../lib/server/sql/barriers.ts";
 
 import {
-  authStoreUnavailable,
-  denyByCredentials,
-  requireAdminAuth,
-} from "../../../../lib/server/auth.ts";
-
-import {
   routeClientKey,
   writeThrottle,
 } from "../../../../lib/server/throttle.ts";
+
+import {
+  parseIdParam,
+  readJsonBody,
+} from "../../../../lib/server/validation.ts";
 
 import { maybeSendImmediate } from "../../../../lib/server/alerts/immediate.ts";
 
@@ -47,11 +52,6 @@ import { getOrCreateAuthor } from "../../../../lib/server/sql/authors.ts";
 import { sqlAlertStore } from "../../../../lib/server/sql/alerts.ts";
 
 import { loadServerConfig } from "../../../../lib/server/config.ts";
-
-import {
-  parseIdParam,
-  readJsonBody,
-} from "../../../../lib/server/validation.ts";
 
 import { define } from "../../../../utils.ts";
 
@@ -146,6 +146,12 @@ export const handler = define.handlers({
       const existing = await getBarrierById(barrierId);
       if (!existing) {
         return notFound("Barrier not found", requestId);
+      }
+      // Same-status retry is a no-op: no history row, no alert fan-out.
+      // transitionBarrierStatus() guards this too; this early return
+      // additionally skips the immediate-send path below.
+      if (existing.availabilityId === statusId) {
+        return ok(existing, requestId);
       }
       const updated = await transitionBarrierStatus(
         barrierId,

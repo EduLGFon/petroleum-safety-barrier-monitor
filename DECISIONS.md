@@ -194,3 +194,42 @@ wildcard match, foreign tag, changed bytes), new `http_test.ts` cases
 trips were not exercised end to end (no valid credential available
 without touching secrets); the deployed dashboard exercises them on
 the next deploy.
+
+## D09 - Duplication-guard hardening (2026-10-08)
+
+Context: review of the dedup design found six residual paths where
+duplicates or inconsistency could still slip in: retried same-status
+PATCHes appended duplicate history rows, the single-write-path rule was
+convention only, sync audit retries could double-insert, catalog/author
+`max(id)+1` allocation raced, the running-lease claim raced under READ
+COMMITTED, and nullable `external_code` rows would be invisible to
+reconcile.
+
+Decision: close all six with DB enforcement first, app guards second.
+
+- Same-status `transitionBarrierStatus()` returns the current row with
+  no write; `PATCH /api/barriers/:id/status` early-returns before the
+  alert fan-out. The generic `PATCH /api/barriers/:id` already skipped
+  unchanged statuses.
+- `trg_guard_availability_write` rejects any direct `UPDATE OF
+  availability_id` unless `record_status_change()` set
+  `app.status_write` first (transaction-local GUC). INSERTs and sync
+  field writes are unaffected.
+- `uniq_sync_changes_run_barrier` plus `ON CONFLICT DO NOTHING` in
+  `insertAuditBatch`/`recordBarrierChange` makes audit retries
+  idempotent (best-effort-after-commit semantics kept per D03).
+- `ensureCatalog` and `getOrCreateAuthor` serialize allocation with
+  `pg_advisory_xact_lock` inside one transaction; UNIQUE label/code/
+  name constraints stay the backstop.
+- `uniq_sync_state_running_scope` partial unique index plus unique-
+  violation mapping to `ScopeBusyError` makes the lease claim atomic.
+- `barriers.external_code` is now `NOT NULL` (clean DBs via DDL,
+  existing DBs via idempotent `ALTER ... SET NOT NULL`, fail-closed
+  on legacy NULL rows).
+
+Verification: new `dedup_test.ts` (pure `isUniqueViolation` cases) and
+`dedup_integration_test.ts` (same-status no-op, guard rejection,
+audit-once, lease-busy; self-skip without DATABASE_URL), `deno task
+check`, full `deno task test` on host and against the migrated docker
+DB. Docs updated in the same change (`docs/DATABASE.md`,
+`docs/ARCHITECTURE.md`, `readme.md`).

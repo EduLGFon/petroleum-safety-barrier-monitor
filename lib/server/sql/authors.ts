@@ -2,7 +2,7 @@
 // This is why it exists: PATCH /api/barriers/:id/status needs an author_id,
 // but dashboard logins only know their user name. This helper resolves or
 // creates the author row so the UI never asks admins to pick numeric ids.
-import { queryRows } from "../db.ts";
+import { queryRows, withTx } from "../db.ts";
 
 export interface AuthorRow {
   id: number;
@@ -26,18 +26,23 @@ export async function listAuthors(): Promise<AuthorRow[]> {
 // getOrCreateAuthor: finds by exact name or inserts with the next free id.
 // The authors table has no identity default (seed rows use explicit ids),
 // so the insert computes max(id)+1. ON CONFLICT keeps it safe when the name
-// already exists; concurrent same-name inserts may retry on a rare id race.
+// already exists. Concurrent inserts are serialized with a
+// transaction-scoped advisory lock so two racers cannot pick the same id
+// (the UNIQUE name constraint stays the backstop).
 export async function getOrCreateAuthor(name: string): Promise<AuthorRow> {
   const clean = normalizeAuthorName(name);
-  const rows = await queryRows<AuthorRow>(
-    `with next as (select coalesce(max(id), 0) + 1 as nid from authors)
-     insert into authors (id, name)
-     select nid, $1 from next
-     on conflict (name) do update set name = excluded.name
-     returning id, name`,
-    [clean],
-  );
-  const author = rows[0];
-  if (!author) throw new Error("getOrCreateAuthor returned no row");
-  return author;
+  return await withTx(async (tx) => {
+    await tx(`select pg_advisory_xact_lock(hashtext('authors'))`, []);
+    const rows = await tx<AuthorRow>(
+      `with next as (select coalesce(max(id), 0) + 1 as nid from authors)
+      insert into authors (id, name)
+      select nid, $1 from next
+      on conflict (name) do update set name = excluded.name
+      returning id, name`,
+      [clean],
+    );
+    const author = rows[0];
+    if (!author) throw new Error("getOrCreateAuthor returned no row");
+    return author;
+  });
 }

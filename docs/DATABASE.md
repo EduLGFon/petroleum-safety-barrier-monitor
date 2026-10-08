@@ -91,7 +91,7 @@ barriers
   comments              text
   action_plan           text
   status_since          date
-  external_code         text unique, nullable (Fracttal match key)
+  external_code         text unique, not null (Fracttal match key)
   source_updated_at     timestamptz, nullable
   deleted_at            timestamptz, nullable (soft delete via sync)
   is_active             boolean, not null default true (Fracttal enable flag; false = Desativada)
@@ -207,7 +207,12 @@ things atomically: it updates `availability_id` + `status_since`
 the corresponding row in the history.
 `transitionBarrierStatus()` in `lib/server/sql/barriers.ts` calls exactly
 that function - it is the only place in the application code that should do
-this.
+this. Same-status calls are a no-op (no history row, no alert fan-out), so
+retried PATCHes never duplicate. Direct `UPDATE barriers SET
+availability_id` is rejected by the `trg_guard_availability_write` trigger;
+only `record_status_change()` (which sets `app.status_write` first) may
+write that column. Manual repair remains possible by setting the GUC first
+in the same transaction.
 
 This is exposed via `PATCH /api/barriers/:id/status` and the modal Editar
 tab (`BarrierEditor` island). Session admins may omit
@@ -216,8 +221,10 @@ explicit `authorId` contract. Only `admin` roles may write.
 
 ### Provenance + sync (P3)
 
-`external_code` (UNIQUE, nullable) is the upsert match key: dedup guaranteed
-by the constraint, not by application logic. `deleted_at` is the soft delete -
+`external_code` (UNIQUE, NOT NULL) is the upsert match key: dedup guaranteed
+by the constraint, not by application logic. NULL is forbidden because
+NULL-coded rows are invisible to `loadLocal` and would duplicate on the
+next sync. `deleted_at` is the soft delete -
 items that disappear from Fracttal (scoped crawl) keep their row and history
 intact, but `buildWhere`/`scopeText` and the `chart.ts` /
 `vocabularies.ts` queries already filter to the admin-chosen `rowScope`
@@ -229,7 +236,12 @@ per run (inserts/updates/deletes/skips counts, `status`, `note`).
 `sync_barrier_changes` records one row per barrier touched by a run (kind,
 old/new availability, `changed_fields`, compact old/new snapshots) so the
 dashboard lists last-run / last-24h scopes paged and loads one barrier's
-before/after diff on demand.
+before/after diff on demand. `UNIQUE(run_id, barrier_id)` plus
+`ON CONFLICT DO NOTHING` makes audit retries idempotent. Catalog id
+allocation (`ensureCatalog`, `getOrCreateAuthor`) serializes `max(id)+1`
+with transaction-scoped advisory locks. One `running` lease per scope is
+DB-enforced by the `uniq_sync_state_running_scope` partial unique index;
+`startRun()` maps the unique violation to `ScopeBusyError`.
 
 ### Alerts (P5 + rules)
 

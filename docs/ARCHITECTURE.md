@@ -242,7 +242,8 @@ Full contract lives in `docs/API.md`. Summary:
   `barrier_status_history` + `users`/`sessions` (cookie logins, two roles) +
   `alert_rules` (per-category triggers) + `alert_events`/`alert_recipients`.
   `compliance_id` is trigger-derived, the only
-  write path is `record_status_change()`. Location and category ids are
+  write path is `record_status_change()` (DB-enforced by
+  `trg_guard_availability_write`; same-status writes are a no-op). Location and category ids are
   NOT frontend contracts - the server serves the dynamic id-keyed
   vocabularies (`{id, code, name, count}` and `{id, label}`) to the island, and
   `lib/resolve.ts` + `lib/api/query.ts` bind those ids at request time.
