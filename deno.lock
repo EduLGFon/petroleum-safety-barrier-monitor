@@ -45,19 +45,19 @@
     "npm:@babel/core@^7.28.0": "7.29.7",
     "npm:@babel/preset-react@^7.27.1": "7.29.7_@babel+core@7.29.7",
     "npm:@opentelemetry/api@^1.9.0": "1.9.1",
-    "npm:@preact/signals@^2.11.3": "2.11.3_preact@11.0.0_preact-render-to-string@6.7.0",
-    "npm:@preact/signals@^2.5.1": "2.11.3_preact@11.0.0_preact-render-to-string@6.7.0",
-    "npm:@prefresh/vite@^2.4.8": "2.4.12_preact@11.0.0_vite@7.3.7",
+    "npm:@preact/signals@^2.11.3": "2.11.3_preact@10.29.8",
+    "npm:@preact/signals@^2.5.1": "2.11.3_preact@10.29.8",
+    "npm:@prefresh/vite@^2.4.8": "2.4.12_preact@10.29.8_vite@7.3.7",
     "npm:@remix-run/node-fetch-server@0.12": "0.12.0",
     "npm:@types/babel__core@^7.20.5": "7.20.5",
     "npm:esbuild-wasm@~0.25.11": "0.25.12",
     "npm:esbuild@0.25.7": "0.25.7",
     "npm:esbuild@~0.25.5": "0.25.12",
     "npm:linkedom@~0.18.13": "0.18.13",
-    "npm:preact-render-to-string@^6.6.3": "6.7.0_preact@11.0.0",
-    "npm:preact@11": "11.0.0_preact-render-to-string@6.7.0",
+    "npm:preact-render-to-string@^6.6.3": "6.7.0_preact@10.29.8",
     "npm:preact@^10.28.2": "10.29.8_preact-render-to-string@6.7.0",
     "npm:preact@^10.29.1": "10.29.8_preact-render-to-string@6.7.0",
+    "npm:preact@^10.29.8": "10.29.8_preact-render-to-string@6.7.0",
     "npm:rollup@^4.55.1": "4.63.2",
     "npm:vite@7": "7.3.7",
     "npm:vite@^7.1.4": "7.3.7",
@@ -821,26 +821,26 @@
     "@preact/signals-core@1.14.4": {
       "integrity": "sha512-HNB6HYeYKhQbJ1aKl+YRjrS4+QWHLKX6qKoUsfS/m0vqzsVaEBiZiaKbG/e+NKk2ch5ALQr/ihWaMHxiCuuWHA=="
     },
-    "@preact/signals@2.11.3_preact@11.0.0_preact-render-to-string@6.7.0": {
+    "@preact/signals@2.11.3_preact@10.29.8": {
       "integrity": "sha512-mttwFM98G/JiriTgMwU+UWygL6sfVmYEiNcPSKkUnv4PxPpZhmP2ugGC4qi360+ZIHyQ8NY05bfJT3b4RUIGlw==",
       "dependencies": [
         "@preact/signals-core",
-        "preact@11.0.0_preact-render-to-string@6.7.0"
+        "preact"
       ]
     },
     "@prefresh/babel-plugin@0.5.3": {
       "integrity": "sha512-57LX2SHs4BX2s1IwCjNzTE2OJeEepRCNf1VTEpbNcUyHfMO68eeOWGDIt4ob9aYlW6PEWZ1SuwNikuoIXANDtQ=="
     },
-    "@prefresh/core@1.5.11_preact@11.0.0_preact-render-to-string@6.7.0": {
+    "@prefresh/core@1.5.11_preact@10.29.8": {
       "integrity": "sha512-Ml00PP8jeHaADxfQqxUs4+M5JS+T5J26UnvPVfsrmlpGw2I3e9XtM0DMeuzkmvg+Tn7VdHSMpLBrDPG0iHoDqQ==",
       "dependencies": [
-        "preact@11.0.0_preact-render-to-string@6.7.0"
+        "preact"
       ]
     },
     "@prefresh/utils@1.2.1": {
       "integrity": "sha512-vq/sIuN5nYfYzvyayXI4C2QkprfNaHUQ9ZX+3xLD8nL3rWyzpxOm1+K7RtMbhd+66QcaISViK7amjnheQ/4WZw=="
     },
-    "@prefresh/vite@2.4.12_preact@11.0.0_vite@7.3.7": {
+    "@prefresh/vite@2.4.12_preact@10.29.8_vite@7.3.7": {
       "integrity": "sha512-FY1fzXpUjiuosznMV0YM7XAOPZjB5FIdWS0W24+XnlxYkt9hNAwwsiKYn+cuTEoMtD/ZVazS5QVssBr9YhpCQA==",
       "dependencies": [
         "@babel/core",
@@ -848,7 +848,7 @@
         "@prefresh/core",
         "@prefresh/utils",
         "@rollup/pluginutils",
-        "preact@11.0.0_preact-render-to-string@6.7.0",
+        "preact",
         "vite"
       ]
     },
@@ -1345,23 +1345,14 @@
         "source-map-js"
       ]
     },
-    "preact-render-to-string@6.7.0_preact@11.0.0": {
+    "preact-render-to-string@6.7.0_preact@10.29.8": {
       "integrity": "sha512-Z4WR8fmLMRpdYqJ9i7vrlXSsSrxVJydwrkEXHapexfARbWfGb7vGcnvNQnIzN0cXciMVOlz/XLoiMCi9gUsy9Q==",
       "dependencies": [
-        "preact@11.0.0_preact-render-to-string@6.7.0"
+        "preact"
       ]
     },
     "preact@10.29.8_preact-render-to-string@6.7.0": {
       "integrity": "sha512-ej2aVZ+vZ8WO7tvlQWRM9N63A0KzF9q4mWJfDUHgYaIofWY9hu74QdnQrjoPMmZi2/nZ5gN0bJCQF49xQqx09Q==",
-      "dependencies": [
-        "preact-render-to-string"
-      ],
-      "optionalPeers": [
-        "preact-render-to-string"
-      ]
-    },
-    "preact@11.0.0_preact-render-to-string@6.7.0": {
-      "integrity": "sha512-LRTLKuSe6VYPhvBDjwFaX+nuZnpsw6IN2GSboisAvhGsncylBmrbDCERhgKDn6yP2mAwbGvsB5OVyTe33M8gBg==",
       "dependencies": [
         "preact-render-to-string"
       ],
@@ -1483,7 +1474,7 @@
       "jsr:@std/path@^1.1.6",
       "npm:@preact/signals@^2.11.3",
       "npm:linkedom@~0.18.13",
-      "npm:preact@11",
+      "npm:preact@^10.29.8",
       "npm:vite@7",
       "npm:xlsx@0.18.5"
     ]
