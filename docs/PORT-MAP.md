@@ -296,36 +296,39 @@ listener.
 
 ## 6. Route → port / service matrix
 
-23 API routes plus 2 page routes. Every `/api/*` route except `/api/health`
+26 API route paths (35 method+path combos) plus 2 page routes. Every `/api/*` route except `/api/health`
 opens a Postgres connection on 5432. None of them contact Fracttal.
 
-| Route                      | Method(s)     | Postgres | SMTP           |
-| -------------------------- | ------------- | -------- | -------------- |
-| `/api/health`              | GET           | no       | no             |
-| `/api/barriers`            | GET           | yes      | no             |
-| `/api/barriers/deleted`    | GET           | yes      | no             |
-| `/api/barriers/:id`        | GET, PATCH    | yes      | **PATCH only** |
-| `/api/barriers/:id/status` | PATCH         | yes      | **yes**        |
-| `/api/export`              | GET, POST     | yes      | no             |
-| `/api/kpi`                 | GET           | yes      | no             |
-| `/api/chart`               | GET           | yes      | no             |
-| `/api/vocabularies`        | GET           | yes      | no             |
-| `/api/lookups`             | GET           | yes      | no             |
-| `/api/field-options`       | GET, PUT      | yes      | no             |
-| `/api/sync-status`         | GET           | yes      | no             |
-| `/api/sync-changes`        | GET           | yes      | no             |
-| `/api/users`               | GET, POST     | yes      | no             |
-| `/api/users/:id`           | PATCH, DELETE | yes      | no             |
-| `/api/recipients`          | GET, POST     | yes      | no             |
-| `/api/recipients/:id`      | PATCH, DELETE | yes      | no             |
-| `/api/alert-rules`         | GET, POST     | yes      | no             |
-| `/api/alert-rules/:id`     | PATCH, DELETE | yes      | no             |
-| `/api/auth/login`          | POST          | yes      | no             |
-| `/api/auth/logout`         | POST          | yes      | no             |
-| `/api/auth/me`             | GET           | yes      | no             |
-| `/api/auth/password`       | POST          | yes      | no             |
-| `/` (page)                 | GET           | yes      | no             |
-| `/login` (page)            | GET           | yes      | no             |
+| Route                           | Method(s)     | Postgres | SMTP           |
+| ------------------------------- | ------------- | -------- | -------------- |
+| `/api/health`                   | GET           | no       | no             |
+| `/api/barriers`                 | GET           | yes      | no             |
+| `/api/barriers/deleted`         | GET           | yes      | no             |
+| `/api/barriers/:id`             | GET, PATCH    | yes      | **PATCH only** |
+| `/api/barriers/:id/status`      | PATCH         | yes      | **yes**        |
+| `/api/barriers/:id/sync-detail` | GET           | yes      | no             |
+| `/api/export`                   | GET, POST     | yes      | no             |
+| `/api/kpi`                      | GET           | yes      | no             |
+| `/api/chart`                    | GET           | yes      | no             |
+| `/api/vocabularies`             | GET           | yes      | no             |
+| `/api/lookups`                  | GET           | yes      | no             |
+| `/api/field-options`            | GET, PUT      | yes      | no             |
+| `/api/sync-status`              | GET           | yes      | no             |
+| `/api/sync-runs`                | GET           | yes      | no             |
+| `/api/sync-changes`             | GET           | yes      | no             |
+| `/api/users`                    | GET, POST     | yes      | no             |
+| `/api/users/:id`                | PATCH, DELETE | yes      | no             |
+| `/api/recipients`               | GET, POST     | yes      | no             |
+| `/api/recipients/:id`           | PATCH, DELETE | yes      | no             |
+| `/api/alert-rules`              | GET, POST     | yes      | no             |
+| `/api/alert-rules/preview`      | GET           | yes      | no             |
+| `/api/alert-rules/:id`          | PATCH, DELETE | yes      | no             |
+| `/api/auth/login`               | POST          | yes      | no             |
+| `/api/auth/logout`              | POST          | yes      | no             |
+| `/api/auth/me`                  | GET           | yes      | no             |
+| `/api/auth/password`            | POST          | yes      | no             |
+| `/` (page)                      | GET           | yes      | no             |
+| `/login` (page)                 | GET           | yes      | no             |
 
 There is **no `_middleware.ts`** in the repo; auth is enforced per route.
 `GET /api/health` (`routes/api/health.ts:6-11`) imports nothing from

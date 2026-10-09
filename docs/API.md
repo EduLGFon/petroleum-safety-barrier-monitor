@@ -120,31 +120,46 @@ table by exact category).
 The handlers `httpAdapterFactory` expects (barriers, `:id`, kpi, chart) plus
 the write/admin/export ones are already implemented in `routes/api/`, on
 PostgreSQL (no ORM - pure SQL via `jsr:@db/postgres`, values bound as `$1/$2`).
-Full inventory: `barriers`, `barriers/deleted`,
-`barriers/:id`, `barriers/:id/status`, `export`, `kpi`, `chart`, `health`,
-`recipients`, `recipients/:id` (`_params.ts` is only parsers, never a route):
+Full inventory (35 method+path combos): `GET /api/health`, `GET /api/barriers`,
+`GET /api/barriers/deleted`, `GET /api/barriers/:id`, `PATCH /api/barriers/:id`,
+`PATCH /api/barriers/:id/status`, `GET /api/barriers/:id/sync-detail`,
+`GET|POST /api/export`, `GET /api/kpi`, `GET /api/chart`,
+`GET /api/vocabularies`, `GET /api/lookups`, `GET|PUT /api/field-options`,
+`GET /api/sync-status`, `GET /api/sync-runs`, `GET /api/sync-changes`,
+`GET|POST /api/users`, `PATCH|DELETE /api/users/:id`,
+`GET|POST /api/recipients`, `PATCH|DELETE /api/recipients/:id`,
+`GET|POST /api/alert-rules`, `PATCH|DELETE /api/alert-rules/:id`,
+`GET /api/alert-rules/preview`, `POST /api/auth/login`,
+`POST /api/auth/logout`, `GET /api/auth/me`, `POST /api/auth/password`
+(`_params.ts` is only parsers and `validation_test.ts` is only tests -
+both never routes, `_` prefix / no handler):
 
-- `GET /api/barriers?locationId=1&availabilityId=4&complianceId=1&categoryId=2&typologyId=0&criticalityId=1&hasActionPlan=false&rowScope=active&query=FAL&since=2024-01-01&until=2024-12-31&page=1&pageSize=25&sortCol=statusSince&sortDir=desc` →
-  `BarriersResponse { items: WireBarrier[], total, page, pageSize, totalPages }`
+- `GET /api/barriers?locationId=1&availabilityId=4&complianceId=1&categoryId=2&typologyId=0&criticalityId=1&criticalOnly=true&hasActionPlan=false&rowScope=active&query=FAL&since=2024-01-01&until=2024-12-31&page=1&pageSize=25&sortCol=statusSince&sortDir=desc` →
+  `200 BarriersResponse { items: WireBarrier[], total, page, pageSize, totalPages }` (+ `ETag`, `304` on revalidate)
   - `locationId` omitted/`0` = all; `query` matches `tag ILIKE %q% OR loc.code`
     (`\%_` escaped, capped at 200 chars); `typologyId` filters the Tipologia
-    column; `since`/`until` = `YYYY-MM-DD` over
+    column; `criticalOnly=true` restricts to ESO/A ranks (absent/false = all
+    ranks); `hasActionPlan=true/false` filters plan presence; `since`/`until` = `YYYY-MM-DD` over
     `status_since`; `rowScope` = `active` (default: enabled live rows),
     `inactive` (upstream-disabled), `deleted` or `all` (both admin-only,
     non-admins get `403`); `page` default 1 (floor, min 1); `pageSize` default 25
     (clamped `1..100000`); `sortCol` whitelist
     (`id/tag/location/typology/criticality/category/owner/availability/compliance/statusSince`,
-    default `id`); strict parsers in `routes/api/_params.ts`; `{ error, code,
+    default `id`); strict parsers in `routes/api/_params.ts` (malformed values
+    fall back to undefined, never `400`); `{ error, code,
     requestId }` envelope on DB failure (see the P4 section below).
-- `GET /api/barriers/:id` → `WireBarrier` (`400` invalid id, `404` missing)
+- `GET /api/barriers/:id` → `200 WireBarrier` (`400` invalid id, `404` missing).
+  Admins see soft-deleted rows (`includeDeleted: true`), others live-only.
 - `PATCH /api/barriers/:id/status` with
   `{ statusId: int >= 0, authorId?: int >= 0, note?: string (cap 2000) }` →
-  updated `WireBarrier` via `record_status_change()` (`400` invalid body,
-  `404` missing). Requires admin (session cookie or
+  `200` updated `WireBarrier` via `record_status_change()` (`400` invalid body,
+  `404` missing; same-status write returns `200` existing with no history row
+  and no alert fan-out). Requires admin (session cookie or
   `Authorization: Bearer <ADMIN_TOKEN>`). Session admins may omit
   `authorId` (derived from their user via `authors`); token callers must
-  send it. `401` without credentials, `401` also when neither is
-  configured - writes are never allowed by omission. After the commit the
+  send it. `401` with dead credentials, `404` camouflage without any
+  credential, `403` for authenticated non-admins - writes are never allowed
+  by omission. After the commit the
   route runs the hybrid immediate fan-out: matches always enqueue in
   `alert_events`, and winning rules with `notify_immediate` send at once
   (`[Imediato]` subject, single attempt, 10s budget) when the SMTP relay
@@ -166,78 +181,142 @@ Full inventory: `barriers`, `barriers/deleted`,
   so a 200k-row export never materialises in
   memory. `format=xls` and `format=html` are still accepted as legacy aliases
   of `xlsx` and `pdf`. `POST`
-  takes a JSON body `{ format?, ids? }`: `ids` narrows the export to
+  takes a JSON body `{ format?, ids?, timeZone? }`: `ids` narrows the export to
   the selected rows (still intersected with the filters, so a stale selection
-  cannot widen the scope).
-- `GET /api/barriers/deleted` (+ the same filters) → `BarriersResponse`
+  cannot widen the scope; positive safe ints only, deduped, capped at
+  200,000 - empty/malformed means the whole scope); `timeZone` resolves via
+  `resolveTimeZone` for the report header. Body `format` wins over
+  `?format=`; default `csv`. Unknown `format` answers
+  `400 format must be csv, xlsx or pdf`.
+- `GET /api/barriers/deleted` (+ the same filters, minus `typologyId`,
+  `criticalOnly`, `rowScope` - forced `rowScope: "deleted"`) → `200 BarriersResponse`
   with only deleted rows (soft-delete sync audit, legacy alias for
   `GET /api/barriers?rowScope=deleted`). Requires
-  `ADMIN_TOKEN`; the `/api/barriers/:id` detail returns deleted rows to
+  admin (session admin or `Bearer <ADMIN_TOKEN>`; non-admin session → `403`,
+  no credential → `404`, dead credential → `401`); the `/api/barriers/:id` detail returns deleted rows to
   admins and keeps hiding them from everyone else. `WireBarrier` carries
   `isActive` (false = Desativada) and `deletedAt` (null = live) so the
   dashboard Situacao filter badges rows without a second lookup.
-- `GET /api/kpi?locationId=1&availabilityId=4&...` → `WireKpiSnapshot`
+- `GET /api/kpi?locationId=1&availabilityId=4&...` → `200 WireKpiSnapshot`
   over the same filter subset as the table (location, availability,
-  compliance, category, text, dates; omitted = all)
-- `GET /api/chart?...` (same filter subset) → `WireCategoryCompliance[]`
-- `GET /api/vocabularies` → `Vocabularies` (id-bearing locations +
-  categories for the refresh cadence; SSR still seeds the first paint)
-- `GET /api/sync-status` → `SyncStatus` (`state` syncing/idle/stale/unknown,
+  compliance, category, typology, criticality, criticalOnly, action-plan
+  presence, text, dates, rowScope; omitted = all). Admins additionally get
+  `inactive`/`deleted` scope counts over the same subset ignoring `rowScope`;
+  other roles get scope-local numbers only. `rowScope=deleted|all` by a
+  non-admin answers `403`.
+- `GET /api/chart?...` (same filter subset) → `200 WireCategoryCompliance[]`
+  (`{ categoryId, compliant, total }[]`; non-compliant derives as
+  `total - compliant`). Same `403` rule on admin-only scopes.
+- `GET /api/vocabularies` → `200 Vocabularies` (`locations: [{ id, code, name, count }]`,
+  `availabilities/compliances/criticalities: string[]`,
+  `categories/typologies: [{ id, label }]`, `authors?: [{ id, name }]` -
+  id-bearing locations + categories for the refresh cadence; SSR still seeds the first paint)
+- `GET /api/sync-status` → `200 SyncStatus` (`state` syncing/idle/stale/unknown,
   `runningSince`, last finished run with counts + note, tracked barrier
   total) for the dashboard indicator; polls every minute (15s fast lane
   while a run is in flight)
 - `GET /api/sync-changes?scope=last-run|last-day&runId=&kind=new|updated|removed|restored|all&query=&page=1&pageSize=25` →
-  `{ run, items: SyncChangeItem[], total, page, pageSize, totalPages, summary }`
+  `200 { run: SyncRun | null, items: SyncChangeItem[], total, page, pageSize, totalPages, summary: { total, byKind, byStatus, critical } }`
   (paged per-barrier list with `oldStatus`, `changedFields`, `runId`; summary
-  reconciles by kind/status/critical for the tab header). Legacy `?limit=8`
-  alone still returns `{ changes: SyncChange[] }` for the old hover card.
-- `GET /api/sync-runs?limit=10` → `{ runs: SyncRun[] }` (recent finished
-  runs, newest first, for the run picker).
+  reconciles by kind/status/critical for the tab header). `runId` overrides
+  `scope`; non-positive/NaN `runId` means unpinned. `query` (alias `q`, tag
+  substring, capped 200 chars) filters. `page` clamps `1..100000` (default 1),
+  `pageSize` clamps `1..100` (default 25). Unknown `scope` falls back to the
+  24h window; malformed values never `400`, they use defaults. Legacy `?limit=8`
+  alone still returns `200 { changes: SyncChange[] }` (`{ barrierId, tag, location, kind, status, changedAt }[]`,
+  page 1, `pageSize = limit` clamped `1..100` default 8) for the old hover card.
+- `GET /api/sync-runs?limit=10` → `200 { runs: SyncRun[] }` (recent finished
+  runs, newest first, for the run picker; `limit` clamps `1..50`, default 10,
+  malformed URL falls back to 10).
 - `GET /api/barriers/:id/sync-detail?runId=&scope=last-day` →
-  `{ detail: SyncBarrierDetail }` (before/after snapshots + changed fields
-  for one barrier; loaded only when a row expands).
-- `GET /api/health` → `{ ok, time }` (liveness, no DB)
-- `GET /api/recipients` (+ `?activeOnly=1`), `POST /api/recipients`
-  `{ email, name? }` (upsert by email, `201`), `PATCH /api/recipients/:id`
-  `{ name?, active? }`, `DELETE /api/recipients/:id` → `{ ok: true }` -
+  `200 { detail: SyncBarrierDetail }` (`{ barrierId, tag, location,
+  kind: new|updated|removed|restored, oldAvailabilityId, newAvailabilityId,
+  changedFields, oldSnapshot, newSnapshot, changedAt, runId }` -
+  before/after snapshots + changed fields
+  for one barrier; loaded only when a row expands). `runId` pins a run;
+  `scope=last-day` uses the rolling 24h window; absent both uses the latest
+  change. `400` invalid id, `404` no sync change found.
+- `GET /api/health` → `200 { ok: true, time: ISO }` (liveness, no DB, no auth, no throttle)
+- `GET /api/recipients` (+ `?activeOnly=1`) → `200 AlertRecipient[]`,
+  `POST /api/recipients`
+  `{ email, name? }` (upsert by email - revives/renames on conflict, `201 AlertRecipient { id, email, name, active, created_at }`),
+  `PATCH /api/recipients/:id`
+  `{ name?, active?: boolean }` (`400` empty patch / bad types, `404` missing),
+  `DELETE /api/recipients/:id` → `200 { ok: true }` (`404` missing) -
   all require admin (session or `Bearer <ADMIN_TOKEN>`, including GET:
-  addresses are admin data).
-- `POST /api/auth/login` `{ email, password }` → public user + HttpOnly
-  session cookie (`401` generic on bad credentials); `GET /api/auth/me` →
-  current session user (`401` without one); `POST /api/auth/logout` →
-  `{ ok: true }` + cleared cookie; `POST /api/auth/password`
-  `{ currentPassword, newPassword }` → `{ ok: true }` + cleared cookie -
+  addresses are admin data). Email normalizes (trim/lower/slice-254 +
+  `user@host.tld` check); name trims to 200 chars, default `""`.
+- `POST /api/auth/login` `{ email, password }` → `200 PublicUser { id, email, name, role, active, created_at }` + HttpOnly
+  session cookie (`barrier_session`, 12h, `SameSite=Lax`, `Secure` on https;
+  write throttle; `400` invalid JSON / missing fields / bad email, `401` generic
+  on bad credentials - wrong email, inactive user, or bad hash all read the same
+  so accounts cannot be enumerated); `GET /api/auth/me` →
+  `200 SessionUser { id, email, name, role, active }` (read throttle; session cookie
+  only - `ADMIN_TOKEN` alone does not satisfy; `401` without one, `503` when the
+  auth store is down); `POST /api/auth/logout` →
+  `200 { ok: true }` + cleared cookie (write throttle; missing cookie still succeeds);
+  `POST /api/auth/password`
+  `{ currentPassword, newPassword }` → `200 { ok: true }` + cleared cookie -
   self-service change for any active session (admin or user; `ADMIN_TOKEN`
   rejected, identity comes from the session alone so no user can address
-  another's password). Requires the current password, enforces the 12–256
-  policy, rejects reuse, revokes every session (re-login everywhere).
-- `GET /api/users`, `POST /api/users` `{ email, name?, password (12+),
-  role? }` (`201`) - both require admin; the first account is provisioned
+  another's password). Requires the current password, enforces the 12-256
+  policy, rejects reuse (`400 new password must differ`), revokes every session
+  (re-login everywhere). `401` on wrong current password. Password throttle
+  (10/min); `ADMIN_TOKEN` callers get `401 session required`.
+- `GET /api/users` → `200 PublicUser[]` (no hashes, `order by id`),
+  `POST /api/users` `{ email, name?, password (12-256), role?: admin|user (default user) }`
+  (`201 PublicUser`) - both require admin; the first account is provisioned
   via CLI (`scripts/create-admin.ts`), never via this route. `PATCH
-  /api/users/:id` `{ name?, role?, active?, password? }`, `DELETE
-  /api/users/:id` → `{ ok: true }` - the last active admin cannot be
-  demoted, deactivated, or deleted.
-- `GET /api/alert-rules` (+ `?activeOnly=1`), `POST /api/alert-rules`
-  `{ name, categoryId?, toStatusId?, criticalOnly?, includeRecovery?,
-  staleDays?, notifyImmediate?, active? }` (`201`),
-  `PATCH /api/alert-rules/:id`, `DELETE /api/alert-rules/:id` → `{ ok: true }`
-  - all require admin. `categoryId: null` means all categories; no active
-    rule covering a category mutes it.
-- `GET /api/lookups` → `{ availabilities: [{ id, label }],
+  /api/users/:id` `{ name?, role?, active?: boolean, password? }` (`200 PublicUser`,
+  `400` empty patch / bad types / last-admin violation; a password change revokes
+  all of that user's sessions), `DELETE
+  /api/users/:id` → `200 { ok: true }` (`404` missing) - the last active admin cannot be
+  demoted, deactivated, or deleted (`400`).
+- `GET /api/alert-rules` (+ `?activeOnly=1`) → `200 AlertRule[]`,
+  `POST /api/alert-rules` (`201 AlertRule`) with
+  `{ name: required trim<=200 non-empty, description?: trim<=2000 (default ""),
+  categoryId?: int>=0|null (default null = all), toStatusId?: int>=0|null,
+  criticalOnly?, includeRecovery?, notifyImmediate?, active? (booleans; defaults false,false,false,true),
+  staleDays?: positive int|null, categoryIds?, fromStatusIds?, toStatusIds?,
+  locationIds?, criticalityIds?, typologyIds?, groupingIds?, ownerIds? (int[] deduped sorted, empty/null = all),
+  urgency?: any|urgent|critical (default any), onlyNoActionPlan? (default false),
+  onTransition? (default true), cooldownMinutes?, maxPerDay?, staleRepeatDays? (positive int|null),
+  quietStartHour?, quietEndHour? (0..23|null), activeDays? (int[] 0..6),
+  priority?: int -1000..1000 (default 0), validFrom?, validTo? (YYYY-MM-DD|null) }`,
+  `PATCH /api/alert-rules/:id` (same fields, all optional/partial; `400` on
+  empty patch, `404` missing), `DELETE /api/alert-rules/:id` → `200 { ok: true }`
+  (`404` missing) - all require admin. Duplicate names answer `400`.
+  `categoryId: null` (and empty id lists) means all categories; no active
+  rule covering a category mutes it.
+- `GET /api/alert-rules/preview?categoryIds=1,2&locationIds=3&criticalityIds=&typologyIds=&groupingIds=&ownerIds=&staleDays=7&onlyNoActionPlan=1` →
+  `200 { count: number, tags: string[<=5] }` (dry-run count over live rows for a
+  rule draft; `categoryIds/locationIds/...` are CSV `int>=0[]`, empty/malformed
+  means all; `staleDays` adds `compliance=NC AND status_since <= today - days`,
+  `400` unless a positive int; `onlyNoActionPlan=1` adds an empty-plan gate).
+  Admin only; read throttle. Note: Fresh routes static `preview.ts` before
+  `[id].ts`, so `/preview` never parses as an id.
+- `GET /api/lookups` → `200 { availabilities: [{ id, label }],
   categories: [{ id, label }], locations: [{ id, code, name }],
   criticalities/typologies/groupings/owners: [{ id, label }],
   authors: [{ id, name }] }` - requires any authenticated caller (session
-  or token); feeds the admin forms.
-- `GET /api/field-options` → `[{ field, options, updated_at, updated_by }]`
-  (any authenticated caller; missing rows seed from the GERAL extraction);
-  `PUT /api/field-options?field=<key>` `{ options: string[] }` (admin only)
+  or token; anonymous → `404`, dead credential → `401`); feeds the admin forms.
+- `GET /api/field-options` → `200 FieldOptionSet[] { field, options, updated_at, updated_by }`
+  (any data reader - session of either role or token; missing rows seed from the GERAL extraction);
+  `PUT /api/field-options?field=<key>` `{ options: string[] }` (`200` updated set, admin only;
+  `field` must be one of `origin|installLocal|equipTypology|category|evidenceCode|outOfService|fieldInstalled|fieldOperational|opStatus|hasMaintPlan|planFollowed|failureFree|maintStatus|hasContingency`,
+  else `400 Unknown field`; `options` trims/collapses-space/slices-200, drops
+  empty/dupes, caps 200, non-empty else `400`)
   - curated answer lists for the barrier sheet questions.
-- `PATCH /api/barriers/:id` (admin only) - partial update of editable core
-  and sheet fields (`tag`, `locationId`, `typologyId`, `categoryId`,
-  `groupingId`, `ownerId`, `criticalityId`, `comments`, `actionPlan`, plus
-  the 15 sheet columns); `availabilityId` routes through
-  `record_status_change()` so history and alerts keep working. Compliance
-  and `statusSince` are never writable.
+- `PATCH /api/barriers/:id` (`200` updated `WireBarrier`, admin only) - partial update of editable core
+  and sheet fields (`tag` cap 200, `locationId`, `typologyId`, `categoryId`,
+  `groupingId`, `ownerId` (null allowed), `criticalityId`, `comments`, `actionPlan`, plus
+  the 15 sheet columns `origin|installLocal|equipTypology|fieldInstalled|fieldOperational|opStatus|hasMaintPlan|planFollowed|failureFree|maintStatus|hasContingency|contingencyDesc|evidenceCode|degradationDesc|extraComments`
+  caps 200/2000; all optional; strings must be strings, ints non-negative ints,
+  else `400`); `availabilityId` routes through
+  `record_status_change()` (with `statusNote?`, default `"Edição de barreira"`)
+  so history and alerts keep working, plus the same best-effort immediate
+  fan-out as the status route (never fails the response). Compliance
+  and `statusSince` are never writable. `404` when the barrier is missing.
 
 ## Errors, auth, and throttle (P4)
 
@@ -259,14 +338,18 @@ instead of full JSON bodies. The pipeline order is fixed
 everywhere: throttle -> `loadServerConfig` -> auth -> validation -> DB.
 
 Login => Dashboard: **dashboard GETs require auth** (`barriers`, `:id`,
-`kpi`, `chart`, `export`, `vocabularies`, `field-options`) - session cookie
+`:id/sync-detail`, `kpi`, `chart`, `export`, `vocabularies`, `sync-status`,
+`sync-runs`, `sync-changes`, `field-options` GET) - session cookie
 or `ADMIN_TOKEN`. Anonymous callers get `404` camouflage (`NOT_FOUND`, same
 shape as a missing route); dead credentials get `401`. A throwing session
 store (DB blip) answers `503 UNAVAILABLE` + `Retry-After`, never `401`, so
 the dashboard backs off instead of dropping the user to login.
-**Writes and admin data require admin** (session cookie or `ADMIN_TOKEN`):
+**Writes and admin data require admin** (admin session cookie or `ADMIN_TOKEN`):
 `PATCH .../status`, `PATCH .../:id`, `PUT .../field-options`, recipients,
-users, alert-rules, `GET /api/barriers/deleted`, `GET /api/lookups`.
+users, alert-rules (including `preview`), `GET /api/barriers/deleted`.
+`GET /api/lookups` and `POST /api/auth/password` require any authenticated
+caller (session or token), with password additionally requiring the session
+path (`ADMIN_TOKEN` alone gets `401 session required`).
 An authenticated non-admin on an admin-only scope gets `403 FORBIDDEN`
 (`admin only`), never `401`, so clients show "restricted" instead of
 redirecting to login in a loop.
@@ -276,10 +359,10 @@ sidepanel Admin tab (admin role only); the admin APIs below stay
 server-enforced regardless of what the drawer shows.
 
 In-memory throttle by remote IP (never `X-Forwarded-For`, which is forgeable):
-120 req/min on reads, 30 req/min on writes, 10 req/min on export and on
-self-service password changes
+120 req/min on reads, 30 req/min on writes, 120 req/min on export, 10 req/min
+on self-service password changes
 (`429 { error, code: RATE_LIMITED }` + `Retry-After`). `/api/health` is not
-throttled (liveness probe). The export additionally shares its budget across
+throttled (liveness probe - the only unthrottled route). The export additionally shares its budget across
 isolates via the `throttle_buckets` table (`lib/server/sql/throttle.ts`,
 memory fallback). Boot validates `DATABASE_URL` with
 `PUBLIC_API_MODE=http` on the first call (`500` naming the variable).
@@ -339,92 +422,96 @@ toWireQuery({ location: "FAL", availability: "Degradado", page: 1 });
 
 ## Files in this layer
 
-| File                                 | Responsibility                                                                                                |
-| ------------------------------------ | ------------------------------------------------------------------------------------------------------------- |
-| `lib/api.ts`                         | Barrel: picks mock vs HTTP via `PUBLIC_API_MODE`, re-exports `toWireQuery` + `mockApi`                        |
-| `lib/api/types.ts`                   | `BarriersApi` (5 methods) + `DomainQuery` (string filters)                                                    |
-| `lib/api/query.ts`                   | `toWireQuery`, `cleanDateParam`, `buildQueryString`                                                           |
-| `lib/api/mock.ts`                    | `mockAdapter`: numeric `matchesQuery` + `sortWire`, resolves only the final page                              |
-| `lib/api/http.ts`                    | `httpAdapterFactory(baseUrl)`: fetch over `routes/api/*`; `null` only on 404                                  |
-| `lib/enums.ts`                       | Barrel over `lib/enums/`                                                                                      |
-| `lib/enums/codes.ts`                 | `LOCATION/AVAILABILITY/COMPLIANCE/CRITICALITY` + `to/fromXId`                                                 |
-| `lib/enums/taxonomy.ts`              | `CATEGORY/GROUPING/TYPOLOGY/OWNER` (`ownerId -1` = empty)                                                     |
-| `lib/enums/context.ts`               | `LOC_DESC/AUTHOR` (from* only)                                                                                |
-| `lib/wireTypes.ts`                   | Wire format (numeric ids; no `complianceId` in `WireBarrier`)                                                 |
-| `lib/types.ts`                       | UI domain (resolved strings, open unions, `Vocabularies`)                                                     |
-| `lib/resolve.ts`                     | `resolveBarrier(s)`, `resolveHistoryEntry`, `resolveKpi`, `resolveChartData`                                  |
-| `lib/data.ts`                        | Barrel over `lib/mock/` (deterministic generator)                                                             |
-| `lib/mock/generator.ts`              | `getWireBarriers()` cached (`0xdeadbeef`, status/station distributions)                                       |
-| `lib/mock/history.ts`                | `generateHistory` + comments/plans/notes per status                                                           |
-| `lib/mock/tags.ts`                   | `buildTag` + prefixes per category                                                                            |
-| `lib/mock/rng.ts`                    | PRNG with seed (`next/int/pick/bool`)                                                                         |
-| `lib/constants.ts`                   | Barrel over `lib/constants/`                                                                                  |
-| `lib/constants/locations.ts`         | `LOCATIONS`, `LOCATION_DIST_BY_ID`, `SIM_DATE`, `PAGE_SIZE(_OPTS)`                                            |
-| `lib/constants/catalog.ts`           | Seed lists (categories, groupings, typologies, owners, locs, authors)                                         |
-| `lib/constants/helpers.ts`           | `isCompliant()` + `distinctBy()`                                                                              |
-| `lib/constants/colors.ts`            | Colors per status + `DISP_KNOWN_ORDER`, `shortStatusLabel`                                                    |
-| `lib/server/db.ts`                   | Lazy server-only Postgres pool (`globalThis.__barrierPool`)                                                   |
-| `lib/server/sql/barriers.ts`         | `listBarriers`, `listBarrierWindow` (export paging), `getBarrierById`, `getKpi`, `transitionBarrierStatus`    |
-| `lib/server/sql/chart.ts`            | `getChartData` (`GROUP BY category_id`)                                                                       |
-| `lib/server/sql/vocabularies.ts`     | `getVocabularies()` (SSR seed + `GET /api/vocabularies` refresh)                                              |
-| `lib/server/sql/where.ts`            | `buildWhere`, `resolveOrderBy` (whitelist), `escapeLike`                                                      |
-| `lib/server/sql/mappers.ts`          | `SELECT_COLUMNS`, `HISTORY_JOIN` (lateral `json_agg`), `toWireBarrier`                                        |
-| `routes/api/_params.ts`              | Strict parsers (`parseInt/parseDate/parseQueryParam`); never a route (`_` prefix)                             |
-| `routes/api/barriers.ts`             | `GET /api/barriers` (session/token, read throttle)                                                            |
-| `routes/api/barriers/deleted.ts`     | `GET /api/barriers/deleted` (deleted only, requires `ADMIN_TOKEN`)                                            |
-| `routes/api/barriers/[id].ts`        | `GET /api/barriers/:id` (session/token, read throttle)                                                        |
-| `routes/api/barriers/[id]/status.ts` | `PATCH /api/barriers/:id/status` (requires admin, write throttle; author derives from session)                |
-| `routes/api/export.ts`               | `GET/POST /api/export` (csv/xlsx/pdf; session/token, export throttle, streamed, selection via `ids`)          |
-| `routes/api/kpi.ts`                  | `GET /api/kpi` (session/token, read throttle)                                                                 |
-| `routes/api/chart.ts`                | `GET /api/chart` (session/token, read throttle)                                                               |
-| `routes/api/sync-status.ts`          | `GET /api/sync-status` (session/token, read throttle; dashboard indicator)                                    |
-| `routes/api/health.ts`               | `GET /api/health` (liveness, no DB, no throttle)                                                              |
-| `routes/api/recipients.ts`           | `GET/POST /api/recipients` (admin, upsert by email)                                                           |
-| `routes/api/recipients/[id].ts`      | `PATCH/DELETE /api/recipients/:id` (admin)                                                                    |
-| `routes/api/auth/login.ts`           | `POST /api/auth/login` (credentials → session cookie)                                                         |
-| `routes/api/auth/logout.ts`          | `POST /api/auth/logout` (revoke + clear cookie)                                                               |
-| `routes/api/auth/me.ts`              | `GET /api/auth/me` (session user for islands)                                                                 |
-| `routes/api/auth/password.ts`        | `POST /api/auth/password` (own password change, session-only)                                                 |
-| `routes/api/users.ts`                | `GET/POST /api/users` (admin only; first account via CLI)                                                     |
-| `routes/api/users/[id].ts`           | `PATCH/DELETE /api/users/:id` (admin, last-admin guard)                                                       |
-| `routes/api/alert-rules.ts`          | `GET/POST /api/alert-rules` (admin, per-category triggers)                                                    |
-| `routes/api/alert-rules/[id].ts`     | `PATCH/DELETE /api/alert-rules/:id` (admin)                                                                   |
-| `routes/api/lookups.ts`              | `GET /api/lookups` (authenticated id lists for admin forms)                                                   |
-| `routes/api/field-options.ts`        | `GET/PUT /api/field-options` (curated sheet-question options)                                                 |
-| `routes/api/barriers/[id].ts`        | `GET/PATCH /api/barriers/:id` (admin field update)                                                            |
-| `lib/server/sql/field-options.ts`    | `field_option_sets` store + GERAL seed defaults                                                               |
-| `lib/server/sql/barriers.ts`         | `updateBarrier` (metadata + sheet fields; status via transition)                                              |
-| `lib/field-options.ts`               | Field registry, pt-BR labels, seed defaults, option validation                                                |
-| `islands/BarrierEditor.tsx`          | Admin barrier edit form (modal Editar tab)                                                                    |
-| `lib/server/config.ts`               | `loadServerConfig` (http boot), `loadSyncConfig` (Fracttal credentials for scripts)                           |
-| `lib/server/errors.ts`               | Envelope `{ error, code, requestId }` + `x-request-id`                                                        |
-| `lib/server/auth.ts`                 | `checkAdminAuth` (Bearer) + `resolveRequestAuth`/`requireAdminAuth`/`requireAuthenticated` (session or token) |
-| `lib/server/throttle.ts`             | `createThrottle` (fixed window, no deps) + per-route buckets                                                  |
-| `lib/server/sql/throttle.ts`         | Postgres `throttle_buckets` budget shared across isolates (memory fallback)                                   |
-| `lib/server/exportRows.ts`           | `resolveExportScope` (scope KPI) + `exportBatches` (5,000-row paged batches)                                  |
-| `lib/server/exportStream.ts`         | `textStream` (head / batch / tail skeleton shared by the CSV format)                                          |
-| `lib/server/exportCsv.ts`            | `streamExportCsv` (BOM + `row()` + `summaryRowsFrom()`)                                                       |
-| `lib/server/exportXlsx.ts`           | `streamExportXlsx` (workbook streamed out of the ZIP writer, batch by batch)                                  |
-| `lib/server/exportPdf.ts`            | `streamExportPdf` (report streamed page by page, batch by batch)                                              |
-| `lib/server/sql/recipients.ts`       | CRUD `alert_recipients` (pure validation + thin store)                                                        |
-| `lib/server/sql/users.ts`            | CRUD `users` (roles, last-admin guard, no hashes in JSON)                                                     |
-| `lib/server/sql/sessions.ts`         | Opaque `sessions` (hash lookup, revoke, expiry sweep)                                                         |
-| `lib/server/sql/authors.ts`          | `listAuthors` + `getOrCreateAuthor` (session → author id)                                                     |
-| `lib/server/sql/alert_rules.ts`      | CRUD `alert_rules` + `listStaleBarriers` (time trigger)                                                       |
-| `lib/server/auth/password.ts`        | PBKDF2-SHA256 hash/verify + 12-char policy (WebCrypto only)                                                   |
-| `lib/server/auth/session.ts`         | Opaque token, SHA-256 hash, HttpOnly cookie builders                                                          |
-| `lib/server/alerts/store.ts`         | `AlertStore` contract (dedup, `delivered[]` per recipient)                                                    |
-| `lib/server/alerts/rules.ts`         | Pure rule matching (category scope, critical, recovery, immediacy)                                            |
-| `lib/server/alerts/detect.ts`        | `detectUrgentTransitions` (history → rules, legacy fallback)                                                  |
-| `lib/server/alerts/immediate.ts`     | `maybeSendImmediate` (PATCH fan-out: enqueue always, at-once send on immediate rules)                         |
-| `lib/server/alerts/run.ts`           | `runAlertCycle` (detect→stale→enqueue→digest→mark, dry-run default, `--reprocess`)                            |
-| `lib/server/alerts/mailer.ts`        | `AlertMailer` + SMTP provider (P3 reuse) + `sendWithRetry`                                                    |
-| `lib/server/alerts/templates.ts`     | Urgent digest pt-BR (subject counts criticals, body lists criticals first)                                    |
-| `lib/server/sql/alerts.ts`           | `sqlAlertStore` (`ON CONFLICT dedup_key DO NOTHING`, dead-letter in payload)                                  |
-| `lib/dashboard/urgent.ts`            | `urgencyOf`/`isUrgent`/`compareUrgency`/`urgentBarriers` (fail-closed baseline = NcAlert)                     |
-| `islands/dashboard/vocabularies.ts`  | Client hook `useDashboardVocabularies` (mock mode only)                                                       |
-| `db/schema.sql`                      | DDL: lookup tables, `barriers`, `barrier_status_history`                                                      |
-| `db/seed_lookups.sql`                | Seeds the static lookups, mirroring `lib/enums/`                                                              |
+| File                                      | Responsibility                                                                                                |
+| ----------------------------------------- | ------------------------------------------------------------------------------------------------------------- |
+| `lib/api.ts`                              | Barrel: picks mock vs HTTP via `PUBLIC_API_MODE`, re-exports `toWireQuery` + `mockApi`                        |
+| `lib/api/types.ts`                        | `BarriersApi` (5 methods) + `DomainQuery` (string filters)                                                    |
+| `lib/api/query.ts`                        | `toWireQuery`, `cleanDateParam`, `buildQueryString`                                                           |
+| `lib/api/mock.ts`                         | `mockAdapter`: numeric `matchesQuery` + `sortWire`, resolves only the final page                              |
+| `lib/api/http.ts`                         | `httpAdapterFactory(baseUrl)`: fetch over `routes/api/*`; `null` only on 404                                  |
+| `lib/enums.ts`                            | Barrel over `lib/enums/`                                                                                      |
+| `lib/enums/codes.ts`                      | `LOCATION/AVAILABILITY/COMPLIANCE/CRITICALITY` + `to/fromXId`                                                 |
+| `lib/enums/taxonomy.ts`                   | `CATEGORY/GROUPING/TYPOLOGY/OWNER` (`ownerId -1` = empty)                                                     |
+| `lib/enums/context.ts`                    | `LOC_DESC/AUTHOR` (from* only)                                                                                |
+| `lib/wireTypes.ts`                        | Wire format (numeric ids; no `complianceId` in `WireBarrier`)                                                 |
+| `lib/types.ts`                            | UI domain (resolved strings, open unions, `Vocabularies`)                                                     |
+| `lib/resolve.ts`                          | `resolveBarrier(s)`, `resolveHistoryEntry`, `resolveKpi`, `resolveChartData`                                  |
+| `lib/data.ts`                             | Barrel over `lib/mock/` (deterministic generator)                                                             |
+| `lib/mock/generator.ts`                   | `getWireBarriers()` cached (`0xdeadbeef`, status/station distributions)                                       |
+| `lib/mock/history.ts`                     | `generateHistory` + comments/plans/notes per status                                                           |
+| `lib/mock/tags.ts`                        | `buildTag` + prefixes per category                                                                            |
+| `lib/mock/rng.ts`                         | PRNG with seed (`next/int/pick/bool`)                                                                         |
+| `lib/constants.ts`                        | Barrel over `lib/constants/`                                                                                  |
+| `lib/constants/locations.ts`              | `LOCATIONS`, `LOCATION_DIST_BY_ID`, `SIM_DATE`, `PAGE_SIZE(_OPTS)`                                            |
+| `lib/constants/catalog.ts`                | Seed lists (categories, groupings, typologies, owners, locs, authors)                                         |
+| `lib/constants/helpers.ts`                | `isCompliant()` + `distinctBy()`                                                                              |
+| `lib/constants/colors.ts`                 | Colors per status + `DISP_KNOWN_ORDER`, `shortStatusLabel`                                                    |
+| `lib/server/db.ts`                        | Lazy server-only Postgres pool (`globalThis.__barrierPool`)                                                   |
+| `lib/server/sql/barriers.ts`              | `listBarriers`, `listBarrierWindow` (export paging), `getBarrierById`, `getKpi`, `transitionBarrierStatus`    |
+| `lib/server/sql/chart.ts`                 | `getChartData` (`GROUP BY category_id`)                                                                       |
+| `lib/server/sql/vocabularies.ts`          | `getVocabularies()` (SSR seed + `GET /api/vocabularies` refresh)                                              |
+| `lib/server/sql/where.ts`                 | `buildWhere`, `resolveOrderBy` (whitelist), `escapeLike`                                                      |
+| `lib/server/sql/mappers.ts`               | `SELECT_COLUMNS`, `HISTORY_JOIN` (lateral `json_agg`), `toWireBarrier`                                        |
+| `routes/api/_params.ts`                   | Strict parsers (`parseInt/parseDate/parseQueryParam`); never a route (`_` prefix)                             |
+| `routes/api/barriers.ts`                  | `GET /api/barriers` (session/token, read throttle)                                                            |
+| `routes/api/barriers/deleted.ts`          | `GET /api/barriers/deleted` (deleted only, admin session or token)                                            |
+| `routes/api/barriers/[id].ts`             | `GET/PATCH /api/barriers/:id` (GET any reader, PATCH admin field update)                                      |
+| `routes/api/barriers/[id]/status.ts`      | `PATCH /api/barriers/:id/status` (requires admin, write throttle; author derives from session)                |
+| `routes/api/barriers/[id]/sync-detail.ts` | `GET /api/barriers/:id/sync-detail` (session/token, read throttle; pinned run or 24h window)                  |
+| `routes/api/export.ts`                    | `GET/POST /api/export` (csv/xlsx/pdf; session/token, export throttle, streamed, selection via `ids`)          |
+| `routes/api/kpi.ts`                       | `GET /api/kpi` (session/token, read throttle)                                                                 |
+| `routes/api/chart.ts`                     | `GET /api/chart` (session/token, read throttle)                                                               |
+| `routes/api/sync-status.ts`               | `GET /api/sync-status` (session/token, read throttle; dashboard indicator)                                    |
+| `routes/api/sync-runs.ts`                 | `GET /api/sync-runs` (session/token, read throttle; `?limit=` 1..50)                                          |
+| `routes/api/sync-changes.ts`              | `GET /api/sync-changes` (session/token, read throttle; paged + legacy `?limit=` shape)                        |
+| `routes/api/vocabularies.ts`              | `GET /api/vocabularies` (session/token, read throttle; refresh cadence)                                       |
+| `routes/api/health.ts`                    | `GET /api/health` (liveness, no DB, no auth, no throttle)                                                     |
+| `routes/api/recipients.ts`                | `GET/POST /api/recipients` (admin, upsert by email)                                                           |
+| `routes/api/recipients/[id].ts`           | `PATCH/DELETE /api/recipients/:id` (admin)                                                                    |
+| `routes/api/auth/login.ts`                | `POST /api/auth/login` (credentials → session cookie)                                                         |
+| `routes/api/auth/logout.ts`               | `POST /api/auth/logout` (revoke + clear cookie)                                                               |
+| `routes/api/auth/me.ts`                   | `GET /api/auth/me` (session user for islands)                                                                 |
+| `routes/api/auth/password.ts`             | `POST /api/auth/password` (own password change, session-only)                                                 |
+| `routes/api/users.ts`                     | `GET/POST /api/users` (admin only; first account via CLI)                                                     |
+| `routes/api/users/[id].ts`                | `PATCH/DELETE /api/users/:id` (admin, last-admin guard)                                                       |
+| `routes/api/alert-rules.ts`               | `GET/POST /api/alert-rules` (admin, scoped triggers + anti-noise windows)                                     |
+| `routes/api/alert-rules/[id].ts`          | `PATCH/DELETE /api/alert-rules/:id` (admin)                                                                   |
+| `routes/api/alert-rules/preview.ts`       | `GET /api/alert-rules/preview` (admin dry-run count + sample tags)                                            |
+| `routes/api/lookups.ts`                   | `GET /api/lookups` (authenticated id lists for admin forms)                                                   |
+| `routes/api/field-options.ts`             | `GET/PUT /api/field-options` (GET any reader, PUT admin only)                                                 |
+| `lib/server/sql/field-options.ts`         | `field_option_sets` store + GERAL seed defaults                                                               |
+| `lib/server/sql/barriers.ts`              | `updateBarrier` (metadata + sheet fields; status via transition)                                              |
+| `lib/field-options.ts`                    | Field registry, pt-BR labels, seed defaults, option validation                                                |
+| `islands/BarrierEditor.tsx`               | Admin barrier edit form (modal Editar tab)                                                                    |
+| `lib/server/config.ts`                    | `loadServerConfig` (http boot), `loadSyncConfig` (Fracttal credentials for scripts)                           |
+| `lib/server/errors.ts`                    | Envelope `{ error, code, requestId }` + `x-request-id`                                                        |
+| `lib/server/auth.ts`                      | `checkAdminAuth` (Bearer) + `resolveRequestAuth`/`requireAdminAuth`/`requireAuthenticated` (session or token) |
+| `lib/server/throttle.ts`                  | `createThrottle` (fixed window, no deps) + per-route buckets                                                  |
+| `lib/server/sql/throttle.ts`              | Postgres `throttle_buckets` budget shared across isolates (memory fallback)                                   |
+| `lib/server/exportRows.ts`                | `resolveExportScope` (scope KPI) + `exportBatches` (5,000-row paged batches)                                  |
+| `lib/server/exportStream.ts`              | `textStream` (head / batch / tail skeleton shared by the CSV format)                                          |
+| `lib/server/exportCsv.ts`                 | `streamExportCsv` (BOM + `row()` + `summaryRowsFrom()`)                                                       |
+| `lib/server/exportXlsx.ts`                | `streamExportXlsx` (workbook streamed out of the ZIP writer, batch by batch)                                  |
+| `lib/server/exportPdf.ts`                 | `streamExportPdf` (report streamed page by page, batch by batch)                                              |
+| `lib/server/sql/recipients.ts`            | CRUD `alert_recipients` (pure validation + thin store)                                                        |
+| `lib/server/sql/users.ts`                 | CRUD `users` (roles, last-admin guard, no hashes in JSON)                                                     |
+| `lib/server/sql/sessions.ts`              | Opaque `sessions` (hash lookup, revoke, expiry sweep)                                                         |
+| `lib/server/sql/authors.ts`               | `listAuthors` + `getOrCreateAuthor` (session → author id)                                                     |
+| `lib/server/sql/alert_rules.ts`           | CRUD `alert_rules` + `listStaleBarriers` (time trigger)                                                       |
+| `lib/server/auth/password.ts`             | PBKDF2-SHA256 hash/verify + 12-char policy (WebCrypto only)                                                   |
+| `lib/server/auth/session.ts`              | Opaque token, SHA-256 hash, HttpOnly cookie builders                                                          |
+| `lib/server/alerts/store.ts`              | `AlertStore` contract (dedup, `delivered[]` per recipient)                                                    |
+| `lib/server/alerts/rules.ts`              | Pure rule matching (category scope, critical, recovery, immediacy)                                            |
+| `lib/server/alerts/detect.ts`             | `detectUrgentTransitions` (history → rules, legacy fallback)                                                  |
+| `lib/server/alerts/immediate.ts`          | `maybeSendImmediate` (PATCH fan-out: enqueue always, at-once send on immediate rules)                         |
+| `lib/server/alerts/run.ts`                | `runAlertCycle` (detect→stale→enqueue→digest→mark, dry-run default, `--reprocess`)                            |
+| `lib/server/alerts/mailer.ts`             | `AlertMailer` + SMTP provider (P3 reuse) + `sendWithRetry`                                                    |
+| `lib/server/alerts/templates.ts`          | Urgent digest pt-BR (subject counts criticals, body lists criticals first)                                    |
+| `lib/server/sql/alerts.ts`                | `sqlAlertStore` (`ON CONFLICT dedup_key DO NOTHING`, dead-letter in payload)                                  |
+| `lib/dashboard/urgent.ts`                 | `urgencyOf`/`isUrgent`/`compareUrgency`/`urgentBarriers` (fail-closed baseline = NcAlert)                     |
+| `islands/dashboard/vocabularies.ts`       | Client hook `useDashboardVocabularies` (mock mode only)                                                       |
+| `db/schema.sql`                           | DDL: lookup tables, `barriers`, `barrier_status_history`                                                      |
+| `db/seed_lookups.sql`                     | Seeds the static lookups, mirroring `lib/enums/`                                                              |
 
 See **docs/DATABASE.md** for the full schema and setup walkthrough, and
 **docs/ARCHITECTURE.md** for the mock vs http flows and the island topology.
