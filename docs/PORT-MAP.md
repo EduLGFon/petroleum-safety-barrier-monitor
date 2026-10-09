@@ -139,7 +139,7 @@ Postgres, Fracttal, and SMTP and never accept any. Note that `docker ps` shows
 image, no DB `depends_on`, and no DB volume in either compose file. The DB is
 external — `docs/DATABASE.md:11` tells the operator to start one themselves
 ("local, Docker, RDS, Supabase, whatever you prefer"). The bundled `db`
-service (`postgres:16-alpine`, named volume `pgdata`, health-gated) is the
+service (`postgres:18-alpine`, named volume `pgdata`, health-gated) is the
 default: host runs reach it at `localhost:${POSTGRES_PORT:-5432}`,
 containers as hostname `db` via `DATABASE_URL_DOCKER`.
 
@@ -213,7 +213,7 @@ from the `poller` service and the `tools` one-offs.
 
 | Service  | Image                                           | Command                           | Published ports               | Healthcheck                      |
 | -------- | ----------------------------------------------- | --------------------------------- | ----------------------------- | -------------------------------- |
-| `db`     | `postgres:16-alpine` (bundled, `pgdata` volume) | — (no command)                    | **`5432:5432`** (host-mapped) | yes, `pg_isready`                |
+| `db`     | `postgres:18-alpine` (bundled, `pgdata` volume) | — (no command)                    | **`5432:5432`** (host-mapped) | yes, `pg_isready`                |
 | `app`    | `barrier-monitor:latest` (build `.`)            | image `CMD` → `deno task start`   | **`8000:8000`** (`:24`)       | yes, `localhost:8000` (`:26-36`) |
 | `poller` | same                                            | `run -A scripts/fracttal-poll.ts` | **none**                      | no                               |
 | `alerts` | same                                            | `run -A scripts/alerts-poll.ts`   | **none**                      | no                               |

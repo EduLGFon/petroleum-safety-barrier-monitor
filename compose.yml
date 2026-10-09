@@ -23,12 +23,18 @@ services:
   # zero host install. Named volume `pgdata` is intentional: bind-mounting
   # PGDATA on Docker Desktop for Windows hits file-permission and fsync
   # performance issues; a named volume stays inside the Linux VM and is fast.
+  # Major upgrades need a dump/restore: pgdata written by PG16 cannot be
+  # started by PG18 (different on-disk format). Migrate with:
+  #   docker compose run --rm -v /srv/backup:/backup db \
+  #     pg_dumpall -U barrier > /backup/full.sql   # against the OLD db
+  #   docker compose down -v   # DELETES all DB data, then `up` recreates
+  #   cat /backup/full.sql | docker compose exec -T db psql -U barrier
   # Credentials come from POSTGRES_* in .env (defaults below are dev-only).
   # Host runs (`deno task db:migrate` on Windows) reach it via
   # localhost:${POSTGRES_PORT:-5432}; containers reach it via hostname `db`
   # (see DATABASE_URL_DOCKER below).
   db:
-    image: postgres:16-alpine
+    image: postgres:18-alpine@sha256:77f585114c32fbca283dc835b0596f4e52b51b4c6662d7810b2f4084f60a1873
     # No env_file: only POSTGRES_* (interpolated below from host .env) are
     # passed in. Mounting the full .env would leak DATABASE_URL/FRACTTAL_*
     # into the DB container for no benefit.

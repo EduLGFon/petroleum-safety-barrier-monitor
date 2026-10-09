@@ -42,10 +42,10 @@
   "imports": {
     "@/": "./",
     "fresh": "jsr:@fresh/core@^2.3.3",
-    "preact": "npm:preact@^10.29.8",
-    "@preact/signals": "npm:@preact/signals@^2.11.2",
+    "preact": "npm:preact@^11.0.0",
+    "@preact/signals": "npm:@preact/signals@^2.11.3",
     "@fresh/plugin-vite": "jsr:@fresh/plugin-vite@^1.1.2",
-    "vite": "npm:vite@^7.1.3",
+    "vite": "npm:vite@^7",
     "@std/path": "jsr:@std/path@^1.1.6",
     "@db/postgres": "jsr:@db/postgres@^0.19.5",
     "xlsx": "npm:xlsx@0.18.5",
