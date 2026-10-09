@@ -27,8 +27,8 @@ services:
   # started by PG18 (different on-disk format). Migrate with:
   #   docker compose run --rm -v /srv/backup:/backup db \
   #     pg_dumpall -U barrier > /backup/full.sql   # against the OLD db
-  #   docker compose down -v   # DELETES all DB data, then `up` recreates
-  #   cat /backup/full.sql | docker compose exec -T db psql -U barrier
+  # docker compose down -v   # DELETES all DB data, then `up` recreates
+  # cat /backup/full.sql | docker compose exec -T db psql -U barrier
   # Credentials come from POSTGRES_* in .env (defaults below are dev-only).
   # Host runs (`deno task db:migrate` on Windows) reach it via
   # localhost:${POSTGRES_PORT:-5432}; containers reach it via hostname `db`
@@ -45,7 +45,7 @@ services:
     ports:
       - "${POSTGRES_PORT:-5432}:5432"
     volumes:
-      - pgdata:/var/lib/postgresql/data
+      - pgdata:/var/lib/postgresql/
     restart: unless-stopped
     healthcheck:
       test: [
