@@ -15,7 +15,12 @@ import {
   installationLabel,
 } from "../../lib/utils.ts";
 
-import { CONF_COLORS, CRIT_COLORS, DISP_COLORS } from "../../lib/constants.ts";
+import {
+  CONF_COLORS,
+  CRIT_COLORS,
+  DISP_COLORS,
+  SCOPE_COLORS,
+} from "../../lib/constants.ts";
 
 import { Div, FR, Sec, Txt } from "./primitives.tsx";
 
@@ -26,11 +31,21 @@ import { Badge } from "../ui/Badge.tsx";
 // BarrierDetails shows identification, inventory sheet columns, contingency,
 // degradation, status duration, comments, and action plan. Fields pair two-up
 // (location already combines code + name) and the header badges collapse into a
-// single status strip, so the dialog stays dense.
+// single status strip, so the dialog stays dense. The Situação field + badge
+// always show Ativa / Desativada / Excluída (deleted wins over the upstream
+// flag, absent flags read as active) so active rows are explicit instead of
+// "no badge means active".
 export function BarrierDetails({ b }: { b: Barrier }) {
   const dc = DISP_COLORS[b.availability],
     cc = CONF_COLORS[b.compliance],
     crc = CRIT_COLORS[b.criticality];
+  const deleted = (b.deletedAt ?? null) !== null;
+  const inactive = !deleted && (b.isActive ?? true) === false;
+  const situation = deleted ? "Excluída" : inactive ? "Desativada" : "Ativa";
+  const sc = SCOPE_COLORS[situation];
+  const situationValue = deleted && b.deletedAt
+    ? `Excluída em ${fmtDate(b.deletedAt)}`
+    : situation;
   // Unknown vocabularies fall back to a neutral pill instead of broken CSS.
   const neutral = {
     solid: "#94a3b8",
@@ -69,6 +84,12 @@ export function BarrierDetails({ b }: { b: Barrier }) {
         />
         <FR Icon={LayersIcon} label="Categoria" value={b.category} />
         <FR Icon={LayersIcon} label="Agrupamento" value={b.grouping} />
+        <FR
+          Icon={ShieldCheckIcon}
+          label="Situação"
+          value={situationValue}
+          accent={sc?.solid}
+        />
       </div>
       <div
         style={{
@@ -86,6 +107,7 @@ export function BarrierDetails({ b }: { b: Barrier }) {
         <Badge label={b.availability} {...(dc ?? neutral)} size="sm" />
         <Badge label={b.compliance} {...(cc ?? neutral)} size="sm" />
         <Badge label={b.criticality} {...(crc ?? neutral)} size="sm" />
+        <Badge label={situation} {...(sc ?? neutral)} size="sm" />
         {b.statusSince && (
           <span
             style={{

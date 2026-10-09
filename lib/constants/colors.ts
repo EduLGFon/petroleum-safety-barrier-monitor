@@ -89,16 +89,38 @@ export const CRIT_COLORS: Record<
 };
 
 // Visibility-scope segments for the admin status band (Desativadas /
-// Excluídas). Deliberately grayscale: they switch which rows are visible,
-// not the availability of the rows themselves.
+// Excluídas) plus the singular row badges (Desativada / Excluída) and the
+// always-visible Situação field in the barrier details modal (Ativa /
+// Desativada / Excluída). Deliberately grayscale except Ativa: they switch
+// which rows are visible, not the availability of the rows themselves.
 export const SCOPE_COLORS: Record<
   string,
   { solid: string; bg: string; border: string }
 > = {
+  "Ativa": {
+    solid: "#22c55e",
+    bg: "rgba(34,197,94,.1)",
+    border: "rgba(34,197,94,.28)",
+  },
+  "Ativas": {
+    solid: "#22c55e",
+    bg: "rgba(34,197,94,.1)",
+    border: "rgba(34,197,94,.28)",
+  },
+  "Desativada": {
+    solid: "#94a3b8",
+    bg: "rgba(148,163,184,.1)",
+    border: "rgba(148,163,184,.28)",
+  },
   "Desativadas": {
     solid: "#94a3b8",
     bg: "rgba(148,163,184,.1)",
     border: "rgba(148,163,184,.28)",
+  },
+  "Excluída": {
+    solid: "#64748b",
+    bg: "rgba(100,116,139,.12)",
+    border: "rgba(100,116,139,.35)",
   },
   "Excluídas": {
     solid: "#64748b",
