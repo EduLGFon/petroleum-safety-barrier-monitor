@@ -20,10 +20,9 @@ import {
 } from "../../../lib/server/errors.ts";
 
 import {
-  type AlertMailer,
-  smtpAlertConfigFromEnv,
-  smtpAlertMailer,
-} from "../../../lib/server/alerts/mailer.ts";
+  postAlert,
+  providerConfigFromEnv,
+} from "../../../lib/server/alerts/provider.ts";
 
 import {
   getBarrierById,
@@ -39,7 +38,7 @@ import {
 
 import { parseIdParam, readJsonBody } from "../../../lib/server/validation.ts";
 
-import { maybeSendImmediate } from "../../../lib/server/alerts/immediate.ts";
+import { maybeSendProviderImmediate } from "../../../lib/server/alerts/run-provider.ts";
 
 import { getResolverLabels } from "../../../lib/server/sql/vocabularies.ts";
 
@@ -244,20 +243,24 @@ export const handler = define.handlers({
         extraComments,
       });
 
-      // Best-effort alert fan-out for the status change above: the
+      // Best-effort provider fan-out for the status change above: the
       // transition already committed, so nothing here may fail the
-      // response. Failures only log; the digest cron retries via history.
+      // response. Enqueue always; violada posts at once when the provider
+      // is configured. Failures only log; the poll cycle retries.
       if (statusChangedTo !== undefined) {
         try {
           const [rules, recipients] = await Promise.all([
             listAlertRules(false),
             listRecipients(true),
           ]);
-          let mailer: AlertMailer | undefined;
+          void rules;
+          let provider:
+            | Awaited<ReturnType<typeof providerConfigFromEnv>>
+            | undefined;
           try {
-            mailer = smtpAlertMailer(smtpAlertConfigFromEnv());
+            provider = providerConfigFromEnv();
           } catch {
-            mailer = undefined; // no relay: enqueue only, cron sends
+            provider = undefined;
           }
           let labels:
             | Awaited<ReturnType<typeof getResolverLabels>>
@@ -267,19 +270,52 @@ export const handler = define.handlers({
           } catch {
             labels = undefined;
           }
-          await maybeSendImmediate({
+          let statusInfo:
+            | Awaited<
+              import("../../../lib/server/alerts/detect.ts").StatusInfo
+            >
+            | undefined;
+          try {
+            const { queryRows } = await import(
+              "../../../lib/server/db.ts"
+            );
+            const rows = await queryRows<
+              { id: number; label: string; ok: boolean }
+            >(
+              `select id, label, is_compliant as ok from availability_statuses`,
+            );
+            const labelById = new Map(rows.map((r) => [r.id, r.label]));
+            const okById = new Map(rows.map((r) => [r.id, r.ok]));
+            statusInfo = {
+              labelOf: (id: number) =>
+                labelById.get(id) ?? `Disponibilidade (${id})`,
+              compliantOf: (id: number) => okById.get(id) ?? false,
+            };
+          } catch {
+            statusInfo = undefined;
+          }
+          const { getBarriersByIds } = await import(
+            "../../../lib/server/sql/barriers.ts"
+          );
+          await maybeSendProviderImmediate({
             store: sqlAlertStore,
+            loadBarriers: getBarriersByIds,
+            sender: provider
+              ? { post: (payload) => postAlert(provider!, payload) }
+              : undefined,
             barrier: updated ?? existing,
             statusId: statusChangedTo,
             transitionDate: (updated ?? existing).statusSince.slice(0, 10),
-            rules,
-            hasAnyRule: rules.length > 0,
-            mailer,
-            recipients,
+            companyId: provider?.companyId ?? 1,
+            appBaseUrl: Deno.env.get("APP_BASE_URL") || undefined,
+            recipients: recipients.map((r) => ({
+              email: r.email,
+              name: r.name,
+              phone: r.phone ?? "",
+            })),
             logger: forRequest(requestId).line("info"),
             labels,
-            brand: Deno.env.get("COMPANY_NAME") || undefined,
-            dashboardUrl: Deno.env.get("APP_BASE_URL") || undefined,
+            statusInfo,
           });
         } catch (err) {
           reqLog.error("immediate fan-out failed", { barrierId, err });

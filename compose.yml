@@ -110,11 +110,11 @@ services:
     restart: unless-stopped
     stop_grace_period: 3m
 
-  # Scheduled alert digest (detect -> enqueue -> mail, same wiring as the
-  # alerts:check --apply one-shot). Needs DATABASE_URL + OPS_SMTP_* in .env;
-  # without a relay it dry-runs (detect + report only). Cadence via
-  # ALERTS_POLL_SECONDS (default 900). Grace period lets an in-flight digest
-  # finish sending before SIGKILL.
+  # Scheduled provider delivery (detect -> enqueue -> post, same wiring as
+  # the alerts:check --apply one-shot). Needs DATABASE_URL + provider token
+  # in .env; without a token it dry-runs (detect + report only). Cadence via
+  # ALERTS_POLL_SECONDS (default 900). Grace period lets in-flight posts
+  # finish before SIGKILL.
   alerts:
     image: barrier-monitor:latest
     command: ["run", "-A", "scripts/alerts-poll.ts"]

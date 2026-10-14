@@ -1,20 +1,14 @@
-// Alerts poll script - scheduled digest delivery ("cron in a container").
-// This is why it exists: alert rules are digest-type by default
-// (notify_immediate=false), so transitions only enqueue at PATCH time and
-// the email only goes out when something runs the cycle with --apply. This
-// loop is that something: every ALERTS_POLL_SECONDS it detects, enqueues
-// idempotently and sends one digest per active recipient (same semantics
-// as scripts/alerts-check.ts --apply, wired identically). Env only.
+// Alerts poll script - scheduled provider delivery ("cron in a container").
+// Every ALERTS_POLL_SECONDS it detects, enqueues idempotently and posts
+// one provider alert per event (same semantics as alerts-check --apply).
 //
 //   DATABASE_URL              required (alert store)
-//   ALERTS_POLL_SECONDS       pause between cycles (default 900, minimum 60;
-//                             effective period is cycle + pause)
-//   OPS_SMTP_HOST / OPS_SMTP_PORT / OPS_SMTP_USER / OPS_SMTP_PASS
-//   OPS_EMAIL_TO / OPS_EMAIL_FROM / COMPANY_NAME
-//                             relay for the digest; without OPS_SMTP_HOST the
-//                             loop still runs in dry-run (detect + report, no
-//                             writes, no mail) so misconfiguration is visible
-//                             in the logs instead of silent.
+//   ALERTS_POLL_SECONDS       pause between cycles (default 900, minimum 60)
+//   ALERT_PROVIDER_BASE_URL / ALERT_PROVIDER_TOKEN / ALERT_PROVIDER_COMPANY_ID
+//   APP_BASE_URL              public link base for provider messages
+//                             without a provider token the loop still runs
+//                             in dry-run (detect + report only) so
+//                             misconfiguration is visible in the logs.
 import {
   consoleNotifier,
   notifyFailureToAll,
@@ -24,10 +18,10 @@ import {
 } from "../lib/server/fracttal/notify.ts";
 
 import {
-  type AlertMailer,
-  smtpAlertConfigFromEnv,
-  smtpAlertMailer,
-} from "../lib/server/alerts/mailer.ts";
+  postAlert,
+  type ProviderConfig,
+  providerConfigFromEnv,
+} from "../lib/server/alerts/provider.ts";
 
 import { getResolverLabels } from "../lib/server/sql/vocabularies.ts";
 
@@ -45,7 +39,7 @@ import { listRecipients } from "../lib/server/sql/recipients.ts";
 
 import { sqlAlertStore } from "../lib/server/sql/alerts.ts";
 
-import { runAlertCycle } from "../lib/server/alerts/run.ts";
+import { runProviderCycle } from "../lib/server/alerts/run-provider.ts";
 
 import { queryRows } from "../lib/server/db.ts";
 
@@ -90,10 +84,9 @@ async function loadStatusInfo(): Promise<StatusInfo | undefined> {
 }
 
 async function cycle(
-  mailer: AlertMailer | null,
+  provider: ProviderConfig | null,
   notifiers: OpsNotifier[],
   startedAt: Date,
-  brand: string | undefined,
   dashboardUrl: string | undefined,
 ): Promise<void> {
   const fail = async (note: string): Promise<void> => {
@@ -105,11 +98,13 @@ async function cycle(
     });
     console.error(`[alerts-poll] ${note}`);
   };
-  let recipients: Array<{ email: string }>;
+  let recipients: Array<{ email: string; name: string; phone: string }>;
   let rules: Awaited<ReturnType<typeof listAlertRules>> = [];
   try {
     recipients = (await listRecipients(true)).map((r) => ({
       email: r.email,
+      name: r.name,
+      phone: r.phone ?? "",
     }));
     rules = await listAlertRules(false);
   } catch (err) {
@@ -123,22 +118,23 @@ async function cycle(
     labels = undefined;
   }
   const statusInfo = await loadStatusInfo();
-  const dryRun = mailer === null;
+  const dryRun = provider === null;
   try {
-    const result = await runAlertCycle({
+    const result = await runProviderCycle({
       store: sqlAlertStore,
       loadBarriers: getBarriersByIds,
-      mailer: mailer ??
-        { name: "none" as const, send: () => Promise.resolve() },
+      sender: provider
+        ? { post: (payload) => postAlert(provider, payload) }
+        : { post: () => Promise.reject(new Error("dry-run")) },
       recipients,
+      companyId: provider?.companyId ?? 1,
+      appBaseUrl: dashboardUrl,
       dryRun,
       logger: log.line("info"),
       rules,
       hasAnyRule: rules.length > 0,
       listStale: (days) => listStaleBarriers(days),
       labels,
-      brand,
-      dashboardUrl,
       statusInfo,
       onRuleFired: (ruleId) => {
         void touchRuleTriggered(ruleId).catch(() => {});
@@ -148,7 +144,7 @@ async function cycle(
       `[alerts-poll] done detected=${result.detected} ` +
         `enqueued=${result.enqueued} sent=${result.sent} ` +
         `failed=${result.failed} parked=${result.skippedDead} ` +
-        `emails=${result.emails}`,
+        `posted=${result.posted} parcial=${result.parcial}`,
     );
   } catch (err) {
     await fail(err instanceof Error ? err.message : String(err));
@@ -159,25 +155,23 @@ function main(): void {
   const notifiers: OpsNotifier[] = [consoleNotifier];
   const opsSmtp = smtpConfigFromEnv();
   if (opsSmtp) notifiers.push(smtpEmailNotifier(opsSmtp));
-  let mailer: AlertMailer | null;
+  let provider: ProviderConfig | null;
   try {
-    mailer = smtpAlertMailer(smtpAlertConfigFromEnv());
+    provider = providerConfigFromEnv();
   } catch {
-    mailer = null;
+    provider = null;
   }
-  const brand = Deno.env.get("COMPANY_NAME") || undefined;
   const dashboardUrl = Deno.env.get("APP_BASE_URL") || undefined;
   console.log(
-    `[alerts-poll] every ${seconds}s, mail=${
-      mailer ? "smtp" : "dry-run (no relay)"
+    `[alerts-poll] every ${seconds}s, provider=${
+      provider ? "configured" : "dry-run (no token)"
     } ` +
-      `notifiers=console${opsSmtp ? ",email" : ""}` +
-      (brand ? ` brand=${brand}` : ""),
+      `notifiers=console${opsSmtp ? ",email" : ""}`,
   );
-  if (!mailer) {
+  if (!provider) {
     console.warn(
-      "[alerts-poll] OPS_SMTP_HOST is not set: cycles detect and report only, " +
-        "nothing is enqueued or mailed. Set the relay to deliver digests.",
+      "[alerts-poll] ALERT_PROVIDER_TOKEN is not set: cycles detect and report only, " +
+        "nothing is enqueued or posted.",
     );
   }
   const stop = () => {
@@ -189,7 +183,7 @@ function main(): void {
   Deno.addSignalListener("SIGTERM", stop);
   (async () => {
     while (running) {
-      await cycle(mailer, notifiers, new Date(), brand, dashboardUrl);
+      await cycle(provider, notifiers, new Date(), dashboardUrl);
       if (running) await sleep(seconds * 1000);
     }
     Deno.exit(0);

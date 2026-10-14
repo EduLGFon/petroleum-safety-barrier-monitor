@@ -1,13 +1,13 @@
 // alerts-check: detect barrier transitions allowed by alert rules,
-// enqueue idempotently, send one digest per active recipient. Dry-run by
+// enqueue idempotently, post one provider alert per event. Dry-run by
 // default (detects and reports, writes nothing, sends nothing); --apply
 // writes and sends. --reprocess clears dead-letter flags so failed events
 // retry; --only-barrier scopes detection to one id (verification support).
 //
-// Env: DATABASE_URL (store), OPS_SMTP_* (relay, same P3 variables as ops
-// mail), FRACTTAL_* not needed. Exit 0 when the run completes (counts in
+// Env: DATABASE_URL (store), ALERT_PROVIDER_BASE_URL/TOKEN/COMPANY_ID,
+// APP_BASE_URL (public link). Exit 0 when the run completes (counts in
 // the log, even with dead-letters); exit 1 on unexpected failure (DB down,
-// no relay when sending) after notifying ops.
+// no provider token when sending) after notifying ops.
 import {
   consoleNotifier,
   notifyFailureToAll,
@@ -17,9 +17,9 @@ import {
 } from "../lib/server/fracttal/notify.ts";
 
 import {
-  smtpAlertConfigFromEnv,
-  smtpAlertMailer,
-} from "../lib/server/alerts/mailer.ts";
+  postAlert,
+  providerConfigFromEnv,
+} from "../lib/server/alerts/provider.ts";
 
 import { getResolverLabels } from "../lib/server/sql/vocabularies.ts";
 
@@ -37,7 +37,7 @@ import type { StatusInfo } from "../lib/server/alerts/detect.ts";
 
 import { sqlAlertStore } from "../lib/server/sql/alerts.ts";
 
-import { runAlertCycle } from "../lib/server/alerts/run.ts";
+import { runProviderCycle } from "../lib/server/alerts/run-provider.ts";
 
 import { queryRows } from "../lib/server/db.ts";
 
@@ -95,11 +95,13 @@ async function main(): Promise<void> {
     Deno.exit(1);
   };
 
-  let recipients: Array<{ email: string }>;
+  let recipients: Array<{ email: string; name: string; phone: string }>;
   let rules: Awaited<ReturnType<typeof listAlertRules>> = [];
   try {
     recipients = (await listRecipients(true)).map((r) => ({
       email: r.email,
+      name: r.name,
+      phone: r.phone ?? "",
     }));
     rules = await listAlertRules(false);
   } catch (err) {
@@ -107,9 +109,16 @@ async function main(): Promise<void> {
   }
 
   const dryRun = !flags.apply;
-  const mailer = dryRun
-    ? { name: "none" as const, send: () => Promise.resolve() }
-    : smtpAlertMailer(smtpAlertConfigFromEnv());
+  let providerConfig:
+    | Awaited<ReturnType<typeof providerConfigFromEnv>>
+    | null = null;
+  if (!dryRun) {
+    try {
+      providerConfig = providerConfigFromEnv();
+    } catch (err) {
+      await fail(err instanceof Error ? err.message : String(err));
+    }
+  }
   // Display labels (authors included) so enqueued payloads carry real names;
   // best-effort: without them the seed-enum fallback still renders.
   let labels: Awaited<ReturnType<typeof getResolverLabels>> | undefined;
@@ -137,12 +146,17 @@ async function main(): Promise<void> {
   }
   const brand = Deno.env.get("COMPANY_NAME") || undefined;
   const dashboardUrl = Deno.env.get("APP_BASE_URL") || undefined;
+  void brand;
   try {
-    const result = await runAlertCycle({
+    const result = await runProviderCycle({
       store: sqlAlertStore,
       loadBarriers: getBarriersByIds,
-      mailer,
+      sender: providerConfig!
+        ? { post: (payload) => postAlert(providerConfig!, payload) }
+        : { post: () => Promise.reject(new Error("dry-run")) },
       recipients: recipients!,
+      companyId: providerConfig?.companyId ?? 1,
+      appBaseUrl: dashboardUrl,
       onlyBarrierIds: flags.onlyBarrier === undefined
         ? undefined
         : [flags.onlyBarrier],
@@ -153,8 +167,6 @@ async function main(): Promise<void> {
       hasAnyRule: (rules?.length ?? 0) > 0,
       listStale: (days) => listStaleBarriers(days),
       labels,
-      brand,
-      dashboardUrl,
       statusInfo,
       onRuleFired: (ruleId) => {
         void touchRuleTriggered(ruleId).catch(() => {});
@@ -166,7 +178,7 @@ async function main(): Promise<void> {
         `[alerts-check] done detected=${result.detected} ` +
           `enqueued=${result.enqueued} sent=${result.sent} ` +
           `failed=${result.failed} parked=${result.skippedDead} ` +
-          `emails=${result.emails} reprocessed=${result.reprocessed}`,
+          `posted=${result.posted} parcial=${result.parcial} reprocessed=${result.reprocessed}`,
       );
     }
   } catch (err) {

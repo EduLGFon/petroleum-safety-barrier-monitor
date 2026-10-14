@@ -18,9 +18,9 @@ import {
 } from "../../../../lib/server/auth.ts";
 
 import {
-  type AlertMailer,
-  smtpAlertConfigFromEnv,
-} from "../../../../lib/server/alerts/mailer.ts";
+  postAlert,
+  providerConfigFromEnv,
+} from "../../../../lib/server/alerts/provider.ts";
 
 import {
   getBarrierById,
@@ -37,13 +37,11 @@ import {
   readJsonBody,
 } from "../../../../lib/server/validation.ts";
 
-import { maybeSendImmediate } from "../../../../lib/server/alerts/immediate.ts";
+import { maybeSendProviderImmediate } from "../../../../lib/server/alerts/run-provider.ts";
 
 import { getResolverLabels } from "../../../../lib/server/sql/vocabularies.ts";
 
 import { listAlertRules } from "../../../../lib/server/sql/alert_rules.ts";
-
-import { smtpAlertMailer } from "../../../../lib/server/alerts/mailer.ts";
 
 import { listRecipients } from "../../../../lib/server/sql/recipients.ts";
 
@@ -165,20 +163,23 @@ export const handler = define.handlers({
       if (!updated) {
         return notFound("Barrier not found", requestId);
       }
-      // Best-effort immediate fan-out (hybrid alerts): the transition
+      // Best-effort provider fan-out (hybrid alerts): the transition
       // already committed above, so nothing here may fail the response.
-      // Matches enqueue always; immediate rules also send at once when a
-      // relay is configured. Failures only log; the digest cron retries.
+      // Enqueue always; violada posts at once when the provider is
+      // configured. Failures only log; the poll cycle retries.
       try {
         const [rules, recipients] = await Promise.all([
           listAlertRules(false),
           listRecipients(true),
         ]);
-        let mailer: AlertMailer | undefined;
+        void rules;
+        let provider:
+          | Awaited<ReturnType<typeof providerConfigFromEnv>>
+          | undefined;
         try {
-          mailer = smtpAlertMailer(smtpAlertConfigFromEnv());
+          provider = providerConfigFromEnv();
         } catch {
-          mailer = undefined; // no relay: enqueue only, cron sends
+          provider = undefined; // no token: enqueue only, cycle sends
         }
         let labels:
           | Awaited<ReturnType<typeof getResolverLabels>>
@@ -188,27 +189,58 @@ export const handler = define.handlers({
         } catch {
           labels = undefined;
         }
-        const fanout = await maybeSendImmediate({
+        let statusInfo:
+          | Awaited<
+            import("../../../../lib/server/alerts/detect.ts").StatusInfo
+          >
+          | undefined;
+        try {
+          const { queryRows } = await import(
+            "../../../../lib/server/db.ts"
+          );
+          const rows = await queryRows<
+            { id: number; label: string; ok: boolean }
+          >(
+            `select id, label, is_compliant as ok from availability_statuses`,
+          );
+          const labelById = new Map(rows.map((r) => [r.id, r.label]));
+          const okById = new Map(rows.map((r) => [r.id, r.ok]));
+          statusInfo = {
+            labelOf: (id: number) =>
+              labelById.get(id) ?? `Disponibilidade (${id})`,
+            compliantOf: (id: number) => okById.get(id) ?? false,
+          };
+        } catch {
+          statusInfo = undefined;
+        }
+        const { getBarriersByIds } = await import(
+          "../../../../lib/server/sql/barriers.ts"
+        );
+        const fanout = await maybeSendProviderImmediate({
           store: sqlAlertStore,
+          loadBarriers: getBarriersByIds,
+          sender: provider
+            ? { post: (payload) => postAlert(provider!, payload) }
+            : undefined,
           barrier: updated,
           statusId: statusId as number,
           transitionDate: updated.statusSince.slice(0, 10),
-          rules,
-          hasAnyRule: rules.length > 0,
-          mailer,
-          recipients,
+          companyId: provider?.companyId ?? 1,
+          appBaseUrl: Deno.env.get("APP_BASE_URL") || undefined,
+          recipients: recipients.map((r) => ({
+            email: r.email,
+            name: r.name,
+            phone: r.phone ?? "",
+          })),
           logger: forRequest(requestId).line("info"),
           labels,
-          brand: Deno.env.get("COMPANY_NAME") || undefined,
-          dashboardUrl: Deno.env.get("APP_BASE_URL") || undefined,
+          statusInfo,
         });
-        if (fanout.matched) {
-          reqLog.info("immediate fan-out finished", {
-            barrierId,
-            enqueued: fanout.enqueued,
-            emailed: fanout.emailed,
-          });
-        }
+        reqLog.info("provider fan-out finished", {
+          barrierId,
+          enqueued: fanout.enqueued,
+          posted: fanout.posted,
+        });
       } catch (err) {
         reqLog.error("immediate fan-out failed", {
           barrierId,
