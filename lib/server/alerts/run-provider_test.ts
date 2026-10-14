@@ -53,28 +53,33 @@ function fakeStore(events: UnsentAlert[] = []): AlertStore & {
   const store = {
     accepted: [] as number[],
     posted: 0,
-    async watermark() {
-      return null;
+    watermark() {
+      return Promise.resolve(null);
     },
-    async recentTransitions() {
-      return [];
+    recentTransitions() {
+      return Promise.resolve([]);
     },
-    async enqueue() {
-      return 0;
+    enqueue() {
+      return Promise.resolve(0);
     },
-    async listUnsent() {
-      return events;
+    listUnsent() {
+      return Promise.resolve(events);
     },
-    async countDead() {
-      return 0;
+    countDead() {
+      return Promise.resolve(0);
     },
-    async markDelivered() {},
-    async markFailed() {},
-    async reprocessDeadLetters() {
-      return 0;
+    markDelivered() {
+      return Promise.resolve();
     },
-    async markProviderAccepted(id: number) {
+    markFailed() {
+      return Promise.resolve();
+    },
+    reprocessDeadLetters() {
+      return Promise.resolve(0);
+    },
+    markProviderAccepted(id: number) {
       store.accepted.push(id);
+      return Promise.resolve();
     },
   } as unknown as AlertStore & { accepted: number[]; posted: number };
   return store;
@@ -109,11 +114,11 @@ Deno.test("provider cycle posts violada with messaging when phone exists", async
   const seen: string[][] = [];
   const result = await runProviderCycle({
     store,
-    loadBarriers: async () => new Map([[1, wire()]]),
+    loadBarriers: () => Promise.resolve(new Map([[1, wire()]])),
     sender: {
-      post: async (payload) => {
+      post: (payload) => {
         seen.push(payload.canais);
-        return {
+        return Promise.resolve({
           ok: true,
           duplicado: false,
           parcial: false,
@@ -124,7 +129,7 @@ Deno.test("provider cycle posts violada with messaging when phone exists", async
           avisos: [],
           aviso_token: null,
           mensagem: "ok",
-        };
+        });
       },
     },
     recipients: [{ email: "a@example.com", phone: "5527999999999" }],
@@ -145,11 +150,12 @@ Deno.test("provider cycle keeps degraded email-only", async () => {
   const seen: string[][] = [];
   const result = await runProviderCycle({
     store,
-    loadBarriers: async () => new Map([[1, wire({ availabilityId: 4 })]]),
+    loadBarriers: () =>
+      Promise.resolve(new Map([[1, wire({ availabilityId: 4 })]])),
     sender: {
-      post: async (payload) => {
+      post: (payload) => {
         seen.push(payload.canais);
-        return {
+        return Promise.resolve({
           ok: true,
           duplicado: false,
           parcial: false,
@@ -160,7 +166,7 @@ Deno.test("provider cycle keeps degraded email-only", async () => {
           avisos: [],
           aviso_token: null,
           mensagem: "ok",
-        };
+        });
       },
     },
     recipients: [{ email: "a@example.com", phone: "5527999999999" }],
@@ -180,11 +186,12 @@ Deno.test("provider cycle accepts planned stop without posting", async () => {
   let posts = 0;
   const result = await runProviderCycle({
     store,
-    loadBarriers: async () => new Map([[1, wire({ availabilityId: 1 })]]),
+    loadBarriers: () =>
+      Promise.resolve(new Map([[1, wire({ availabilityId: 1 })]])),
     sender: {
-      post: async () => {
+      post: () => {
         posts++;
-        throw new Error("must not post");
+        return Promise.reject(new Error("must not post"));
       },
     },
     recipients: [{ email: "a@example.com" }],
