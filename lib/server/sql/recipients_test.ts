@@ -1,5 +1,5 @@
 // Unit tests for recipient validation (P5) - pure, no DB.
-import { normalizeEmail, normalizeName } from "./recipients.ts";
+import { normalizeEmail, normalizeName, normalizePhone } from "./recipients.ts";
 
 import { assertStrictEquals } from "jsr:@std/assert@^1";
 
@@ -33,4 +33,23 @@ Deno.test("normalizeName trims, caps, defaults empty", () => {
     caught = true;
   }
   assertStrictEquals(caught, true);
+});
+
+Deno.test("normalizePhone keeps empty, normalizes domestic numbers", () => {
+  assertStrictEquals(normalizePhone(undefined), "");
+  assertStrictEquals(normalizePhone(""), "");
+  assertStrictEquals(normalizePhone("+55 27 99874-6290"), "5527998746290");
+  assertStrictEquals(normalizePhone("27998746290"), "5527998746290");
+});
+
+Deno.test("normalizePhone rejects short numbers without area code", () => {
+  for (const bad of ["998746290", "123", 42]) {
+    let caught = false;
+    try {
+      normalizePhone(bad);
+    } catch {
+      caught = true;
+    }
+    assertStrictEquals(caught, true, String(bad));
+  }
 });

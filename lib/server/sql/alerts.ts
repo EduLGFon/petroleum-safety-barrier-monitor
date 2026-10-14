@@ -171,6 +171,47 @@ export const sqlAlertStore: AlertStore = {
     return rows.length;
   },
 
+  // markProviderAccepted: provider 202 receipt. Stores the correlation id
+  // + parcial flag in columns (direct + list lookup) and merges the full
+  // response into payload for audit. Sets sent_at: the event is accepted.
+  async markProviderAccepted(
+    id: number,
+    receipt: {
+      correlationId?: string;
+      parcial: boolean;
+      eventoId?: number;
+      idempotencyKey?: string;
+      enfileirados: number;
+      rejeitados: unknown;
+      avisos: unknown;
+    },
+  ): Promise<void> {
+    await queryRows(
+      `update alert_events
+       set provider_correlation_id = $2,
+           provider_parcial = $3,
+           payload = payload || jsonb_build_object(
+             'provider_evento_id', $4::bigint,
+             'provider_idempotency_key', $5::text,
+             'provider_enfileirados', $6::int,
+             'provider_rejeitados', $7::jsonb,
+             'provider_avisos', $8::jsonb
+           ),
+           sent_at = now()
+       where id = $1`,
+      [
+        id,
+        receipt.correlationId ?? null,
+        receipt.parcial,
+        receipt.eventoId ?? null,
+        receipt.idempotencyKey ?? null,
+        receipt.enfileirados,
+        JSON.stringify(receipt.rejeitados ?? []),
+        JSON.stringify(receipt.avisos ?? []),
+      ],
+    );
+  },
+
   async countRuleEvents(
     ruleId: number,
     barrierId: number,

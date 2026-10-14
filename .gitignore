@@ -10,5 +10,4 @@ _fresh/
 # Environment
 .env*
 test/
-BARREIRAS-AUSENTES.md
-SYNC-ANOMALIES.md
+_*.md

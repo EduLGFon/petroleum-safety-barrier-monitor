@@ -86,7 +86,7 @@ export const handler = define.handlers({
     }
   },
 
-  // POST { email, name? } - creates or revives (upsert on email).
+  // POST { email, name?, phone? } - creates or revives (upsert on email).
   async POST(ctx) {
     const requestId = newRequestId();
     const denied = await guard(
@@ -99,16 +99,24 @@ export const handler = define.handlers({
     if (denied) return denied;
     const parsed = await readJsonBody(ctx.req);
     if (!parsed.ok) return badRequest("Invalid JSON body", requestId);
-    const body = parsed.body as { email?: unknown; name?: unknown };
+    const body = parsed.body as {
+      email?: unknown;
+      name?: unknown;
+      phone?: unknown;
+    };
     try {
       const createdRecipient = await createRecipient(
         body.email as string,
         (body.name as string | undefined) ?? "",
+        body.phone ?? "",
       );
       return created(createdRecipient, requestId);
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
-      if (message.startsWith("invalid email") || message.includes("name")) {
+      if (
+        message.startsWith("invalid email") || message.includes("name") ||
+        message.includes("phone")
+      ) {
         return badRequest(message, requestId);
       }
       return internal(

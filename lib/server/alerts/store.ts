@@ -85,6 +85,17 @@ export interface AlertStore {
   markDelivered(id: number, email: string, complete: boolean): Promise<void>;
   markFailed(id: number, error: string, deadLetter: boolean): Promise<void>;
   reprocessDeadLetters(): Promise<number>;
+  // markProviderAccepted: provider 202 receipt (optional so fakes stay
+  // small; the SQL store implements it with correlation + parcial columns).
+  markProviderAccepted?(id: number, receipt: {
+    correlationId?: string;
+    parcial: boolean;
+    eventoId?: number;
+    idempotencyKey?: string;
+    enfileirados: number;
+    rejeitados: unknown;
+    avisos: unknown;
+  }): Promise<void>;
   // countRuleEvents: anti-noise helper (optional so fakes stay small).
   // Counts events fired by a rule for a barrier since an ISO timestamp.
   countRuleEvents?(

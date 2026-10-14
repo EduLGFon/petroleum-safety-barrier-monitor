@@ -403,6 +403,15 @@ create index if not exists idx_alert_events_transition
 create index if not exists idx_alert_events_barrier_created
   on alert_events(barrier_id, created_at desc);
 
+-- Provider receipt (generic alert provider cutover): correlation id for
+-- direct lookup, parcial flag for incomplete delivery. Full response
+-- (queue ids, per-channel counts, rejected, warnings, rotation notice)
+-- stays inside payload JSONB. Additive only, no query change.
+alter table alert_events add column if not exists provider_correlation_id text;
+alter table alert_events add column if not exists provider_parcial boolean not null default false;
+create index if not exists idx_alert_events_provider_corr
+  on alert_events(provider_correlation_id);
+
 -- Alert recipients (P5): who gets the urgent digest. Managed through the
 -- auth-guarded /api/recipients routes; the send path only reads active rows.
 create table if not exists alert_recipients (
@@ -412,6 +421,12 @@ create table if not exists alert_recipients (
   active     boolean     not null default true,
   created_at timestamptz not null default now()
 );
+
+-- Phone for critical-only second channel (provider rule: voice/messaging
+-- only for the uncontained unavailable landing; contained and degraded
+-- landings stay email-only). Empty = email only. Stored as digits, see
+-- normalizePhone in lib/server/validation.ts.
+alter table alert_recipients add column if not exists phone text not null default '';
 
 -- ─── Users + sessions (auth, two roles: admin and user) ─────────────────────
 -- Users own the dashboard login (email + password, cookie session). Role is

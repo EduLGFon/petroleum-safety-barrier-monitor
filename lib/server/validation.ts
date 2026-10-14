@@ -17,6 +17,22 @@ export function normalizeName(raw: unknown): string {
   return raw.trim().slice(0, 200);
 }
 
+// normalizePhone: optional second-channel number for critical-only alerts.
+// Empty/null/undefined stays "" (email only). Otherwise strips to digits
+// and accepts: 12-13 digits starting with 55 (full), or 10-11 digits
+// (area code + number, 55 prefixed). Rejects short numbers without area
+// code and non-domestic numbers. Returns digits only, capped at 13.
+export function normalizePhone(raw: unknown): string {
+  if (raw === undefined || raw === null) return "";
+  if (typeof raw !== "string") throw new Error("phone must be a string");
+  const trimmed = raw.trim();
+  if (trimmed === "") return "";
+  const digits = trimmed.replace(/\D/g, "").slice(0, 13);
+  if (/^55\d{10,11}$/.test(digits)) return digits;
+  if (/^\d{10,11}$/.test(digits)) return `55${digits}`;
+  throw new Error("invalid phone number");
+}
+
 // parseIdParam: numeric path ids are positive safe integers, nothing else.
 // Returns the id or undefined when the segment is not a valid id, so every
 // route answers 400 the same way instead of hand-rolling Number() checks.

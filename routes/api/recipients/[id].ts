@@ -28,7 +28,7 @@ import { loadServerConfig } from "../../../lib/server/config.ts";
 import { define } from "../../../utils.ts";
 
 export const handler = define.handlers({
-  // PATCH { name?, active? } - partial update; 404 when missing.
+  // PATCH { name?, phone?, active? } - partial update; 404 when missing.
   async PATCH(ctx) {
     const requestId = newRequestId();
     const limit = writeThrottle.check(routeClientKey(ctx));
@@ -63,7 +63,11 @@ export const handler = define.handlers({
     }
     const parsed = await readJsonBody(ctx.req);
     if (!parsed.ok) return badRequest("Invalid JSON body", requestId);
-    const body = parsed.body as { name?: unknown; active?: unknown };
+    const body = parsed.body as {
+      name?: unknown;
+      phone?: unknown;
+      active?: unknown;
+    };
     try {
       const updated = await updateRecipient(id, body);
       if (!updated) return notFound("Recipient not found", requestId);
@@ -71,7 +75,8 @@ export const handler = define.handlers({
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       if (
-        message.includes("name") || message.includes("active") ||
+        message.includes("name") || message.includes("phone") ||
+        message.includes("active") ||
         message.includes("nothing to update")
       ) {
         return badRequest(message, requestId);

@@ -25,6 +25,7 @@ interface Recipient {
   id: number;
   email: string;
   name: string;
+  phone: string;
   active: boolean;
 }
 
@@ -37,6 +38,7 @@ export function RecipientsManager(
   const [error, setError] = useState("");
   const [email, setEmail] = useState("");
   const [name, setName] = useState("");
+  const [phone, setPhone] = useState("");
   const [busy, setBusy] = useState(false);
   const [confirmId, setConfirmId] = useState<number | null>(null);
 
@@ -66,10 +68,11 @@ export function RecipientsManager(
       await adminApi("/api/recipients", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, name }),
+        body: JSON.stringify({ email, name, phone }),
       });
       setEmail("");
       setName("");
+      setPhone("");
       await refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
@@ -109,7 +112,7 @@ export function RecipientsManager(
     <div style={{ display: "grid", gap: 12 }}>
       <AdminHero
         title="Destinatários"
-        hint="Quem recebe os e-mails de alerta do monitor."
+        hint="Quem recebe os alertas. E-mail sempre; mensagem só em barreira sem contingência."
         count={`${items.filter((r) => r.active).length} ativos`}
       />
       {error && <ErrorBanner message={error} onRetry={() => void refresh()} />}
@@ -134,6 +137,15 @@ export function RecipientsManager(
               placeholder="Nome (opcional)"
               value={name}
               onInput={(e) => setName(e.currentTarget.value)}
+              style={inputSt}
+            />
+          </Field>
+          <Field label="Telefone (só crítico)">
+            <input
+              type="tel"
+              placeholder="DDD + número (opcional)"
+              value={phone}
+              onInput={(e) => setPhone(e.currentTarget.value)}
               style={inputSt}
             />
           </Field>
@@ -181,6 +193,17 @@ export function RecipientsManager(
                       }}
                     >
                       {r.name}
+                      {r.phone ? ` · ${r.phone}` : ""}
+                    </div>
+                  )}
+                  {!r.name && r.phone && (
+                    <div
+                      style={{
+                        fontSize: "var(--d-small)",
+                        color: "var(--text-muted)",
+                      }}
+                    >
+                      {r.phone}
                     </div>
                   )}
                 </span>
