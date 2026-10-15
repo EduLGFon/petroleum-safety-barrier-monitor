@@ -47,7 +47,7 @@ function Register-NssmService([string]$Name, [string]$Args, [string]$Desc) {
   & $NssmExe set $Name AppRotateOnline 1 | Out-Null
   & $NssmExe set $Name AppThrottle 5000 | Out-Null
   & $NssmExe start $Name | Out-Null
-  Write-Host "service $Name: installed + started ($Desc)"
+  Write-Host "service ${Name}: installed + started ($Desc)"
 }
 
 New-Item -ItemType Directory -Force -Path "$InstallDir\logs" | Out-Null

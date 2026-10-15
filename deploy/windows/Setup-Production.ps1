@@ -293,7 +293,7 @@ if (Test-Path "$InstallDir\deno.jsonc") {
   }
   git clone --branch $Branch $RepoUrl $InstallDir
 } else {
-  Write-Need "no code at $InstallDir: pass -RepoUrl or -SourceZip, or copy the repo there first."
+  Write-Need "no code at ${InstallDir}: pass -RepoUrl or -SourceZip, or copy the repo there first."
 }
 $deployDir = Join-Path $InstallDir 'deploy\windows'
 if (-not (Test-Path "$deployDir\Register-Services.ps1")) { Write-Need 'checkout is missing deploy/windows scripts.' }
