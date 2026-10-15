@@ -36,6 +36,7 @@
     "fracttal:extract": "deno run -A scripts/fracttal-extract.ts",
     "alerts:check": "deno run -A --env-file=.env scripts/alerts-check.ts",
     "alerts:poll": "deno run -A --env-file=.env scripts/alerts-poll.ts",
+    "alerts:provider-check": "deno run -A --env-file=.env scripts/alerts-provider-check.ts",
     "admin:create": "deno run -A --env-file=.env scripts/create-admin.ts",
     "doctor": "deno run -A --env-file=.env scripts/doctor.ts"
   },
