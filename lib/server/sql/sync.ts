@@ -346,6 +346,16 @@ export const defaultSyncIo: SyncIo = {
   ): Promise<PlanCounts> {
     const counts: PlanCounts = { inserts: 0, updates: 0, deletes: 0, skips: 0 };
     const rid = runId ?? null;
+    // Latest history author per touched barrier, null when the barrier has no
+    // status transition history (legacy / seed rows). A barrier whose latest
+    // transition was authored by someone other than the sync author is an
+    // admin override: the next sweep must respect it instead of reverting it
+    // to the remote value, otherwise the admin's change is dropped on the
+    // next sync.
+    const syncTouchedIds = entries
+      .filter((e) => e.kind === "update" || e.kind === "restore")
+      .map((e) => e.local.id);
+    const latestAuthors = await loadLatestStatusAuthors(syncTouchedIds);
     // Chunked transactions: a crash leaves whole chunks applied or not,
     // never half a chunk. Audit rows batch after each commit (best-effort,
     // same as before) so a missing audit table never fails barrier writes.
@@ -437,7 +447,16 @@ export const defaultSyncIo: SyncIo = {
               entry.kind === "restore",
             ],
           );
-          if (entry.statusChanged) {
+          // Every sync-touched id is pre-seeded with null, so this is never
+          // undefined at runtime; coalesce to keep the type narrow.
+          const lastAuthor = latestAuthors.get(entry.local.id) ?? null;
+          // An admin-authored latest transition is an explicit override: the
+          // sync must not revert it to the remote value on the next sweep.
+          // Only sync-owned statuses (latest author is the sync author, or no
+          // history row at all - legacy / seed) get overwritten by upstream.
+          const adminOwnsStatus = !statusIsSyncOwned(lastAuthor);
+          const propagateStatus = entry.statusChanged && !adminOwnsStatus;
+          if (propagateStatus) {
             await tx(
               "select record_status_change($1, $2, $3, $4)",
               [
@@ -453,16 +472,23 @@ export const defaultSyncIo: SyncIo = {
             barrierId: entry.local.id,
             kind: entry.kind === "restore" ? "restored" : "updated",
             oldAvailabilityId: entry.local.availabilityId,
-            newAvailabilityId: input.availabilityId,
+            newAvailabilityId: propagateStatus
+              ? input.availabilityId
+              : entry.local.availabilityId,
             changedFields: diffSignatureFields(
               entry.local.fields,
               input,
-              entry.statusChanged,
+              propagateStatus,
             ),
             oldSnapshot: entry.local.fields
               ? snapshotOf(entry.local.fields, entry.local.availabilityId)
               : { availabilityId: entry.local.availabilityId },
-            newSnapshot: snapshotOf(input, input.availabilityId),
+            newSnapshot: snapshotOf(
+              input,
+              propagateStatus
+                ? input.availabilityId
+                : entry.local.availabilityId,
+            ),
           });
         }
       });
@@ -555,6 +581,43 @@ async function insertBarrier(input: {
     ],
   );
   return rows[0]?.id ?? null;
+}
+
+// statusIsSyncOwned: true when the local availability was last set by the
+// sync itself (latest history author is the sync author) or was never set
+// through record_status_change (no history row, e.g. legacy / seed rows).
+// When an admin's author id is the latest transition, the admin explicitly
+// owns the current status and the sync must not clobber it on the next sweep.
+export function statusIsSyncOwned(
+  latestHistoryAuthorId: number | null,
+): boolean {
+  return (
+    latestHistoryAuthorId === null ||
+    latestHistoryAuthorId === SYNC_AUTHOR_ID
+  );
+}
+
+// loadLatestStatusAuthors: latest history author per queried barrier, null
+// when the barrier has no status transition history. Used by applyPlan so a
+// sync never overwrites a status an admin explicitly set.
+async function loadLatestStatusAuthors(
+  ids: number[],
+): Promise<Map<number, number | null>> {
+  const authors = new Map<number, number | null>();
+  for (const id of ids) authors.set(id, null);
+  if (ids.length === 0) return authors;
+  const rows = await queryRows<{
+    barrier_id: number;
+    author_id: number;
+  }>(
+    `select distinct on (barrier_id) barrier_id, author_id
+     from barrier_status_history
+     where barrier_id = any($1::int[])
+     order by barrier_id, created_at desc, id desc`,
+    [ids],
+  );
+  for (const r of rows) authors.set(r.barrier_id, r.author_id);
+  return authors;
 }
 
 // AuditRow: one sync_barrier_changes row per touched barrier.
