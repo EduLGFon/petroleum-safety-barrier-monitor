@@ -29,32 +29,42 @@ export function computeKpi(b: Barrier[]): KpiSnapshot {
   // byCriticality) so the KPI cards can show ESO/A splits without the rows.
   const ncByCriticality: Record<string, number> = {};
   for (const x of b) {
-    byAvailability[x.availability] = (byAvailability[x.availability] ?? 0) + 1;
+    // Hidden rows (inactive/desativada or soft-deleted/excluída) carry no
+    // meaningful availability status: when Situacao=Todas they must not
+    // inflate Disponível (or any availability bucket). They still count in
+    // total and land in other so fixed fields + other === total keeps holding.
     byCompliance[x.compliance] = (byCompliance[x.compliance] ?? 0) + 1;
     byCriticality[x.criticality] = (byCriticality[x.criticality] ?? 0) + 1;
-    switch (x.availability) {
-      case "Disponível":
-        available++;
-        break;
-      case "Fora de Operação":
-        outOfService++;
-        break;
-      case "Indisponível Contingenciado":
-        contingencyOutage++;
-        break;
-      case "Degradado Contingenciado":
-        degradedContingency++;
-        break;
-      case "Degradado":
-        degraded++;
-        break;
-      case "Indisponível":
-        unavailable++;
-        break;
-      default:
-        // Novel status: counted in other so fixed fields + other === total.
-        other++;
-        break;
+    const hidden = (x.isActive ?? true) === false || (x.deletedAt ?? null) !== null;
+    if (!hidden) {
+      byAvailability[x.availability] = (byAvailability[x.availability] ?? 0) + 1;
+      switch (x.availability) {
+        case "Disponível":
+          available++;
+          break;
+        case "Fora de Operação":
+          outOfService++;
+          break;
+        case "Indisponível Contingenciado":
+          contingencyOutage++;
+          break;
+        case "Degradado Contingenciado":
+          degradedContingency++;
+          break;
+        case "Degradado":
+          degraded++;
+          break;
+        case "Indisponível":
+          unavailable++;
+          break;
+        default:
+          // Novel status: counted in other so fixed fields + other === total.
+          other++;
+          break;
+      }
+    } else {
+      // Inactive/deleted: no real availability status -> other.
+      other++;
     }
     if (x.compliance === "Conforme") compliant++;
     else {

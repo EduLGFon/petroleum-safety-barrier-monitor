@@ -166,3 +166,38 @@ Deno.test("countScopeRows splits disabled and soft-deleted rows", () => {
     { inactive: 1, deleted: 2 },
   );
 });
+
+// Hidden rows (inactive/deleted) carry no availability status: they count in
+// total and other, but not as Disponível / any availability bucket. Keeps
+// Disponível from being inflated when Situacao=Todas includes them.
+Deno.test("computeKpi does not count hidden rows as available", () => {
+  const k = computeKpi([
+    barrier({ id: 1, availability: "Disponível", compliance: "Conforme" }),
+    barrier({
+      id: 2,
+      availability: "Disponível",
+      compliance: "Conforme",
+      isActive: false,
+    }), // desativada
+    barrier({
+      id: 3,
+      availability: "Disponível",
+      compliance: "Conforme",
+      deletedAt: "2026-02-01",
+    }), // excluída
+    barrier({ id: 4, availability: "Indisponível", compliance: "Não Conforme" }),
+  ]);
+  assertStrictEquals(k.total, 4);
+  // Only the active, non-deleted Disponível barrier counts.
+  assertStrictEquals(k.available, 1);
+  assertStrictEquals(k.byAvailability?.["Disponível"], 1);
+  // Hidden rows land in other so fixed fields + other === total.
+  assertStrictEquals(k.other, 2);
+  assertStrictEquals(
+    k.available + k.outOfService + k.contingencyOutage +
+      k.degradedContingency + k.degraded + k.unavailable + k.other,
+    k.total,
+  );
+  // pctCompliant divides by full total: 3 of 4 rows are Conforme.
+  assertStrictEquals(k.pctCompliant, 75);
+});

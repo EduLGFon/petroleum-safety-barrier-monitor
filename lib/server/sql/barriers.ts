@@ -284,13 +284,14 @@ export async function getKpi(
     }>(
       `select
         count(*)::text as total,
-        count(*) filter (where b.availability_id = 0)::text as available,
-        count(*) filter (where b.availability_id = 1)::text as out_of_service,
-        count(*) filter (where b.availability_id = 2)::text as contingency_outage,
-        count(*) filter (where b.availability_id = 3)::text as degraded_contingency,
-        count(*) filter (where b.availability_id = 4)::text as degraded,
-        count(*) filter (where b.availability_id = 5)::text as unavailable,
-        count(*) filter (where b.availability_id not in (0, 1, 2, 3, 4, 5))::text as other,
+        count(*) filter (where b.availability_id = 0 and coalesce(b.is_active, true) and b.deleted_at is null)::text as available,
+        count(*) filter (where b.availability_id = 1 and coalesce(b.is_active, true) and b.deleted_at is null)::text as out_of_service,
+        count(*) filter (where b.availability_id = 2 and coalesce(b.is_active, true) and b.deleted_at is null)::text as contingency_outage,
+        count(*) filter (where b.availability_id = 3 and coalesce(b.is_active, true) and b.deleted_at is null)::text as degraded_contingency,
+        count(*) filter (where b.availability_id = 4 and coalesce(b.is_active, true) and b.deleted_at is null)::text as degraded,
+        count(*) filter (where b.availability_id = 5 and coalesce(b.is_active, true) and b.deleted_at is null)::text as unavailable,
+        count(*) filter (where b.availability_id not in (0, 1, 2, 3, 4, 5)
+          or not coalesce(b.is_active, true) or b.deleted_at is not null)::text as other,
         count(*) filter (where b.compliance_id = 0)::text as compliant,
         count(*) filter (where coalesce(b.compliance_id, 1) <> 0)::text as non_compliant,
         count(*) filter (where coalesce(b.compliance_id, 1) <> 0 and b.criticality_id in (0, 1))::text as critical_non_compliant,
@@ -306,7 +307,7 @@ export async function getKpi(
     queryRows<{ grp: string; id: string; count: string }>(
       `select grp, id, count(*)::text as count from (
         select 'avail' as grp, b.availability_id::text as id
-        ${from}
+        ${from} and coalesce(b.is_active, true) and b.deleted_at is null
         union all
         select 'conf' as grp, b.compliance_id::text as id
         ${from}
