@@ -15,7 +15,7 @@ param(
   [string]$InstallDir = 'C:\srv\barrier-monitor',
   [string]$NssmExe = 'C:\tools\nssm\nssm.exe',
   [string]$DenoExe = '',
-  [string]$AppPort = '8000'
+  [string]$AppPort = '8300'
 )
 
 $ErrorActionPreference = 'Stop'
@@ -52,10 +52,10 @@ function Register-NssmService([string]$Name, [string]$Args, [string]$Desc) {
 
 New-Item -ItemType Directory -Force -Path "$InstallDir\logs" | Out-Null
 
-# NOTE: `deno task start` already embeds `--env-file=.env --port 8000` via
+# NOTE: `deno task start` already embeds `--env-file=.env --port 8300` via
 # deno.jsonc, so no port flags are passed here. To move the port, change the
 # `start` task AND this file AND the firewall rule together (see PORT-MAP).
-Register-NssmService 'BarrierApp' 'task start' 'Barrier Monitor dashboard + API (deno serve :8000)'
+Register-NssmService 'BarrierApp' 'task start' 'Barrier Monitor dashboard + API (deno serve :8300)'
 Register-NssmService 'BarrierPoller' 'run -A scripts/fracttal-poll.ts' 'Barrier Monitor upstream sync loop'
 Register-NssmService 'BarrierAlerts' 'run -A scripts/alerts-poll.ts' 'Barrier Monitor alert digest loop'
 

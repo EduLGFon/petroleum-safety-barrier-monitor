@@ -78,7 +78,7 @@ are for the exact pinned version unless noted.
 4. **Hygiene (no bulletin, reduces future blast radius):** prune the orphan
    `pdf-lib` lock entry; keep `denoland/deno` digest fresh; never expose
    `deno task dev` (`:5173`) beyond localhost; keep `-A` services (`app`,
-   `poller`, `alerts`, `tools`) network-isolated except `db` + `:8000`.
+   `poller`, `alerts`, `tools`) network-isolated except `db` + `:8300`.
 
 ## 4. Reproduce
 

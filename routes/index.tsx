@@ -52,7 +52,7 @@ export default define.page(async function Home(
   if (apiMode === "http") {
     // Empty PUBLIC_API_BASE_URL falls back to the request origin so the
     // island fetches /api/* from wherever this same Fresh app is actually
-    // served (dev auto-picks its port, start binds 8000). Set the variable
+    // served (dev auto-picks its port, start binds 8300). Set the variable
     // explicitly only when the API lives on a different origin.
     const baseUrl = (() => {
       try {

@@ -192,9 +192,9 @@ async function checkBuild(): Promise<void> {
 }
 
 async function checkPorts(): Promise<void> {
-  // Probe TCP 8000/5432 without extra permissions: a refused connect means
+  // Probe TCP 8300/5432 without extra permissions: a refused connect means
   // "free", a success means "taken". Timeouts stay short for CI hosts.
-  for (const port of [8000, 5432]) {
+  for (const port of [8300, 5432]) {
     try {
       const conn = await Deno.connect({ hostname: "127.0.0.1", port });
       conn.close();
@@ -202,7 +202,7 @@ async function checkPorts(): Promise<void> {
         `port-${port}`,
         port === 5432 ? "ok" : "warn",
         `127.0.0.1:${port} accepts connections (${
-          port === 8000
+          port === 8300
             ? "app already running or conflict"
             : "local Postgres up"
         })`,

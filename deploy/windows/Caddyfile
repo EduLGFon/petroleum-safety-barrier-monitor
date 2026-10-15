@@ -1,5 +1,5 @@
 # Caddy reverse proxy for Barrier Monitor on Windows Server.
-# This is why it exists: `deno serve` speaks plain HTTP on :8000 and the
+# This is why it exists: `deno serve` speaks plain HTTP on :8300 and the
 # session cookie only sets Secure over https, so production must terminate
 # TLS in front (see docs/PORT-MAP.md finding 11.3). Caddy is a single
 # Windows exe with automatic HTTPS; the IIS alternative is documented in
@@ -8,11 +8,11 @@
 # Usage:
 #   1. Set the public hostname below (no trailing slash, matches APP_BASE_URL).
 #   2. caddy run --config C:\srv\barrier-monitor\deploy\windows\Caddyfile
-#   3. Keep TCP 80+443 open; close :8000 to the outside (loopback only).
+#   3. Keep TCP 80+443 open; close :8300 to the outside (loopback only).
 
 barreiras.example.com {
 	# Dashboard + API on the same origin (no CORS needed).
-	reverse_proxy 127.0.0.1:8000
+	reverse_proxy 127.0.0.1:8300
 
 	# Same-origin by design: never add Access-Control-Allow-Origin here.
 	# Rate limits key on remote address at the app layer; X-Forwarded-For is

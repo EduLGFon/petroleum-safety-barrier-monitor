@@ -31,7 +31,7 @@ Linux/macOS path; on Windows Server use path A.
 - PostgreSQL 16 (EDB installer: https://www.postgresql.org/download/windows/).
   Create role `barrier` + database `barreiras`, note the port (default 5432).
 - Outbound 443 (Fracttal API, Deno/JSR downloads, fonts) and 587/465 (SMTP).
-- Inbound 443 (public site). Port 8000 stays **loopback-only** behind the proxy.
+- Inbound 443 (public site). Port 8300 stays **loopback-only** behind the proxy.
 
 ### 2. Lay down the app
 
@@ -98,7 +98,7 @@ powershell -ExecutionPolicy Bypass -File .\deploy\windows\Install-BarrierMonitor
 
 It pins Deno **2.9.7** (repo-verified), locks `.env` ACLs to
 Administrators + SYSTEM, then runs `doctor` → `build` → `db:migrate` and
-opens TCP 8000 inbound.
+opens TCP 8300 inbound.
 
 ### 3. Validate before serving
 
@@ -107,13 +107,13 @@ deno run -A --env-file=.env scripts/doctor.ts   # must be all green
 deno task db:migrate                            # idempotent schema + lookups
 deno task admin:create -- --email you@example.com --password 'at-least-12-chars'
 deno task build
-deno task start                                 # serves :8000 from _fresh/server.js
-Invoke-RestMethod http://localhost:8000/api/health
+deno task start                                 # serves :8300 from _fresh/server.js
+Invoke-RestMethod http://localhost:8300/api/health
 ```
 
 `doctor` checks: Deno 2.x, `.env` present, `DATABASE_URL` parseable (catches
 the old `postgres://postgres://` typo), DB reachable, bundle built, ports
-8000/5432 state. It exits non-zero on any failure so scripts can gate on it.
+8300/5432 state. It exits non-zero on any failure so scripts can gate on it.
 
 ### 4. Run as services (NSSM)
 
@@ -136,18 +136,18 @@ commands with "Run whether user is logged on or not".
 
 ### 5. TLS (required)
 
-The app speaks plain HTTP on `:8000`, and the session cookie only sets
-`Secure` over https. Never expose `:8000` directly. Two options:
+The app speaks plain HTTP on `:8300`, and the session cookie only sets
+`Secure` over https. Never expose `:8300` directly. Two options:
 
 **Caddy (recommended, single exe, auto-HTTPS):**
 
 1. Edit `deploy/windows/Caddyfile` hostname + `APP_BASE_URL` in `.env` to match.
 2. Run Caddy as a service (nssm or `caddy run --config …` under Task Scheduler).
-3. Open TCP 80 + 443, remove the :8000 firewall exception for remote hosts.
+3. Open TCP 80 + 443, remove the :8300 firewall exception for remote hosts.
 
 **IIS (if the shop already runs it):** install ARR + URL Rewrite, create a
 site binding 443 with the cert, add a reverse-proxy rule to
-`127.0.0.1:8000`, enable `X-Forwarded-*` passthrough. The app intentionally
+`127.0.0.1:8300`, enable `X-Forwarded-*` passthrough. The app intentionally
 ignores `X-Forwarded-For` for rate limiting (forgeable header), so all
 proxied clients share one throttle bucket — fine for an internal dashboard.
 
@@ -170,7 +170,7 @@ deno task doctor     # catches env drift before anything restarts
 deno task build
 deno task db:migrate # idempotent
 Restart-Service BarrierApp,BarrierPoller,BarrierAlerts
-Invoke-RestMethod http://localhost:8000/api/health
+Invoke-RestMethod http://localhost:8300/api/health
 ```
 
 Rollback: set `PUBLIC_API_MODE=mock` in `.env`, restart `BarrierApp` only.
@@ -199,7 +199,7 @@ $env:COMPOSE_CONVERT_WINDOWS_PATHS=1
 docker compose build
 docker compose run --rm tools deno run -A scripts/migrate.ts
 docker compose up -d
-curl http://localhost:8000/api/health
+curl http://localhost:8300/api/health
 ```
 
 ## Troubleshooting (Windows-specific)
@@ -209,7 +209,7 @@ curl http://localhost:8000/api/health
 | `DATABASE_URL is not set` on `start` | Started outside the app dir or `.env` misnamed (must be exactly `.env`, not `.env.txt` — disable "hide extensions").                                               |
 | `postgres://postgres://…`            | Old typo fixed in this release; value must be single-scheme `postgres://barrier:…@localhost:5432/barreiras?sslmode=disable` on host, `@db` only inside containers. |
 | Login loops / cookie dropped         | Serving over http while `APP_BASE_URL` is https, or proxy not forwarding Host: Secure cookies need real TLS (path A step 5).                                       |
-| `:8000` reachable on LAN             | Firewall rule too wide — restrict to loopback + proxy host.                                                                                                        |
+| `:8300` reachable on LAN             | Firewall rule too wide — restrict to loopback + proxy host.                                                                                                        |
 | `deno` not found in service          | Service PATH lacks `%LOCALAPPDATA%\deno\bin`; reinstall with Install script (sets Machine PATH) or pass `-DenoExe` explicitly.                                     |
 | CRLF weirdness in `.env`             | `doctor`'s parser strips `\r`; but values with trailing spaces fail auth — don't pad `KEY = value`.                                                                |
 | Paths with spaces                    | Quote them (`"C:\srv\barrier monitor\…"`) in NSSM `AppDirectory`, not in `.env` URLs.                                                                              |
@@ -221,7 +221,7 @@ curl http://localhost:8000/api/health
 - [ ] `doctor` green on the server itself (not just the admin laptop).
 - [ ] Real `ADMIN_TOKEN` (64 hex), real DB password, `.env` ACLs locked.
 - [ ] `BarrierApp/Poller/Alerts` all `Running`, survive a reboot.
-- [ ] Public URL serves https, `:8000` not reachable remotely.
+- [ ] Public URL serves https, `:8300` not reachable remotely.
 - [ ] Login → dashboard → export CSV/XLSX/PDF each download a file.
 - [ ] Nightly backup task exists and a restore was drilled once.
 - [ ] `docs/PORT-MAP.md` §10 consulted before changing any port.

@@ -15,7 +15,7 @@ runtime state of the running stack. Excludes `.git/`, `node_modules/`, the
 
 | Port     | Proto | Direction          | What it is                                      | Where it's bound                     |
 | -------- | ----- | ------------------ | ----------------------------------------------- | ------------------------------------ |
-| **8000** | TCP   | **Inbound**        | App HTTP server (production)                    | `deno serve` default, all interfaces |
+| **8300** | TCP   | **Inbound**        | App HTTP server (production)                    | `deno serve` default, all interfaces |
 | **5173** | TCP   | **Inbound**        | App HTTP server (dev / HMR)                     | Vite, `--host` → `0.0.0.0` in Docker |
 | **5432** | TCP   | Outbound           | PostgreSQL                                      | `DATABASE_URL` host                  |
 | **587**  | TCP   | Outbound           | SMTP submission (STARTTLS)                      | `OPS_SMTP_PORT` default              |
@@ -24,7 +24,7 @@ runtime state of the running stack. Excludes `.git/`, `node_modules/`, the
 | **9333** | TCP   | Inbound (loopback) | Chrome DevTools Protocol — `browser-smoke.ts`   | Chrome, `127.0.0.1`                  |
 | **9336** | TCP   | Inbound (loopback) | Chrome DevTools Protocol — `browser-capture.ts` | Chrome, `127.0.0.1`                  |
 
-**Only two ports are ever published to the host: 8000 (prod) and 5173 (dev).**
+**Only two ports are ever published to the host: 8300 (prod) and 5173 (dev).**
 Everything else is outbound or loopback-only dev tooling.
 
 ---
@@ -37,15 +37,15 @@ entirely by which runner starts the process.
 | Run mode        | Command                | Server                       | Port     | Bind                                    |
 | --------------- | ---------------------- | ---------------------------- | -------- | --------------------------------------- |
 | Local dev       | `deno task dev`        | Vite HMR                     | **5173** | loopback (host) / `0.0.0.0` (Docker)    |
-| Local prod-like | `deno task preview`    | `deno serve`                 | **8000** | all interfaces                          |
-| Local prod      | `deno task start`      | `deno serve --env-file=.env` | **8000** | all interfaces                          |
-| Docker prod     | `deno task docker:up`  | `deno serve` in container    | **8000** | published `0.0.0.0:8000`                |
-| Docker dev      | `deno task docker:dev` | Vite HMR in container        | **5173** | published `0.0.0.0:5173` (+ inert 8000) |
+| Local prod-like | `deno task preview`    | `deno serve`                 | **8300** | all interfaces                          |
+| Local prod      | `deno task start`      | `deno serve --env-file=.env` | **8300** | all interfaces                          |
+| Docker prod     | `deno task docker:up`  | `deno serve` in container    | **8300** | published `0.0.0.0:8300`                |
+| Docker dev      | `deno task docker:dev` | Vite HMR in container        | **5173** | published `0.0.0.0:5173` (+ inert 8300) |
 
 Evidence that the port is implicit:
 
 - `deno.jsonc:15` — `"start": "deno serve --env-file=.env -A _fresh/server.js"`
-  → no `--port` flag, so `deno serve` uses its **8000** default.
+  → no `--port` flag, so `deno serve` uses its **8300** default.
 - `deno.jsonc:14` — `"preview": "deno serve -A _fresh/server.js"` → same.
 - `deno.jsonc:12` — `"dev": "vite"` → no port configured.
 - `vite.config.ts:6-8` — `defineConfig({ plugins: [fresh()] })` — **no
@@ -65,24 +65,24 @@ Evidence that the port is implicit:
 - The client is port-agnostic: `PUBLIC_API_BASE_URL` is empty in `.env`, and
   `routes/index.tsx:48` falls back to `url.origin`, so the browser always
   calls back the origin it was served from. The app works unchanged on
-  8000 or 5173.
+  8300 or 5173.
 
 ---
 
 ## 3. Inbound (listening) ports
 
-### 3.1 Port 8000 — production app
+### 3.1 Port 8300 — production app
 
 | Item               | Value                                    | Source                                               |
 | ------------------ | ---------------------------------------- | ---------------------------------------------------- |
 | Server             | `deno serve` (Fresh 2 production bundle) | `deno.jsonc:15`                                      |
 | Bind               | `deno serve` default — all interfaces    | implicit                                             |
-| `EXPOSE`           | `EXPOSE 8000`                            | `Dockerfile:19`                                      |
-| Docker publish     | `"8000:8000"`                            | `compose.yml:24`                                     |
-| Healthcheck target | `http://localhost:8000/api/health`       | `compose.yml:31`                                     |
-| Docs               | `curl -s localhost:8000/api/health`      | `compose.yml:12`, `readme.md:141`, `docs/API.md:393` |
+| `EXPOSE`           | `EXPOSE 8300`                            | `Dockerfile:19`                                      |
+| Docker publish     | `"8300:8300"`                            | `compose.yml:24`                                     |
+| Healthcheck target | `http://localhost:8300/api/health`       | `compose.yml:31`                                     |
+| Docs               | `curl -s localhost:8300/api/health`      | `compose.yml:12`, `readme.md:141`, `docs/API.md:393` |
 
-`deno serve` is started with full permissions (`-A`). `EXPOSE 8000` matches
+`deno serve` is started with full permissions (`-A`). `EXPOSE 8300` matches
 the publish and the `deno serve` default.
 
 ### 3.2 Port 5173 — dev app with HMR
@@ -118,7 +118,7 @@ ever published or exposed outside the host.
 `poller`, `alerts`, and `tools` have **no `ports:` and no `EXPOSE`** in either
 compose file. They are outbound-only workers — they open connections to
 Postgres, Fracttal, and SMTP and never accept any. Note that `docker ps` shows
-`8000/tcp` for `poller` and `alerts`; that is inherited image metadata from
+`8300/tcp` for `poller` and `alerts`; that is inherited image metadata from
 `Dockerfile:19`, not a live listener.
 
 ---
@@ -214,7 +214,7 @@ from the `poller` service and the `tools` one-offs.
 | Service  | Image                                           | Command                           | Published ports               | Healthcheck                      |
 | -------- | ----------------------------------------------- | --------------------------------- | ----------------------------- | -------------------------------- |
 | `db`     | `postgres:18-alpine` (bundled, `pgdata` volume) | — (no command)                    | **`5432:5432`** (host-mapped) | yes, `pg_isready`                |
-| `app`    | `barrier-monitor:latest` (build `.`)            | image `CMD` → `deno task start`   | **`8000:8000`** (`:24`)       | yes, `localhost:8000` (`:26-36`) |
+| `app`    | `barrier-monitor:latest` (build `.`)            | image `CMD` → `deno task start`   | **`8300:8300`** (`:24`)       | yes, `localhost:8300` (`:26-36`) |
 | `poller` | same                                            | `run -A scripts/fracttal-poll.ts` | **none**                      | no                               |
 | `alerts` | same                                            | `run -A scripts/alerts-poll.ts`   | **none**                      | no                               |
 | `tools`  | same                                            | image `CMD`, invoked explicitly   | **none**                      | no                               |
@@ -254,7 +254,7 @@ from the `poller` service and the `tools` one-offs.
 
 `docker compose` merges `ports` as a **unique-resources sequence** (key =
 `{ip, target, published, protocol}`): entries are appended, and the dev file's
-`"5173:5173"` does not collide with the base file's `"8000:8000"`, so the base
+`"5173:5173"` does not collide with the base file's `"8300:8300"`, so the base
 mapping survives. Verified against the live Compose v5.5.1:
 
 ```
@@ -262,12 +262,12 @@ $ docker compose -f compose.yml -f compose.dev.yml config
   app:
     command: [task, dev, --host, --port, "5173"]
     ports:
-      - {target: 8000, published: "8000", protocol: tcp}   # inherited, inert
+      - {target: 8300, published: "8300", protocol: tcp}   # inherited, inert
       - {target: 5173, published: "5173", protocol: tcp}   # live
 ```
 
-So `deno task docker:dev` binds host **5173 (live)** and host **8000 (dead)**.
-Nothing in the container listens on 8000 in dev — the mapping accepts the TCP
+So `deno task docker:dev` binds host **5173 (live)** and host **8300 (dead)**.
+Nothing in the container listens on 8300 in dev — the mapping accepts the TCP
 connection and resets it. This is a real port leak; see §11.1.
 
 Production, for contrast, publishes exactly one port:
@@ -275,21 +275,21 @@ Production, for contrast, publishes exactly one port:
 ```
 $ docker compose -f compose.yml config
   app:
-    ports: [{target: 8000, published: "8000", protocol: tcp}]
+    ports: [{target: 8300, published: "8300", protocol: tcp}]
 ```
 
 ### 5.4 Current live runtime state
 
 ```
 $ docker ps --format '{{.Names}}\t{{.Status}}\t{{.Ports}}'
-barrier-monitor-app-1      Up 15 hours (healthy)  0.0.0.0:8000->8000/tcp, [::]:8000->8000/tcp
-barrier-monitor-poller-1   Up 15 hours            8000/tcp
-barrier-monitor-alerts-1   Up 15 hours            8000/tcp
+barrier-monitor-app-1      Up 15 hours (healthy)  0.0.0.0:8300->8300/tcp, [::]:8300->8300/tcp
+barrier-monitor-poller-1   Up 15 hours            8300/tcp
+barrier-monitor-alerts-1   Up 15 hours            8300/tcp
 ```
 
-The production stack is up and healthy. Note `app` binds **0.0.0.0:8000** —
+The production stack is up and healthy. Note `app` binds **0.0.0.0:8300** —
 it is reachable from anywhere that can route to this host, not just loopback.
-`poller` and `alerts` show `8000/tcp` as inherited image metadata, not a
+`poller` and `alerts` show `8300/tcp` as inherited image metadata, not a
 listener.
 
 ---
@@ -338,7 +338,7 @@ heartbeat, and the `curl` smoke check.
 
 In `http` mode the page route calls `/api/barriers` back over HTTP through
 `lib/api/http.ts:48` — a self-request that stays on whichever port served the
-page (8000 or 5173).
+page (8300 or 5173).
 
 ---
 
@@ -352,7 +352,7 @@ One server-to-client stream exists: `GET|POST /api/export` returns a
 `ReadableStream<Uint8Array>` of chunked CSV, `.xlsx` bytes or PDF pages
 (`routes/api/export.ts`, `lib/server/exportStream.ts` +
 `lib/server/exportXlsx.ts` + `lib/server/exportPdf.ts`, one chunk per
-5,000-row database batch). That is chunked transfer encoding on 8000/5173,
+5,000-row database batch). That is chunked transfer encoding on 8300/5173,
 not a separate port or protocol.
 
 ### Client polling cadence
@@ -380,7 +380,7 @@ All of these are same-origin and pause on hidden tabs.
 
 | Component            | Listens         | → Postgres 5432                   | → Fracttal 443          | → SMTP 587                   | → Fonts 443   |
 | -------------------- | --------------- | --------------------------------- | ----------------------- | ---------------------------- | ------------- |
-| `app` (8000 / 5173)  | **8000 / 5173** | yes, all routes but `/api/health` | no                      | yes, on immediate rule match | yes (browser) |
+| `app` (8300 / 5173)  | **8300 / 5173** | yes, all routes but `/api/health` | no                      | yes, on immediate rule match | yes (browser) |
 | `poller`             | nothing         | yes                               | yes                     | yes, on failure only         | no            |
 | `alerts`             | nothing         | yes                               | no                      | yes, digests                 | no            |
 | `tools`              | nothing         | yes                               | yes (sync/audit/import) | no                           | no            |
@@ -416,12 +416,12 @@ Every other task runs `-A`.
 
 ## 10. Changing a port — full checklist
 
-### App port 8000 → N
+### App port 8300 → N
 
 Touches **5 files** because the port is never in TypeScript:
 
-1. `Dockerfile:19` — `EXPOSE 8000`
-2. `compose.yml:24` — `"8000:8000"`
+1. `Dockerfile:19` — `EXPOSE 8300`
+2. `compose.yml:24` — `"8300:8300"`
 3. `compose.yml:31` — the healthcheck fetch URL
 4. `deno.jsonc:15` — add `--port N` to the `start` task
 5. Docs — `compose.yml:12`, `readme.md:130,141`, `docs/API.md:393`
@@ -458,13 +458,13 @@ them distinct if you want both scripts to run concurrently.
 
 ## 11. Findings
 
-### 11.1 `compose.dev.yml` leaks host port 8000
+### 11.1 `compose.dev.yml` leaks host port 8300
 
 Compose merges `ports` by appending unique entries, so the dev override's
-`"5173:5173"` does not remove the base file's `"8000:8000"`. The dev stack
-publishes both; the 8000 mapping is inert because Vite only listens on 5173
+`"5173:5173"` does not remove the base file's `"8300:8300"`. The dev stack
+publishes both; the 8300 mapping is inert because Vite only listens on 5173
 in the container. It holds a host port for nothing and will produce confusing
-connection-reset behaviour if someone curls 8000 expecting the dev server.
+connection-reset behaviour if someone curls 8300 expecting the dev server.
 
 Fix with an explicit reset (Compose ≥ v2.24.4):
 
@@ -482,9 +482,9 @@ So an empty `OPS_SMTP_PORT=` yields 587 on the alert path and **port 0** on the
 ops-failure path, which will fail to connect. The `??` in `notify.ts:80` is
 the wrong operator here; it should be `||` to match.
 
-### 11.3 The app binds `0.0.0.0:8000` with no reverse proxy
+### 11.3 The app binds `0.0.0.0:8300` with no reverse proxy
 
-`deno serve` binds all interfaces and compose publishes `0.0.0.0:8000`, with
+`deno serve` binds all interfaces and compose publishes `0.0.0.0:8300`, with
 no nginx/Caddy/Traefik anywhere in the repo. Whatever fronts this in
 production must terminate TLS, because the session cookie only sets `Secure`
 when the request itself is `https:` (`lib/server/auth/session.ts:58,67-74`).
@@ -505,9 +505,9 @@ password in a git-ignored `.env`, and no compose service provides a local
 fallback. There is also no Postgres port published — correct, but it means
 there is no way to run this stack self-contained without an external DB.
 
-### 11.6 Port 8000 appears in `docker ps` for the worker services
+### 11.6 Port 8300 appears in `docker ps` for the worker services
 
-`poller` and `alerts` display `8000/tcp` because they inherit
+`poller` and `alerts` display `8300/tcp` because they inherit
 `Dockerfile:19`'s `EXPOSE`. They listen on nothing. Cosmetic, but it reads as
 a false positive when auditing the stack.
 

@@ -16,7 +16,7 @@
 param(
   [string]$InstallDir = 'C:\srv\barrier-monitor',
   [string]$BackupDir = 'D:\backups\barreiras',
-  [string]$AppPort = '8000'
+  [string]$AppPort = '8300'
 )
 
 $ErrorActionPreference = 'SilentlyContinue'
@@ -40,7 +40,7 @@ foreach ($s in @('BarrierApp', 'BarrierPoller', 'BarrierAlerts', 'BarrierCaddy',
   else { SayBoth 'PASS' "service ${s}: Running." }
 }
 
-foreach ($p in @(8000, 80, 5432)) {
+foreach ($p in @(8300, 80, 5432)) {
   if (Get-NetTCPConnection -LocalPort $p -State Listen -ErrorAction SilentlyContinue) { SayBoth 'PASS' "port ${p}: something is listening." }
   elseif ($p -eq 80) { SayBoth 'INFO' 'port 80: nothing listening (ok without Caddy / loopback-only host).' }
   else { SayBoth 'FAIL' "port ${p}: nothing listening." }

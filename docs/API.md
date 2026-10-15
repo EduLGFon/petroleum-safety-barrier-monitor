@@ -525,7 +525,7 @@ cp .env.example .env   # set DATABASE_URL + FRACTTAL_* + ADMIN_TOKEN (+ OPS_*)
 docker compose build
 docker compose run --rm tools deno run -A --env-file=.env scripts/migrate.ts
 docker compose up -d                       # app + poller
-curl -s localhost:8000/api/health          # {"ok":true,...}
+curl -s localhost:8300/api/health          # {"ok":true,...}
 docker compose ps                          # both healthy / running
 ```
 

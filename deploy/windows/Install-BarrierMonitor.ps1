@@ -13,7 +13,7 @@
 #>
 param(
   [string]$InstallDir = 'C:\srv\barrier-monitor',
-  [string]$AppPort = '8000',
+  [string]$AppPort = '8300',
   [string]$PgPort = '5432',
   [string]$DenoVersion = 'v2.9.7',
   [string]$PgPassword = '',
@@ -101,5 +101,5 @@ Write-Host '  1. Edit .env (DATABASE_URL, ADMIN_TOKEN, OPS_SMTP_*, COMPANY_NAME)
 if ($PgPassword) { Write-Host '     (You passed -PgPassword but Postgres user setup stays manual: create role barrier + db barreiras.)' }
 Write-Host '  2. deno run -A --env-file=.env scripts/doctor.ts   # all green'
 Write-Host "  3. Register services: .\deploy\windows\Register-Services.ps1 -InstallDir $InstallDir"
-Write-Host '  4. Reverse proxy + TLS: Caddy (deploy\windows\Caddyfile) or IIS. Never expose :8000 directly.'
+Write-Host '  4. Reverse proxy + TLS: Caddy (deploy\windows\Caddyfile) or IIS. Never expose :8300 directly.'
 Write-Host "  5. Smoke: Invoke-RestMethod http://localhost:$AppPort/api/health"

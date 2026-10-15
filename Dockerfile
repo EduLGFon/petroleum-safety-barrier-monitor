@@ -37,7 +37,7 @@ COPY . ./
 RUN --mount=type=cache,target=/tmp/dcache \
     DENO_DIR=/tmp/dcache deno task build
 
-EXPOSE 8000
+EXPOSE 8300
 
 # Same boot path as local `deno task start` (reads the mounted .env).
 CMD ["task", "start"]

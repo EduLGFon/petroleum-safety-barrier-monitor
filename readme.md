@@ -133,7 +133,7 @@ Visit `http://localhost:5173/login`, sign in, and land on the dashboard.
 
 ```bash
 deno task build          # vite build -> _fresh/server.js + _fresh/client
-deno task start          # deno serve --env-file=.env -A _fresh/server.js (port 8000)
+deno task start          # deno serve --env-file=.env -A --port 8300 _fresh/server.js (port 8300)
 deno task preview        # same bundle, shell env instead of .env
 ```
 
@@ -144,7 +144,7 @@ cp .env.example .env     # set DATABASE_URL, admin token, upstream credentials
 docker compose build
 docker compose run --rm tools deno run -A --env-file=.env scripts/migrate.ts
 docker compose up -d     # app + sync poller + alert loop
-curl -s localhost:8000/api/health
+curl -s localhost:8300/api/health
 ```
 
 The dev override bind-mounts the tree over the image so vite HMR and

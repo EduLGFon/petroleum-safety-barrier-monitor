@@ -831,7 +831,7 @@ interaction changes, and `deno run -A scripts/import-sort.ts` for import-order c
   task needs them).
 - Keep long-running services up across calls (vite dev process, local Postgres, compose stack)
   instead of rebooting them per command. One readiness probe beats a restart
-  (`curl -s localhost:8000/api/health`). Never bounce the owner's compose `app` process to test
+  (`curl -s localhost:8300/api/health`). Never bounce the owner's compose `app` process to test
   something; use a local smoke (`deno task dev`, `deno task preview`, `deno task alerts:check`
   dry-run).
 - Run long commands (full `check` / `test`, `build`, sync sweeps, `chaos-scale`, `browser-smoke`,

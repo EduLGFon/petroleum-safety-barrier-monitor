@@ -43,7 +43,7 @@ param(
   [string]$DbPassword = '',
   [string]$PgPort = '5432',
   [string]$PostgresSuperPassword = '',
-  [string]$AppPort = '8000',
+  [string]$AppPort = '8300',
   [string]$DenoVersion = 'v2.9.7',
   [string]$CaddyVersion = 'v2.11.7',
   [string]$NssmVersion = '2.24',
@@ -152,7 +152,7 @@ if ($CheckOnly) {
   $freeGB = [math]::Round((Get-PSDrive $drive.TrimEnd(':')).Free / 1GB, 1)
   if ($freeGB -ge 10) { Write-Host "PASS disk: $freeGB GB free on $drive (need ~2 GB + backups)." -ForegroundColor Green }
   else { Write-Host "WARN disk: only $freeGB GB free on $drive." -ForegroundColor Yellow }
-  foreach ($p in @(80, 443, 8000, 5432)) {
+  foreach ($p in @(80, 443, 8300, 5432)) {
     if (Test-ListenPort $p) { Write-Host "WARN port ${p}: already in use (setup continues; 5432 busy = Postgres already here)." -ForegroundColor Yellow }
     else { Write-Host "PASS port ${p}: free." -ForegroundColor Green }
   }

@@ -32,7 +32,7 @@ Email whoever provisions the server (IT, hosting, the client) exactly this:
   crash. The dashboard, the sync loop and the alert loop each become one.
   Reboot-safe by construction.
 - **Firewall**: the bouncer. The setup opens **only port 80** (the website),
-  optionally limited to your office network. Port 8000 (the raw app) stays
+  optionally limited to your office network. Port 8300 (the raw app) stays
   reachable from inside the server only. Nothing else is opened.
 - **PostgreSQL**: the filing cabinet where barriers, users and history live.
   You never touch it directly; the app and the nightly backup do.
@@ -93,7 +93,7 @@ immediately — they are never shown again and never written to any log.
 
 ## 4. Prove it works (two checks)
 
-1. On the server: `http://localhost:8000/api/health` should show
+1. On the server: `http://localhost:8300/api/health` should show
    `{"ok":true,…}` — or just run the diagnostics:
    ```powershell
    powershell -ExecutionPolicy Bypass -File .\deploy\windows\Test-BarrierHealth.ps1
@@ -110,7 +110,7 @@ immediately — they are never shown again and never written to any log.
 - **Will this break other things on the server?** It only _adds_: three
   folders (`C:\srv\barrier-monitor`, `C:\tools`, Postgres), four services,
   one firewall rule, one nightly task. It never modifies existing software.
-  Ports used: 80 (website), 8000 (loopback only), 5432 (database, localhost
+  Ports used: 80 (website), 8300 (loopback only), 5432 (database, localhost
   only). If any of those is taken, `-CheckOnly` tells you first.
 - **Can I run it twice?** Yes — it is idempotent. Re-running pulls updates,
   rebuilds, migrates and restarts; your `.env` secrets are never rotated.
