@@ -185,7 +185,10 @@ Full contract lives in `docs/API.md`. Summary:
 - Bridge (`lib/enums/*` + `lib/resolve.ts` + `lib/api/query.ts`):
   `toXId` returns `undefined` on unknown (caller skips + warns),
   `fromXId` returns explicit sentinels (`ST-7`), `resolveBarrier` always
-  derives `compliance` via `isCompliant()`.
+  derives `compliance` via `isCompliant()`, after promoting stored
+  `Degradado`/`Indisponivel` with `has_contingency = 'Sim'` to the
+  `Degradado/Indisponivel Contingenciado` display states
+  (`effectiveAvailabilityId` - manual sheet flag overlay).
 - `BarriersApi` (`lib/api/types.ts`): `getBarriers`, `getAllBarriers`
   (http forces `pageSize: 100000`), `getBarrierById` (`null` only on 404),
   `getKpi` / `getChartData` (full filter subset, minus paging/sort).
@@ -233,8 +236,13 @@ Full contract lives in `docs/API.md`. Summary:
   `lib/server/fracttal/map.ts` import defaults. Dry-runs without `--apply`.
 - Shared mapping rules (`lib/server/fracttal/barrier-rules.ts`): the one
   converged source for scope keywords, station parse, typology,
-  work-event classification, and 4-state availability used by both the
-  import and the live sync. Precedence: the import owns full catalog
+  work-event classification, contingency signals
+  (`isContingencyFlag` for the sheet `Sim`, `isContingencyText` for
+  `contingenc` / `GM-...` / bare `GM` / `CEC` in work free text), and
+  availability used by both the import and the live sync. Base
+  derivation yields the four operational states (0/1/4/5); open
+  corrective work carrying a contingency signal promotes to the
+  `Contingenciado` states (4 to 3, 5 to 2). Precedence: the import owns full catalog
   rebuilds (creates locations/categories with deterministic ids); the sync
   creates missing rows between rebuilds (unknown labels converge instead
   of skipping).
@@ -243,7 +251,11 @@ Full contract lives in `docs/API.md`. Summary:
   `alert_rules` (per-category triggers) + `alert_events`/`alert_recipients`.
   `compliance_id` is trigger-derived, the only
   write path is `record_status_change()` (DB-enforced by
-  `trg_guard_availability_write`; same-status writes are a no-op). Location and category ids are
+  `trg_guard_availability_write`; same-status writes are a no-op). Reads
+  (KPI, chart, vocabularies, filters) count the effective availability:
+  stored 4/5 with `has_contingency = 'Sim'` read as 3/2, so server
+  numbers match `resolveBarrier` even before the next materializing
+  write. Location and category ids are
   NOT frontend contracts - the server serves the dynamic id-keyed
   vocabularies (`{id, code, name, count}` and `{id, label}`) to the island, and
   `lib/resolve.ts` + `lib/api/query.ts` bind those ids at request time.

@@ -91,6 +91,15 @@ barriers
   comments              text
   action_plan           text
   status_since          date
+  origin / install_local / equip_typology / field_installed /
+  field_operational / op_status / has_maint_plan / plan_followed /
+  failure_free / maint_status / has_contingency / contingency_desc /
+  evidence_code / degradation_desc / extra_comments
+                        sheet inventory columns (GERAL, free text, null =
+                        "não informado", admin-fillable; the sync writes
+                        `has_contingency = 'Sim'` + `contingency_desc` only
+                        for auto-detected contingency rows and otherwise
+                        preserves the local values)
   external_code         text unique, not null (Fracttal match key)
   source_updated_at     timestamptz, nullable
   deleted_at            timestamptz, nullable (soft delete via sync)
@@ -190,6 +199,14 @@ manual query. (`compliance_id` has `DEFAULT 1`; it is not `GENERATED` because
 the native syntax forbids joins and the compliant set lives in the lookup,
 not in literals.)
 
+Reads do not rely on the stored `compliance_id` alone: KPI, chart,
+vocabularies and filters count the effective availability (stored 4/5
+with `has_contingency = 'Sim'` read as 3/2, hence compliant), matching
+`resolveBarrier`. The trigger stays base-only; `PATCH
+/api/barriers/:id` materializes manual `Sim` to stored 2/3 via a second
+`record_status_change()` (`"Contingência registrada"`, clearing demotes
+back), so stored and display converge on the next write.
+
 `updated_at` is maintained by `trg_barriers_updated_at` (`BEFORE UPDATE` via
 `set_updated_at()`).
 
@@ -231,7 +248,11 @@ intact, but `buildWhere`/`scopeText` and the `chart.ts` /
 (default `active`: `deleted_at is null and is_active`) instead of showing
 everything; the dashboard Situacao filter (admin only) lists `inactive`
 (`is_active = false`), `deleted`, or `all`. `is_active` mirrors the upstream
-`active` flag and never changes availability derivation. `sync_state` records one row
+`active` flag and never changes availability derivation. Contingency
+sheet columns are sync-owned only when auto-detected
+(`has_contingency = coalesce($new, has_contingency)`): an
+auto-detected row writes `Sim` plus the source snippet, rows without a
+work-text signal keep their manual values. `sync_state` records one row
 per run (inserts/updates/deletes/skips counts, `status`, `note`).
 `sync_barrier_changes` records one row per barrier touched by a run (kind,
 old/new availability, `changed_fields`, compact old/new snapshots) so the
@@ -252,7 +273,10 @@ DB-enforced by the `uniq_sync_state_running_scope` partial unique index;
 availability, criticality, `urgency`, `category`, `immediate`, `attempts`,
 `last_error`, `dead_letter`, `delivered[]` per recipient).
 `alert_recipients` (`email` UNIQUE, `name`, `active`) is the digest
-audience, managed by `/api/recipients*`. `alert_rules` defines triggers:
+audience, managed by `/api/recipients*`. `phone` (digits, empty = email
+only) enables the provider second channel, but only for the uncontained
+unavailable landing (`violada`, status 5 via `whatsapp`); contained and
+degraded landings stay email-only. `alert_rules` defines triggers:
 per-category enable/disable (no active rule covering a category means that
 category never alerts), landing status, critical-only, recovery opt-in,
 stale days, immediate vs digest. Empty rules fall back to legacy behavior
@@ -344,6 +368,7 @@ splitter that respects dollar-quoted bodies (`$$`), quotes, and comments
 | `lib/server/alerts/detect.ts`        | `detectUrgentTransitions` (history → `isUrgent`, same predicate as the dashboard)                                                                                                                                                  |
 | `lib/server/alerts/run.ts`           | `runAlertCycle` (detect→enqueue→digest→mark, dry-run default, `--reprocess`)                                                                                                                                                       |
 | `lib/server/alerts/mailer.ts`        | `AlertMailer` + SMTP provider (P3 reuse) + `sendWithRetry`                                                                                                                                                                         |
+| `lib/server/alerts/provider.ts`      | Generic provider payload (`canal: email                                                                                                                                                                                            |
 | `lib/server/alerts/templates.ts`     | Urgent digest pt-BR (subject counts criticals, body lists criticals first)                                                                                                                                                         |
 | `lib/dashboard/urgent.ts`            | `urgencyOf`/`isUrgent`/`compareUrgency`/`urgentBarriers` (fail-closed baseline = NcAlert)                                                                                                                                          |
 | `routes/api/_params.ts`              | Shared strict parsers (`parseInt/parseDate/parseQueryParam`)                                                                                                                                                                       |

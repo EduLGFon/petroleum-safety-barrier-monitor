@@ -261,3 +261,58 @@ summaries) stays plain `console.log` for piping. Browser
 Verification: new `log_test.ts` (15 cases: parsing, filtering, sinks,
 redaction, error/circular safety, child/line/audit, request binding),
 `deno task check`, full `deno task test`.
+
+## D11 - Contingency derivation from work text plus manual sheet flag (2026-10-16)
+
+Context: 20k Fracttal-imported barriers showed zero contingency rows.
+Two `Contingenciado` display states exist (ids 2/3, compliant) but no
+code path ever produced them: `resolveAvailability` only emitted 0/1/4/5
+and the import/sync never wrote `has_contingency`. The dump census
+found zero explicit contingency hits, so the signal had to be defined,
+not discovered.
+
+Decision: two sources promote to the same states. Auto: open corrective
+work whose free text matches `contingenc`, a `GM-...` evidence code (or
+bare `GM`), or a `CEC` token (`isContingencyText` /
+`hasContingencySignal`, scanning description plus task notes, labels and
+custom status) promotes 4 to 3 / 5 to 2 at derivation time and writes
+`has_contingency = 'Sim'` plus the source snippet; preventive notes
+stay inert (no corrective slot, no promotion). Manual: stored 4/5 with
+sheet `Sim` read as 3/2 everywhere (`effectiveAvailabilityId` in
+`resolveBarrier` plus the same `CASE` in KPI/chart/vocabulary/filter
+SQL), and `PATCH /api/barriers/:id` materializes the overlay to stored
+2/3 via a second `record_status_change()` (explicit `availabilityId`
+wins over the overlay). Sync preserves manual flags
+(`coalesce($new, has_contingency)`) and never clears them; admin-owned
+statuses keep the existing override guard. The compliance trigger stays
+base-only; all reads derive effective compliance.
+
+Verification: new unit tests (flag/text/signal helpers, overlay,
+work-slot flagging, `mapAsset` 2/3 promotion, `resolveBarrier`
+promotion), live-DB checks (filter `availabilityId=3` finds `4+Sim`
+rows, KPI and chart `compliant+1` with total unchanged), full
+`deno task test` (592 passed). Docs updated in the same change
+(`docs/ARCHITECTURE.md`, `docs/API.md`, `docs/DATABASE.md`,
+`docs/FRACTTAL-DATA.md`, `readme.md`).
+
+## D12 - Provider second channel is `whatsapp`, not `messaging` (2026-10-16)
+
+Context: homologation measured whole-payload `422 canal_nao_aceito` on
+every `violada` alert with a phone-carrying recipient: the provider
+accepts only `email`, `whatsapp` and `internal`, and our payload sent
+`canal: "messaging"` / `canais: ["email", "messaging"]`. Hidden until a
+second recipient with a phone was registered, because the second
+channel only attaches for status 5 with a phone present.
+
+Decision: send `canal: "whatsapp"` / `canais: ["email", "whatsapp"]`
+(`lib/server/alerts/provider.ts`); internal `withMessaging` field name
+and test titles kept (never hit the network). Docs updated in the same
+change (`docs/API.md`, `docs/DATABASE.md` provider rows plus fan-out
+notes). Note for deploy: `routes/api/barriers/[id].ts` and
+`routes/api/barriers/[id]/status.ts` import the provider for immediate
+fan-out, so the app service needs a redeploy too, not just the poller
+scripts.
+
+Verification: `deno test lib/server/alerts/` (37 passed), full
+`deno task test` (592 passed), homologation A/B proof (422 vs 202) plus
+`--apply --reprocess --only-barrier 427` delivering 4 dispatches.

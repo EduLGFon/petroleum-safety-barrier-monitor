@@ -97,7 +97,12 @@ Important: `compliance` **never** travels in `WireBarrier` - it is always
 derived from `availabilityId` via `isCompliant()`, in the mock
 (`lib/api/mock.ts`), in the resolver (`resolveBarrier`), and in the DB via the
 trigger (`trg_barriers_set_compliance` on the stored column
-`barriers.compliance_id`, used only for SQL filter/aggregation).
+`barriers.compliance_id`, used only for SQL filter/aggregation). The
+resolver first applies the contingency display overlay
+(`effectiveAvailabilityId`: stored 4/5 with `hasContingency = 'Sim'` read
+as 3/2); server KPI/chart/filter/vocabulary queries apply the same
+overlay in SQL, so both sides agree with or without a materializing
+status write.
 
 `WireKpiSnapshot` carries the fixed fields plus the optional dynamic buckets
 `byAvailability`, `byCompliance`, `byCriticality` (keys = numeric id as
@@ -142,7 +147,9 @@ both never routes, `_` prefix / no handler):
     ranks); `hasActionPlan=true/false` filters plan presence; `since`/`until` = `YYYY-MM-DD` over
     `status_since`; `rowScope` = `active` (default: enabled live rows),
     `inactive` (upstream-disabled), `deleted` or `all` (both admin-only,
-    non-admins get `403`); `page` default 1 (floor, min 1); `pageSize` default 25
+    non-admins get `403`); `availabilityId`/`complianceId` match the
+    effective display state (stored 4/5 with `hasContingency = 'Sim'`
+    read as 3/2, hence compliant); `page` default 1 (floor, min 1); `pageSize` default 25
     (clamped `1..100000`); `sortCol` whitelist
     (`id/tag/location/typology/criticality/category/owner/availability/compliance/statusSince`,
     default `id`); strict parsers in `routes/api/_params.ts` (malformed values
@@ -162,8 +169,15 @@ both never routes, `_` prefix / no handler):
   by omission. After the commit the
   route runs the hybrid immediate fan-out: matches always enqueue in
   `alert_events`, and winning rules with `notify_immediate` send at once
-  (`[Imediato]` subject, single attempt, 10s budget) when the SMTP relay
-  is configured - otherwise the digest cron sends. Fan-out failures only
+  (`[Imediato]` subject, single attempt, 10s budget) when the provider
+  is configured - otherwise the digest cron sends. Second-channel
+  delivery goes through the generic provider
+  (`lib/server/alerts/provider.ts`, MSGFlow HTTPS+JSON): only the
+  `violada` landing (status 5) attaches `whatsapp` recipients (and only
+  for recipients with a phone number); every other landing is
+  email-only. The provider accepts the `email`, `whatsapp` and
+  `internal` channels and rejects the whole payload (`422`) on an
+  unknown one. Fan-out failures only
   log; the response stays the updated `WireBarrier`.
 - `GET|POST /api/export?format=csv|xlsx|pdf` (+ the same filters as
   `/api/barriers`) → the whole scope as CSV, `.xlsx` workbook or real PDF
@@ -315,7 +329,11 @@ both never routes, `_` prefix / no handler):
   else `400`); `availabilityId` routes through
   `record_status_change()` (with `statusNote?`, default `"Edição de barreira"`)
   so history and alerts keep working, plus the same best-effort immediate
-  fan-out as the status route (never fails the response). Compliance
+  fan-out as the status route (never fails the response). When the request
+  does not set `availabilityId` explicitly, a `hasContingency` change also
+  materializes the overlay: `Sim` promotes stored 4 to 3 / 5 to 2
+  (`"Contingência registrada"`), clearing it demotes 3 to 4 / 2 to 5
+  (`"Contingência removida"`). Compliance
   and `statusSince` are never writable. `404` when the barrier is missing.
 
 ## Errors, auth, and throttle (P4)
@@ -506,6 +524,7 @@ toWireQuery({ location: "FAL", availability: "Degradado", page: 1 });
 | `lib/server/alerts/immediate.ts`          | `maybeSendImmediate` (PATCH fan-out: enqueue always, at-once send on immediate rules)                         |
 | `lib/server/alerts/run.ts`                | `runAlertCycle` (detect→stale→enqueue→digest→mark, dry-run default, `--reprocess`)                            |
 | `lib/server/alerts/mailer.ts`             | `AlertMailer` + SMTP provider (P3 reuse) + `sendWithRetry`                                                    |
+| `lib/server/alerts/provider.ts`           | Generic provider payload (`canal: email                                                                       |
 | `lib/server/alerts/templates.ts`          | Urgent digest pt-BR (subject counts criticals, body lists criticals first)                                    |
 | `lib/server/sql/alerts.ts`                | `sqlAlertStore` (`ON CONFLICT dedup_key DO NOTHING`, dead-letter in payload)                                  |
 | `lib/dashboard/urgent.ts`                 | `urgencyOf`/`isUrgent`/`compareUrgency`/`urgentBarriers` (fail-closed baseline = NcAlert)                     |
