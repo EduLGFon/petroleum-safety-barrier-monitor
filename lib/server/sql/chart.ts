@@ -15,13 +15,18 @@ export async function getChartData(
     ? { locationId: filter }
     : filter ?? {};
   const where = buildWhere(q);
+  // Effective compliance (display overlay): stored 4/5 with Há
+  // Contingência?=Sim count as compliant, mirroring getKpi and
+  // resolveBarrier, so the chart and the KPI cards never disagree.
+  const effCompliant =
+    `((case when b.availability_id in (4, 5) and lower(trim(coalesce(b.has_contingency, ''))) = 'sim' then case when b.availability_id = 4 then 3 else 2 end else b.availability_id end) in (0, 1, 2, 3))`;
   const rows = await queryRows<{
     category_id: string;
     compliant: string;
     total: string;
   }>(
     `select b.category_id::text as category_id,
-       count(*) filter (where b.compliance_id = 0)::text as compliant,
+       count(*) filter (where ${effCompliant})::text as compliant,
        count(*)::text as total
      from barriers b join locations loc on loc.id = b.location_id ${where.text}
      group by b.category_id order by count(*) desc`,

@@ -47,10 +47,30 @@ export function buildWhere(
     push("and b.location_id = ", q.locationId);
   }
   if (q.availabilityId !== undefined) {
-    push("and b.availability_id = ", q.availabilityId);
+    // Effective availability (docs/STATUSES.md display overlay): a stored
+    // Degradado/Indisponível with Há Contingência?=Sim reads as its
+    // contingenciado state, so the filter matches display, not just the
+    // stored id. Mirrors effectiveAvailabilityId() in barrier-rules.
+    args.push(q.availabilityId);
+    conds.push(
+      `and (case when b.availability_id in (4, 5) and lower(trim(coalesce(b.has_contingency, ''))) = 'sim' then case when b.availability_id = 4 then 3 else 2 end else b.availability_id end) = $${args.length}`,
+    );
   }
   if (q.complianceId !== undefined) {
-    push("and b.compliance_id = ", q.complianceId);
+    // Compliance derives from the effective availability (2/3 count as
+    // compliant, like isCompliant), not from the stored compliance_id which
+    // still reflects the base id until the next materializing write.
+    if (q.complianceId === 0) {
+      conds.push(
+        `and (case when b.availability_id in (4, 5) and lower(trim(coalesce(b.has_contingency, ''))) = 'sim' then case when b.availability_id = 4 then 3 else 2 end else b.availability_id end) in (0, 1, 2, 3)`,
+      );
+    } else if (q.complianceId === 1) {
+      conds.push(
+        `and (case when b.availability_id in (4, 5) and lower(trim(coalesce(b.has_contingency, ''))) = 'sim' then case when b.availability_id = 4 then 3 else 2 end else b.availability_id end) in (4, 5)`,
+      );
+    } else {
+      push("and b.compliance_id = ", q.complianceId);
+    }
   }
   if (q.categoryId !== undefined) {
     push("and b.category_id = ", q.categoryId);

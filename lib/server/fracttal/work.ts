@@ -10,6 +10,7 @@ import {
   classifyCorrective,
   classifyRequest,
   earliestDate,
+  hasContingencySignal,
   isClosedRequestStatus,
   isoDate,
   mergeEvent,
@@ -25,6 +26,7 @@ export interface WorkSlot {
   urgent: StatusEvent | null;
   planned: StatusEvent | null;
   stopAssets: boolean;
+  hasContingency: boolean;
 }
 
 // WorkEvents is the merged per-code signal handed to the mapper.
@@ -32,6 +34,8 @@ export interface WorkEvents {
   urgent: StatusEvent | null;
   planned: StatusEvent | null;
   stopAssets: boolean;
+  hasContingency?: boolean;
+  contingencySource?: string;
 }
 
 // WorkEventsResolver looks up merged signals by asset code (null = no open
@@ -112,6 +116,10 @@ function workRequestEvent(wr: FracttalWorkRequest): StatusEvent {
 
 // workOrderSlot sorts one order: closed rows (done !== false) carry no
 // signal; open rows classify into a slot and always report the stop flag.
+// Contingency rides along when the row text carries it (GM/CEC/contingência
+// in description or folio); promotion to 2/3 happens in resolveAvailability
+// only when a corrective slot exists, so preventive contingency notes stay
+// inert by design.
 export function workOrderSlot(wo: FracttalWorkOrder): WorkSlot | null {
   if (wo.done !== false) return null;
   const slot = classifyCorrective(
@@ -123,6 +131,7 @@ export function workOrderSlot(wo: FracttalWorkOrder): WorkSlot | null {
     urgent: slot === "urgent" ? event : null,
     planned: slot === "planned" ? event : null,
     stopAssets: wo.stop_assets === true,
+    hasContingency: hasContingencySignal(wo.description, wo.wo_folio),
   };
 }
 
@@ -137,7 +146,48 @@ export function workRequestSlot(wr: FracttalWorkRequest): WorkSlot | null {
     urgent: slot === "urgent" ? event : null,
     planned: slot === "planned" ? event : null,
     stopAssets: false,
+    hasContingency: hasContingencySignal(wr.description, wr.wo_folio),
   };
+}
+
+// contingencyFromRaw scans the wider free-text surface of a raw work row
+// (task notes, labels, custom status) for a contingency signal. The parsed
+// structs only carry description/folio; live rows may carry GM/CEC in
+// labels or the custom status field (both empty in the dump samples but
+// present in the schema), so the merge ORs this with the parsed check.
+export function contingencyFromRaw(raw: unknown): boolean {
+  if (typeof raw !== "object" || raw === null) return false;
+  const row = raw as Record<string, unknown>;
+  const texts: Array<string | null> = [];
+  for (
+    const key of [
+      "description",
+      "task_note",
+      "notes",
+      "task_description",
+      "work_orders_status_custom_description",
+      "types_description",
+      "tasks_log_types_description",
+      "types_2_description",
+    ] as const
+  ) {
+    const v = row[key];
+    if (typeof v === "string") texts.push(v);
+  }
+  const labels = row["labels"];
+  if (Array.isArray(labels)) {
+    for (const l of labels) {
+      if (typeof l === "string") texts.push(l);
+      else if (typeof l === "object" && l !== null) {
+        const o = l as Record<string, unknown>;
+        if (typeof o["description"] === "string") {
+          texts.push(o["description"] as string);
+        }
+        if (typeof o["name"] === "string") texts.push(o["name"] as string);
+      }
+    }
+  }
+  return hasContingencySignal(...texts);
 }
 
 // buildWorkEvents folds raw order/request rows into per-code merged signals.
@@ -164,6 +214,8 @@ export function buildWorkEvents(
     urgent: null,
     planned: null,
     stopAssets: false,
+    hasContingency: false,
+    contingencySource: "",
   });
   const bad = (index: number, err: unknown) => {
     malformed.push({
@@ -182,6 +234,14 @@ export function buildWorkEvents(
       if (slot.urgent) acc.urgent = mergeEvent(acc.urgent, slot.urgent);
       if (slot.planned) acc.planned = mergeEvent(acc.planned, slot.planned);
       acc.stopAssets = acc.stopAssets || slot.stopAssets;
+      const cont = slot.hasContingency || contingencyFromRaw(patched.row);
+      if (cont && (acc.contingencySource ?? "") === "") {
+        const folio = (wo.wo_folio ?? "").trim();
+        const desc = (wo.description ?? "").trim();
+        acc.contingencySource = (folio ? `${folio}: ${desc}` : desc)
+          .slice(0, 800);
+      }
+      acc.hasContingency = (acc.hasContingency ?? false) || cont;
       events.set(wo.code, acc);
     } catch (err) {
       bad(i, err);
@@ -195,6 +255,14 @@ export function buildWorkEvents(
       const acc = events.get(wr.code_item) ?? blank();
       if (slot.urgent) acc.urgent = mergeEvent(acc.urgent, slot.urgent);
       if (slot.planned) acc.planned = mergeEvent(acc.planned, slot.planned);
+      const cont = slot.hasContingency || contingencyFromRaw(raw);
+      if (cont && (acc.contingencySource ?? "") === "") {
+        const folio = (wr.wo_folio ?? "").trim();
+        const desc = (wr.description ?? "").trim();
+        acc.contingencySource = (folio ? `${folio}: ${desc}` : desc)
+          .slice(0, 800);
+      }
+      acc.hasContingency = (acc.hasContingency ?? false) || cont;
       events.set(wr.code_item, acc);
     } catch (err) {
       bad(orders.length + i, err);

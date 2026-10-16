@@ -9,6 +9,8 @@
 // between rebuilds (unknown labels converge, never guessed).
 export const AVAILABILITY_AVAILABLE = 0;
 export const AVAILABILITY_OUT_OF_SERVICE = 1;
+export const AVAILABILITY_CONTINGENCY_OUTAGE = 2;
+export const AVAILABILITY_DEGRADED_CONTINGENCY = 3;
 export const AVAILABILITY_DEGRADED = 4;
 export const AVAILABILITY_UNAVAILABLE = 5;
 
@@ -347,16 +349,77 @@ export function earliestDate(
   return a < b ? a : b;
 }
 
-// AvailabilitySignals is every input the 4-state derivation reads. The live
-// path feeds the asset flag; the import feeds work events (it passes the
-// asset flag as available so a blessed import stays byte-identical until
-// dump semantics for that flag are verified in Phase 1).
+// isContingencyFlag reports whether a sheet Há Contingência? value means
+// "Sim" (case/accent-insensitive, trimmed). Null/empty/anything else is not
+// contingency. Shared by the display overlay and the PATCH promotion so the
+// two can never disagree on what counts as contingency-held.
+export function isContingencyFlag(
+  value: string | null | undefined,
+): boolean {
+  return foldText(value).trim() === "sim";
+}
+
+// isContingencyText reports whether free text carries a contingency signal:
+// `contingenc` (contingência/contingenciamento/contingenciado), a GM evidence
+// code (`GM-...`, `GM ...`), or a bare CEC token. Folded first so accents and
+// case never hide a hit; GM requires a code tail or word boundary so words
+// containing "gm" never match.
+export function isContingencyText(
+  value: string | null | undefined,
+): boolean {
+  const text = foldText(value);
+  if (text === "") return false;
+  if (text.includes("contingenc")) return true;
+  if (/\bgm[-_ ]?\d/.test(text)) return true;
+  if (/\bgm\b/.test(text)) return true;
+  if (/\bcec\b/.test(text)) return true;
+  return false;
+}
+
+// hasContingencySignal ORs a list of free-text fields into one flag: any
+// hit means the work row carries contingency context (GM/CEC evidence or an
+// explicit contingency note). Callers pass every text field they have;
+// nulls/empties are neutral.
+export function hasContingencySignal(
+  ...texts: Array<string | null | undefined>
+): boolean {
+  return texts.some((t) => isContingencyText(t));
+}
+
+// effectiveAvailabilityId overlays the manual sheet flag on a stored base:
+// Degradado (4) + Sim -> Degradado Contingenciado (3), Indisponível (5) +
+// Sim -> Indisponível Contingenciado (2). Every other base passes through,
+// including rows already stored as 2/3. This is the display derivation
+// (docs/STATUSES.md): the sync derives the four operational states, the
+// sheet flag promotes the two contingency display states.
+export function effectiveAvailabilityId(
+  baseId: number,
+  hasContingency: string | null | undefined,
+): number {
+  if (!isContingencyFlag(hasContingency)) return baseId;
+  if (baseId === AVAILABILITY_DEGRADED) {
+    return AVAILABILITY_DEGRADED_CONTINGENCY;
+  }
+  if (baseId === AVAILABILITY_UNAVAILABLE) {
+    return AVAILABILITY_CONTINGENCY_OUTAGE;
+  }
+  return baseId;
+}
+
+// AvailabilitySignals is every input the derivation reads. hasContingency
+// is the auto-detected work-text signal (GM/CEC/contingência in the open
+// corrective WO/WR); the manual sheet flag overlays later via
+// effectiveAvailabilityId so both sources promote to the same 2/3 states.
+// The live path feeds the asset flag; the import feeds work events (it
+// passes the asset flag as available so a blessed import stays
+// byte-identical until dump semantics for that flag are verified).
 export interface AvailabilitySignals {
   urgent: StatusEvent | null;
   planned: StatusEvent | null;
   stopAssets: boolean;
   outOfServiceDate: string | null;
   assetAvailable: boolean | null;
+  hasContingency?: boolean;
 }
 
 // AvailabilityOut is the derived status triple written to the barrier row.
@@ -367,24 +430,31 @@ export interface AvailabilityOut {
 }
 
 // resolveAvailability derives status by precedence (docs/FRACTTAL-DATA.md
-// section 4): open emergency corrective -> Indisponivel (5); open planned
-// corrective -> Degradada (4); stopped asset or out-of-service date -> Fora
-// de Operacao (1); asset flagged unavailable -> Indisponivel (5, the
-// documented P3 draft for the bare flag); otherwise Disponivel (0).
+// section 4, docs/STATUSES.md for the contingency overlay): open emergency
+// corrective -> Indisponivel (5, or 2 when contingency is in place); open
+// planned corrective -> Degradada (4, or 3 when contingency is in place);
+// stopped asset or out-of-service date -> Fora de Operacao (1); asset
+// flagged unavailable -> Indisponivel (5, the documented P3 draft for the
+// bare flag); otherwise Disponivel (0).
 export function resolveAvailability(
   signals: AvailabilitySignals,
   today: string,
 ): AvailabilityOut {
+  const conting = signals.hasContingency === true;
   if (signals.urgent) {
     return {
-      availabilityId: AVAILABILITY_UNAVAILABLE,
+      availabilityId: conting
+        ? AVAILABILITY_CONTINGENCY_OUTAGE
+        : AVAILABILITY_UNAVAILABLE,
       statusSince: signals.urgent.date ?? today,
       note: signals.urgent.source,
     };
   }
   if (signals.planned) {
     return {
-      availabilityId: AVAILABILITY_DEGRADED,
+      availabilityId: conting
+        ? AVAILABILITY_DEGRADED_CONTINGENCY
+        : AVAILABILITY_DEGRADED,
       statusSince: signals.planned.date ?? today,
       note: signals.planned.source,
     };

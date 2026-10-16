@@ -216,7 +216,7 @@ export const handler = define.handlers({
         }
       }
 
-      const updated = await updateBarrier(barrierId, {
+      let updated = await updateBarrier(barrierId, {
         tag,
         locationId,
         typologyId,
@@ -242,6 +242,39 @@ export const handler = define.handlers({
         degradationDesc,
         extraComments,
       });
+
+      // Manual contingency overlay (docs/STATUSES.md): Há Contingência?=Sim
+      // promotes a stored Degradado/Indisponível to its contingenciado
+      // display state, clearing it demotes back. Only when the request did
+      // not explicitly set availability (an explicit status wins over the
+      // overlay), so a two-field edit in one PATCH never fights itself.
+      if (
+        body.availabilityId === undefined && updated &&
+        hasContingency !== undefined
+      ) {
+        const { isContingencyFlag } = await import(
+          "../../../lib/server/fracttal/barrier-rules.ts"
+        );
+        const flag = isContingencyFlag(updated.hasContingency);
+        let target: number | undefined;
+        if (flag && updated.availabilityId === 4) target = 3;
+        else if (flag && updated.availabilityId === 5) target = 2;
+        else if (!flag && updated.availabilityId === 3) target = 4;
+        else if (!flag && updated.availabilityId === 2) target = 5;
+        if (target !== undefined) {
+          const author = await getOrCreateAuthor(
+            auth.user?.name || auth.user?.email || "admin",
+          );
+          const promoted = await transitionBarrierStatus(
+            barrierId,
+            target,
+            author.id,
+            flag ? "Contingência registrada" : "Contingência removida",
+          );
+          if (promoted) updated = promoted;
+          statusChangedTo = target;
+        }
+      }
 
       // Best-effort provider fan-out for the status change above: the
       // transition already committed, so nothing here may fail the

@@ -281,7 +281,18 @@ Contingency events may live in:
 - Records created after the dump date
 - A different Fracttal module not captured in this dump
 
-**Status**: unmapped for import. Always list, never guess.
+**Status**: mapped. Open corrective work whose free text carries
+`contingenc`, a `GM-…` evidence code (or bare `GM`), or a `CEC` token
+promotes Degradada→Degradado Contingenciado and
+Indisponível→Indisponível Contingenciado (`isContingencyText` /
+`hasContingencySignal` in `lib/server/fracttal/barrier-rules.ts`, merged
+per code in `lib/server/fracttal/work.ts`, applied in `map.ts` and
+`scripts/fracttal-import.ts`). Manual Há Contingência?=Sim promotes the
+same way on display (`effectiveAvailabilityId`, applied in `lib/resolve.ts`
+and the server KPI/filter) and materializes to 2/3 on PATCH. The 2026-09
+dump samples carried no such signal, so a rebuild from that dump still
+yields zero contingencies until live work text or manual entries provide
+one.
 
 ## 8. Meters (not a status signal)
 

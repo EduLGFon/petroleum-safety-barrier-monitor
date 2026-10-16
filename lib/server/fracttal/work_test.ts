@@ -3,6 +3,7 @@
 // live run and a rebuild agree on every status.
 import {
   buildWorkEvents,
+  contingencyFromRaw,
   parseWorkOrder,
   parseWorkRequest,
   resolverFor,
@@ -136,4 +137,33 @@ Deno.test("buildWorkEvents counts no recovery without the id map", () => {
   const built = buildWorkEvents([{ ...order(), code: "", id_item: 1 }], []);
   assertStrictEquals(built.malformed.length, 1);
   assertStrictEquals(built.recovered, 0);
+});
+
+Deno.test("workOrderSlot flags contingency text without changing the slot", () => {
+  const cont = workOrderSlot(
+    parseWorkOrder(order({ description: "Falha com contingência GM-123" })),
+  );
+  assertStrictEquals(cont?.hasContingency, true);
+  assertStrictEquals(cont?.planned !== null, true);
+  const plain = workOrderSlot(parseWorkOrder(order()));
+  assertStrictEquals(plain?.hasContingency, false);
+});
+
+Deno.test("contingencyFromRaw scans labels and custom status", () => {
+  assertStrictEquals(contingencyFromRaw({ labels: ["CEC"] }), true);
+  assertStrictEquals(
+    contingencyFromRaw({ work_orders_status_custom_description: "GM ok" }),
+    true,
+  );
+  assertStrictEquals(contingencyFromRaw({ description: "rotina" }), false);
+});
+
+Deno.test("buildWorkEvents merges contingency per code with source", () => {
+  const { events } = buildWorkEvents(
+    [order({ description: "Corretiva com contingência aplicada" })],
+    [],
+  );
+  const acc = events.get("FAL-EQ-001");
+  assertStrictEquals(acc?.hasContingency, true);
+  assertStrictEquals((acc?.contingencySource ?? "").includes("conting"), true);
 });

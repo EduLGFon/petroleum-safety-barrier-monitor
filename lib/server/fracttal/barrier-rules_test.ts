@@ -4,7 +4,9 @@
 // classification, and availability precedence.
 import {
   AVAILABILITY_AVAILABLE,
+  AVAILABILITY_CONTINGENCY_OUTAGE,
   AVAILABILITY_DEGRADED,
+  AVAILABILITY_DEGRADED_CONTINGENCY,
   AVAILABILITY_OUT_OF_SERVICE,
   AVAILABILITY_UNAVAILABLE,
   CATEGORY_FALLBACK,
@@ -13,9 +15,13 @@ import {
   classifyRequest,
   criticalityLabelFor,
   earliestDate,
+  effectiveAvailabilityId,
   foldText,
+  hasContingencySignal,
   isBarrierCandidate,
   isClosedRequestStatus,
+  isContingencyFlag,
+  isContingencyText,
   isoDate,
   locationTypeOf,
   mergeEvent,
@@ -316,4 +322,71 @@ Deno.test("scopeSources admits keyword hits, ESO flags, or both", () => {
   assertEquals(scopeSources("Bomba", "ESO"), ["eso"]);
   assertEquals(scopeSources("Bomba", null), []);
   assertEquals(scopeSources(null, null), []);
+});
+
+Deno.test("isContingencyFlag matches Sim case-insensitively only", () => {
+  assertStrictEquals(isContingencyFlag("Sim"), true);
+  assertStrictEquals(isContingencyFlag(" sim "), true);
+  assertStrictEquals(isContingencyFlag("SIM"), true);
+  assertStrictEquals(isContingencyFlag("Não"), false);
+  assertStrictEquals(isContingencyFlag(""), false);
+  assertStrictEquals(isContingencyFlag(null), false);
+});
+
+Deno.test("isContingencyText detects GM/CEC/contingencia signals", () => {
+  assertStrictEquals(
+    isContingencyText("Contingência operacional aplicada"),
+    true,
+  );
+  assertStrictEquals(isContingencyText("plano de CONTINGENCIAMENTO"), true);
+  assertStrictEquals(isContingencyText("GM-3655.01-2024-T-005"), true);
+  assertStrictEquals(isContingencyText("evidência CEC anexada"), true);
+  assertStrictEquals(isContingencyText("Sanar falha de atuação"), false);
+  assertStrictEquals(isContingencyText(null), false);
+  assertStrictEquals(hasContingencySignal("nada", "GM-1"), true);
+  assertStrictEquals(hasContingencySignal("nada", null), false);
+});
+
+Deno.test("effectiveAvailabilityId promotes 4/5 with Sim only", () => {
+  assertStrictEquals(
+    effectiveAvailabilityId(AVAILABILITY_DEGRADED, "Sim"),
+    AVAILABILITY_DEGRADED_CONTINGENCY,
+  );
+  assertStrictEquals(
+    effectiveAvailabilityId(AVAILABILITY_UNAVAILABLE, "Sim"),
+    AVAILABILITY_CONTINGENCY_OUTAGE,
+  );
+  assertStrictEquals(
+    effectiveAvailabilityId(AVAILABILITY_DEGRADED, "Não"),
+    AVAILABILITY_DEGRADED,
+  );
+  assertStrictEquals(
+    effectiveAvailabilityId(AVAILABILITY_AVAILABLE, "Sim"),
+    AVAILABILITY_AVAILABLE,
+  );
+  assertStrictEquals(
+    effectiveAvailabilityId(AVAILABILITY_OUT_OF_SERVICE, "Sim"),
+    AVAILABILITY_OUT_OF_SERVICE,
+  );
+});
+
+Deno.test("resolveAvailability promotes corrective work with contingency", () => {
+  const planned = resolveAvailability(
+    {
+      ...idle,
+      planned: { date: "2026-09-12", source: "p" },
+      hasContingency: true,
+    },
+    "2026-09-15",
+  );
+  assertStrictEquals(planned.availabilityId, AVAILABILITY_DEGRADED_CONTINGENCY);
+  const urgent = resolveAvailability(
+    {
+      ...idle,
+      urgent: { date: "2026-09-11", source: "u" },
+      hasContingency: true,
+    },
+    "2026-09-15",
+  );
+  assertStrictEquals(urgent.availabilityId, AVAILABILITY_CONTINGENCY_OUTAGE);
 });

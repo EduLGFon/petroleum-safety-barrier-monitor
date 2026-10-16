@@ -241,6 +241,30 @@ Deno.test("mapAsset stamps sourceUpdatedAt from the winning event", () => {
   assertStrictEquals(mapped.input.sourceUpdatedAt, "2026-09-11");
 });
 
+Deno.test("mapAsset promotes corrective work with contingency to 2/3", () => {
+  const degr = mapAsset(asset(), ctx, {
+    work: {
+      planned: { date: "2026-09-11", source: "OS - 1" },
+      hasContingency: true,
+      contingencySource: "OS - 1: contingência GM-1",
+    },
+    today: "2026-09-15",
+  });
+  if (!degr.ok) throw new Error("expected ok");
+  assertStrictEquals(degr.input.availabilityId, 3);
+  assertStrictEquals(degr.input.hasContingency, "Sim");
+  const ind = mapAsset(asset(), ctx, {
+    work: {
+      urgent: { date: "2026-09-11", source: "OS - 2" },
+      hasContingency: true,
+      contingencySource: "OS - 2: CEC",
+    },
+    today: "2026-09-15",
+  });
+  if (!ind.ok) throw new Error("expected ok");
+  assertStrictEquals(ind.input.availabilityId, 2);
+});
+
 Deno.test("mapAsset admits out-of-scope families with scope 'all'", () => {
   const allCtx: MapContext = {
     ...ctx,

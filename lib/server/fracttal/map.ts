@@ -76,6 +76,8 @@ export interface SyncBarrierInput {
   // Scope provenance (keyword / eso / keyword+eso): which gate admitted the
   // row. Rides the sync signature so scope edits rewrite every touched row.
   scopeSource: string;
+  hasContingency?: string | null;
+  contingencyDesc?: string;
 }
 
 export type MappedRow =
@@ -90,6 +92,8 @@ export interface MapOptions {
     urgent?: StatusEvent | null;
     planned?: StatusEvent | null;
     stopAssets?: boolean;
+    hasContingency?: boolean;
+    contingencySource?: string;
   } | null;
   today?: string;
 }
@@ -187,9 +191,12 @@ export function mapAsset(
       stopAssets: work?.stopAssets ?? false,
       outOfServiceDate,
       assetAvailable: asset.available ?? null,
+      hasContingency: work?.hasContingency ?? false,
     },
     today,
   );
+  const autoCont = work?.hasContingency === true &&
+    (status.availabilityId === 2 || status.availabilityId === 3);
 
   return {
     ok: true,
@@ -217,6 +224,12 @@ export function mapAsset(
       // visible, the pre-flag behavior for old fixtures and dumps).
       isActive: asset.active ?? true,
       scopeSource,
+      ...(autoCont
+        ? {
+          hasContingency: "Sim",
+          contingencyDesc: (work?.contingencySource ?? "").slice(0, 800),
+        }
+        : {}),
     },
   };
 }

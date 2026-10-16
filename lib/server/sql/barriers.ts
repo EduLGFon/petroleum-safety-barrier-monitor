@@ -267,6 +267,13 @@ export async function getKpi(
   const scopeWhere = opts.scopeCounts
     ? buildWhere({ ...q, rowScope: "all" })
     : null;
+  // Effective availability (docs/STATUSES.md display overlay, mirrors
+  // effectiveAvailabilityId): stored 4/5 with Há Contingência?=Sim read as
+  // 3/2. Fixed counts, buckets and compliance all derive from it so the
+  // server snapshot matches resolveBarrier on the client.
+  const eff =
+    `(case when b.availability_id in (4, 5) and lower(trim(coalesce(b.has_contingency, ''))) = 'sim' then case when b.availability_id = 4 then 3 else 2 end else b.availability_id end)`;
+  const effCompliant = `(${eff} in (0, 1, 2, 3))`;
   const [rows, bucketRows] = await Promise.all([
     queryRows<{
       total: string;
@@ -284,17 +291,17 @@ export async function getKpi(
     }>(
       `select
         count(*)::text as total,
-        count(*) filter (where b.availability_id = 0 and coalesce(b.is_active, true) and b.deleted_at is null)::text as available,
-        count(*) filter (where b.availability_id = 1 and coalesce(b.is_active, true) and b.deleted_at is null)::text as out_of_service,
-        count(*) filter (where b.availability_id = 2 and coalesce(b.is_active, true) and b.deleted_at is null)::text as contingency_outage,
-        count(*) filter (where b.availability_id = 3 and coalesce(b.is_active, true) and b.deleted_at is null)::text as degraded_contingency,
-        count(*) filter (where b.availability_id = 4 and coalesce(b.is_active, true) and b.deleted_at is null)::text as degraded,
-        count(*) filter (where b.availability_id = 5 and coalesce(b.is_active, true) and b.deleted_at is null)::text as unavailable,
-        count(*) filter (where b.availability_id not in (0, 1, 2, 3, 4, 5)
+        count(*) filter (where ${eff} = 0 and coalesce(b.is_active, true) and b.deleted_at is null)::text as available,
+        count(*) filter (where ${eff} = 1 and coalesce(b.is_active, true) and b.deleted_at is null)::text as out_of_service,
+        count(*) filter (where ${eff} = 2 and coalesce(b.is_active, true) and b.deleted_at is null)::text as contingency_outage,
+        count(*) filter (where ${eff} = 3 and coalesce(b.is_active, true) and b.deleted_at is null)::text as degraded_contingency,
+        count(*) filter (where ${eff} = 4 and coalesce(b.is_active, true) and b.deleted_at is null)::text as degraded,
+        count(*) filter (where ${eff} = 5 and coalesce(b.is_active, true) and b.deleted_at is null)::text as unavailable,
+        count(*) filter (where ${eff} not in (0, 1, 2, 3, 4, 5)
           or not coalesce(b.is_active, true) or b.deleted_at is not null)::text as other,
-        count(*) filter (where b.compliance_id = 0)::text as compliant,
-        count(*) filter (where coalesce(b.compliance_id, 1) <> 0)::text as non_compliant,
-        count(*) filter (where coalesce(b.compliance_id, 1) <> 0 and b.criticality_id in (0, 1))::text as critical_non_compliant,
+        count(*) filter (where ${effCompliant})::text as compliant,
+        count(*) filter (where not ${effCompliant})::text as non_compliant,
+        count(*) filter (where not ${effCompliant} and b.criticality_id in (0, 1))::text as critical_non_compliant,
         count(*) filter (where b.action_plan is null or b.action_plan = '')::text as without_action_plan
       from barriers b join locations loc on loc.id = b.location_id ${where.text}`,
       where.args,
@@ -306,17 +313,17 @@ export async function getKpi(
     // appends AND so its filter subset stays identical to the old query.
     queryRows<{ grp: string; id: string; count: string }>(
       `select grp, id, count(*)::text as count from (
-        select 'avail' as grp, b.availability_id::text as id
+        select 'avail' as grp, ${eff}::text as id
         ${from} and coalesce(b.is_active, true) and b.deleted_at is null
         union all
-        select 'conf' as grp, b.compliance_id::text as id
+        select 'conf' as grp, (case when ${effCompliant} then 0 else 1 end)::text as id
         ${from}
         union all
         select 'crit' as grp, b.criticality_id::text as id
         ${from}
         union all
         select 'nccrit' as grp, b.criticality_id::text as id
-        ${from} and coalesce(b.compliance_id, 1) <> 0
+        ${from} and not ${effCompliant}
       ) g group by grp, id`,
       where.args,
     ),

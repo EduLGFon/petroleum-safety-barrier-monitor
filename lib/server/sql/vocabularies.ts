@@ -74,18 +74,22 @@ export async function getVocabularies(): Promise<Vocabularies> {
        order by count(b.id) desc, loc.code`,
       ),
       queryRows<{ label: string }>(
+        // Effective availability labels (display overlay): stored 4/5 with
+        // Há Contingência?=Sim read as 3/2, mirroring effectiveAvailabilityId
+        // and the KPI/filter, so the filter dropdown lists contingenciado
+        // options as soon as any overlay exists, not only after
+        // materialization.
         `select distinct disp.label as label from barriers b
-       join availability_statuses disp on disp.id = b.availability_id
-       where b.deleted_at is null
-       order by disp.label`,
+        join availability_statuses disp on disp.id = (case when b.availability_id in (4, 5) and lower(trim(coalesce(b.has_contingency, ''))) = 'sim' then case when b.availability_id = 4 then 3 else 2 end else b.availability_id end)
+        where b.deleted_at is null
+        order by disp.label`,
       ),
       queryRows<{ label: string }>(
-        `select distinct case when disp.is_compliant then 'Conforme'
+        `select distinct case when (case when b.availability_id in (4, 5) and lower(trim(coalesce(b.has_contingency, ''))) = 'sim' then case when b.availability_id = 4 then 3 else 2 end else b.availability_id end) in (0, 1, 2, 3) then 'Conforme'
          else 'Não Conforme' end as label
-       from barriers b
-       join availability_statuses disp on disp.id = b.availability_id
-       where b.deleted_at is null
-       order by label`,
+        from barriers b
+        where b.deleted_at is null
+        order by label`,
       ),
       queryRows<{ label: string }>(
         `select distinct crit.label as label from barriers b

@@ -18,6 +18,7 @@ import {
   classifyRequest,
   criticalityLabelFor,
   earliestDate,
+  hasContingencySignal,
   IMPORT_NOTE,
   isClosedRequestStatus,
   isoDate,
@@ -181,6 +182,39 @@ interface BarrierAcc extends EquipmentRow {
   planned: StatusEvent | null;
   urgent: StatusEvent | null;
   stopAssets: boolean;
+  hasContingency: boolean;
+  contingencySource: string;
+}
+
+// contingencyTexts pulls every free-text field a dump work row may carry a
+// GM/CEC/contingência signal in (description plus notes, labels, custom
+// status). The dump samples left labels/custom empty, but the schema
+// carries them and live rows may populate them.
+function contingencyTexts(row: Record<string, unknown>): string[] {
+  const out: string[] = [];
+  for (
+    const key of [
+      "description",
+      "task_note",
+      "notes",
+      "task_description",
+      "work_orders_status_custom_description",
+      "types_description",
+      "tasks_log_types_description",
+      "types_2_description",
+      "wo_folio",
+    ] as const
+  ) {
+    const v = row[key];
+    if (typeof v === "string" && v !== "") out.push(v);
+  }
+  const labels = row["labels"];
+  if (Array.isArray(labels)) {
+    for (const l of labels) {
+      if (typeof l === "string") out.push(l);
+    }
+  }
+  return out;
 }
 
 // extractEvent distills a dump work order/request row to a shared status
@@ -215,6 +249,10 @@ function applyWorkOrder(
     acc.urgent = mergeEvent(acc.urgent, extractEvent(wo));
   }
   if (wo.stop_assets === true) acc.stopAssets = true;
+  if (hasContingencySignal(...contingencyTexts(wo)) && !acc.hasContingency) {
+    acc.hasContingency = true;
+    acc.contingencySource = extractEvent(wo).source;
+  }
   return "matched";
 }
 
@@ -231,6 +269,10 @@ function applyWorkRequest(
   if (slot === null) return "not-corrective";
   if (slot === "urgent") acc.urgent = mergeEvent(acc.urgent, extractEvent(wr));
   else acc.planned = mergeEvent(acc.planned, extractEvent(wr));
+  if (hasContingencySignal(...contingencyTexts(wr)) && !acc.hasContingency) {
+    acc.hasContingency = true;
+    acc.contingencySource = extractEvent(wr).source;
+  }
   return "matched";
 }
 
@@ -346,6 +388,8 @@ async function main() {
       planned: null,
       urgent: null,
       stopAssets: false,
+      hasContingency: false,
+      contingencySource: "",
     });
   }
   console.log(
@@ -380,11 +424,15 @@ async function main() {
 
   // ── Derived status per barrier ────────────────────────────────────────────
   // Shared precedence (lib/server/fracttal/barrier-rules.ts): open emergency
-  // corrective -> Indisponível (5); open planned corrective -> Degradada (4);
-  // stopped asset or out-of-service date -> Fora de Operação (1); asset
-  // flagged unavailable -> Indisponível (5); otherwise Disponível (0). The
-  // asset flag is passed as available: the dump semantics for that column
-  // are unverified, so the import derives status from work events only.
+  // corrective -> Indisponível (5, or 2 when contingency text is present);
+  // open planned corrective -> Degradada (4, or 3 when contingency text is
+  // present); stopped asset or out-of-service date -> Fora de Operação (1);
+  // asset flagged unavailable -> Indisponível (5); otherwise Disponível (0).
+  // The asset flag is passed as available: the dump semantics for that
+  // column are unverified, so the import derives status from work events
+  // only. Contingency auto-detection scans the open corrective work text
+  // for GM/CEC/contingência and promotes 4->3 / 5->2 with the source kept
+  // in contingency_desc.
   const today = new Date().toISOString().slice(0, 10);
   const statusOf = (acc: BarrierAcc) =>
     resolveAvailability(
@@ -394,6 +442,7 @@ async function main() {
         stopAssets: acc.stopAssets,
         outOfServiceDate: acc.outOfServiceDate,
         assetAvailable: true,
+        hasContingency: acc.hasContingency,
       },
       today,
     );
@@ -485,6 +534,8 @@ async function main() {
     const chunk = barrierList.slice(i, i + BATCH_SIZE);
     const rows: InsertRow[] = chunk.map((acc) => {
       const s = statusOf(acc);
+      const autoCont = acc.hasContingency &&
+        (s.availabilityId === 2 || s.availabilityId === 3);
       return {
         tag: tagFor(acc.description, acc.code),
         typology_id: typologyIdOf(acc.parentDescription),
@@ -504,6 +555,11 @@ async function main() {
         external_code: acc.code,
         scope_source: acc.scope,
         is_active: acc.isActive,
+        has_contingency: autoCont ? "Sim" : null,
+        contingency_desc: autoCont ? acc.contingencySource.slice(0, 800) : null,
+        evidence_code: null,
+        degradation_desc: null,
+        extra_comments: null,
       };
     });
     const insert = buildInsert(

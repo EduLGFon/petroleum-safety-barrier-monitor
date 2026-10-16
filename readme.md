@@ -340,8 +340,13 @@ inventory-sheet free-text fields, plus provenance (`externalCode`,
 | `Indisponível Contingenciado` | Same as unavailable, but a contingency is in place         |
 | `Fora de Operação`            | The protected asset is out of service, positively isolated |
 
-The two contingency states are display states; the sync derives the four
-operational states from upstream signals.
+The two contingency states are display states over the same two base
+states: open corrective work plus a contingency signal (GM/CEC evidence or
+an explicit contingência note in the work text, or Há Contingência?=Sim on
+the sheet) promotes Degradado→Degradado Contingenciado and
+Indisponível→Indisponível Contingenciado. The sync auto-detects the work
+signal; the sheet flag covers manual entries and promotes on display and
+on PATCH.
 
 **Compliance** is `Conforme` or `Não Conforme`. Any availability other than the
 compliant set counts as non-compliant, everywhere, consistently.

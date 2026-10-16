@@ -28,6 +28,7 @@ import type {
   StatusHistoryEntry,
 } from "./types.ts";
 import { isCompliant } from "./constants.ts";
+import { effectiveAvailabilityId } from "./server/fracttal/barrier-rules.ts";
 import type { KpiSnapshot } from "./types.ts";
 
 // Maps a wire history entry's numeric IDs to display strings; date/note pass through unchanged.
@@ -61,7 +62,15 @@ export function resolveBarrier(
   w: WireBarrier,
   labels?: ResolverLabels,
 ): Barrier {
-  const availability = fromAvailabilityId(w.availabilityId);
+  // Display overlay (docs/STATUSES.md): a stored Degradado/Indisponível with
+  // Há Contingência?=Sim reads as the contingenciado display state, so
+  // manually contingenciado rows count as compliant without a second status
+  // edit. Rows already stored as 2/3 pass through unchanged.
+  const effectiveId = effectiveAvailabilityId(
+    w.availabilityId,
+    w.hasContingency,
+  );
+  const availability = fromAvailabilityId(effectiveId);
   return {
     id: w.id,
     tag: w.tag,

@@ -420,14 +420,20 @@ export const defaultSyncIo: SyncIo = {
             continue;
           }
           // update / restore: same field write (location included, so
-          // station moves persist); restore clears deleted_at.
+          // station moves persist); restore clears deleted_at. Contingency
+          // sheet columns are sync-owned only when auto-detected: coalesce
+          // preserves manual Há Contingência?/descrição on rows without a
+          // work-text signal instead of clearing them to null.
           await tx(
             `update barriers set
                tag = $2, location_id = $3, typology_id = $4, loc_desc_id = $5,
                criticality_id = $6, category_id = $7, grouping_id = $8,
                owner_id = $9, comments = $10, action_plan = $11,
                source_updated_at = $12, scope_source = $13, is_active = $14,
-               deleted_at = case when $15 then null else deleted_at end
+               deleted_at = case when $15 then null else deleted_at end,
+               has_contingency = coalesce($16, has_contingency),
+               contingency_desc = case when $16 is not null
+                 then $17 else contingency_desc end
              where id = $1`,
             [
               entry.local.id,
@@ -445,6 +451,8 @@ export const defaultSyncIo: SyncIo = {
               input.scopeSource,
               input.isActive,
               entry.kind === "restore",
+              input.hasContingency ?? null,
+              input.contingencyDesc ?? null,
             ],
           );
           // Every sync-touched id is pre-seeded with null, so this is never
@@ -552,14 +560,17 @@ async function insertBarrier(input: {
   comments: string;
   actionPlan: string;
   sourceUpdatedAt: string | null;
+  hasContingency?: string | null;
+  contingencyDesc?: string;
 }, query: TxQuery = queryRows): Promise<number | null> {
   const rows = await query<{ id: number }>(
     `insert into barriers
        (external_code, tag, location_id, typology_id, loc_desc_id,
         criticality_id, category_id, grouping_id, owner_id,
         availability_id, comments, action_plan, status_since,
-        source_updated_at, scope_source, is_active)
-     values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, current_date, $13, $14, $15)
+        source_updated_at, scope_source, is_active,
+        has_contingency, contingency_desc)
+     values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, current_date, $13, $14, $15, $16, $17)
      on conflict (external_code) do nothing
      returning id`,
     [
@@ -578,6 +589,8 @@ async function insertBarrier(input: {
       input.sourceUpdatedAt,
       input.scopeSource,
       input.isActive,
+      input.hasContingency ?? null,
+      input.contingencyDesc ?? null,
     ],
   );
   return rows[0]?.id ?? null;

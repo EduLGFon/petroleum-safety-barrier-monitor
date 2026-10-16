@@ -170,6 +170,19 @@ Deno.test("resolveBarrier derives compliance from availability (Conforme case)",
   assertStrictEquals(b.compliance, "Conforme");
 });
 
+Deno.test("resolveBarrier promotes stored 4/5 with Sim to contingenciado", () => {
+  const degr = resolveBarrier(
+    wireBarrier({ availabilityId: 4, hasContingency: "Sim" }),
+  );
+  assertStrictEquals(degr.availability, "Degradado Contingenciado");
+  assertStrictEquals(degr.compliance, "Conforme");
+  const ind = resolveBarrier(
+    wireBarrier({ availabilityId: 5, hasContingency: "Sim" }),
+  );
+  assertStrictEquals(ind.availability, "Indisponível Contingenciado");
+  assertStrictEquals(ind.compliance, "Conforme");
+});
+
 Deno.test("resolveBarrier maps negative owner and unknown disp id", () => {
   const b = resolveBarrier(wireBarrier({ ownerId: -1, availabilityId: 42 }));
   assertStrictEquals(b.owner, "");
