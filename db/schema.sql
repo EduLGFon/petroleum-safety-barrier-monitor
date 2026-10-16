@@ -422,7 +422,7 @@ create table if not exists alert_recipients (
   created_at timestamptz not null default now()
 );
 
--- Phone for critical-only second channel (provider rule: voice/messaging
+-- Phone for critical-only second channel (provider rule: voice/whatsapp
 -- only for the uncontained unavailable landing; contained and degraded
 -- landings stay email-only). Empty = email only. Stored as digits, see
 -- normalizePhone in lib/server/validation.ts.

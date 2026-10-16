@@ -1,0 +1,3 @@
+# Normalize line endings to LF on checkout (the homologation Windows box
+# showed 375/377 fmt failures from CRLF conversion; the repo itself is LF).
+* text=auto eol=lf

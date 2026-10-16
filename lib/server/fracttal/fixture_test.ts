@@ -24,7 +24,11 @@ async function loadFixture(): Promise<unknown[]> {
     "../../../scripts/fixtures/fracttal-assets-sample.json",
     import.meta.url,
   );
-  const text = await Deno.readTextFile(decodeURIComponent(url.pathname));
+  // Pass the file URL through directly: decoding url.pathname keeps a
+  // leading "/C:/..." on Windows, which escapes the task's
+  // --allow-read=scripts/fixtures grant (NotCapable). Same pattern as
+  // scripts/check-migration-order_test.ts.
+  const text = await Deno.readTextFile(url);
   const json = JSON.parse(text) as {
     meta?: { synthetic?: boolean };
     items?: unknown[];

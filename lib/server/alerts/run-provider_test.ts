@@ -142,7 +142,7 @@ Deno.test("provider cycle posts violada with messaging when phone exists", async
   });
   assertStrictEquals(result.sent, 1);
   assertStrictEquals(result.posted, 1);
-  assertStrictEquals(seen[0]!.join(","), "email,messaging");
+  assertStrictEquals(seen[0]!.join(","), "email,whatsapp");
 });
 
 Deno.test("provider cycle keeps degraded email-only", async () => {

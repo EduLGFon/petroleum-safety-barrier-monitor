@@ -2,7 +2,7 @@
 // This is why it exists: local SMTP digest is retired; detection stays
 // local (rules, watermark, dedup) while delivery, retry, templates and
 // opt-out belong to the provider. One barrier event maps to one POST;
-// the second channel (messaging) fires only for the uncontained
+// the second channel (whatsapp) fires only for the uncontained
 // unavailable landing, never for contained or degraded landings.
 export interface ProviderConfig {
   baseUrl: string;
@@ -20,7 +20,7 @@ export interface ProviderMapping {
 }
 
 // mapLanding: compliance-driven table (ids mirror availability_statuses).
-// 5 Indisponivel (non-compliant) -> violada + messaging + immediate.
+// 5 Indisponivel (non-compliant) -> violada + whatsapp + immediate.
 // 4 Degradado (non-compliant) -> degradada, email only, queued.
 // 2/3 contained (compliant) -> degradada low, email only, queued.
 // 0 Available (compliant) -> normalizada (caller must ensure the previous
@@ -221,7 +221,7 @@ export function buildAlertPayload(
     ? input.recipients
       .filter((r) => (r.phone ?? "").trim() !== "")
       .map((r) => ({
-        canal: "messaging",
+        canal: "whatsapp",
         valor: (r.phone ?? "").trim(),
         ...(r.name ? { nome: r.name } : {}),
       }))
@@ -229,7 +229,7 @@ export function buildAlertPayload(
   const destinatarios = [...emailDest, ...msgDest];
   if (destinatarios.length === 0) return null;
   const canais = mapping.withMessaging && msgDest.length > 0
-    ? ["email", "messaging"]
+    ? ["email", "whatsapp"]
     : ["email"];
   return {
     alerta_id: buildAlertaId(

@@ -73,7 +73,7 @@ Deno.test("violada attaches messaging only when a phone exists", () => {
     ...base,
     recipients: [{ email: "a@example.com", phone: "5527999999999" }],
   })!;
-  assert(withPhone.canais.includes("messaging"));
+  assert(withPhone.canais.includes("whatsapp"));
   assertStrictEquals(withPhone.despachar_agora, true);
 });
 
