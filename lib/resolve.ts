@@ -13,20 +13,25 @@ import {
   fromOwnerId,
   fromTypologyId,
 } from "./enums.ts";
+
 import type {
   WireBarrier,
   WireCategoryCompliance,
   WireKpiSnapshot,
   WireStatusHistoryEntry,
 } from "./wireTypes.ts";
+
 import type {
   Barrier,
   CategoryCompliance,
   StatusHistoryEntry,
 } from "./types.ts";
-import { isCompliant } from "./constants.ts";
+
 import { effectiveAvailabilityId } from "./server/fracttal/barrier-rules.ts";
+
 import type { KpiSnapshot } from "./types.ts";
+
+import { isCompliant } from "./constants.ts";
 
 // Maps a wire history entry's numeric IDs to display strings; date/note pass through unchanged.
 export function resolveHistoryEntry(

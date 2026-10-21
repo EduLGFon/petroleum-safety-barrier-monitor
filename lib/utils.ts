@@ -8,12 +8,7 @@ export {
   sanitizeFilterPatch,
   sanitizeFilters,
 } from "./dashboard/filters.ts";
-export {
-  applyFilters,
-  applyRowScope,
-  applySorting,
-  paginate,
-} from "./dashboard/filters.ts";
+
 export {
   daysSince,
   fmt,
@@ -24,5 +19,14 @@ export {
   pct1,
   timeAgoPt,
 } from "./format.ts";
-export { computeChartData } from "./dashboard/chart.ts";
+
+export {
+  applyFilters,
+  applyRowScope,
+  applySorting,
+  paginate,
+} from "./dashboard/filters.ts";
+
 export { computeKpi, countScopeRows } from "./dashboard/kpi.ts";
+
+export { computeChartData } from "./dashboard/chart.ts";

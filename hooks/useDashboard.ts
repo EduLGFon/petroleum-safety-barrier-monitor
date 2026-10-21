@@ -4,13 +4,20 @@
 // persistence (SSR-safe hydration), and paged rows/KPI/chart derivations.
 // Sole data source for dashboard islands in client (mock) mode.
 import { useVisibleColumns } from "./dashboard/visible-columns.ts";
+
 import { loadDash, saveDash } from "./dashboard/persistence.ts";
+
 import { useDashboardDerived } from "./dashboard/derived.ts";
+
 import { useFilterState } from "./dashboard/filter-state.ts";
+
 import { restoreSelection } from "./dashboard/selection.ts";
-import { useSelection } from "./dashboard/selection.ts";
-import { useCallback, useEffect } from "preact/hooks";
+
 import type { Barrier, FilterState } from "../lib/types.ts";
+
+import { useSelection } from "./dashboard/selection.ts";
+
+import { useCallback, useEffect } from "preact/hooks";
 
 // Central dashboard store; starts from defaults for SSR, hydrates from `barrier-dashboard` after mount.
 // Persists location/filters/selection/openId via saveDash once hydrated.
