@@ -1,7 +1,7 @@
 # Deploy on Windows Server 2022 / 2025
 
 > Never touched a Windows Server? Read `docs/WINDOWS-SERVER-START-HERE.md`
-> first — it explains RDP, admin terminals, the three commands, what success
+> first - it explains RDP, admin terminals, the three commands, what success
 > looks like, and what to do when red text appears. This page is the
 > reference; that page is the walkthrough.
 
@@ -23,7 +23,7 @@ Hyper-V / WSL2 plumbing, and bind-mounts (`./.env:/app/.env:ro`) plus
 named volumes behave differently there. The compose stack stays the
 Linux/macOS path; on Windows Server use path A.
 
-## Path A — native (step by step)
+## Path A - native (step by step)
 
 ### 1. Prerequisites
 
@@ -67,7 +67,7 @@ APP_BASE_URL=https://barreiras.example.com
 > `python -c "import secrets;print(secrets.token_hex(32))"` or
 > `[Convert]::ToHexString((1..32 | ForEach-Object { Get-Random -Max 256 }))`.
 
-True one-command path (no git needed on the server — download, unpack, launch):
+True one-command path (no git needed on the server - download, unpack, launch):
 
 ```powershell
 # In an Administrator PowerShell on the server:
@@ -84,12 +84,12 @@ backups, smoke tests. Idempotent and fails hard on any gate. Omit
 `-Hostname` for a loopback-only host; any secret you omit is generated and
 printed once at the end; re-runs pull, rebuild, migrate and restart without
 rotating `.env`. (Replace `ORG/REPO` with the real repo path, or ship the
-folder by any other means — only `deno.jsonc` at the target root matters.)
+folder by any other means - only `deno.jsonc` at the target root matters.)
 
 Need the exotic knobs (`-DbUser`, `-SmtpHost`, `-SourceZip`, …)? Call
-`Setup-Production.ps1` directly — same parameters, no wrapper in the way.
+`Setup-Production.ps1` directly - same parameters, no wrapper in the way.
 
-Lighter alternative (prerequisites only — Postgres/services/Caddy stay
+Lighter alternative (prerequisites only - Postgres/services/Caddy stay
 manual) when you want step-by-step control:
 
 ```powershell
@@ -149,7 +149,7 @@ The app speaks plain HTTP on `:8300`, and the session cookie only sets
 site binding 443 with the cert, add a reverse-proxy rule to
 `127.0.0.1:8300`, enable `X-Forwarded-*` passthrough. The app intentionally
 ignores `X-Forwarded-For` for rate limiting (forgeable header), so all
-proxied clients share one throttle bucket — fine for an internal dashboard.
+proxied clients share one throttle bucket - fine for an internal dashboard.
 
 ### 6. Postgres ops on Windows
 
@@ -176,10 +176,10 @@ Invoke-RestMethod http://localhost:8300/api/health
 Rollback: set `PUBLIC_API_MODE=mock` in `.env`, restart `BarrierApp` only.
 The DB is untouched.
 
-## Path B — Docker on Windows Server (not recommended)
+## Path B - Docker on Windows Server (not recommended)
 
 Only if the org mandates containers: install **Mirantis Container Runtime**
-(or Docker Engine EE) with Hyper-V isolation and run the Linux image as-is —
+(or Docker Engine EE) with Hyper-V isolation and run the Linux image as-is -
 no code change needed. Caveats, all verified against this repo:
 
 - No Docker Desktop: unsupported on Server; WSL2-backend tricks from dev
@@ -187,12 +187,12 @@ no code change needed. Caveats, all verified against this repo:
 - Bind-mount `./.env:/app/.env:ro` needs an absolute path or a
   `COMPOSE_CONVERT_WINDOWS_PATHS=1` env; prefer copying `.env` next to
   `compose.yml` and running from there.
-- The bundled `db` service uses a **named volume** (`pgdata`) deliberately —
+- The bundled `db` service uses a **named volume** (`pgdata`) deliberately -
   keep it, do not switch to a bind mount (NTFS permission + fsync issues).
 - `Dockerfile` is a Linux image; it cannot build or run as a Windows
   container. Do not attempt `FROM mcr.microsoft.com/windows/...`.
 - Save the file with LF endings if edited in Notepad (CRLF in `compose.yml`
-  is tolerated, CRLF inside `.env` values is not — no trailing spaces).
+  is tolerated, CRLF inside `.env` values is not - no trailing spaces).
 
 ```powershell
 $env:COMPOSE_CONVERT_WINDOWS_PATHS=1
@@ -206,14 +206,14 @@ curl http://localhost:8300/api/health
 
 | Symptom                              | Cause / fix                                                                                                                                                        |
 | ------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `DATABASE_URL is not set` on `start` | Started outside the app dir or `.env` misnamed (must be exactly `.env`, not `.env.txt` — disable "hide extensions").                                               |
+| `DATABASE_URL is not set` on `start` | Started outside the app dir or `.env` misnamed (must be exactly `.env`, not `.env.txt` - disable "hide extensions").                                               |
 | `postgres://postgres://…`            | Old typo fixed in this release; value must be single-scheme `postgres://barrier:…@localhost:5432/barreiras?sslmode=disable` on host, `@db` only inside containers. |
 | Login loops / cookie dropped         | Serving over http while `APP_BASE_URL` is https, or proxy not forwarding Host: Secure cookies need real TLS (path A step 5).                                       |
-| `:8300` reachable on LAN             | Firewall rule too wide — restrict to loopback + proxy host.                                                                                                        |
+| `:8300` reachable on LAN             | Firewall rule too wide - restrict to loopback + proxy host.                                                                                                        |
 | `deno` not found in service          | Service PATH lacks `%LOCALAPPDATA%\deno\bin`; reinstall with Install script (sets Machine PATH) or pass `-DenoExe` explicitly.                                     |
-| CRLF weirdness in `.env`             | `doctor`'s parser strips `\r`; but values with trailing spaces fail auth — don't pad `KEY = value`.                                                                |
+| CRLF weirdness in `.env`             | `doctor`'s parser strips `\r`; but values with trailing spaces fail auth - don't pad `KEY = value`.                                                                |
 | Paths with spaces                    | Quote them (`"C:\srv\barrier monitor\…"`) in NSSM `AppDirectory`, not in `.env` URLs.                                                                              |
-| Poller exits code 2                  | Missing `FRACTTAL_KEY`/`FRACTTAL_SECRET` — by design it exits instead of idling. Set them or stop the `BarrierPoller` service for offline sites.                   |
+| Poller exits code 2                  | Missing `FRACTTAL_KEY`/`FRACTTAL_SECRET` - by design it exits instead of idling. Set them or stop the `BarrierPoller` service for offline sites.                   |
 | Alerts silent                        | No relay configured = visible dry-run by design; set `OPS_SMTP_*` + recipients, then `deno run -A --env-file=.env scripts/alerts-check.ts --apply`.                |
 
 ## Pre-handover checklist

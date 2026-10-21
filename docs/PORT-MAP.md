@@ -1,6 +1,6 @@
 # PORT MAP
 
-Complete inventory of every network port this project touches — inbound
+Complete inventory of every network port this project touches - inbound
 listeners, Docker published ports, outbound dependencies, and the dev/test
 tooling ports.
 
@@ -21,8 +21,8 @@ runtime state of the running stack. Excludes `.git/`, `node_modules/`, the
 | **587**  | TCP   | Outbound           | SMTP submission (STARTTLS)                      | `OPS_SMTP_PORT` default              |
 | **465**  | TCP   | Outbound           | SMTP implicit TLS                               | Selected when `OPS_SMTP_PORT=465`    |
 | **443**  | TCP   | Outbound           | Fracttal API + Google Fonts                     | Implicit, no port in any URL         |
-| **9333** | TCP   | Inbound (loopback) | Chrome DevTools Protocol — `browser-smoke.ts`   | Chrome, `127.0.0.1`                  |
-| **9336** | TCP   | Inbound (loopback) | Chrome DevTools Protocol — `browser-capture.ts` | Chrome, `127.0.0.1`                  |
+| **9333** | TCP   | Inbound (loopback) | Chrome DevTools Protocol - `browser-smoke.ts`   | Chrome, `127.0.0.1`                  |
+| **9336** | TCP   | Inbound (loopback) | Chrome DevTools Protocol - `browser-capture.ts` | Chrome, `127.0.0.1`                  |
 
 **Only two ports are ever published to the host: 8300 (prod) and 5173 (dev).**
 Everything else is outbound or loopback-only dev tooling.
@@ -31,7 +31,7 @@ Everything else is outbound or loopback-only dev tooling.
 
 ## 2. Run modes and their ports
 
-Five ways to boot. The port is **never written in TypeScript** — it is decided
+Five ways to boot. The port is **never written in TypeScript** - it is decided
 entirely by which runner starts the process.
 
 | Run mode        | Command                | Server                       | Port     | Bind                                    |
@@ -44,13 +44,13 @@ entirely by which runner starts the process.
 
 Evidence that the port is implicit:
 
-- `deno.jsonc:15` — `"start": "deno serve --env-file=.env -A _fresh/server.js"`
+- `deno.jsonc:15` - `"start": "deno serve --env-file=.env -A _fresh/server.js"`
   → no `--port` flag, so `deno serve` uses its **8300** default.
-- `deno.jsonc:14` — `"preview": "deno serve -A _fresh/server.js"` → same.
-- `deno.jsonc:12` — `"dev": "vite"` → no port configured.
-- `vite.config.ts:6-8` — `defineConfig({ plugins: [fresh()] })` — **no
+- `deno.jsonc:14` - `"preview": "deno serve -A _fresh/server.js"` → same.
+- `deno.jsonc:12` - `"dev": "vite"` → no port configured.
+- `vite.config.ts:6-8` - `defineConfig({ plugins: [fresh()] })` - **no
   `server.port` key**, so Vite's own **5173** default applies.
-- `compose.dev.yml:18` — the only place a port is passed explicitly:
+- `compose.dev.yml:18` - the only place a port is passed explicitly:
   `["task", "dev", "--host", "--port", "5173"]`.
 - There is **no `Deno.serve()`, no `listen()`, no `serve()` call anywhere in
   the source tree.** The listening socket is created by the Fresh-generated
@@ -71,12 +71,12 @@ Evidence that the port is implicit:
 
 ## 3. Inbound (listening) ports
 
-### 3.1 Port 8300 — production app
+### 3.1 Port 8300 - production app
 
 | Item               | Value                                    | Source                                               |
 | ------------------ | ---------------------------------------- | ---------------------------------------------------- |
 | Server             | `deno serve` (Fresh 2 production bundle) | `deno.jsonc:15`                                      |
-| Bind               | `deno serve` default — all interfaces    | implicit                                             |
+| Bind               | `deno serve` default - all interfaces    | implicit                                             |
 | `EXPOSE`           | `EXPOSE 8300`                            | `Dockerfile:19`                                      |
 | Docker publish     | `"8300:8300"`                            | `compose.yml:24`                                     |
 | Healthcheck target | `http://localhost:8300/api/health`       | `compose.yml:31`                                     |
@@ -85,7 +85,7 @@ Evidence that the port is implicit:
 `deno serve` is started with full permissions (`-A`). `EXPOSE 8300` matches
 the publish and the `deno serve` default.
 
-### 3.2 Port 5173 — dev app with HMR
+### 3.2 Port 5173 - dev app with HMR
 
 | Item                        | Value                                                                             | Source                                                          |
 | --------------------------- | --------------------------------------------------------------------------------- | --------------------------------------------------------------- |
@@ -96,9 +96,9 @@ the publish and the `deno serve` default.
 | Docs                        | `http://localhost:5173/login`                                                     | `readme.md:121,124,148`, `docs/ARCHITECTURE.md:31`              |
 
 `5173` is the **most duplicated port in the repo** (11 locations) and the most
-likely to drift — see the change checklist in §10.
+likely to drift - see the change checklist in §10.
 
-### 3.3 Ports 9333 / 9336 — Chrome DevTools Protocol
+### 3.3 Ports 9333 / 9336 - Chrome DevTools Protocol
 
 Both dev-only. Each script spawns its own headless Chrome and polls
 `/json/list` before opening a CDP WebSocket. The two ports are deliberately
@@ -116,7 +116,7 @@ ever published or exposed outside the host.
 ### 3.4 Services that do NOT listen
 
 `poller`, `alerts`, and `tools` have **no `ports:` and no `EXPOSE`** in either
-compose file. They are outbound-only workers — they open connections to
+compose file. They are outbound-only workers - they open connections to
 Postgres, Fracttal, and SMTP and never accept any. Note that `docker ps` shows
 `8300/tcp` for `poller` and `alerts`; that is inherited image metadata from
 `Dockerfile:19`, not a live listener.
@@ -125,7 +125,7 @@ Postgres, Fracttal, and SMTP and never accept any. Note that `docker ps` shows
 
 ## 4. Outbound (dependency) ports
 
-### 4.1 Port 5432 — PostgreSQL
+### 4.1 Port 5432 - PostgreSQL
 
 | Item           | Value                                                    | Source                                             |
 | -------------- | -------------------------------------------------------- | -------------------------------------------------- |
@@ -137,7 +137,7 @@ Postgres, Fracttal, and SMTP and never accept any. Note that `docker ps` shows
 
 **No PostgreSQL service exists in this repository.** There is no `postgres`
 image, no DB `depends_on`, and no DB volume in either compose file. The DB is
-external — `docs/DATABASE.md:11` tells the operator to start one themselves
+external - `docs/DATABASE.md:11` tells the operator to start one themselves
 ("local, Docker, RDS, Supabase, whatever you prefer"). The bundled `db`
 service (`postgres:18-alpine`, named volume `pgdata`, health-gated) is the
 default: host runs reach it at `localhost:${POSTGRES_PORT:-5432}`,
@@ -148,7 +148,7 @@ that is not `localhost` / `127.0.0.1` / `::1` / `[::1]` and has no
 `sslmode=disable` in the query string. The live `.env` value is a remote IP
 with no `sslmode`, so **every connection attempts a TLS handshake first**.
 
-**Is `DATABASE_URL` required to boot?** No — the pool is lazy
+**Is `DATABASE_URL` required to boot?** No - the pool is lazy
 (`lib/server/db.ts:83-91`) and `loadServerConfig()` runs _per API request_,
 not at process start. But with `PUBLIC_API_MODE=http` and no
 `DATABASE_URL`, `loadServerConfig` throws (`lib/server/config.ts:31-36`) and
@@ -156,7 +156,7 @@ every `/api/*` route returns a 500 naming the variable. `/api/health` never
 loads config, so **the container boots and passes its healthcheck even with a
 completely broken or unreachable database.**
 
-### 4.2 Ports 587 / 465 — SMTP relay
+### 4.2 Ports 587 / 465 - SMTP relay
 
 | Item                    | Value                                                     | Source                                        |
 | ----------------------- | --------------------------------------------------------- | --------------------------------------------- |
@@ -170,14 +170,15 @@ completely broken or unreachable database.**
 | Defaults in template    | 587; presets for Gmail and Office365                      | `.env.example:81,88-89,95-96`                 |
 
 **465 is a sentinel, not a normal port.** The value is never used to decide
-"implicit TLS vs STARTTLS" by convention — it is a hard-coded equality check
+"implicit TLS vs STARTTLS" by convention - it is a hard-coded equality check
 in three places. Any port other than 465 opens a plaintext socket and upgrades
 only if the server advertises STARTTLS (`smtp.ts:340-346`).
 
 Two independent resolvers read the same env vars: `smtpAlertConfigFromEnv()`
 (alert digests + immediate fan-out) and `smtpConfigFromEnv()` (sync-failure
 ops mail). They have different defaults for `from` and a divergent port parse
-— see §11.2.
+
+- see §11.2.
 
 Outbound SMTP is triggered from exactly two places, both best-effort inside
 `try`/`catch` so a missing relay degrades to enqueue-only:
@@ -185,7 +186,7 @@ Outbound SMTP is triggered from exactly two places, both best-effort inside
 (immediate rule matches), plus the `alerts` digest loop
 (`scripts/alerts-poll.ts`) and the poller's failure notifier.
 
-### 4.3 Port 443 — HTTPS upstreams
+### 4.3 Port 443 - HTTPS upstreams
 
 All HTTPS; **no port appears in any URL**, so all of these are implicit 443.
 
@@ -213,7 +214,7 @@ from the `poller` service and the `tools` one-offs.
 
 | Service  | Image                                           | Command                           | Published ports               | Healthcheck                      |
 | -------- | ----------------------------------------------- | --------------------------------- | ----------------------------- | -------------------------------- |
-| `db`     | `postgres:18-alpine` (bundled, `pgdata` volume) | — (no command)                    | **`5432:5432`** (host-mapped) | yes, `pg_isready`                |
+| `db`     | `postgres:18-alpine` (bundled, `pgdata` volume) | - (no command)                    | **`5432:5432`** (host-mapped) | yes, `pg_isready`                |
 | `app`    | `barrier-monitor:latest` (build `.`)            | image `CMD` → `deno task start`   | **`8300:8300`** (`:24`)       | yes, `localhost:8300` (`:26-36`) |
 | `poller` | same                                            | `run -A scripts/fracttal-poll.ts` | **none**                      | no                               |
 | `alerts` | same                                            | `run -A scripts/alerts-poll.ts`   | **none**                      | no                               |
@@ -227,7 +228,7 @@ from the `poller` service and the `tools` one-offs.
 - `env_file: [.env]` and `./.env:/app/.env:ro` on the four app services
   (`db` only gets `POSTGRES_*` interpolation, never the full file).
 - `restart: unless-stopped` on `app`/`poller`/`alerts`; not on `tools`.
-- No `networks:`, `network_mode:`, or `expose:` in either file — everything
+- No `networks:`, `network_mode:`, or `expose:` in either file - everything
   is on the implicit default bridge. `app`/`poller`/`alerts`/`tools` declare
   `depends_on: db` with a health gate; no service talks to another over the
   network besides that gate.
@@ -240,7 +241,7 @@ from the `poller` service and the `tools` one-offs.
 | `poller` | `run --watch -A scripts/fracttal-poll.ts` | **none**                | same 4                                                              | no                      |
 | `alerts` | `run --watch -A scripts/alerts-poll.ts`   | **none**                | same 4                                                              | no                      |
 
-- Named volumes: `pgdata` (prod Postgres data — kept as a volume, never a
+- Named volumes: `pgdata` (prod Postgres data - kept as a volume, never a
   bind mount, for Docker Desktop Windows compat) plus `deno-dir` (dev-only
   Deno cache, real name `barrier-monitor_deno-dir`).
 - The anonymous volumes `/app/node_modules` and `/app/_fresh` stop the
@@ -267,7 +268,7 @@ $ docker compose -f compose.yml -f compose.dev.yml config
 ```
 
 So `deno task docker:dev` binds host **5173 (live)** and host **8300 (dead)**.
-Nothing in the container listens on 8300 in dev — the mapping accepts the TCP
+Nothing in the container listens on 8300 in dev - the mapping accepts the TCP
 connection and resets it. This is a real port leak; see §11.1.
 
 Production, for contrast, publishes exactly one port:
@@ -287,7 +288,7 @@ barrier-monitor-poller-1   Up 15 hours            8300/tcp
 barrier-monitor-alerts-1   Up 15 hours            8300/tcp
 ```
 
-The production stack is up and healthy. Note `app` binds **0.0.0.0:8300** —
+The production stack is up and healthy. Note `app` binds **0.0.0.0:8300** -
 it is reachable from anywhere that can route to this host, not just loopback.
 `poller` and `alerts` show `8300/tcp` as inherited image metadata, not a
 listener.
@@ -332,12 +333,12 @@ opens a Postgres connection on 5432. None of them contact Fracttal.
 
 There is **no `_middleware.ts`** in the repo; auth is enforced per route.
 `GET /api/health` (`routes/api/health.ts:6-11`) imports nothing from
-`lib/server/*` — it is a pure liveness probe that answers even when Postgres
+`lib/server/*` - it is a pure liveness probe that answers even when Postgres
 is down. It is the target of the Docker healthcheck, the 5-second browser
 heartbeat, and the `curl` smoke check.
 
 In `http` mode the page route calls `/api/barriers` back over HTTP through
-`lib/api/http.ts:48` — a self-request that stays on whichever port served the
+`lib/api/http.ts:48` - a self-request that stays on whichever port served the
 page (8300 or 5173).
 
 ---
@@ -400,8 +401,8 @@ All of these are same-origin and pause on hidden tabs.
 | `FRACTTAL_KEY` / `FRACTTAL_SECRET` | none (throws)                             | OAuth2 client credentials            | `lib/server/config.ts:48-49,50-54`                  |
 | `OPS_SMTP_HOST` / `MAIL_HOST`      | none (throws)                             | SMTP host                            | `mailer.ts:57`, `notify.ts:77`                      |
 | `OPS_SMTP_PORT`                    | `587`                                     | **SMTP port; 465 = implicit TLS**    | `mailer.ts:64`, `notify.ts:80`                      |
-| `OPS_SMTP_USER` / `MAIL_USER`      | —                                         | SMTP AUTH                            | `mailer.ts:63`, `notify.ts:81`                      |
-| `OPS_SMTP_PASS` / `MAIL_PASS`      | —                                         | SMTP AUTH                            | `mailer.ts:70`, `notify.ts:87`                      |
+| `OPS_SMTP_USER` / `MAIL_USER`      | -                                         | SMTP AUTH                            | `mailer.ts:63`, `notify.ts:81`                      |
+| `OPS_SMTP_PASS` / `MAIL_PASS`      | -                                         | SMTP AUTH                            | `mailer.ts:70`, `notify.ts:87`                      |
 | `OPS_EMAIL_TO`                     | none (null config)                        | required for ops-failure mail        | `notify.ts:78-79`                                   |
 | `OPS_EMAIL_FROM`                   | falls back to user                        | `MAIL FROM`                          | `mailer.ts:71`, `notify.ts:88`                      |
 | `DENO_DIR`                         | `/deno-dir` (image default)               | cache volume, dev only               | `compose.dev.yml:24,39,50`                          |
@@ -409,34 +410,34 @@ All of these are same-origin and pause on hidden tabs.
 
 `deno task test` is the only task with scoped net permission:
 `--allow-net=127.0.0.1,localhost` (`deno.jsonc:11`), so integration tests
-never reach the real network — they self-skip when `DATABASE_URL` is unset.
+never reach the real network - they self-skip when `DATABASE_URL` is unset.
 Every other task runs `-A`.
 
 ---
 
-## 10. Changing a port — full checklist
+## 10. Changing a port - full checklist
 
 ### App port 8300 → N
 
 Touches **5 files** because the port is never in TypeScript:
 
-1. `Dockerfile:19` — `EXPOSE 8300`
-2. `compose.yml:24` — `"8300:8300"`
-3. `compose.yml:31` — the healthcheck fetch URL
-4. `deno.jsonc:15` — add `--port N` to the `start` task
-5. Docs — `compose.yml:12`, `readme.md:130,141`, `docs/API.md:393`
+1. `Dockerfile:19` - `EXPOSE 8300`
+2. `compose.yml:24` - `"8300:8300"`
+3. `compose.yml:31` - the healthcheck fetch URL
+4. `deno.jsonc:15` - add `--port N` to the `start` task
+5. Docs - `compose.yml:12`, `readme.md:130,141`, `docs/API.md:393`
 
 A systemd deployment (documented at `docs/API.md:417-448` and
 `readme.md:660-661`) also needs the new port in the unit file.
 
 ### Dev port 5173 → N
 
-Touches **9 locations** — the widest blast radius in the repo:
+Touches **9 locations** - the widest blast radius in the repo:
 
 1. `compose.dev.yml:16` (comment), `:18` (`--port 5173`), `:27` (`"5173:5173"`)
-2. `scripts/browser-capture.ts:9` — default target URL
-3. `scripts/browser-smoke.ts:6` (comment), `:11` — default target URL
-4. `.env:25` — commented example
+2. `scripts/browser-capture.ts:9` - default target URL
+3. `scripts/browser-smoke.ts:6` (comment), `:11` - default target URL
+4. `.env:25` - commented example
 5. `readme.md:121,124,148`, `docs/ARCHITECTURE.md:31`
 
 ### SMTP port
@@ -474,8 +475,8 @@ ports: !override ["5173:5173"]
 
 ### 11.2 The two SMTP resolvers disagree on an empty port
 
-- `mailer.ts:64` — `Number(get("OPS_SMTP_PORT")) || 587` → `""` becomes 587
-- `notify.ts:80` — `Number(get("OPS_SMTP_PORT") ?? 587)` → `""` becomes
+- `mailer.ts:64` - `Number(get("OPS_SMTP_PORT")) || 587` → `""` becomes 587
+- `notify.ts:80` - `Number(get("OPS_SMTP_PORT") ?? 587)` → `""` becomes
   `Number("")` = **0**
 
 So an empty `OPS_SMTP_PORT=` yields 587 on the alert path and **port 0** on the
@@ -502,7 +503,7 @@ unreachable database reports **healthy** while every `/api/*` route returns
 
 The whole stack depends on one Postgres at a public IP with a plaintext
 password in a git-ignored `.env`, and no compose service provides a local
-fallback. There is also no Postgres port published — correct, but it means
+fallback. There is also no Postgres port published - correct, but it means
 there is no way to run this stack self-contained without an external DB.
 
 ### 11.6 Port 8300 appears in `docker ps` for the worker services
