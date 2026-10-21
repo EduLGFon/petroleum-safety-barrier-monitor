@@ -179,7 +179,7 @@ export async function fetchWorkSignals(
     concurrency?: number;
     // itemIdToCode feeds the work-order id_item fallback (see
     // buildWorkEvents). The poller passes the previous cycle's equipment
-    // id map — items are fetched after work, and id/code mappings are
+    // id map - items are fetched after work, and id/code mappings are
     // stable across cycles.
     itemIdToCode?: (id: number) => string | null;
   } = {},

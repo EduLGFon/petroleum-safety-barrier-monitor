@@ -301,7 +301,7 @@ function scopeSummary(r: AlertRule): string {
   if (r.cooldown_minutes != null) parts.push(`pausa ${r.cooldown_minutes}min`);
   if (r.max_per_day != null) parts.push(`máx ${r.max_per_day}/dia`);
   if (r.quiet_start_hour !== null && r.quiet_end_hour !== null) {
-    parts.push(`silêncio ${r.quiet_start_hour}–${r.quiet_end_hour}h`);
+    parts.push(`silêncio ${r.quiet_start_hour}-${r.quiet_end_hour}h`);
   }
   if (!r.on_transition) parts.push("só lembrete");
   if (r.include_recovery) parts.push("+recuperação");
@@ -648,7 +648,7 @@ export function RulesManager({ onCount }: { onCount?: (n: number) => void }) {
             <input
               type="number"
               min={1}
-              placeholder="—"
+              placeholder="-"
               value={d.staleDays}
               onInput={(e) => update({ staleDays: e.currentTarget.value })}
               style={inputSt}
@@ -669,7 +669,7 @@ export function RulesManager({ onCount }: { onCount?: (n: number) => void }) {
             <input
               type="number"
               min={1}
-              placeholder="—"
+              placeholder="-"
               value={d.cooldownMinutes}
               onInput={(e) =>
                 update({ cooldownMinutes: e.currentTarget.value })}
@@ -680,7 +680,7 @@ export function RulesManager({ onCount }: { onCount?: (n: number) => void }) {
             <input
               type="number"
               min={1}
-              placeholder="—"
+              placeholder="-"
               value={d.maxPerDay}
               onInput={(e) => update({ maxPerDay: e.currentTarget.value })}
               style={inputSt}
@@ -707,7 +707,7 @@ export function RulesManager({ onCount }: { onCount?: (n: number) => void }) {
               type="number"
               min={0}
               max={23}
-              placeholder="—"
+              placeholder="-"
               value={d.quietStart}
               onInput={(e) => update({ quietStart: e.currentTarget.value })}
               style={inputSt}
@@ -718,7 +718,7 @@ export function RulesManager({ onCount }: { onCount?: (n: number) => void }) {
               type="number"
               min={0}
               max={23}
-              placeholder="—"
+              placeholder="-"
               value={d.quietEnd}
               onInput={(e) => update({ quietEnd: e.currentTarget.value })}
               style={inputSt}
@@ -780,7 +780,7 @@ export function RulesManager({ onCount }: { onCount?: (n: number) => void }) {
     <div style={{ display: "grid", gap: 12 }}>
       <AdminHero
         title="Regras de alerta"
-        hint="Sem regras, todo estado não conforme alerta. Com regras, só o que casar com escopo, gatilho e janela anti-ruído alerta — a de maior prioridade vence."
+        hint="Sem regras, todo estado não conforme alerta. Com regras, só o que casar com escopo, gatilho e janela anti-ruído alerta - a de maior prioridade vence."
         count={`${rules.filter((r) => r.active).length} ativas`}
       />
       {error && <ErrorBanner message={error} onRetry={() => void refresh()} />}
@@ -892,7 +892,7 @@ export function RulesManager({ onCount }: { onCount?: (n: number) => void }) {
               }}
             >
               Escopo atual casa com <strong>{preview.count}</strong> barreira(s)
-              {preview.tags.length > 0 && ` — ex.: ${preview.tags.join(", ")}`}.
+              {preview.tags.length > 0 && ` - ex.: ${preview.tags.join(", ")}`}.
             </div>
           )}
         </form>

@@ -196,7 +196,7 @@ export function contingencyFromRaw(raw: unknown): boolean {
 // itemIdToCode is an optional fallback for open-sweep rows whose `code`
 // arrives empty (observed live: every such row still carries numeric
 // `id_item`). The caller builds it from the same cycle's equipment sweep
-// (or the previous cycle's — id/code mappings are stable); recovered rows
+// (or the previous cycle's - id/code mappings are stable); recovered rows
 // are counted separately so ops can tell fallback signal from direct joins.
 export function buildWorkEvents(
   orders: unknown[],
