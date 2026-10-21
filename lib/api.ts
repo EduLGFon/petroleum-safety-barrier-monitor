@@ -1,17 +1,13 @@
-/**
- * ══════════════════════════════════════════════════════════════════════════
- * UNIFIED API CLIENT - single entry point that feeds the entire dashboard
- * ══════════════════════════════════════════════════════════════════════════
- * Barrel over lib/api/*: types, query conversion, mock and HTTP adapters.
- * Every consumer reads data exclusively through this module (`api.*`).
- *
- * Active adapter is controlled by `PUBLIC_API_MODE`:
- *   - "mock" (default) -> mockAdapter
- *   - "http"            -> httpAdapter, using PUBLIC_API_BASE_URL
- *
- * To go live: set PUBLIC_API_MODE=http and PUBLIC_API_BASE_URL to
- * your backend root. No other file in the app needs to change.
- */
+// Unified API client - single entry point that feeds the entire dashboard.
+// Barrel over lib/api/*: types, query conversion, mock and HTTP adapters.
+// Every consumer reads data exclusively through this module (`api.*`).
+//
+// Active adapter is controlled by `PUBLIC_API_MODE`:
+//   - "mock" (default) -> mockAdapter
+//   - "http"            -> httpAdapter, using PUBLIC_API_BASE_URL
+//
+// To go live: set PUBLIC_API_MODE=http and PUBLIC_API_BASE_URL to
+// your backend root. No other file in the app needs to change.
 export type { BarriersApi, DomainQuery } from "./api/types.ts";
 import { httpAdapterFactory } from "./api/http.ts";
 import type { BarriersApi } from "./api/types.ts";

@@ -1,13 +1,9 @@
-/**
- * ══════════════════════════════════════════════════════════════════════════
- * WIRE TYPES - the shape of data as it travels over the network
- * ══════════════════════════════════════════════════════════════════════════
- * These mirror what a real backend would return: compact records using
- * numeric ids (see lib/enums.ts) instead of display strings. The API layer
- * (lib/api.ts) converts WireBarrier -> Barrier (domain type) via
- * `resolveBarrier`, so every other part of the app only ever sees
- * fully-resolved, human-readable domain objects.
- */
+// Wire types - the shape of data as it travels over the network.
+// These mirror what a real backend would return: compact records using
+// numeric ids (see lib/enums.ts) instead of display strings. The API layer
+// (lib/api.ts) converts WireBarrier -> Barrier (domain type) via
+// `resolveBarrier`, so every other part of the app only ever sees
+// fully-resolved, human-readable domain objects.
 
 export interface WireStatusHistoryEntry {
   date: string; // ISO date

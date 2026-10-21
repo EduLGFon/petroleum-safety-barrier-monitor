@@ -1,10 +1,6 @@
-/**
- * ══════════════════════════════════════════════════════════════════════════
- * UTILS - barrel over dashboard derivations and shared formatters
- * ══════════════════════════════════════════════════════════════════════════
- * Importers keep importing from here; implementations live in small modules
- * (dashboard derivations, pt-BR formatters) instead of one large file.
- */
+// Utils - barrel over dashboard derivations and shared formatters.
+// Importers keep importing from here; implementations live in small modules
+// (dashboard derivations, pt-BR formatters) instead of one large file.
 export {
   defaultFilters,
   FILTER_DEFAULTS_VERSION,

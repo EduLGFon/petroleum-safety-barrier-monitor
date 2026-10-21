@@ -1,8 +1,5 @@
-/**
- * ══════════════════════════════════════════════════════════════════════════
- * RESOLVE - converts wire (numeric-id) records into domain objects the UI uses
- * ══════════════════════════════════════════════════════════════════════════
- */
+// Resolve - converts wire (numeric-id) records into domain objects the UI
+// uses. Unknown ids fall back deterministically so imported rows still render.
 
 import {
   fromAuthorId,

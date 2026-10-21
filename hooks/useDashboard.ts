@@ -1,12 +1,8 @@
-/**
- * ══════════════════════════════════════════════════════════════════════════
- * USE-DASHBOARD - central dashboard state + derived data for the main page
- * ══════════════════════════════════════════════════════════════════════════
- * Composer over dashboard slices (filter-state, selection, persistence,
- * derived): filter semantics, selection/open-row state with localStorage
- * persistence (SSR-safe hydration), and paged rows/KPI/chart derivations.
- * Sole data source for dashboard islands in client (mock) mode.
- */
+// useDashboard - central dashboard state and derived data for the main page.
+// Composer over dashboard slices (filter-state, selection, persistence,
+// derived): filter semantics, selection/open-row state with localStorage
+// persistence (SSR-safe hydration), and paged rows/KPI/chart derivations.
+// Sole data source for dashboard islands in client (mock) mode.
 import { useVisibleColumns } from "./dashboard/visible-columns.ts";
 import { loadDash, saveDash } from "./dashboard/persistence.ts";
 import { useDashboardDerived } from "./dashboard/derived.ts";

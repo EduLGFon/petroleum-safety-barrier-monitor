@@ -1,11 +1,7 @@
-/**
- * ══════════════════════════════════════════════════════════════════════════
- * TYPES - canonical domain types shared by UI, utils, hooks, and API layer
- * ══════════════════════════════════════════════════════════════════════════
- * Open string unions (Availability, Compliance, Criticality) plus
- * Barrier, KpiSnapshot, FilterState and table types. Central contract so
- * new station values compile without code changes (dynamic-data principle).
- */
+// Types - canonical domain types shared by UI, utils, hooks, and API layer.
+// Open string unions (Availability, Compliance, Criticality) plus
+// Barrier, KpiSnapshot, FilterState and table types. Central contract so
+// new station values compile without code changes (dynamic-data principle).
 
 // Row visibility scope (admin Situacao filter) lives in the wire contract;
 // re-exported here so UI code imports domain types from one module.
