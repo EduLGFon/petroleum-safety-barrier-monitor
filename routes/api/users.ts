@@ -125,10 +125,17 @@ export const handler = define.handlers({
       return created(user, requestId);
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
+      if (message.includes("duplicate") || message.includes("unique")) {
+        return badRequest(
+          message.includes("email") || message.includes("users_email")
+            ? "email already exists"
+            : "duplicate value",
+          requestId,
+        );
+      }
       if (
         message.includes("email") || message.includes("name") ||
-        message.includes("password") || message.includes("role") ||
-        message.includes("duplicate") || message.includes("unique")
+        message.includes("password") || message.includes("role")
       ) {
         return badRequest(message, requestId);
       }

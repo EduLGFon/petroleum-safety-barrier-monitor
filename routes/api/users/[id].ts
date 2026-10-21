@@ -12,23 +12,28 @@ import {
 } from "../../../lib/server/errors.ts";
 
 import {
+  hashPassword,
+  validateNewPassword,
+  verifyPassword,
+} from "../../../lib/server/auth/password.ts";
+
+import {
   authStoreUnavailable,
   denyByCredentials,
   requireAdminAuth,
 } from "../../../lib/server/auth.ts";
 
 import {
-  hashPassword,
-  validateNewPassword,
-} from "../../../lib/server/auth/password.ts";
+  deleteUser,
+  getUserById,
+  updateUser,
+} from "../../../lib/server/sql/users.ts";
 
 import { routeClientKey, writeThrottle } from "../../../lib/server/throttle.ts";
 
 import { parseIdParam, readJsonBody } from "../../../lib/server/validation.ts";
 
 import { deleteSessionsForUser } from "../../../lib/server/sql/sessions.ts";
-
-import { deleteUser, updateUser } from "../../../lib/server/sql/users.ts";
 
 import { loadServerConfig } from "../../../lib/server/config.ts";
 
@@ -74,7 +79,15 @@ export const handler = define.handlers({
     try {
       let passwordHash: string | undefined;
       if (body.password !== undefined) {
-        passwordHash = await hashPassword(validateNewPassword(body.password));
+        const target = await getUserById(id);
+        if (!target) return notFound("User not found", requestId);
+        const next = validateNewPassword(body.password);
+        // Match the self-service route: a reset must actually change the
+        // password, not re-hash the same one.
+        if (await verifyPassword(next, target.password_hash)) {
+          return badRequest("new password must differ", requestId);
+        }
+        passwordHash = await hashPassword(next);
       }
       const updated = await updateUser(id, {
         name: body.name,
@@ -89,13 +102,23 @@ export const handler = define.handlers({
       return ok(updated, requestId);
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
+      // A self-demotion/deactivation is still the last-admin guard, but the
+      // caller can act on a clearer "your own account" explanation. The wire
+      // message stays English; the UI localizes it.
+      const publicMessage = auth.user?.id === id &&
+          message.includes("last active admin")
+        ? message.replace(
+          "the last active admin",
+          "your own account while you are the last active admin",
+        )
+        : message;
       if (
         message.includes("name") || message.includes("role") ||
         message.includes("active") || message.includes("password") ||
         message.includes("nothing to update") ||
         message.includes("last active admin")
       ) {
-        return badRequest(message, requestId);
+        return badRequest(publicMessage, requestId);
       }
       return internal(
         "PATCH /api/users/:id",
@@ -141,7 +164,13 @@ export const handler = define.handlers({
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       if (message.includes("last active admin")) {
-        return badRequest(message, requestId);
+        const publicMessage = auth.user?.id === id
+          ? message.replace(
+            "the last active admin",
+            "your own account while you are the last active admin",
+          )
+          : message;
+        return badRequest(publicMessage, requestId);
       }
       return internal(
         "DELETE /api/users/:id",

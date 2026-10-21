@@ -50,15 +50,18 @@ export default define.page(async function Home(
   const companyName = getCompanyName();
   const sessionUser = session.user;
   if (apiMode === "http") {
-    // Empty PUBLIC_API_BASE_URL falls back to the request origin so the
-    // island fetches /api/* from wherever this same Fresh app is actually
-    // served (dev auto-picks its port, start binds 8300). Set the variable
-    // explicitly only when the API lives on a different origin.
+    // Empty PUBLIC_API_BASE_URL means "same origin": the island fetches
+    // relative /api/* paths, so each browser uses the host it actually
+    // typed. Never bake url.origin in here - behind a TLS-terminating proxy
+    // the request URL is http:// while the page is https://, and an
+    // absolute cross-origin base also drops the session cookie
+    // (credentials: same-origin). Set the variable explicitly only when the
+    // API really lives on another origin (that origin then needs CORS).
     const baseUrl = (() => {
       try {
-        return Deno.env.get("PUBLIC_API_BASE_URL")?.trim() || url.origin;
+        return Deno.env.get("PUBLIC_API_BASE_URL")?.trim() || "";
       } catch {
-        return url.origin;
+        return "";
       }
     })();
     const vocabularies: Vocabularies = await getVocabularies();

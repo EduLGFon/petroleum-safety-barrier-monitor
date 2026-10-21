@@ -101,6 +101,14 @@ export const handler = define.handlers({
       return ok(updated, requestId);
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
+      if (message.includes("duplicate") || message.includes("unique")) {
+        return badRequest(
+          message.includes("name") || message.includes("alert_rules_name")
+            ? "rule name already exists"
+            : "duplicate value",
+          requestId,
+        );
+      }
       if (
         message.includes("name") || message.includes("description") ||
         message.includes("category") || message.includes("toStatus") ||
@@ -116,9 +124,7 @@ export const handler = define.handlers({
         message.includes("priority") || message.includes("validFrom") ||
         message.includes("validTo") || message.includes("actionPlan") ||
         message.includes("onTransition") ||
-        message.includes("nothing to update") ||
-        message.includes("duplicate") ||
-        message.includes("unique")
+        message.includes("nothing to update")
       ) {
         return badRequest(message, requestId);
       }

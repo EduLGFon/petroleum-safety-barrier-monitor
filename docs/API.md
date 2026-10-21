@@ -273,7 +273,8 @@ both never routes, `_` prefix / no handler):
   `{ currentPassword, newPassword }` → `200 { ok: true }` + cleared cookie -
   self-service change for any active session (admin or user; `ADMIN_TOKEN`
   rejected, identity comes from the session alone so no user can address
-  another's password). Requires the current password, enforces the 12-256
+  another's password through this route; admins use `PATCH /api/users/:id` to
+  reset someone else). Requires the current password, enforces the 12-256
   policy, rejects reuse (`400 new password must differ`), revokes every session
   (re-login everywhere). `401` on wrong current password. Password throttle
   (10/min); `ADMIN_TOKEN` callers get `401 session required`.
@@ -282,8 +283,10 @@ both never routes, `_` prefix / no handler):
   (`201 PublicUser`) - both require admin; the first account is provisioned
   via CLI (`scripts/create-admin.ts`), never via this route. `PATCH
   /api/users/:id` `{ name?, role?, active?: boolean, password? }` (`200 PublicUser`,
-  `400` empty patch / bad types / last-admin violation; a password change revokes
-  all of that user's sessions), `DELETE
+  `400` empty patch / bad types / last-admin violation / unchanged password; a
+  password change is the admin reset path: the target's current password is not
+  required, any user (including another admin) can be reset, and all of that
+  user's sessions are revoked. Self-service remains `POST /api/auth/password`), `DELETE
   /api/users/:id` → `200 { ok: true }` (`404` missing) - the last active admin cannot be
   demoted, deactivated, or deleted (`400`).
 - `GET /api/alert-rules` (+ `?activeOnly=1`) → `200 AlertRule[]`,

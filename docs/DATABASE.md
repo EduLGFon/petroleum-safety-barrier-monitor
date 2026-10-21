@@ -293,7 +293,8 @@ PBKDF2-SHA256 (`lib/server/auth/password.ts`, no native deps).
 `POST /api/auth/login` sets the HttpOnly cookie, `GET /api/auth/me`
 reveals the role to islands, `POST /api/auth/logout` revokes,
 `POST /api/auth/password` changes the caller's own password (session-only,
-revokes every session). Admin routes
+revokes every session). The admin-only `PATCH /api/users/:id` can reset any
+user's password (also revoking that user's sessions). Admin routes
 accept a session or `ADMIN_TOKEN`. The first user on an empty table becomes
 admin (or use `scripts/create-admin.ts`).
 

@@ -162,7 +162,10 @@ export function AdminSection(
         })}
       </div>
       {sub === "users" && (
-        <UsersManager onCount={(n) => setCounts((c) => ({ ...c, users: n }))} />
+        <UsersManager
+          currentUserId={sessionUser?.id}
+          onCount={(n) => setCounts((c) => ({ ...c, users: n }))}
+        />
       )}
       {sub === "recipients" && (
         <RecipientsManager

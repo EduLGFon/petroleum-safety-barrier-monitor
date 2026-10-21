@@ -64,3 +64,22 @@ Deno.test("adminApi falls back to Erro status on non-JSON bodies", async () => {
     globalThis.fetch = prev;
   }
 });
+
+Deno.test("adminApi translates dropped connections", async () => {
+  const prev = globalThis.fetch;
+  globalThis.fetch =
+    (() => Promise.reject(new TypeError("Failed to fetch"))) as typeof fetch;
+  try {
+    await adminApi("/api/users");
+    throw new Error("unreachable");
+  } catch (err) {
+    assertInstanceOf(err, AdminApiError);
+    assertStrictEquals(
+      (err as Error).message,
+      "Não foi possível conectar ao servidor. Tente novamente.",
+    );
+    assertStrictEquals((err as AdminApiError).status, 0);
+  } finally {
+    globalThis.fetch = prev;
+  }
+});

@@ -10,6 +10,8 @@ import type {
 
 import { useCallback, useEffect, useState } from "preact/hooks";
 
+import { toPtError } from "../../lib/api/error-pt.ts";
+
 import { toLoginWithReturn } from "./server.ts";
 
 export interface ChangeListQuery {
@@ -80,7 +82,7 @@ export function useSyncChangeList(
         toLoginWithReturn();
         return null;
       }
-      if (!res.ok) throw new Error(`sync-changes ${res.status}`);
+      if (!res.ok) throw new Error(`Erro ${res.status} ao carregar alterações`);
       return res.json() as Promise<ChangeListResult>;
     }).then((next) => {
       if (!next || cancelled) return;
@@ -102,7 +104,9 @@ export function useSyncChangeList(
         cancelled || (err instanceof DOMException && err.name === "AbortError")
       ) return;
       setError(
-        err instanceof Error ? err.message : "Falha ao carregar alterações",
+        toPtError(
+          err instanceof Error ? err.message : "Falha ao carregar alterações",
+        ),
       );
       setLoading(false);
     });

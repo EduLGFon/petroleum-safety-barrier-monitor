@@ -13,6 +13,8 @@ import { exportToCSV, exportToPDF, exportToXlsx } from "../../lib/export.ts";
 
 import { useEffect, useMemo, useRef, useState } from "preact/hooks";
 
+import { toPtError } from "../../lib/api/error-pt.ts";
+
 import type { Fmt } from "../../lib/export/format.ts";
 
 import type { Barrier } from "../../lib/types.ts";
@@ -150,7 +152,9 @@ export function ExportMenu(
       }
       return true;
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Falha ao exportar");
+      setError(
+        toPtError(err instanceof Error ? err.message : "Falha ao exportar"),
+      );
       return false;
     } finally {
       setLoading(null);

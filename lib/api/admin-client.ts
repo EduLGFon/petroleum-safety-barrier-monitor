@@ -31,7 +31,17 @@ export async function adminApi(
   path: string,
   init?: RequestInit,
 ): Promise<unknown> {
-  const res = await fetch(path, { credentials: "same-origin", ...init });
+  let res: Response;
+  try {
+    res = await fetch(path, { credentials: "same-origin", ...init });
+  } catch {
+    // A dropped connection is a user-facing failure too; don't expose the
+    // browser's English "Failed to fetch" text.
+    throw new AdminApiError(
+      "Não foi possível conectar ao servidor. Tente novamente.",
+      0,
+    );
+  }
   if (!res.ok) {
     let message = `Erro ${res.status}`;
     let code: string | undefined;

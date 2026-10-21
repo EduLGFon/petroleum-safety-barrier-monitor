@@ -7,6 +7,8 @@ import type { BarriersQuery } from "../../lib/wireTypes.ts";
 
 import { browserTimeZone } from "../../lib/export/html.ts";
 
+import { toPtError } from "../../lib/api/error-pt.ts";
+
 import type { Fmt } from "../../lib/export/format.ts";
 
 import { FMT_EXT } from "../../lib/export/format.ts";
@@ -64,11 +66,11 @@ async function requestFile(
     let detail = `HTTP ${res.status}`;
     try {
       const body = await res.json() as { error?: string };
-      if (body.error) detail = body.error;
+      if (body.error) detail = toPtError(body.error);
     } catch {
       // Non-JSON error body; keep the status text.
     }
-    throw new Error(detail);
+    throw new Error(toPtError(detail));
   }
   return { res };
 }

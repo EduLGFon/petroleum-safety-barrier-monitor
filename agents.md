@@ -406,7 +406,8 @@ Privacy by Design
 - Implement applicable data-subject rights and consent requirements: reads require a session or
   `ADMIN_TOKEN`; writes require `admin`; there is no self-registration (first account via empty
   table or `scripts/create-admin.ts`); the last active admin cannot be demoted, deactivated, or
-  deleted; password change is session-only and carries no user id.
+  deleted; self-service password change is session-only and carries no user id, while admins may
+  reset any user's password through the admin-only users route (which revokes the target's sessions).
 - Consider copies in caches, backups, indexes, logs, derived stores, and third-party services when
   implementing deletion or retention requirements (status history, `sync_barrier_changes` snapshots,
   alert payloads with `delivered[]`, `localStorage`, downloaded exports, SMTP deliveries, upstream
@@ -424,11 +425,13 @@ Authentication
 - Validate identity where the platform allows it (lowercased emails, PBKDF2-SHA256 with 210,000
   iterations plus per-user salt plus constant-time verification via WebCrypto only, 32 random session
   bytes with only the SHA-256 hash stored, HttpOnly SameSite=Lax cookie with Secure on https and
-  12 h TTL, session-only password change with 12-256 policy and no current-password reuse).
+  12 h TTL, session-only self-service password change with 12-256 policy and no current-password
+  reuse; admin-initiated resets follow the same 12-256 policy and revoke the target's sessions).
 - Never trust user-supplied identities, roles, permissions, ownership fields, or similar
   authorization attributes. Author on session status writes derives from the session via `authors`;
   sort input resolves only through the `SORTABLE` whitelist; filter ids resolve via `lib/enums/`
-  plus `lib/resolve.ts`; password change carries no target user id by construction.
+  plus `lib/resolve.ts`; self-service password change carries no target user id by construction,
+  while admin resets derive the target from the admin-only users route id.
 - Use established mechanisms: Postgres `users` / `sessions`, `ADMIN_TOKEN` compared in constant
   time, PBKDF2 plus SHA-256 hashes. Do not invent other schemes and do not add other sign-in methods
   without an ADR.
@@ -457,8 +460,9 @@ Authorization and Access Control
   admin-only.
 - Never rely on hidden UI elements, disabled buttons, frontend routes, or obscurity as security
   controls.
-- Verify resource ownership for every object-level operation: password change addresses only the
-  caller's session; status writes address the named barrier id through `record_status_change()`;
+- Verify resource ownership for every object-level operation: self-service password change
+  addresses only the caller's session; admin password resets require an admin session and address
+  the named user id; status writes address the named barrier id through `record_status_change()`;
   user updates cannot demote, deactivate, or delete the last active admin; exports intersect the
   selection with the active filters on the server so a stale selection cannot widen the file.
 - Prevent horizontal privilege escalation, vertical privilege escalation, insecure direct object

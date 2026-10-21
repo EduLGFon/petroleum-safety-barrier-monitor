@@ -218,6 +218,9 @@ Full contract lives in `docs/API.md`. Summary:
     Editar tab (`islands/BarrierEditor.tsx`, admin only). Every
     authenticated user also gets a Conta tab (`AccountSection.tsx`) with a
     self-service password change (`POST /api/auth/password`, session-only).
+    Admins can reset any other user's password from the Usuários tab
+    (`UsersManager.tsx`, `PATCH /api/users/:id`), which revokes the target's
+    sessions.
 - Access: Login => Dashboard. Data reads need a session or `ADMIN_TOKEN`
   (anonymous `404`, dead credentials `401`); `/` redirects logged-out
   visitors to `/login?next=`.

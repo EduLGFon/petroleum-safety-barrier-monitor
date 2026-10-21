@@ -3,6 +3,8 @@
 // the modal, picking from curated option lists or typing custom text.
 import { type FieldKey, SEED_DEFAULTS } from "../lib/field-options.ts";
 
+import { toPtError } from "../lib/api/error-pt.ts";
+
 import { useEffect, useState } from "preact/hooks";
 
 import type { Barrier } from "../lib/types.ts";
@@ -273,7 +275,7 @@ export function BarrierEditor(
         onSaved(updated);
       }, 500);
     } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
+      setError(toPtError(err instanceof Error ? err.message : String(err)));
     } finally {
       setBusy(false);
     }

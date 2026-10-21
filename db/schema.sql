@@ -435,15 +435,21 @@ alter table alert_recipients add column if not exists phone text not null defaul
 -- recipients and alert rules. Passwords store a PBKDF2-SHA256 digest in the
 -- `pbkdf2$iterations$salt_b64$hash_b64` format (see lib/server/auth/).
 create table if not exists users (
-  id            integer generated always as identity primary key,
-  email         text        not null unique,   -- always stored lowercased
-  name          text        not null default '',
-  password_hash text        not null,
-  role          text        not null default 'user' check (role in ('admin', 'user')),
-  active        boolean     not null default true,
-  created_at    timestamptz not null default now(),
-  updated_at    timestamptz not null default now()
+  id                  integer generated always as identity primary key,
+  email               text        not null unique,   -- always stored lowercased
+  name                text        not null default '',
+  password_hash       text        not null,
+  role                text        not null default 'user' check (role in ('admin', 'user')),
+  active              boolean     not null default true,
+  -- true after an admin creates/resets an account: login only reaches the
+  -- change-password screen until the user picks a password of their own.
+  must_change_password boolean    not null default false,
+  created_at          timestamptz not null default now(),
+  updated_at          timestamptz not null default now()
 );
+
+-- Pre-existing databases gain the forced-change flag on the next migrate.
+alter table users add column if not exists must_change_password boolean not null default false;
 
 create index if not exists idx_users_role on users(role);
 
@@ -465,6 +471,23 @@ create table if not exists sessions (
 
 create index if not exists idx_sessions_user on sessions(user_id);
 create index if not exists idx_sessions_expires on sessions(expires_at);
+
+-- Password reset links: one row per "esqueci minha senha" request. Only the
+-- SHA-256 hash of the token is stored (same rule as sessions), the link in
+-- the e-mail carries the clear value. used_at makes each link single-use;
+-- expires_at is 1 hour after creation. A successful reset deletes the user's
+-- sessions and pending reset rows.
+create table if not exists password_resets (
+  id          integer generated always as identity primary key,
+  user_id     integer     not null references users(id) on delete cascade,
+  token_hash  text        not null unique,
+  expires_at  timestamptz not null,
+  used_at     timestamptz,
+  created_at  timestamptz not null default now()
+);
+
+create index if not exists idx_password_resets_user on password_resets(user_id);
+create index if not exists idx_password_resets_expires on password_resets(expires_at);
 
 -- ─── Alert rules (which events trigger email, per category) ─────────────────
 -- One row defines a trigger: transitions landing on to_status_id (null means

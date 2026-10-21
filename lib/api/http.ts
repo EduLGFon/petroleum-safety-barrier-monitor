@@ -42,6 +42,19 @@ export function isAuthExpired(err: unknown): boolean {
 // every 200 and drop when the server stops tagging.
 const MAX_CACHED_URLS = 50;
 
+// fetchOrFail: network failures are user-facing; translate them once instead
+// of letting the browser's English "Failed to fetch" reach the error card.
+async function fetchOrFail(
+  input: string,
+  init: RequestInit,
+): Promise<Response> {
+  try {
+    return await fetch(input, init);
+  } catch {
+    throw new Error("Falha de conexão, tente novamente");
+  }
+}
+
 // Creates an HTTP BarriersApi bound to the given backend baseUrl. labels
 // carries dynamic station/category id->label maps so imported values beyond
 // the seed enums still resolve for display.
@@ -55,7 +68,7 @@ export function httpAdapterFactory(
   // GETs JSON path from baseUrl; throws on non-OK status.
   async function fetchJson<T>(path: string): Promise<T> {
     const cached = etagCache.get(path);
-    const res = await fetch(`${baseUrl}${path}`, {
+    const res = await fetchOrFail(`${baseUrl}${path}`, {
       headers: {
         "Accept": "application/json",
         ...(cached ? { "If-None-Match": cached.etag } : {}),
@@ -67,7 +80,7 @@ export function httpAdapterFactory(
     // only confirms tags it issued.
     if (res.status === 304) {
       if (cached) return cached.body as T;
-      throw new Error(`API error ${res.status}: ${path}`);
+      throw new Error(`Erro ${res.status} ao carregar dados`);
     }
     // 401 = dead session, 404 = camouflaged anonymous on collections
     // (collection reads never 404 for missing data - they return empty
@@ -78,7 +91,7 @@ export function httpAdapterFactory(
     if (res.status === 401 || res.status === 404) {
       throw new AuthExpiredError(res.status, path);
     }
-    if (!res.ok) throw new Error(`API error ${res.status}: ${path}`);
+    if (!res.ok) throw new Error(`Erro ${res.status} ao carregar dados`);
     const body = await res.json() as T;
     const etag = res.headers.get("etag");
     if (etag) {
@@ -117,7 +130,7 @@ export function httpAdapterFactory(
     // logged-out callers redirect to login instead of seeing a null row.
     async getBarrierById(id) {
       const path = `/api/barriers/${id}`;
-      const res = await fetch(`${baseUrl}${path}`, {
+      const res = await fetchOrFail(`${baseUrl}${path}`, {
         headers: { "Accept": "application/json" },
         credentials: "same-origin",
       });
@@ -133,7 +146,7 @@ export function httpAdapterFactory(
         return null;
       }
       if (res.status === 401) throw new AuthExpiredError(401, path);
-      if (!res.ok) throw new Error(`API error ${res.status}: ${path}`);
+      if (!res.ok) throw new Error(`Erro ${res.status} ao carregar dados`);
       const w = await res.json() as WireBarrier;
       return resolveBarriers([w], labels)[0];
     },

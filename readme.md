@@ -469,9 +469,11 @@ Invariants worth knowing before touching the schema:
   users, recipients, rules and field options. The last active admin cannot be
   demoted, deactivated or deleted.
 - The first account is provisioned from the CLI, never self-registered.
-- Password change is session-only and carries no user id, so no account can
-  address another's password by construction; it revokes every session,
-  including the caller's.
+- Self-service password change is session-only and carries no user id, so no
+  account can address another's password through that route; it revokes every
+  session, including the caller's. Admins can reset any other user's password
+  from the Usuários tab (`PATCH /api/users/:id`), which revokes that user's
+  sessions without touching the caller's session.
 - Anonymous API calls get a `404` shaped exactly like a missing route;
   dead credentials get a `401`. Writes fail closed when no credential is
   configured at all.
