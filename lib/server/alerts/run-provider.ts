@@ -8,21 +8,21 @@ import {
   type ProviderPayload,
 } from "./provider.ts";
 
+import { detectUrgentTransitions, landingLabel } from "./detect.ts";
+
+import { fromCriticalityId, fromLocationId } from "../../enums.ts";
+
 import { type AlertStore, isDead, withFailure } from "./store.ts";
 
 import { matchesStaleScope, sortedRules } from "./rules.ts";
 
 import { isCriticalRankId } from "../../enums/codes.ts";
 
-import { fromCriticalityId, fromLocationId } from "../../enums.ts";
-
 import type { ResolverLabels } from "../../resolve.ts";
 
 import type { AlertRule } from "../sql/alert_rules.ts";
 
 import type { WireBarrier } from "../../wireTypes.ts";
-
-import { detectUrgentTransitions, landingLabel } from "./detect.ts";
 
 import type { StatusInfo } from "./detect.ts";
 

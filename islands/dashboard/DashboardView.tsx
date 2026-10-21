@@ -3,6 +3,8 @@
 // from the API. Both render the shared DashboardSections tree.
 import type { AuthUser, Barrier, Vocabularies } from "../../lib/types.ts";
 
+import { useCallback, useEffect, useRef, useState } from "preact/hooks";
+
 import { ServerErrorBanner, ServerErrorCard } from "./ServerError.tsx";
 
 import { useServerDashboard } from "../../hooks/dashboard/server.ts";
@@ -12,8 +14,6 @@ import { useSyncStatus } from "../../hooks/dashboard/sync-status.ts";
 import { LoadingScreen } from "../../components/LoadingScreen.tsx";
 
 import { useSettings } from "../../context/SettingsContext.tsx";
-
-import { useCallback, useEffect, useRef, useState } from "preact/hooks";
 
 import { useDashboardVocabularies } from "./vocabularies.ts";
 

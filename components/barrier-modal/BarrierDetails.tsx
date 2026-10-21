@@ -9,18 +9,18 @@ import {
 } from "../ui/Icons.tsx";
 
 import {
-  daysSince,
-  fmtDate,
-  humanDuration,
-  installationLabel,
-} from "../../lib/utils.ts";
-
-import {
   CONF_COLORS,
   CRIT_COLORS,
   DISP_COLORS,
   SCOPE_COLORS,
 } from "../../lib/constants.ts";
+
+import {
+  daysSince,
+  fmtDate,
+  humanDuration,
+  installationLabel,
+} from "../../lib/utils.ts";
 
 import { Div, FR, Sec, Txt } from "./primitives.tsx";
 

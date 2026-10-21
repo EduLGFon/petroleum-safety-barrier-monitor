@@ -18,14 +18,16 @@ import {
 } from "../../../../lib/server/auth.ts";
 
 import {
+  getBarrierById,
+  transitionBarrierStatus,
+} from "../../../../lib/server/sql/barriers.ts";
+
+import {
   postAlert,
   providerConfigFromEnv,
 } from "../../../../lib/server/alerts/provider.ts";
 
-import {
-  getBarrierById,
-  transitionBarrierStatus,
-} from "../../../../lib/server/sql/barriers.ts";
+import { maybeSendProviderImmediate } from "../../../../lib/server/alerts/run-provider.ts";
 
 import {
   routeClientKey,
@@ -36,8 +38,6 @@ import {
   parseIdParam,
   readJsonBody,
 } from "../../../../lib/server/validation.ts";
-
-import { maybeSendProviderImmediate } from "../../../../lib/server/alerts/run-provider.ts";
 
 import { getResolverLabels } from "../../../../lib/server/sql/vocabularies.ts";
 

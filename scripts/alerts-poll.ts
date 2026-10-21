@@ -23,6 +23,8 @@ import {
   providerConfigFromEnv,
 } from "../lib/server/alerts/provider.ts";
 
+import { runProviderCycle } from "../lib/server/alerts/run-provider.ts";
+
 import { getResolverLabels } from "../lib/server/sql/vocabularies.ts";
 
 import { touchRuleTriggered } from "../lib/server/sql/alert_rules.ts";
@@ -38,8 +40,6 @@ import { getBarriersByIds } from "../lib/server/sql/barriers.ts";
 import { listRecipients } from "../lib/server/sql/recipients.ts";
 
 import { sqlAlertStore } from "../lib/server/sql/alerts.ts";
-
-import { runProviderCycle } from "../lib/server/alerts/run-provider.ts";
 
 import { queryRows } from "../lib/server/db.ts";
 

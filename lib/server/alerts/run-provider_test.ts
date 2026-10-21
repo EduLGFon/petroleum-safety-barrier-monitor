@@ -1,13 +1,13 @@
 // Unit tests for the provider cycle - fake store + fake sender, no DB.
-import { runProviderCycle } from "./run-provider.ts";
-
 import type { AlertStore, UnsentAlert } from "./store.ts";
 
-import { dedupKey } from "./store.ts";
+import { assertStrictEquals } from "jsr:@std/assert@^1";
 
 import type { WireBarrier } from "../../wireTypes.ts";
 
-import { assertStrictEquals } from "jsr:@std/assert@^1";
+import { runProviderCycle } from "./run-provider.ts";
+
+import { dedupKey } from "./store.ts";
 
 function wire(over: Partial<WireBarrier> = {}): WireBarrier {
   return {

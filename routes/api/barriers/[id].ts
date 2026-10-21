@@ -20,11 +20,6 @@ import {
 } from "../../../lib/server/errors.ts";
 
 import {
-  postAlert,
-  providerConfigFromEnv,
-} from "../../../lib/server/alerts/provider.ts";
-
-import {
   getBarrierById,
   transitionBarrierStatus,
   updateBarrier,
@@ -36,9 +31,14 @@ import {
   writeThrottle,
 } from "../../../lib/server/throttle.ts";
 
-import { parseIdParam, readJsonBody } from "../../../lib/server/validation.ts";
+import {
+  postAlert,
+  providerConfigFromEnv,
+} from "../../../lib/server/alerts/provider.ts";
 
 import { maybeSendProviderImmediate } from "../../../lib/server/alerts/run-provider.ts";
+
+import { parseIdParam, readJsonBody } from "../../../lib/server/validation.ts";
 
 import { getResolverLabels } from "../../../lib/server/sql/vocabularies.ts";
 
