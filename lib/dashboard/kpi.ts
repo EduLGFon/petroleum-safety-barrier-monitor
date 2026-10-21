@@ -35,9 +35,11 @@ export function computeKpi(b: Barrier[]): KpiSnapshot {
     // total and land in other so fixed fields + other === total keeps holding.
     byCompliance[x.compliance] = (byCompliance[x.compliance] ?? 0) + 1;
     byCriticality[x.criticality] = (byCriticality[x.criticality] ?? 0) + 1;
-    const hidden = (x.isActive ?? true) === false || (x.deletedAt ?? null) !== null;
+    const hidden = (x.isActive ?? true) === false ||
+      (x.deletedAt ?? null) !== null;
     if (!hidden) {
-      byAvailability[x.availability] = (byAvailability[x.availability] ?? 0) + 1;
+      byAvailability[x.availability] = (byAvailability[x.availability] ?? 0) +
+        1;
       switch (x.availability) {
         case "Disponível":
           available++;

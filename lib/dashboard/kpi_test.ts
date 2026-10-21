@@ -185,7 +185,11 @@ Deno.test("computeKpi does not count hidden rows as available", () => {
       compliance: "Conforme",
       deletedAt: "2026-02-01",
     }), // excluída
-    barrier({ id: 4, availability: "Indisponível", compliance: "Não Conforme" }),
+    barrier({
+      id: 4,
+      availability: "Indisponível",
+      compliance: "Não Conforme",
+    }),
   ]);
   assertStrictEquals(k.total, 4);
   // Only the active, non-deleted Disponível barrier counts.
