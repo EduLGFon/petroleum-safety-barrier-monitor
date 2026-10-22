@@ -136,8 +136,9 @@ commands with "Run whether user is logged on or not".
 
 ### 5. TLS (required)
 
-The app speaks plain HTTP on `:8300`, and the session cookie only sets
-`Secure` over https. Never expose `:8300` directly. Two options:
+The app speaks plain HTTP on `:8300`. Set `APP_BASE_URL` to the public https URL
+so the session cookie is marked `Secure` even though the upstream request is
+http. Never expose `:8300` directly. Two options:
 
 **Caddy (recommended, single exe, auto-HTTPS):**
 

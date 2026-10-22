@@ -261,10 +261,11 @@ both never routes, `_` prefix / no handler):
   addresses are admin data). Email normalizes (trim/lower/slice-254 +
   `user@host.tld` check); name trims to 200 chars, default `""`.
 - `POST /api/auth/login` `{ email, password }` → `200 PublicUser { id, email, name, role, active, created_at }` + HttpOnly
-  session cookie (`barrier_session`, 12h, `SameSite=Lax`, `Secure` on https;
-  write throttle; `400` invalid JSON / missing fields / bad email, `401` generic
-  on bad credentials - wrong email, inactive user, or bad hash all read the same
-  so accounts cannot be enumerated); `GET /api/auth/me` →
+  session cookie (`barrier_session`, 12h, `SameSite=Lax`, `Secure` on https or
+  when `APP_BASE_URL` is https behind a TLS proxy; write throttle; `400` invalid
+  JSON / missing fields / bad email, `401` generic on bad credentials - wrong
+  email, inactive user, or bad hash all read the same and pay the same PBKDF2
+  cost, so accounts cannot be enumerated by body or timing); `GET /api/auth/me` →
   `200 SessionUser { id, email, name, role, active }` (read throttle; session cookie
   only - `ADMIN_TOKEN` alone does not satisfy; `401` without one, `503` when the
   auth store is down); `POST /api/auth/logout` →
@@ -276,8 +277,9 @@ both never routes, `_` prefix / no handler):
   another's password through this route; admins use `PATCH /api/users/:id` to
   reset someone else). Requires the current password, enforces the 12-256
   policy, rejects reuse (`400 new password must differ`), revokes every session
-  (re-login everywhere). `401` on wrong current password. Password throttle
-  (10/min); `ADMIN_TOKEN` callers get `401 session required`.
+  (re-login everywhere). `401` on wrong current password or a concurrent admin
+  reset/deactivation. Password throttle (10/min); `ADMIN_TOKEN` callers get
+  `401 session required`.
 - `GET /api/users` → `200 PublicUser[]` (no hashes, `order by id`),
   `POST /api/users` `{ email, name?, password (12-256), role?: admin|user (default user) }`
   (`201 PublicUser`) - both require admin; the first account is provisioned
@@ -286,7 +288,8 @@ both never routes, `_` prefix / no handler):
   `400` empty patch / bad types / last-admin violation / unchanged password; a
   password change is the admin reset path: the target's current password is not
   required, any user (including another admin) can be reset, and all of that
-  user's sessions are revoked. Self-service remains `POST /api/auth/password`), `DELETE
+  user's sessions are revoked; changing `active` also revokes them. Self-service
+  remains `POST /api/auth/password`), `DELETE
   /api/users/:id` → `200 { ok: true }` (`404` missing) - the last active admin cannot be
   demoted, deactivated, or deleted (`400`).
 - `GET /api/alert-rules` (+ `?activeOnly=1`) → `200 AlertRule[]`,

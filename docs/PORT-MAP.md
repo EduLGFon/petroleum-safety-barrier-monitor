@@ -485,13 +485,14 @@ the wrong operator here; it should be `||` to match.
 
 ### 11.3 The app binds `0.0.0.0:8300` with no reverse proxy
 
-`deno serve` binds all interfaces and compose publishes `0.0.0.0:8300`, with
-no nginx/Caddy/Traefik anywhere in the repo. Whatever fronts this in
-production must terminate TLS, because the session cookie only sets `Secure`
-when the request itself is `https:` (`lib/server/auth/session.ts:58,67-74`).
-Also note `routeClientKey` keys rate limits on `remoteAddr` and never reads
-`X-Forwarded-For` (`lib/server/throttle.ts:76,88-91`), so behind a proxy all
-clients share one rate-limit bucket.
+`deno serve` binds all interfaces and compose publishes `0.0.0.0:8300`.
+Whatever fronts this in production must terminate TLS. The session cookie is
+marked `Secure` when the request itself is `https:` or when `APP_BASE_URL`
+starts with `https:` (`lib/server/auth/session.ts`), so set `APP_BASE_URL` to
+the public https URL when a proxy terminates TLS and the upstream request is
+plain http. Also note `routeClientKey` keys rate limits on `remoteAddr` and
+never reads `X-Forwarded-For` (`lib/server/throttle.ts:76,88-91`), so behind a
+proxy all clients share one rate-limit bucket.
 
 ### 11.4 No readiness probe, and health cannot detect a dead database
 

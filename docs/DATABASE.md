@@ -295,8 +295,9 @@ reveals the role to islands, `POST /api/auth/logout` revokes,
 `POST /api/auth/password` changes the caller's own password (session-only,
 revokes every session). The admin-only `PATCH /api/users/:id` can reset any
 user's password (also revoking that user's sessions). Admin routes
-accept a session or `ADMIN_TOKEN`. The first user on an empty table becomes
-admin (or use `scripts/create-admin.ts`).
+accept a session or `ADMIN_TOKEN`. The first user is provisioned from the CLI
+(`scripts/create-admin.ts`); the users route never self-registers, even on an
+empty table.
 
 ## Indexes
 
