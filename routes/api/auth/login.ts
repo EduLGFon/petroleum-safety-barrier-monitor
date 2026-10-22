@@ -43,6 +43,14 @@ import { readJsonBody } from "../../../lib/server/validation.ts";
 
 import { define } from "../../../utils.ts";
 
+// DUMMY_PASSWORD_HASH: valid 210k-iteration digest verified when the e-mail
+// is unknown or the account is inactive. Always paying the PBKDF2 cost keeps
+// response timing from revealing which emails exist; the generic 401 already
+// hides the message side of enumeration. Regenerate it if the PBKDF2 iteration
+// count changes in lib/server/auth/password.ts.
+const DUMMY_PASSWORD_HASH =
+  "pbkdf2$210000$pdOZd6xzTouTgnvS/jpifg==$guuZhsKO5i+JQEEmO3SEgneUwf5XoaX5sWYhiPxe8nc=";
+
 export const handler = define.handlers({
   // POST { email, password } - validates credentials, creates a session.
   async POST(ctx) {
@@ -73,20 +81,29 @@ export const handler = define.handlers({
         return badRequest("email and password are required", requestId);
       }
       const user = await getUserByEmail(email);
-      const credentialsOk = user !== null && user.active &&
-        await verifyPassword(body.password, user.password_hash);
-      if (!credentialsOk || !user) {
+      const activeUser = user !== null && user.active ? user : null;
+      // Unknown and inactive accounts verify against the dummy digest so the
+      // KDF costs the same as a real wrong-password attempt.
+      const credentialsOk = await verifyPassword(
+        body.password,
+        activeUser?.password_hash ?? DUMMY_PASSWORD_HASH,
+      );
+      if (!activeUser || !credentialsOk) {
         return unauthorized("invalid credentials", requestId);
       }
       const token = createSessionToken();
       const expires = sessionExpiry();
-      await createSession(user.id, await hashSessionToken(token), expires);
+      await createSession(
+        activeUser.id,
+        await hashSessionToken(token),
+        expires,
+      );
       try {
         await deleteExpiredSessions();
       } catch {
         // Sweep is opportunistic; a failure must not block login.
       }
-      return ok(toPublicUser(user), requestId, {
+      return ok(toPublicUser(activeUser), requestId, {
         headers: {
           "set-cookie": buildSessionCookie(
             token,

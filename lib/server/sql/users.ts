@@ -6,7 +6,7 @@ import { normalizeEmail, normalizeName } from "../validation.ts";
 
 export { normalizeEmail, normalizeName };
 
-import { queryRows } from "../db.ts";
+import { queryRows, type TxQuery, withTx } from "../db.ts";
 
 export type UserRole = "admin" | "user";
 
@@ -18,7 +18,6 @@ export interface UserRow {
   role: UserRole;
   active: boolean;
   created_at: string;
-  updated_at: string;
 }
 
 export interface PublicUser {
@@ -48,8 +47,7 @@ export function normalizeRole(raw: unknown): UserRole {
   throw new Error("role must be admin or user");
 }
 
-const PUBLIC_COLUMNS =
-  "id, email, name, role, active, created_at::text, updated_at::text";
+const PUBLIC_COLUMNS = "id, email, name, role, active, created_at::text";
 
 export async function listUsers(): Promise<PublicUser[]> {
   const rows = await queryRows<PublicUser>(
@@ -60,18 +58,19 @@ export async function listUsers(): Promise<PublicUser[]> {
 
 export async function getUserByEmail(email: string): Promise<UserRow | null> {
   const rows = await queryRows<UserRow>(
-    `select id, email, name, password_hash, role, active,
-            created_at::text, updated_at::text
+    `select id, email, name, password_hash, role, active, created_at::text
      from users where email = $1`,
     [email],
   );
   return rows[0] ?? null;
 }
 
-export async function getUserById(id: number): Promise<UserRow | null> {
-  const rows = await queryRows<UserRow>(
-    `select id, email, name, password_hash, role, active,
-            created_at::text, updated_at::text
+export async function getUserById(
+  id: number,
+  query: TxQuery = queryRows,
+): Promise<UserRow | null> {
+  const rows = await query<UserRow>(
+    `select id, email, name, password_hash, role, active, created_at::text
      from users where id = $1`,
     [id],
   );
@@ -85,8 +84,10 @@ export async function countUsers(): Promise<number> {
   return Number(rows[0]?.n ?? 0);
 }
 
-export async function countActiveAdmins(): Promise<number> {
-  const rows = await queryRows<{ n: string }>(
+export async function countActiveAdmins(
+  query: TxQuery = queryRows,
+): Promise<number> {
+  const rows = await query<{ n: string }>(
     `select count(*)::text as n from users where role = 'admin' and active`,
   );
   return Number(rows[0]?.n ?? 0);
@@ -115,8 +116,21 @@ export async function createUser(input: {
   return created;
 }
 
+// lockActiveAdmins: serializes the last-admin guard. Without the row locks,
+// two admins demoting/deactivating each other at the same time can both pass
+// the "more than one active admin" check and leave the app with zero admins.
+async function lockActiveAdmins(query: TxQuery): Promise<void> {
+  await query(
+    `select id from users where role = 'admin' and active order by id for update`,
+  );
+}
+
 // updateUser: partial update for name, role, active, or password hash.
-// Guards the last active admin: demoting or deactivating it throws.
+// Guards the last active admin: demoting or deactivating it throws. A password
+// change or active-state change revokes every session in the same transaction,
+// so a hash change never survives a failed revocation. The optional guard makes
+// the update conditional: a concurrent admin reset or deactivation wins instead
+// of being overwritten by a stale self-service password change.
 export async function updateUser(
   id: number,
   patch: {
@@ -125,63 +139,90 @@ export async function updateUser(
     active?: unknown;
     passwordHash?: string;
   },
+  guard: {
+    expectedPasswordHash?: string;
+    requireActive?: boolean;
+  } = {},
 ): Promise<PublicUser | null> {
-  const current = await getUserById(id);
-  if (!current) return null;
-  const sets: string[] = [];
-  const args: unknown[] = [];
-  if (patch.name !== undefined) {
-    args.push(normalizeName(patch.name));
-    sets.push(`name = $${args.length}`);
-  }
-  if (patch.role !== undefined) {
-    const role = normalizeRole(patch.role);
-    if (current.role === "admin" && role !== "admin") {
-      if ((await countActiveAdmins()) <= 1 && current.active) {
-        throw new Error("cannot demote the last active admin");
+  return await withTx(async (query) => {
+    await lockActiveAdmins(query);
+    const current = await getUserById(id, query);
+    if (!current) return null;
+    const sets: string[] = [];
+    const args: unknown[] = [];
+    if (patch.name !== undefined) {
+      args.push(normalizeName(patch.name));
+      sets.push(`name = $${args.length}`);
+    }
+    if (patch.role !== undefined) {
+      const role = normalizeRole(patch.role);
+      if (current.role === "admin" && role !== "admin") {
+        if ((await countActiveAdmins(query)) <= 1 && current.active) {
+          throw new Error("cannot demote the last active admin");
+        }
       }
+      args.push(role);
+      sets.push(`role = $${args.length}`);
     }
-    args.push(role);
-    sets.push(`role = $${args.length}`);
-  }
-  if (patch.active !== undefined) {
-    if (typeof patch.active !== "boolean") {
-      throw new Error("active must be a boolean");
-    }
-    if (current.role === "admin" && patch.active === false) {
-      if ((await countActiveAdmins()) <= 1 && current.active) {
-        throw new Error("cannot deactivate the last active admin");
+    if (patch.active !== undefined) {
+      if (typeof patch.active !== "boolean") {
+        throw new Error("active must be a boolean");
       }
+      if (current.role === "admin" && patch.active === false) {
+        if ((await countActiveAdmins(query)) <= 1 && current.active) {
+          throw new Error("cannot deactivate the last active admin");
+        }
+      }
+      args.push(patch.active);
+      sets.push(`active = $${args.length}`);
     }
-    args.push(patch.active);
-    sets.push(`active = $${args.length}`);
-  }
-  if (patch.passwordHash !== undefined) {
-    args.push(patch.passwordHash);
-    sets.push(`password_hash = $${args.length}`);
-  }
-  if (sets.length === 0) throw new Error("nothing to update");
-  args.push(id);
-  const rows = await queryRows<PublicUser>(
-    `update users set ${sets.join(", ")} where id = $${args.length}
-     returning ${PUBLIC_COLUMNS}`,
-    args,
-  );
-  return rows[0] ?? null;
+    if (patch.passwordHash !== undefined) {
+      args.push(patch.passwordHash);
+      sets.push(`password_hash = $${args.length}`);
+    }
+    if (sets.length === 0) throw new Error("nothing to update");
+    args.push(id);
+    const conditions = [`id = $${args.length}`];
+    if (guard.expectedPasswordHash !== undefined) {
+      args.push(guard.expectedPasswordHash);
+      conditions.push(`password_hash = $${args.length}`);
+    }
+    if (guard.requireActive) conditions.push("active = true");
+    const rows = await query<PublicUser>(
+      `update users set ${sets.join(", ")}
+       where ${conditions.join(" and ")}
+       returning ${PUBLIC_COLUMNS}`,
+      args,
+    );
+    if (rows.length === 0) return null;
+    // Any active-state change revokes sessions: deactivation must not leave a
+    // dormant cookie that comes back to life before the 12 h TTL expires, and
+    // reactivation must not revive sessions created before deactivation.
+    const activeChanged = patch.active !== undefined &&
+      patch.active !== current.active;
+    if (patch.passwordHash !== undefined || activeChanged) {
+      await query(`delete from sessions where user_id = $1`, [id]);
+    }
+    return rows[0] ?? null;
+  });
 }
 
-// deleteUser: hard delete (sessions cascade). Refuses the last admin.
+// deleteUser: hard delete (sessions cascade). Refuses the last admin. The
+// active-admin locks make the guard safe against concurrent deletions.
 export async function deleteUser(id: number): Promise<boolean> {
-  const current = await getUserById(id);
-  if (!current) return false;
-  if (current.role === "admin" && current.active) {
-    if ((await countActiveAdmins()) <= 1) {
-      throw new Error("cannot delete the last active admin");
+  return await withTx(async (query) => {
+    await lockActiveAdmins(query);
+    const current = await getUserById(id, query);
+    if (!current) return false;
+    if (current.role === "admin" && current.active) {
+      if ((await countActiveAdmins(query)) <= 1) {
+        throw new Error("cannot delete the last active admin");
+      }
     }
-  }
-  const rows = await queryRows<{ id: number }>(
-    `delete from users where id = $1 returning id`,
-    [id],
-  );
-  return rows.length > 0;
+    const rows = await query<{ id: number }>(
+      `delete from users where id = $1 returning id`,
+      [id],
+    );
+    return rows.length > 0;
+  });
 }

@@ -44,12 +44,6 @@ export async function deleteSession(tokenHash: string): Promise<void> {
   await queryRows(`delete from sessions where token_hash = $1`, [tokenHash]);
 }
 
-// deleteSessionsForUser: revokes every session after a password or role
-// change so stale cookies cannot linger with old privileges.
-export async function deleteSessionsForUser(userId: number): Promise<void> {
-  await queryRows(`delete from sessions where user_id = $1`, [userId]);
-}
-
 // deleteExpiredSessions: opportunistic sweep, safe to run on login.
 export async function deleteExpiredSessions(): Promise<number> {
   const rows = await queryRows<{ id: number }>(

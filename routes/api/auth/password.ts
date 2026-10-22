@@ -30,8 +30,6 @@ import {
   routeClientKey,
 } from "../../../lib/server/throttle.ts";
 
-import { deleteSessionsForUser } from "../../../lib/server/sql/sessions.ts";
-
 import { getUserById, updateUser } from "../../../lib/server/sql/users.ts";
 
 import { buildExpiredCookie } from "../../../lib/server/auth/session.ts";
@@ -102,10 +100,16 @@ export const handler = define.handlers({
       if (await verifyPassword(next, row.password_hash)) {
         return badRequest("new password must differ", requestId);
       }
-      await updateUser(row.id, { passwordHash: await hashPassword(next) });
-      // Every session dies, including this one: a hijacked cookie must not
-      // survive the change. The expired cookie below clears the browser.
-      await deleteSessionsForUser(row.id);
+      // updateUser revokes every session, including this one, in the same
+      // transaction as the hash change: a hijacked cookie must not survive.
+      // The guard makes a concurrent admin reset/deactivation win instead of
+      // being overwritten by this request after it verified the old hash.
+      const updated = await updateUser(
+        row.id,
+        { passwordHash: await hashPassword(next) },
+        { expectedPasswordHash: row.password_hash, requireActive: true },
+      );
+      if (!updated) return unauthorized("not authenticated", requestId);
       return ok({ ok: true }, requestId, {
         headers: { "set-cookie": buildExpiredCookie() },
       });

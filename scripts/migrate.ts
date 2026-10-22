@@ -1,4 +1,4 @@
-// Migrate - applies db/schema.sql then db/seed_lookups.sql.
+// Migrate - applies db/schema.sql, the unused-auth cleanup, then the seeds.
 // This is why it exists: idempotent one-command DB setup for Fresh routes.
 // Run with: deno task db:migrate
 import { fromFileUrl } from "@std/path";
@@ -131,6 +131,7 @@ async function applyFile(url: URL) {
 
 try {
   await applyFile(new URL("../db/schema.sql", import.meta.url));
+  await applyFile(new URL("../db/cleanup-unused-auth.sql", import.meta.url));
   await applyFile(new URL("../db/seed_lookups.sql", import.meta.url));
   console.log("\nMigration complete.");
 } catch (err) {

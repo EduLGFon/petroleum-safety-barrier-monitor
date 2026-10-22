@@ -5,6 +5,7 @@ import {
   createSessionToken,
   getSessionTokenFromRequest,
   hashSessionToken,
+  isSecureRequest,
 } from "./session.ts";
 
 import { assertStrictEquals } from "jsr:@std/assert@^1";
@@ -33,4 +34,30 @@ Deno.test("expired cookie clears the session", () => {
 Deno.test("missing cookie yields null", () => {
   const req = new Request("http://localhost/");
   assertStrictEquals(getSessionTokenFromRequest(req), null);
+});
+
+Deno.test("secure flag follows request protocol and public base URL", () => {
+  assertStrictEquals(
+    isSecureRequest(new Request("https://monitor.example.com/"), ""),
+    true,
+  );
+  assertStrictEquals(
+    isSecureRequest(new Request("http://127.0.0.1:8300/"), ""),
+    false,
+  );
+  // TLS terminated by a reverse proxy: upstream is http, public site is https.
+  assertStrictEquals(
+    isSecureRequest(
+      new Request("http://127.0.0.1:8300/"),
+      "https://monitor.example.com",
+    ),
+    true,
+  );
+  assertStrictEquals(
+    isSecureRequest(
+      new Request("http://127.0.0.1:8300/"),
+      "http://monitor.example.com",
+    ),
+    false,
+  );
 });

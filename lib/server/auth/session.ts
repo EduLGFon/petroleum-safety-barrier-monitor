@@ -64,11 +64,32 @@ export function buildExpiredCookie(): string {
   return `${SESSION_COOKIE}=; Path=/; HttpOnly; SameSite=Lax; Expires=Thu, 01 Jan 1970 00:00:00 GMT`;
 }
 
-// isSecureRequest: Secure cookies only over https (localhost stays http).
-export function isSecureRequest(req: Request): boolean {
-  try {
-    return new URL(req.url).protocol === "https:";
-  } catch {
-    return false;
+// appBaseUrlIsHttps: APP_BASE_URL is the public site URL. Behind a TLS
+// terminating proxy the upstream request is plain http:// even though the
+// browser is on https://, so the request protocol alone would drop Secure.
+function appBaseUrlIsHttps(appBaseUrl: string | undefined): boolean {
+  let value = appBaseUrl;
+  if (value === undefined) {
+    try {
+      value = Deno.env.get("APP_BASE_URL") ?? "";
+    } catch {
+      value = "";
+    }
   }
+  return value.trim().toLowerCase().startsWith("https://");
+}
+
+// isSecureRequest: Secure cookies over https, including deployments behind a
+// TLS-terminating reverse proxy whose upstream request is plain http. The
+// optional appBaseUrl keeps the proxy decision testable without env access.
+export function isSecureRequest(
+  req: Request,
+  appBaseUrl?: string,
+): boolean {
+  try {
+    if (new URL(req.url).protocol === "https:") return true;
+  } catch {
+    // Fall through to the configured public URL.
+  }
+  return appBaseUrlIsHttps(appBaseUrl);
 }

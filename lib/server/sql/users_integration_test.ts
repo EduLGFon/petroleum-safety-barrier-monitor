@@ -2,7 +2,7 @@
 // admin-only PATCH /api/users/:id path. Skipped without DATABASE_URL.
 import { createUser, deleteUser, getUserById, updateUser } from "./users.ts";
 
-import { createSession, deleteSessionsForUser } from "./sessions.ts";
+import { createSession } from "./sessions.ts";
 
 import { hashPassword, verifyPassword } from "../auth/password.ts";
 
@@ -51,7 +51,6 @@ Deno.test("admin password reset replaces the hash and revokes sessions", async (
       passwordHash: await hashPassword("new-password-5678"),
     });
     assertStrictEquals(updated?.id, userId);
-    await deleteSessionsForUser(userId);
 
     const after = await getUserById(userId);
     assertStrictEquals(
@@ -72,6 +71,95 @@ Deno.test("admin password reset replaces the hash and revokes sessions", async (
   } finally {
     if (userId !== undefined) await deleteUser(userId);
     if (otherId !== undefined) await deleteUser(otherId);
+  }
+});
+
+Deno.test("changing active state revokes the user's sessions", async () => {
+  if (!Deno.env.get("DATABASE_URL")) {
+    console.log("skip: DATABASE_URL unset - needs a real Postgres");
+    return;
+  }
+  const email = `pwdeactivate-${Date.now()}@example.com`;
+  let userId: number | undefined;
+  try {
+    const created = await createUser({
+      email,
+      name: "Deactivate Test",
+      passwordHash: await hashPassword("active-password-1234"),
+      role: "user",
+    });
+    userId = created.id;
+    await createSession(
+      userId,
+      `pwdeactivate-${crypto.randomUUID()}`,
+      new Date(Date.now() + 60_000),
+    );
+    assertStrictEquals(await countSessions(userId), 1);
+
+    const updated = await updateUser(userId, { active: false });
+    assertStrictEquals(updated?.active, false);
+    assertStrictEquals(await countSessions(userId), 0);
+
+    // A dormant session that predates the deactivation must not come back when
+    // the account is reactivated.
+    await createSession(
+      userId,
+      `pwreactivate-${crypto.randomUUID()}`,
+      new Date(Date.now() + 60_000),
+    );
+    assertStrictEquals(await countSessions(userId), 1);
+    const reactivated = await updateUser(userId, { active: true });
+    assertStrictEquals(reactivated?.active, true);
+    assertStrictEquals(await countSessions(userId), 0);
+  } finally {
+    if (userId !== undefined) await deleteUser(userId);
+  }
+});
+
+Deno.test("conditional password update rejects a stale hash", async () => {
+  if (!Deno.env.get("DATABASE_URL")) {
+    console.log("skip: DATABASE_URL unset - needs a real Postgres");
+    return;
+  }
+  const email = `pwstale-${Date.now()}@example.com`;
+  let userId: number | undefined;
+  try {
+    const firstHash = await hashPassword("first-password-1234");
+    const secondHash = await hashPassword("second-password-5678");
+    const staleHash = await hashPassword("stale-password-9012");
+    const created = await createUser({
+      email,
+      name: "Stale Test",
+      passwordHash: firstHash,
+      role: "user",
+    });
+    userId = created.id;
+
+    const changed = await updateUser(
+      userId,
+      { passwordHash: secondHash },
+      { expectedPasswordHash: firstHash, requireActive: true },
+    );
+    assertStrictEquals(changed?.id, userId);
+
+    const stale = await updateUser(
+      userId,
+      { passwordHash: staleHash },
+      { expectedPasswordHash: firstHash, requireActive: true },
+    );
+    assertStrictEquals(stale, null);
+
+    const after = await getUserById(userId);
+    assertStrictEquals(
+      await verifyPassword("second-password-5678", after!.password_hash),
+      true,
+    );
+    assertStrictEquals(
+      await verifyPassword("stale-password-9012", after!.password_hash),
+      false,
+    );
+  } finally {
+    if (userId !== undefined) await deleteUser(userId);
   }
 });
 

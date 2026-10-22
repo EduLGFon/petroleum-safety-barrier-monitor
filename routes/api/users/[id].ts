@@ -33,8 +33,6 @@ import { routeClientKey, writeThrottle } from "../../../lib/server/throttle.ts";
 
 import { parseIdParam, readJsonBody } from "../../../lib/server/validation.ts";
 
-import { deleteSessionsForUser } from "../../../lib/server/sql/sessions.ts";
-
 import { loadServerConfig } from "../../../lib/server/config.ts";
 
 import { define } from "../../../utils.ts";
@@ -89,6 +87,8 @@ export const handler = define.handlers({
         }
         passwordHash = await hashPassword(next);
       }
+      // updateUser revokes sessions itself when the password or active state
+      // changes, in one transaction with the row update.
       const updated = await updateUser(id, {
         name: body.name,
         role: body.role,
@@ -96,9 +96,6 @@ export const handler = define.handlers({
         passwordHash,
       });
       if (!updated) return notFound("User not found", requestId);
-      if (passwordHash !== undefined) {
-        await deleteSessionsForUser(id);
-      }
       return ok(updated, requestId);
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);

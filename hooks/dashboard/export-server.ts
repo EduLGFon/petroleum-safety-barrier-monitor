@@ -66,10 +66,12 @@ async function requestFile(
     let detail = `HTTP ${res.status}`;
     try {
       const body = await res.json() as { error?: string };
-      if (body.error) detail = toPtError(body.error);
+      if (body.error) detail = body.error;
     } catch {
       // Non-JSON error body; keep the status text.
     }
+    // Translate exactly once: known wire errors, non-JSON statuses, and
+    // already-localized messages all resolve through the same boundary.
     throw new Error(toPtError(detail));
   }
   return { res };
