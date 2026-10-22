@@ -404,10 +404,11 @@ Privacy by Design
   and `test/` captures are never committed.
 - Prefer synthetic, anonymized, pseudonymized, or minimized data for development and testing.
 - Implement applicable data-subject rights and consent requirements: reads require a session or
-  `ADMIN_TOKEN`; writes require `admin`; there is no self-registration (first account via empty
-  table or `scripts/create-admin.ts`); the last active admin cannot be demoted, deactivated, or
-  deleted; self-service password change is session-only and carries no user id, while admins may
-  reset any user's password through the admin-only users route (which revokes the target's sessions).
+  `ADMIN_TOKEN`; writes require `admin`; there is no self-registration (the first
+  account comes from `scripts/create-admin.ts`, even on an empty table); the last
+  active admin cannot be demoted, deactivated, or deleted; self-service password
+  change is session-only and carries no user id, while admins may reset any user's
+  password through the admin-only users route (which revokes the target's sessions).
 - Consider copies in caches, backups, indexes, logs, derived stores, and third-party services when
   implementing deletion or retention requirements (status history, `sync_barrier_changes` snapshots,
   alert payloads with `delivered[]`, `localStorage`, downloaded exports, SMTP deliveries, upstream
@@ -424,8 +425,9 @@ Authentication
 - Never trust client-side authentication state as proof of identity.
 - Validate identity where the platform allows it (lowercased emails, PBKDF2-SHA256 with 210,000
   iterations plus per-user salt plus constant-time verification via WebCrypto only, 32 random session
-  bytes with only the SHA-256 hash stored, HttpOnly SameSite=Lax cookie with Secure on https and
-  12 h TTL, session-only self-service password change with 12-256 policy and no current-password
+  bytes with only the SHA-256 hash stored, HttpOnly SameSite=Lax cookie with Secure on https (or
+  when `APP_BASE_URL` is https behind a TLS proxy) and 12 h TTL, session-only self-service password
+  change with 12-256 policy and no current-password
   reuse; admin-initiated resets follow the same 12-256 policy and revoke the target's sessions).
 - Never trust user-supplied identities, roles, permissions, ownership fields, or similar
   authorization attributes. Author on session status writes derives from the session via `authors`;

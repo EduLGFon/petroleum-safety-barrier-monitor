@@ -462,9 +462,9 @@ Invariants worth knowing before touching the schema:
   12-256 character policy, constant-time verification, no reuse of the current
   password.
 - Sessions: 32 random bytes in an HttpOnly, SameSite=Lax cookie (Secure on
-  https), 12 hour TTL. Only the SHA-256 hash is stored, so a database leak
-  yields no usable cookie and revocation is a row delete. Expired rows are swept
-  opportunistically on login.
+  https, including behind a TLS proxy when `APP_BASE_URL` is https), 12 hour TTL.
+  Only the SHA-256 hash is stored, so a database leak yields no usable cookie and
+  revocation is a row delete. Expired rows are swept opportunistically on login.
 - Two roles: `admin` and `user`. Only admins write status, edit records, manage
   users, recipients, rules and field options. The last active admin cannot be
   demoted, deactivated or deleted.
