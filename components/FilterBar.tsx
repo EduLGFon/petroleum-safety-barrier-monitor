@@ -14,7 +14,7 @@ import type { FilterState, RowScope } from "../lib/types.ts";
 
 import { ColumnsMenu } from "./table/ColumnsMenu.tsx";
 
-import { useEffect, useState } from "preact/hooks";
+import { useEffect, useRef, useState } from "preact/hooks";
 
 import type { ComponentChildren } from "preact";
 
@@ -154,13 +154,24 @@ export function FilterBar(
   // the dashboard pipeline debounced, so each keystroke no longer triggers a
   // full filter + O(N log N) sort over tens of thousands of rows.
   const [draft, setDraft] = useState(filters.query);
-  // External query changes (reset, restored state) overwrite the draft.
+  // Tracks the last value we pushed upstream via the debounced onFilter, so
+  // an echo of our own write (which lands one render later) never clobbers
+  // characters typed in the meantime. Genuine external changes (reset,
+  // restored state, showUrgent) differ from this ref and still win.
+  const lastSentRef = useRef(filters.query);
+  // External query changes (reset, restored state) overwrite the draft, but
+  // only when they are not the echo of our own debounced write.
   useEffect(() => {
+    if (filters.query === lastSentRef.current) return;
     setDraft(filters.query);
+    lastSentRef.current = filters.query;
   }, [filters.query]);
   useEffect(() => {
     if (draft === filters.query) return;
-    const t = setTimeout(() => onFilter({ query: draft }), 200);
+    const t = setTimeout(() => {
+      lastSentRef.current = draft;
+      onFilter({ query: draft });
+    }, 200);
     return () => clearTimeout(t);
   }, [draft, filters.query, onFilter]);
 
