@@ -1,2 +1,0 @@
-- test protected endpoint security
-- check architecture compliance
