@@ -1,282 +1,466 @@
-# Manual do Usuario - Monitor de Barreiras de Segurança
+# Manual do Usuário - Monitor de Barreiras de Segurança
 
-Documento de uso em portugues (pt-BR). Descreve o painel visto pelo usuario final.
-Para detalhes tecnicos, veja `docs/ARCHITECTURE.md`, `docs/API.md` e `docs/DATABASE.md`.
+Para obter informações técnicas sobre a implementação, consulte `docs/ARCHITECTURE.md`, `docs/API.md` e `docs/DATABASE.md`.
 
-## 1. Introducao
+## 1. Introdução
 
-O Monitor de Barreiras de Segurança acompanha o estado operacional das barreiras de
-seguranca que protegem equipamentos de processo em uma instalacao de oleo e gas.
-As barreiras sao importadas do sistema de manutencao (CMMS) do operador,
-normalizadas em um modelo pequeno no PostgreSQL e servidas em um painel
-Fresh/Preact. No painel e possivel filtrar por instalacao, criticidade,
-disponibilidade e conformidade, acompanhar tendencias de conformidade por
-categoria, editar registros, exportar relatorios e receber avisos por e-mail
-quando uma barreira se degrada.
+O Monitor de Barreiras de Segurança permite acompanhar o estado operacional das barreiras que protegem equipamentos de processo em instalações de óleo e gás.
 
-## 2. Acesso e perfis
+Os dados das barreiras são importados do sistema de gerenciamento, processados pelo servidor e disponibilizados no painel.
 
-- A unica rota publica e `/login`. Visitantes anonimos sao redirecionados para
-  `/login?next=...` e voltam para a pagina original apos o login.
-- Existem dois perfis: `admin` e `user`.
-- Nao existe auto-cadastro. A primeira conta e criada pelo administrador via
-  linha de comando (`deno task admin:create`).
-- A sessao dura 12 horas. Logout revoga a sessao imediatamente.
-- Troca de senha pelo proprio usuario (aba Conta nas configuracoes) revoga todas
-  as sessoes, inclusive a atual. A politica exige de 12 a 256 caracteres.
-- Administradores podem redefinir a senha de qualquer usuario na aba Usuarios,
-  revogando apenas as sessoes desse usuario.
+No painel, é possível filtrar barreiras por instalação, criticidade, disponibilidade e conformidade; acompanhar tendências de conformidade por categoria; consultar e editar registros; exportar relatórios; e receber alertas por e-mail quando uma barreira apresenta deterioração de seu estado operacional.
 
-## 3. Visao geral do painel
+## 2. Acesso e perfis de usuário
 
-O painel principal (`/`) contem, de cima para baixo:
+O sistema possui dois perfis de acesso: `admin` (administrador) e `user` (usuário).
 
-1. Cabecalho com o nome do operador (quando configurado), o indicador de
-   saude (sincronizacao + conexao) e os botoes de configuracoes e exportacao.
-2. Faixa de KPIs: total, disponíveis, nao conformes, contingenciados, percentual
-   de conformidade, nao conformes criticos, sem plano de acao e "outros estados",
-   mais a faixa de criticidade.
-3. Faixa de status de disponibilidade, dimensionada por volume. Clicar em um
-   segmento filtra a tabela por aquele status. Administradores tambem tem os
-   segmentos Desativadas e Excluidas, que trocam o escopo de visibilidade.
-4. Barra de filtros.
-5. Grafico de conformidade por categoria.
-6. Tabela de barreiras com paginacao.
-7. Modal de detalhes da barreira (abre ao clicar em uma linha).
+### 2.1. Autenticação e sessões
 
-O painel ocupa toda a largura da tela (sem limite de 1400 px), para usar o
-monitor inteiro.
+- **Acesso público:** a única rota pública é `/login`. Visitantes não autenticados são redirecionados para `/login?next=...` e, após o login, retornam à página que tentavam acessar.
+- **Cadastro de contas:** não há cadastro público. A primeira conta deve ser criada pelo administrador por meio do comando `deno task admin:create`.
+- **Duração da sessão:** cada sessão permanece válida por 12 horas.
+- **Logout:** encerra a sessão e revoga sua validade imediatamente.
+- **Alteração de senha pelo próprio usuário:** disponível na aba **Conta**, nas configurações. A operação revoga todas as sessões do usuário, inclusive a sessão atual. A senha deve ter entre 12 e 256 caracteres.
+- **Redefinição de senha por um administrador:** disponível na aba **Usuários**. A operação revoga as sessões do usuário cuja senha foi redefinida, sem afetar as sessões dos demais usuários.
+
+## 3. Visão geral do painel
+
+O painel principal (`/`) organiza as informações de cima para baixo da seguinte maneira:
+
+1. **Cabeçalho:** exibe o nome do operador, quando configurado, o indicador de saúde da sincronização e da conexão, além dos botões de configurações e exportação.
+2. **Indicadores-chave de desempenho (KPIs):** apresentam o total de barreiras, a quantidade de barreiras disponíveis, não conformes e contingenciadas, o percentual de conformidade, a quantidade de barreiras críticas não conformes, as barreiras sem plano de ação e os outros estados. Essa área também apresenta a distribuição por criticidade.
+3. **Distribuição por disponibilidade:** exibe uma faixa cujos segmentos são dimensionados de acordo com o volume de barreiras em cada estado. Ao clicar em um segmento, a tabela é filtrada pelo respectivo estado. Administradores também podem acessar os segmentos **Desativadas** e **Excluídas**, que alteram o conjunto de registros exibidos.
+4. **Barra de filtros:** permite restringir os registros apresentados.
+5. **Gráfico de conformidade por categoria:** apresenta a distribuição da conformidade entre as categorias de barreiras.
+6. **Tabela de barreiras:** lista os registros e permite navegar entre as páginas de resultados.
+7. **Janela de detalhes da barreira:** é aberta ao clicar em uma linha da tabela e apresenta as informações detalhadas do registro.
+
+O painel ocupa toda a largura disponível da tela, sem um limite máximo de 1.400 pixels, aproveitando toda a área útil do monitor.
 
 ## 4. Filtros
 
-A barra de filtros permite combinar:
+A barra de filtros permite combinar diferentes critérios para localizar e analisar barreiras.
 
-- Busca textual (com debounce), em tag e codigo de instalacao.
-- Tipologia.
-- Categoria.
-- Portao de criticidade (um toque lista apenas as faixas criticas ESO e A).
-- Disponibilidade.
-- Conformidade.
-- Plano de acao (com / sem).
-- Intervalo de datas (`Desde` / `Ate`).
+### 4.1. Filtros disponíveis
 
-Regras:
+- **Busca textual:** pesquisa por tag e código da instalação. A busca utiliza _debounce_ para evitar atualizações excessivas durante a digitação.
+- **Tipologia:** restringe os resultados de acordo com a tipologia da barreira.
+- **Categoria:** filtra os registros por categoria.
+- **Criticidade:** permite filtrar por faixa de criticidade. A opção **Somente críticos** restringe os resultados às faixas ESO e A.
+- **Disponibilidade:** filtra pelo estado operacional da barreira.
+- **Conformidade:** filtra entre registros conformes e não conformes.
+- **Plano de ação:** permite selecionar barreiras com ou sem plano de ação.
+- **Intervalo de datas:** define as datas inicial (**Desde**) e final (**Até**) do período desejado.
 
-- As opcoes de filtro sao as vocabularias vivas do banco; nao ha lista fixa.
-- "Limpar filtros" aparece quando algo esta ativo.
-- A contagem de resultados e exibida ao vivo.
-- A tabela abre sem filtros, com 25 linhas por pagina, ordenada por id
-  crescente.
-- Os filtros padrao e a ordenacao padrao podem ser configurados no painel de
-  configuracoes.
+### 4.2. Comportamento dos filtros
+
+- **Opções dinâmicas:** as opções de filtro são obtidas dos valores existentes no banco de dados. Não há listas fixas para esses campos.
+- **Limpeza dos filtros:** o botão **Limpar filtros** aparece quando pelo menos um filtro está ativo.
+- **Contagem de resultados:** a quantidade de registros encontrados é atualizada conforme os filtros são aplicados.
+- **Estado inicial da tabela:** a tabela é aberta sem filtros, com 25 linhas por página e ordenação crescente por ID.
+- **Configuração dos padrões:** os filtros iniciais e a ordenação padrão podem ser personalizados no painel de configurações.
 
 ## 5. Tabela de barreiras
 
-- Cabecalhos ordenaveis (Enter/Espaco, `aria-sort`).
-- 10 colunas alternaveis e reordenaveis a partir de um dialogo portado.
-- Dois toggles de filtro extras fixados na tabela.
-- Selecao tri-estadual com escopos estilo Gmail: pagina atual, todo o conjunto
-  filtrado e limpar.
-- Paginacao com campo "ir para pagina". Tamanhos de pagina: 25, 50 e 100.
-- Linhas nao conformes mostram o chip "dias sem contingência".
-- A ultima coluna visivel nao pode ser ocultada.
-- A selecao sobrevive a mudancas de pagina e filtro, e e limitada ao restaurar.
+A tabela permite visualizar, ordenar, selecionar e navegar pelos registros.
 
-## 6. Detalhes e historico
+### 5.1. Organização e ordenação
 
-O modal da barreira tem tres abas:
+- Os cabeçalhos das colunas permitem ordenar os registros. A ordenação também pode ser acionada pelo teclado, usando **Enter** ou **Espaço**.
+- O atributo de acessibilidade `aria-sort` informa a ordenação aplicada.
+- Existem 10 colunas que podem ser exibidas ou ocultadas e cuja ordem pode ser alterada por meio de um diálogo específico.
+- Dois controles adicionais de filtro permanecem fixados à tabela.
+- A última coluna visível não pode ser ocultada, garantindo que a tabela sempre mantenha pelo menos uma coluna visível.
 
-- Detalhes: campos de identificacao, instalacao, tipologia, criticidade,
-  categoria, grupo, proprietario, disponibilidade, conformidade, data de status,
-  comentarios, plano de acao e os campos de texto livre da ficha de
-  inventario.
-- Historico: linha do tempo de mudancas de status.
-- Edicao: apenas para administradores (ver secao 7).
+### 5.2. Seleção de registros
 
-## 7. Edicao (somente admin)
+A seleção possui três estados de escopo, em um modelo semelhante ao utilizado pelo Gmail:
 
-Administradores podem editar campos centrais e da ficha, e alterar o status de
-disponibilidade. A mudanca de status passa por `record_status_change()`, que
-atualiza disponibilidade e data de status e acrescenta historico de forma
-atomica. Escritas com o mesmo status nao geram historico nem alerta.
+- Selecionar os registros da página atual.
+- Selecionar todos os registros que correspondem aos filtros aplicados.
+- Limpar a seleção.
 
-A sobreposicao manual de contingência (Há Contingência?=Sim) promove
-Degradado para Degradado Contingenciado e Indisponível para Indisponível
-Contingenciado na exibicao e no PATCH.
+A seleção é preservada durante as mudanças de página e de filtro. Ao restaurar uma seleção salva, o sistema aplica as validações e limitações necessárias para manter a seleção consistente.
 
-Apos uma mudanca de status, o sistema pode enviar alertas imediatos conforme
-as regras configuradas, e sempre enfileira o evento para o ciclo de digest.
+### 5.3. Paginação e indicadores
 
-## 8. Grafico de conformidade
+- A tabela possui um campo **Ir para página**, que permite navegar diretamente para uma página específica.
+- Os tamanhos de página disponíveis são 25, 50 e 100 registros.
+- As linhas de barreiras não conformes exibem o indicador **Dias sem contingência**, conforme as regras de apresentação do sistema.
 
-Dois modos:
+## 6. Detalhes e histórico da barreira
 
-- Barras horizontais empilhadas por categoria.
-- Resumo executivo: rosca com percentual de conformidade e lista Top-NC.
+Ao clicar em uma linha da tabela, abre-se uma janela com as informações detalhadas da barreira. Essa janela possui três abas.
 
-Funcionalidades:
+### 6.1. Detalhes
 
-- Ordenacao por volume, taxa de nao conformidade ou nome.
-- Expansao alem das 20 primeiras categorias em uma cauda agregada.
-- Clique em uma linha para filtrar a tabela.
-- Busca interna por categoria.
-- Geometria adaptada a densidade e a largura do monitor.
-- Tooltip limitado a area visivel.
-- Preferencias persistidas.
+Apresenta os dados da barreira, incluindo:
 
-## 9. Exportacao
+- Identificação e instalação.
+- Tipologia, criticidade e categoria.
+- Grupo e proprietário.
+- Disponibilidade e conformidade.
+- Data da última alteração de status.
+- Comentários e plano de ação.
+- Campos de texto livre provenientes da ficha de inventário.
 
-Formatos: CSV, XLSX e PDF. Toda exportacao cobre a selecao inteira (inclusive
-selecoes que cruzam paginas nunca carregadas no navegador), com streaming a
-partir do banco.
+### 6.2. Histórico
 
-Limites e conteudo:
+Apresenta uma linha do tempo com as alterações de status da barreira, permitindo consultar a evolução de seu estado operacional.
 
-- Teto de 200.000 linhas por exportacao. Acima disso a exportacao e recusada
-  com a contagem real, para que os filtros sejam estreitados. Nada e cortado
-  silenciosamente.
-- A selecao e intersectada com os filtros ativos no servidor, para que uma
-  selecao antiga nao amplie o arquivo.
-- CSV: 30 colunas, UTF-8 com BOM, separado por ponto e virgula, mais bloco
-  RESUMO de KPIs.
-- XLSX: pasta de trabalho OOXML real, com cabecalho de marca, faixa de KPIs,
-  linha de cabecalho congelada com autofiltro, larguras ajustadas, cores de
-  status e criticidade, IDs numericos e uma aba Resumo.
-- PDF: bytes PDF reais, relatorio em A4 paisagem com bloco de marca, chips de
-  KPI, as 30 colunas (partes fixas, texto quebrado, nada cortado na borda do
-  papel), linha de cabecalho repetida e numeracao de paginas no rodape.
-- Arquivos nomeados com a data da exportacao, um arquivo por exportacao.
+### 6.3. Edição
 
-## 10. Configuracoes e tema
+Disponível exclusivamente para administradores. Permite alterar os campos autorizados do registro, conforme descrito na seção 7.
 
-O painel de configuracoes (engrenagem) permite:
+## 7. Edição de registros (somente administradores)
 
-- Tema: claro, escuro ou preto puro.
-- Cor de destaque: 8 paletas, que recoloram o fundo da pagina.
-- Densidade: 3 presets, que re-ritmam a interface via variaveis CSS.
-- Reducao de movimento.
-- Filtros padrao e ordenacao padrao.
-- Troca de senha (aba Conta).
+Os administradores podem editar os campos principais da barreira, os campos da ficha de inventário e o estado de disponibilidade.
 
-Aba administrativa (somente admin):
+### 7.1. Alteração de status
 
-- Usuarios: listar, criar, editar, remover; protecao do ultimo admin ativo.
-- Destinatarios de alerta: listar, criar, ativar, remover.
-- Regras de alerta: definir gatilhos por categoria, status de chegada,
-  criticidade, recuperacao, dias de atraso, imediato vs. digest.
-- Opcoes de campo: listas curadas por pergunta da ficha.
+As alterações de status são processadas pela função `record_status_change()`, responsável por:
 
-Tudo persiste em `localStorage` e e restaurado antes da hidratacao, evitando
-flash de tema errado.
+1. Atualizar o estado de disponibilidade.
+2. Atualizar a data do status.
+3. Registrar a alteração no histórico.
 
-## 11. Indicador de sincronizacao e conexao
+Essas operações são executadas de forma atômica, garantindo que a atualização do registro e o respectivo histórico sejam tratados como uma única operação.
 
-- Um ponto de saude unico combina o estado de sincronizacao (nucleo) com o
-  estado de conexao (halo), com animacoes distintas.
-- Linha de status com hora local e deltas `+N ~N -N`.
-- Cartao flutuante com a duracao do ultimo ciclo e o que mudou.
-- Modal de auditoria listando as linhas tocadas pelo ciclo.
-- A sonda de conexao faz ping a cada 5 segundos e pausa em abas ocultas.
-- Estados de sincronizacao: sincronizando, ocioso, atrasado, desconhecido.
+Se o novo status for igual ao status atual, o sistema não gera um novo registro de histórico nem dispara um alerta decorrente da alteração.
 
-## 12. Papeis e permissoes
+### 7.2. Sobreposição manual de contingência
 
-| Acao                                | user | admin |
-| ----------------------------------- | ---- | ----- |
-| Visualizar dashboard, KPIs, grafico | sim  | sim   |
-| Filtrar e ordenar                   | sim  | sim   |
-| Exportar                            | sim  | sim   |
-| Ver linhas excluidas/desativadas    | nao  | sim   |
-| Editar barreira                     | nao  | sim   |
-| Alterar status                      | nao  | sim   |
-| Gerenciar usuarios                  | nao  | sim   |
-| Gerenciar destinatarios e regras    | nao  | sim   |
-| Gerenciar opcoes de campo           | nao  | sim   |
+Quando o campo **Há Contingência?** está definido como **Sim**, o sistema considera a contingência manual na apresentação e no processamento das alterações de status (`PATCH`).
 
-Chamadas anonimas a API recebem 404 com a mesma forma de uma rota inexistente;
-credenciais invalidas recebem 401. Escritas falham fechadas quando nenhuma
-credencial esta configurada.
+Nesse caso:
 
-## 13. Persistencia local
+- **Degradado** passa a ser exibido como **Degradado Contingenciado**.
+- **Indisponível** passa a ser exibido como **Indisponível Contingenciado**.
 
-Tres chaves no `localStorage`:
+### 7.3. Alertas após alterações
 
-- `barrier-dashboard`: instalacao, filtros, selecao, linha aberta, colunas
-  visiveis e fixadas.
-- `barrier-chart`: modo do grafico, ordenacao, expansao.
-- `barrier-settings`: tema, cor, densidade, movimento, filtros e ordenacao
-  padrao.
+Após uma alteração de status, o sistema pode enviar alertas imediatos, de acordo com as regras configuradas. Independentemente do envio imediato, o evento é enfileirado para processamento pelo ciclo de notificações agrupadas (_digest_).
 
-Cada chave e validada campo a campo na restauracao; uma pagina salva antiga
-se autocorrige.
+## 8. Gráfico de conformidade
+
+O gráfico de conformidade pode ser apresentado em dois modos.
+
+### 8.1. Barras horizontais empilhadas
+
+Exibe a distribuição dos estados de conformidade por categoria, permitindo comparar os volumes e as proporções entre as categorias.
+
+### 8.2. Resumo executivo
+
+Apresenta um gráfico de rosca com o percentual de conformidade e uma lista **Top-NC**, destinada a destacar as categorias ou os registros com maior destaque negativo em conformidade, conforme a agregação utilizada pelo sistema.
+
+### 8.3. Recursos disponíveis
+
+- **Ordenação:** por volume de registros, taxa de não conformidade ou nome da categoria.
+- **Expansão de categorias:** permite visualizar categorias além das 20 primeiras, agrupando as categorias restantes em uma cauda agregada.
+- **Filtragem pela categoria:** clicar em uma linha do gráfico filtra a tabela de barreiras pela categoria correspondente.
+- **Busca interna:** permite pesquisar categorias diretamente no gráfico.
+- **Adaptação do layout:** a geometria do gráfico é ajustada à densidade dos dados e à largura do monitor.
+- **Área de dicas:** os _tooltips_ são limitados à área visível da interface.
+- **Persistência das preferências:** as preferências de visualização do gráfico são salvas localmente.
+
+## 9. Exportação de relatórios
+
+O sistema permite exportar os dados nos formatos CSV, XLSX e PDF.
+
+As exportações abrangem toda a seleção válida, inclusive registros de páginas que não foram carregadas no navegador. Os dados são transmitidos a partir do banco de dados por meio de processamento em fluxo (_streaming_).
+
+### 9.1. Limite de exportação
+
+Cada arquivo pode conter, no máximo, 200.000 linhas de dados.
+
+Se a exportação ultrapassar esse limite:
+
+- A operação é recusada.
+- O sistema informa a quantidade real de registros encontrados.
+- O usuário deve restringir os filtros para reduzir o conjunto de dados.
+
+Nenhum registro é omitido silenciosamente para fazer uma exportação excedente caber no limite.
+
+A seleção também é intersectada, no servidor, com os filtros ativos. Assim, uma seleção anterior não permite incluir no arquivo registros que já não correspondem aos filtros atuais.
+
+### 9.2. CSV
+
+O arquivo CSV possui as seguintes características:
+
+- 30 colunas de dados.
+- Codificação UTF-8 com BOM, para melhorar a compatibilidade com programas como o Microsoft Excel.
+- Ponto e vírgula (`;`) como separador de campos.
+- Bloco `RESUMO` com os indicadores-chave de desempenho (KPIs).
+
+### 9.3. XLSX
+
+O arquivo XLSX é uma pasta de trabalho OOXML válida, com os seguintes recursos:
+
+- Cabeçalho com a identidade visual do sistema.
+- Faixa de indicadores-chave de desempenho (KPIs).
+- Linha de cabeçalho congelada e filtros automáticos.
+- Larguras de colunas ajustadas ao conteúdo.
+- Cores aplicadas aos estados de disponibilidade e às faixas de criticidade.
+- IDs armazenados como valores numéricos.
+- Aba **Resumo**, com os indicadores consolidados.
+
+### 9.4. PDF
+
+O relatório PDF possui as seguintes características:
+
+- Formato A4 em orientação paisagem.
+- Cabeçalho com a identidade visual do sistema.
+- Indicadores-chave de desempenho (KPIs) apresentados em cartões.
+- Até 30 colunas, organizadas para acomodar o conteúdo no espaço disponível.
+- Texto quebrado em linhas quando necessário, evitando cortes nas bordas da página.
+- Repetição do cabeçalho da tabela nas páginas seguintes.
+- Numeração de páginas no rodapé.
+
+### 9.5. Nome dos arquivos
+
+Os arquivos exportados recebem nomes que incluem a data da exportação. Cada operação de exportação gera um arquivo.
+
+## 10. Configurações e personalização
+
+O painel de configurações, acessível pelo botão de engrenagem, permite personalizar a aparência e o comportamento da interface.
+
+### 10.1. Preferências do usuário
+
+- **Tema:** claro, escuro ou preto puro.
+- **Cor de destaque:** seleção entre oito paletas de cores, que alteram a coloração da interface e do fundo da página.
+- **Densidade da interface:** três predefinições que ajustam o espaçamento e o ritmo visual dos componentes por meio de variáveis CSS.
+- **Redução de movimento:** permite reduzir animações e movimentos na interface.
+- **Filtros padrão:** define os filtros aplicados inicialmente ao abrir o painel.
+- **Ordenação padrão:** define a ordenação inicial dos registros.
+- **Alteração de senha:** disponível na aba **Conta**.
+
+### 10.2. Configurações administrativas
+
+Os recursos a seguir estão disponíveis somente para administradores.
+
+**Usuários**
+
+Permite listar, criar, editar e remover contas. O sistema protege a última conta de administrador ativa, impedindo que o sistema fique sem um administrador ativo.
+
+**Destinatários de alertas**
+
+Permite listar, cadastrar, ativar e remover os destinatários das notificações por e-mail.
+
+**Regras de alerta**
+
+Permite configurar os critérios que determinam quando um alerta deve ser gerado, incluindo:
+
+- Categoria da barreira.
+- Status de chegada.
+- Criticidade.
+- Recuperação do estado operacional.
+- Quantidade de dias de atraso.
+- Envio imediato ou agrupado em notificações periódicas (_digest_).
+
+**Opções de campo**
+
+Permite administrar listas de opções controladas para as perguntas da ficha de inventário.
+
+### 10.3. Persistência das preferências
+
+As preferências da interface são armazenadas no `localStorage` do navegador e restauradas antes da hidratação da aplicação. Isso evita que o usuário veja temporariamente um tema diferente daquele que havia selecionado.
+
+As preferências persistidas e suas respectivas chaves são detalhadas na seção 13.
+
+## 11. Indicador de sincronização e conexão
+
+O painel possui um indicador visual de saúde que combina informações sobre a sincronização dos dados e a conexão com o sistema.
+
+### 11.1. Indicador de saúde
+
+- O **núcleo** do indicador representa o estado da sincronização.
+- O **halo** representa o estado da conexão.
+- Cada componente utiliza animações distintas para facilitar a diferenciação visual entre os estados.
+
+### 11.2. Informações de sincronização
+
+A linha de status apresenta:
+
+- Horário local da última atualização pertinente.
+- Variações identificadas durante o ciclo, no formato `+N ~N -N`.
+
+Um cartão flutuante exibe a duração do último ciclo de sincronização e um resumo das alterações detectadas.
+
+O sistema também disponibiliza um modal de auditoria que lista os registros afetados pelo ciclo.
+
+### 11.3. Monitoramento da conexão
+
+A verificação de conectividade executa um _ping_ a cada cinco segundos. Essa verificação é pausada quando a aba do navegador fica oculta.
+
+### 11.4. Estados de sincronização
+
+O indicador pode assumir os seguintes estados:
+
+- **Sincronizando:** um ciclo de sincronização está em andamento.
+- **Ocioso:** não há atividade de sincronização em andamento.
+- **Atrasado:** a sincronização está atrasada em relação ao esperado.
+- **Desconhecido:** não há informações suficientes para determinar o estado atual.
+
+## 12. Papéis e permissões
+
+A tabela abaixo resume as permissões de cada perfil.
+
+| Ação                                          | `user` | `admin` |
+| --------------------------------------------- | ------ | ------- |
+| Visualizar o painel, os KPIs e o gráfico      | Sim    | Sim     |
+| Filtrar e ordenar registros                   | Sim    | Sim     |
+| Exportar dados                                | Sim    | Sim     |
+| Visualizar registros excluídos ou desativados | Não    | Sim     |
+| Editar barreiras                              | Não    | Sim     |
+| Alterar o status das barreiras                | Não    | Sim     |
+| Gerenciar usuários                            | Não    | Sim     |
+| Gerenciar destinatários e regras de alerta    | Não    | Sim     |
+| Gerenciar opções de campo                     | Não    | Sim     |
+
+### 12.1. Proteção das rotas e operações
+
+- **Requisições sem autenticação:** chamadas anônimas à API recebem uma resposta HTTP `404`, com o mesmo formato utilizado para rotas inexistentes.
+- **Credenciais inválidas:** resultam em uma resposta HTTP `401`.
+- **Falha segura:** operações de escrita são recusadas quando nenhuma credencial está configurada.
+
+Essas medidas evitam a exposição desnecessária de informações sobre rotas protegidas e impedem alterações sem autenticação adequada.
+
+## 13. Persistência local
+
+O navegador utiliza três chaves no `localStorage` para armazenar preferências e o estado da interface.
+
+| Chave               | Informações armazenadas                                                                                   |
+| ------------------- | --------------------------------------------------------------------------------------------------------- |
+| `barrier-dashboard` | Instalação, filtros, seleção de registros, linha aberta e colunas visíveis e fixadas.                     |
+| `barrier-chart`     | Modo de visualização do gráfico, ordenação e estado de expansão.                                          |
+| `barrier-settings`  | Tema, cor de destaque, densidade, preferência de redução de movimento, filtros padrão e ordenação padrão. |
+
+### 13.1. Validação e restauração
+
+Cada chave é validada campo a campo durante a restauração.
+
+Se os dados salvos forem incompatíveis com a versão atual da aplicação, o sistema aplica as correções necessárias para restaurar um estado válido da interface.
 
 ## 14. Atalhos e acessibilidade
 
-- Escape fecha todas as sobreposicoes.
-- Tab fica preso dentro dos dialogos e o foco retorna ao gatilho.
-- Anel de foco visivel.
-- Regioes ao vivo para a linha de sincronizacao e o status da tabela.
-- Suporte a reducao de movimento (toggle mais preferencia do sistema).
-- Nao ha atalhos globais de tecla unica.
+O sistema oferece recursos de acessibilidade para facilitar a navegação por teclado e o uso de tecnologias assistivas.
+
+- **Tecla Escape:** fecha as sobreposições abertas.
+- **Navegação por teclado:** a tecla Tab mantém o foco dentro dos diálogos enquanto estiverem abertos.
+- **Restauração do foco:** ao fechar um diálogo, o foco retorna ao elemento que o abriu.
+- **Indicador de foco:** um anel de foco visível destaca o componente que está selecionado para interação pelo teclado.
+- **Regiões dinâmicas:** regiões acessíveis são utilizadas para anunciar atualizações na linha de sincronização e no status da tabela.
+- **Redução de movimento:** a interface respeita a preferência configurada no sistema operacional, além de disponibilizar um controle próprio nas configurações.
+- **Atalhos globais:** não existem atalhos baseados em uma única tecla que possam interferir inesperadamente na navegação.
 
 ## 15. Status de disponibilidade e conformidade
 
-Disponibilidade (seis estados):
+Esta seção explica os estados operacionais utilizados pelo painel, a relação entre disponibilidade e conformidade e os critérios de urgência.
 
-| Status                      | Significado                                                   |
-| --------------------------- | ------------------------------------------------------------- |
-| Disponível                  | Livre de falhas ou defeitos                                   |
-| Degradado                   | Obra corretiva planejada aberta no ativo protegido            |
-| Indisponível                | Obra corretiva emergencial aberta no ativo protegido          |
-| Degradado Contingenciado    | Igual ao degradado, com contingência em vigor                 |
-| Indisponível Contingenciado | Igual ao indisponível, com contingência em vigor              |
-| Fora de Operacao            | O ativo protegido esta fora de servico, isolado positivamente |
+### 15.1. Estados de disponibilidade
 
-Os dois estados contingenciados sao estados de exibicao sobre os dois estados
-base: obra corretiva aberta mais sinal de contingência (evidencia GM/CEC ou
-nota explicita de contingência no texto da obra, ou Há Contingência?=Sim na
-ficha) promove Degradado para Degradado Contingenciado e Indisponível para
-Indisponível Contingenciado.
+O sistema utiliza seis estados de disponibilidade.
 
-Conformidade e sempre derivada: `Conforme` ou `Não Conforme`. Qualquer
-disponibilidade fora do conjunto conforme conta como nao conforme, em toda a
-aplicacao, de forma consistente.
+| Status                          | Significado                                                                             |
+| ------------------------------- | --------------------------------------------------------------------------------------- |
+| **Disponível**                  | O ativo protegido está livre de falhas ou defeitos que comprometam sua disponibilidade. |
+| **Degradado**                   | Existe uma intervenção corretiva planejada em aberto no ativo protegido.                |
+| **Indisponível**                | Existe uma intervenção corretiva emergencial em aberto no ativo protegido.              |
+| **Degradado Contingenciado**    | O ativo apresenta a condição degradada, com uma contingência em vigor.                  |
+| **Indisponível Contingenciado** | O ativo está indisponível, com uma contingência em vigor.                               |
+| **Fora de Operação**            | O ativo protegido está fora de serviço e foi positivamente isolado.                     |
 
-Criticidade ranqueada: `ESO > A > B > C > D`. ESO e A sao as faixas criticas
-que alimentam o KPI de nao conformes criticos, o filtro "somente criticos" e a
-urgencia dos alertas.
+### 15.2. Regras de contingência
 
-Urgencia (necessita atencao agora):
+Os estados **Degradado Contingenciado** e **Indisponível Contingenciado** são estados de exibição derivados dos respectivos estados-base.
 
-| Nivel   | Regra                                  |
-| ------- | -------------------------------------- |
-| critico | nao conforme E faixa critica (ESO / A) |
-| urgente | qualquer outro nao conforme            |
-| nenhum  | conforme                               |
+Quando existe uma intervenção corretiva em aberto e há evidência de contingência, o sistema pode promover o estado-base para o estado contingenciado correspondente.
 
-Ordenacao dentro de um nivel: mais critico primeiro, depois a data de status
-mais antiga, depois o id.
+As evidências consideradas incluem:
 
-## 16. Limites e observacoes
+- Evidência GM/CEC.
+- Nota explícita de contingência no texto da intervenção corretiva.
+- Campo **Há Contingência?** definido como **Sim** na ficha de inventário.
 
-- Teto de exportacao: 200.000 linhas por arquivo.
-- Tamanhos de pagina: 25, 50, 100.
-- Sessao: 12 horas.
-- Senha: de 12 a 256 caracteres.
-- Limites de taxa por endereco remoto: 120/min leituras, 30/min escritas,
-  120/min exportacoes, 10/min trocas de senha.
-- O grafico expande alem das 20 primeiras categorias em cauda agregada.
-- A interface e pt-BR; identificadores, comentarios e logs sao em ingles.
+Assim, as seguintes transições de exibição são aplicadas:
 
-## 17. Mapa de documentacao
+- **Degradado** → **Degradado Contingenciado**.
+- **Indisponível** → **Indisponível Contingenciado**.
 
-| Documento              | Cobre                                                      |
-| ---------------------- | ---------------------------------------------------------- |
-| `docs/USO.md`          | Este manual (uso final)                                    |
-| `docs/ARCHITECTURE.md` | Modulos, fluxos, ciclo de vida, topologia de ilhas, config |
-| `docs/API.md`          | Contrato de fio, endpoints, autenticacao, throttling       |
-| `docs/DATABASE.md`     | Esquema, invariantes, passo a passo de configuracao        |
-| `docs/GLOSSARY.md`     | Mapeamento de valor de exibicao para identificador         |
-| `docs/STATUSES.md`     | Definicoes de status de disponibilidade                    |
-| `readme.md`            | Escopo do produto e convencoes (em ingles)                 |
-| `agents.md`            | Regras do espaco de trabalho para agentes e contribuidores |
+### 15.3. Regras de conformidade
+
+A conformidade é sempre derivada do estado de disponibilidade, não sendo tratada como um status independente.
+
+O sistema apresenta dois resultados possíveis:
+
+- **Conforme**.
+- **Não Conforme**.
+
+Qualquer estado de disponibilidade que não pertença ao conjunto definido como conforme é classificado como **Não Conforme**.
+
+Essa regra é aplicada de maneira consistente em toda a aplicação, incluindo os indicadores, os filtros, os gráficos e os alertas.
+
+### 15.4. Classificação de criticidade
+
+A ordem de criticidade, da maior para a menor, é:
+
+`ESO > A > B > C > D`
+
+As faixas **ESO** e **A** são consideradas críticas e são utilizadas para:
+
+- Calcular o indicador de barreiras críticas não conformes.
+- Aplicar o filtro **Somente críticos**.
+- Determinar a urgência dos alertas.
+
+### 15.5. Classificação de urgência
+
+A urgência indica se uma barreira precisa de atenção imediata.
+
+| Nível       | Regra                                                                          |
+| ----------- | ------------------------------------------------------------------------------ |
+| **Crítico** | A barreira está não conforme e pertence a uma faixa crítica (ESO ou A).        |
+| **Urgente** | A barreira está não conforme, mas não atende ao critério de criticidade acima. |
+| **Nenhum**  | A barreira está conforme.                                                      |
+
+### 15.6. Ordenação por urgência
+
+Dentro de cada nível de urgência, os registros são ordenados pelos seguintes critérios, nesta sequência:
+
+1. Maior criticidade primeiro.
+2. Data de status mais antiga primeiro.
+3. ID crescente, para desempate.
+
+## 16. Limites e observações
+
+Os principais limites operacionais do sistema são:
+
+| Recurso               | Limite ou comportamento                                                                            |
+| --------------------- | -------------------------------------------------------------------------------------------------- |
+| Exportação            | Máximo de 200.000 linhas por arquivo.                                                              |
+| Tamanhos de página    | 25, 50 ou 100 registros.                                                                           |
+| Duração da sessão     | 12 horas.                                                                                          |
+| Comprimento da senha  | De 12 a 256 caracteres.                                                                            |
+| Consultas de leitura  | 120 requisições por minuto, por endereço remoto.                                                   |
+| Operações de escrita  | 30 requisições por minuto, por endereço remoto.                                                    |
+| Exportações           | 120 requisições por minuto, por endereço remoto.                                                   |
+| Alterações de senha   | 10 requisições por minuto, por endereço remoto.                                                    |
+| Categorias no gráfico | As 20 primeiras são exibidas individualmente; as demais podem ser agrupadas em uma cauda agregada. |
+
+A interface do usuário está em português brasileiro (pt-BR). Identificadores técnicos, comentários e registros de log permanecem em inglês.
+
+Os limites de requisições são aplicados por endereço remoto, conforme a configuração do sistema.
+
+## 17. Mapa da documentação
+
+Os demais documentos do projeto contêm informações complementares sobre a implementação e a operação do sistema.
+
+| Documento              | Conteúdo                                                                                     |
+| ---------------------- | -------------------------------------------------------------------------------------------- |
+| `docs/USO.md`          | Este manual, destinado aos usuários finais.                                                  |
+| `docs/ARCHITECTURE.md` | Módulos, fluxos, ciclo de vida, topologia de ilhas e configuração da aplicação.              |
+| `docs/API.md`          | Contratos de comunicação, endpoints, autenticação e limitação de requisições (_throttling_). |
+| `docs/DATABASE.md`     | Esquema do banco de dados, invariantes e procedimentos de configuração.                      |
+| `docs/GLOSSARY.md`     | Mapeamento entre os valores exibidos na interface e seus identificadores internos.           |
+| `docs/STATUSES.md`     | Definições dos estados de disponibilidade.                                                   |
+| `readme.md`            | Escopo do produto e convenções do projeto, em inglês.                                        |
+| `agents.md`            | Regras do ambiente de trabalho destinadas a agentes e contribuidores.                        |
