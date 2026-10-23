@@ -132,6 +132,14 @@ export function Combo(
     setOpen(false);
     if (v !== value) onChange(v);
   };
+  // Opening is shared by focus and click. Option rows commit on mousedown
+  // with preventDefault (to keep focus while the menu closes), so the input
+  // is still focused afterwards: a following click fires no focus event and
+  // the menu would stay shut until the user blurred the box first.
+  const openMenu = () => {
+    setDraft(openUnfiltered ? "" : value);
+    setOpen(true);
+  };
   const narrow = `${placeholder.length + 4}ch`;
   const wide = `${
     Math.min(Math.max(placeholder.length, widest(opts), value.length) + 4, 42)
@@ -157,9 +165,10 @@ export function Combo(
         autoComplete="off"
         spellcheck={false}
         title={value || placeholder}
-        onFocus={() => {
-          setDraft(openUnfiltered ? "" : value);
-          setOpen(true);
+        onFocus={openMenu}
+        onClick={() => {
+          // Second click on an already-focused combo reopens the menu.
+          if (!open) openMenu();
         }}
         onBlur={() => {
           setOpen(false);
