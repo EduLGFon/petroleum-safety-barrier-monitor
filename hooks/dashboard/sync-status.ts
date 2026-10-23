@@ -22,7 +22,8 @@ export function useSyncStatus(
   const active = status?.state === "syncing";
 
   useEffect(() => {
-    if (!enabled || !baseUrl) return;
+    // Empty baseUrl means same origin (relative /api/*), not disabled.
+    if (!enabled) return;
     const cadence = active ? activeMs : idleMs;
     if (!cadence || cadence <= 0) return;
     let cancelled = false;

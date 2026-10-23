@@ -338,7 +338,7 @@ export function useServerDashboard(
   // by the cadence timer and post-sync refreshAll so tabs/counts never stay
   // stale after a run while the table already reloaded.
   const refreshVocab = useCallback(() => {
-    if (!baseUrl) return;
+    // Empty baseUrl means same origin (relative /api/*), not disabled.
     fetch(`${baseUrl}/api/vocabularies`, {
       headers: { "Accept": "application/json" },
       credentials: "same-origin",

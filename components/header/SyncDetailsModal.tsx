@@ -253,7 +253,7 @@ export function SyncDetailsModal(
                 </button>
               </div>
             )}
-            {run && baseUrl && (
+            {run && (
               <SyncChangesList
                 baseUrl={baseUrl}
                 scope={tab}

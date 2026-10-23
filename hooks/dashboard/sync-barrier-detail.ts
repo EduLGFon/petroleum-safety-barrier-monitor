@@ -26,7 +26,8 @@ export function useBarrierSyncDetail(
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!enabled || !baseUrl || barrierId === null) return;
+    // Empty baseUrl means same origin (relative /api/*), not disabled.
+    if (!enabled || barrierId === null) return;
     const key = `${barrierId}:${runId ?? scope}`;
     const hit = cache.get(key);
     if (hit) {

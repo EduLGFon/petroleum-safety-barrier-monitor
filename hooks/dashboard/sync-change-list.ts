@@ -60,7 +60,8 @@ export function useSyncChangeList(
   const retry = useCallback(() => setNonce((n) => n + 1), []);
 
   useEffect(() => {
-    if (!enabled || !baseUrl) return;
+    // Empty baseUrl means same origin (relative /api/*), not disabled.
+    if (!enabled) return;
     let cancelled = false;
     const ctrl = new AbortController();
     setLoading(true);

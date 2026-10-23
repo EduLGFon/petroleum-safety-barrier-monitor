@@ -16,7 +16,8 @@ export function useSyncChanges(
   const [changes, setChanges] = useState<SyncChange[] | null>(null);
 
   useEffect(() => {
-    if (!enabled || !refreshMs || refreshMs <= 0 || !baseUrl) return;
+    // Empty baseUrl means same origin (relative /api/*), not disabled.
+    if (!enabled || !refreshMs || refreshMs <= 0) return;
     let cancelled = false;
     const load = (): void => {
       fetch(`${baseUrl}/api/sync-changes?limit=8`, {
