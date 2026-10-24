@@ -241,7 +241,17 @@ export function DashboardSections(
           kpi={kpi}
           chartData={chartData}
           activeAvailability={filters.availability}
-          onDispFilter={(v) => setFilter({ availability: v })}
+          onDispFilter={(v) => {
+            const cur = Array.isArray(filters.availability)
+              ? filters.availability
+              : filters.availability
+              ? [filters.availability]
+              : [];
+            const next = cur.includes(v)
+              ? cur.filter((x) => x !== v)
+              : [...cur, v];
+            setFilter({ availability: next });
+          }}
           onSelectCategory={(v) =>
             setFilter({ category: filters.category === v ? "" : v })}
           activeCategory={filters.category}

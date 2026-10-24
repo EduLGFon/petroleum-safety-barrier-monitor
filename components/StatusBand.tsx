@@ -15,7 +15,7 @@ import { AURORA, AURORA_TYPE } from "../lib/aurora.ts";
 import { fmt } from "../lib/utils.ts";
 interface Props {
   kpi: KpiSnapshot;
-  activeFilter: string;
+  activeFilter: string | string[];
   onFilter: (k: string) => void;
   // Visibility scope switching (admin Situacao segments). Non-admins never
   // receive scope segments, so their band is availability-only.
@@ -77,8 +77,12 @@ export function StatusBand(
           const count = counts[key] ?? 0;
           const cfg = dispColorFor(key),
             short = shortStatusLabel(key),
-            isA = activeFilter === key,
-            isDim = !!activeFilter && !isA;
+            isA = Array.isArray(activeFilter)
+              ? activeFilter.includes(key)
+              : activeFilter === key,
+            isDim = (Array.isArray(activeFilter)
+              ? activeFilter.length > 0
+              : !!activeFilter) && !isA;
           return (
             <button
               type="button"

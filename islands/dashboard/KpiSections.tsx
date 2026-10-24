@@ -18,7 +18,7 @@ import { NcAlert } from "./NcAlert.tsx";
 interface KpiSectionsProps {
   kpi: KpiSnapshot;
   chartData: CategoryCompliance[];
-  activeAvailability: string;
+  activeAvailability: string | string[];
   onDispFilter: (v: string) => void;
   // Chart row click-through: full category name ("" clears the filter).
   onSelectCategory: (v: string) => void;
