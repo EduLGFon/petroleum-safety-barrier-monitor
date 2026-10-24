@@ -1,3 +1,4 @@
+// deno-lint-ignore-file react-no-danger
 // Root app wrapper - renders outer HTML shell for every Fresh route.
 // This is why it exists: ports Next layout (lang, title, fonts, FOUC guard)
 // without React providers (added back when context is ported to preact).
@@ -29,6 +30,11 @@ const INIT = `(function(){try{
   document.documentElement.dataset.density=dn;
 }catch(e){}})();`;
 
+// Font loader: same raw-script rule as INIT. Preact escapes text children
+// inside <script>, which turns quotes into &quot; and breaks the JS parser.
+const FONT_LOADER =
+  `document.getElementById("font-css")?.addEventListener("load",function(){this.media="all"})`;
+
 // App shell: builds branded title and outer html/head for all routes.
 export default define.page(function App({ Component }) {
   const title = withBrand(
@@ -46,7 +52,8 @@ export default define.page(function App({ Component }) {
           content={title}
         />
         <link rel="icon" href="/favicon.svg" />
-        <script>{INIT}</script>
+        {/* Static bootstrap only: never interpolate request data into a raw script. */}
+        <script dangerouslySetInnerHTML={{ __html: INIT }}></script>
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link
           rel="preconnect"
@@ -64,9 +71,7 @@ export default define.page(function App({ Component }) {
           rel="stylesheet"
           media="print"
         />
-        <script>
-          {`document.getElementById("font-css")?.addEventListener("load",function(){this.media="all"})`}
-        </script>
+        <script dangerouslySetInnerHTML={{ __html: FONT_LOADER }}></script>
       </head>
       <body>
         <Component />
