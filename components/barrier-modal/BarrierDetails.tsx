@@ -72,7 +72,12 @@ export function BarrierDetails({ b }: { b: Barrier }) {
           Icon={BuildingIcon}
           label="Instalação"
           value={installationLabel(b.location, b.locationName)}
-          full
+        />
+        <FR
+          Icon={ShieldCheckIcon}
+          label="Situação"
+          value={situationValue}
+          accent={sc?.solid}
         />
         <FR Icon={BuildingIcon} label="Tipologia" value={b.typology} />
         <FR
@@ -84,18 +89,13 @@ export function BarrierDetails({ b }: { b: Barrier }) {
         />
         <FR Icon={LayersIcon} label="Categoria" value={b.category} />
         <FR Icon={LayersIcon} label="Agrupamento" value={b.grouping} />
-        <FR
-          Icon={ShieldCheckIcon}
-          label="Situação"
-          value={situationValue}
-          accent={sc?.solid}
-        />
       </div>
       <div
         style={{
           display: "flex",
           flexWrap: "wrap",
           alignItems: "center",
+          justifyContent: "center",
           gap: "var(--d-gap-xs)",
           padding: "var(--d-row-pad)",
           background: "var(--bg-elevated)",
@@ -107,14 +107,12 @@ export function BarrierDetails({ b }: { b: Barrier }) {
         <Badge label={b.availability} {...(dc ?? neutral)} size="sm" />
         <Badge label={b.compliance} {...(cc ?? neutral)} size="sm" />
         <Badge label={b.criticality} {...(crc ?? neutral)} size="sm" />
-        <Badge label={situation} {...(sc ?? neutral)} size="sm" />
         {b.statusSince && (
           <span
             style={{
               display: "inline-flex",
               alignItems: "center",
               gap: "var(--d-mini-gap)",
-              marginLeft: "auto",
               fontSize: "var(--d-small)",
               fontWeight: 600,
               color: isNC ? "var(--alert-nc-text)" : "var(--text-muted)",
@@ -224,33 +222,6 @@ export function BarrierDetails({ b }: { b: Barrier }) {
           italic={missing(b.failureFree)}
         />
       </div>
-      <Div />
-      <Sec>Contingência</Sec>
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "1fr 1fr",
-          gap: "var(--d-details-gap)",
-          marginBottom: "var(--d-details-gap)",
-        }}
-      >
-        <FR
-          Icon={ShieldCheckIcon}
-          label="Há Contingência?"
-          value={na(b.hasContingency)}
-          italic={missing(b.hasContingency)}
-        />
-        <FR
-          Icon={BuildingIcon}
-          label="Código Evidência"
-          value={na(b.evidenceCode)}
-          italic={missing(b.evidenceCode)}
-        />
-      </div>
-      <Txt
-        value={b.contingencyDesc || "Sem descrição de contingência."}
-        muted={!b.contingencyDesc}
-      />
       <Div />
       <Sec>Degradação</Sec>
       <Txt

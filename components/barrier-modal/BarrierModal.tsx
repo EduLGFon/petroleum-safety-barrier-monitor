@@ -3,7 +3,7 @@
 // chronological statusHistory without leaving the dashboard grid.
 import { useCallback, useEffect, useRef, useState } from "preact/hooks";
 
-import { HistoryIcon, InfoIcon, PencilIcon } from "../ui/Icons.tsx";
+import { HistoryIcon, InfoIcon, PencilIcon, ShieldCheckIcon } from "../ui/Icons.tsx";
 
 import { UnsavedChangesDialog } from "./UnsavedChangesDialog.tsx";
 
@@ -14,12 +14,13 @@ import { lockBody, unlockBody } from "../../lib/body-lock.ts";
 import type { AuthUser, Barrier } from "../../lib/types.ts";
 
 import { BarrierDetails } from "./BarrierDetails.tsx";
+import { BarrierContingency } from "./BarrierContingency.tsx";
 
 import { BarrierHistory } from "./BarrierHistory.tsx";
 
 import { BarrierHeader } from "./BarrierHeader.tsx";
 
-type Tab = "details" | "history" | "edit";
+type Tab = "details" | "contingency" | "history" | "edit";
 
 interface Props {
   barrier: Barrier | null;
@@ -242,6 +243,7 @@ function Content(
   const isAdmin = sessionUser?.role === "admin";
   const tabs: { key: Tab; label: string; Icon: typeof InfoIcon }[] = [
     { key: "details", label: "Detalhes", Icon: InfoIcon },
+    { key: "contingency", label: "Contingência", Icon: ShieldCheckIcon },
     { key: "history", label: "Histórico", Icon: HistoryIcon },
     ...(canEditBarrier(local, isAdmin)
       ? [{ key: "edit" as Tab, label: "Editar", Icon: PencilIcon }]
@@ -294,6 +296,7 @@ function Content(
       {/* Body */}
       <div style={{ overflowY: "auto", flex: 1 }}>
         {tab === "details" && <BarrierDetails b={local} />}
+        {tab === "contingency" && <BarrierContingency b={local} />}
         {tab === "history" && <BarrierHistory b={local} />}
         {tab === "edit" && canEditBarrier(local, isAdmin) && (
           <BarrierEditor
