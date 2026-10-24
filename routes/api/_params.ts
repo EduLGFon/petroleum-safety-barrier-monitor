@@ -13,6 +13,22 @@ export function parseIntParam(v: string | null): number | undefined {
   return Number.isSafeInteger(n) ? n : undefined;
 }
 
+// Parses a comma-separated list of integers (multi-select filters).
+// Single value returns a number for backward compat? Keep array when multiple.
+export function parseIntArrayParam(v: string | null): number | number[] | undefined {
+  if (v === null || v === "") return undefined;
+  const parts = v.split(",").map((x) => x.trim()).filter(Boolean);
+  const nums: number[] = [];
+  for (const p of parts) {
+    if (!/^-?\d+$/.test(p)) return undefined;
+    const n = Number(p);
+    if (!Number.isSafeInteger(n)) return undefined;
+    nums.push(n);
+  }
+  if (nums.length === 0) return undefined;
+  return nums.length === 1 ? nums[0] : nums;
+}
+
 // Parses optional ISO-date param (YYYY-MM-DD); undefined when malformed.
 export function parseDateParam(v: string | null): string | undefined {
   if (v === null || v === "") return undefined;
@@ -48,11 +64,11 @@ export function parseRowScope(v: string | null): RowScope | undefined {
 // export all honor; paging/sort stay per-route so caps differ honestly.
 export function parseFilterQuery(sp: URLSearchParams): {
   locationId?: number;
-  availabilityId?: number;
-  complianceId?: number;
-  categoryId?: number;
-  typologyId?: number;
-  criticalityId?: number;
+  availabilityId?: number | number[];
+  complianceId?: number | number[];
+  categoryId?: number | number[];
+  typologyId?: number | number[];
+  criticalityId?: number | number[];
   criticalOnly?: boolean;
   hasActionPlan?: boolean;
   query?: string;
@@ -62,11 +78,11 @@ export function parseFilterQuery(sp: URLSearchParams): {
 } {
   return {
     locationId: parseIntParam(sp.get("locationId")),
-    availabilityId: parseIntParam(sp.get("availabilityId")),
-    complianceId: parseIntParam(sp.get("complianceId")),
-    categoryId: parseIntParam(sp.get("categoryId")),
-    typologyId: parseIntParam(sp.get("typologyId")),
-    criticalityId: parseIntParam(sp.get("criticalityId")),
+    availabilityId: parseIntArrayParam(sp.get("availabilityId")),
+    complianceId: parseIntArrayParam(sp.get("complianceId")),
+    categoryId: parseIntArrayParam(sp.get("categoryId")),
+    typologyId: parseIntArrayParam(sp.get("typologyId")),
+    criticalityId: parseIntArrayParam(sp.get("criticalityId")),
     criticalOnly: parseBooleanParam(sp.get("criticalOnly")),
     hasActionPlan: parseBooleanParam(sp.get("hasActionPlan")),
     query: parseQueryParam(sp.get("query")),

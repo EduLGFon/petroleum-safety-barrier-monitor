@@ -13,6 +13,7 @@ import {
 import {
   parseBooleanParam,
   parseDateParam,
+  parseIntArrayParam,
   parseIntParam,
   parseQueryParam,
 } from "../_params.ts";
@@ -71,10 +72,10 @@ export const handler = define.handlers({
     const sp = ctx.url.searchParams;
     const query: BarriersQuery = {
       locationId: parseIntParam(sp.get("locationId")),
-      availabilityId: parseIntParam(sp.get("availabilityId")),
-      complianceId: parseIntParam(sp.get("complianceId")),
-      categoryId: parseIntParam(sp.get("categoryId")),
-      criticalityId: parseIntParam(sp.get("criticalityId")),
+      availabilityId: parseIntArrayParam(sp.get("availabilityId")),
+      complianceId: parseIntArrayParam(sp.get("complianceId")),
+      categoryId: parseIntArrayParam(sp.get("categoryId")),
+      criticalityId: parseIntArrayParam(sp.get("criticalityId")),
       hasActionPlan: parseBooleanParam(sp.get("hasActionPlan")),
       query: parseQueryParam(sp.get("query")),
       since: parseDateParam(sp.get("since")),
