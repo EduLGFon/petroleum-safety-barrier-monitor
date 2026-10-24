@@ -10,6 +10,7 @@ const INIT = `(function(){try{
   var t=s.theme||'dark';
   document.documentElement.dataset.theme=(t==='light'||t==='dark'||t==='amoled')?t:'dark';
   if(s.reduceMotion) document.documentElement.classList.add('no-anim');
+  if(s.disableBlur) document.documentElement.classList.add('no-blur');
   var P={aurora:{p:'#6366f1',s:'#22d3ee',g:'rgba(99,102,241,.35)'},
          blue:{p:'#3b82f6',s:'#6366f1',g:'rgba(59,130,246,.18)'},
          green:{p:'#22c55e',s:'#10b981',g:'rgba(34,197,94,.18)'},

@@ -116,6 +116,7 @@ export interface SettingsState {
   defaultFilters: Partial<FilterState>;
   defaultLocation: string;
   reduceMotion: boolean;
+  disableBlur: boolean;
 }
 
 export const DEFAULTS: SettingsState = {
@@ -125,6 +126,7 @@ export const DEFAULTS: SettingsState = {
   defaultFilters: {},
   defaultLocation: "ALL",
   reduceMotion: false,
+  disableBlur: false,
 };
 
 export const KEY = "barrier-settings";

@@ -1198,6 +1198,25 @@ html.no-anim *::after {
   scroll-behavior: auto !important;
 }
 
+/* ── Disable blur (lightweight) ─────────────────────────────────────────────── */
+html.no-blur *,
+html.no-blur *::before,
+html.no-blur *::after {
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+/* Make glass surfaces opaque when blur is disabled so text stays readable. */
+html.no-blur {
+  --bg-surface: var(--au-dialog);
+  --bg-elevated: var(--au-dialog);
+  --au-card: var(--au-dialog);
+  --au-data: var(--au-dialog);
+  --au-seg: var(--au-dialog);
+  --au-pill: var(--au-dialog);
+  --au-row: var(--au-dialog);
+  --glass-bg: var(--au-dialog);
+}
+
 /* Honour OS preference */
 @media (prefers-reduced-motion: reduce) {
   *,

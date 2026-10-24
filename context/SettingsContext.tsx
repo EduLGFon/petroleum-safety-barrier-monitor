@@ -10,6 +10,7 @@ import {
 
 import {
   applyAccent,
+  applyBlur,
   applyDensity,
   applyMotion,
   applyTheme,
@@ -55,6 +56,7 @@ interface Ctx {
   // write (filters + default location together).
   resetFilterDefaults: () => void;
   setReduceMotion: (v: boolean) => void;
+  setDisableBlur: (v: boolean) => void;
 }
 
 const SettingsCtx = createContext<Ctx>({
@@ -66,6 +68,7 @@ const SettingsCtx = createContext<Ctx>({
   setDefaultLoc: () => {},
   resetFilterDefaults: () => {},
   setReduceMotion: () => {},
+  setDisableBlur: () => {},
 });
 
 // Provides settings store; starts from DEFAULTS for SSR then hydrates from `barrier-settings` after mount.
@@ -88,6 +91,7 @@ export function SettingsProvider(
     applyAccent(s.accentColor);
     applyDensity(s.density);
     applyMotion(s.reduceMotion);
+     applyBlur(s.disableBlur);
   }, []);
 
   // Merges a patch into the current settings, publishes it and persists it to
@@ -136,6 +140,10 @@ export function SettingsProvider(
     applyMotion(v);
     patch({ reduceMotion: v });
   }, [patch]);
+  const setDisableBlur = useCallback((v: boolean) => {
+    applyBlur(v);
+    patch({ disableBlur: v });
+  }, [patch]);
 
   return (
     <SettingsCtx.Provider
@@ -148,6 +156,7 @@ export function SettingsProvider(
         setDefaultLoc,
         resetFilterDefaults,
         setReduceMotion,
+        setDisableBlur,
       }}
     >
       {children}

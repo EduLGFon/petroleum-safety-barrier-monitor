@@ -25,6 +25,10 @@ export function applyTheme(t: Theme) {
 export function applyMotion(reduce: boolean) {
   document.documentElement.classList.toggle("no-anim", reduce);
 }
+// Toggles .no-blur class to disable backdrop/box blurs; persisted via save, not here.
+export function applyBlur(disable: boolean) {
+  document.documentElement.classList.toggle("no-blur", disable);
+}
 // Applies density token via dataset.density (falls back to comfortable); persisted via save, not here.
 export function applyDensity(d: Density) {
   const key: Density = d === "compact" || d === "spacious" ? d : "comfortable";

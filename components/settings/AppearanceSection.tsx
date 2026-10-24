@@ -20,6 +20,7 @@ interface Props {
   onDensity: (d: Density) => void;
   onAccent: (c: AccentColor) => void;
   onReduceMotion: (v: boolean) => void;
+  onDisableBlur: (v: boolean) => void;
 }
 
 // AppearanceSection: stacks pickers, accessibility toggle, and accent preview.
@@ -33,6 +34,7 @@ export function AppearanceSection(
     onDensity,
     onAccent,
     onReduceMotion,
+    onDisableBlur,
   }: Props,
 ) {
   return (
@@ -97,6 +99,46 @@ export function AppearanceSection(
           <Toggle
             checked={settings.reduceMotion}
             onChange={onReduceMotion}
+          />
+        </div>
+      </div>
+      {/* Disable blur toggle */}
+      <div>
+        <SectTitle>Desempenho</SectTitle>
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            padding: "var(--d-row-pad)",
+            background: "var(--bg-elevated)",
+            border: "1.5px solid var(--border)",
+            borderRadius: "var(--d-row-radius)",
+          }}
+        >
+          <div>
+            <div
+              style={{
+                fontSize: "var(--d-lead)",
+                fontWeight: 600,
+                color: "var(--text-primary)",
+              }}
+            >
+              Desativar desfoque
+            </div>
+            <div
+              style={{
+                fontSize: "var(--d-small)",
+                color: "var(--text-muted)",
+                marginTop: 2,
+              }}
+            >
+              Remove efeitos de blur (mais leve)
+            </div>
+          </div>
+          <Toggle
+            checked={settings.disableBlur}
+            onChange={onDisableBlur}
           />
         </div>
       </div>

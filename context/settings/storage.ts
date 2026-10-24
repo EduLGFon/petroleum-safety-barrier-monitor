@@ -40,6 +40,9 @@ export function loadSettings(): SettingsState {
       reduceMotion: typeof raw.reduceMotion === "boolean"
         ? raw.reduceMotion
         : DEFAULTS.reduceMotion,
+      disableBlur: typeof raw.disableBlur === "boolean"
+        ? raw.disableBlur
+        : DEFAULTS.disableBlur,
       // defaultFilters is applied to live dashboard state: keep only
       // well-formed keys, drop the rest instead of spreading blindly.
       defaultFilters: sanitizeFilterPatch(raw.defaultFilters),

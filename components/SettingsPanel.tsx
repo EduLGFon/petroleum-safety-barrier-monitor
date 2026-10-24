@@ -64,6 +64,7 @@ export function SettingsPanel(
     setDefaultLoc,
     resetFilterDefaults,
     setReduceMotion,
+  setDisableBlur,
   } = useSettings();
   const [section, setSection] = useState<
     "appearance" | "filters" | "account" | "admin"
@@ -264,6 +265,7 @@ export function SettingsPanel(
             onDensity={handleDensity}
             onAccent={handleAccent}
             onReduceMotion={setReduceMotion}
+            onDisableBlur={setDisableBlur}
           />
         )}
 
