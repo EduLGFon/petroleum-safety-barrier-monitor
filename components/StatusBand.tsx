@@ -91,7 +91,7 @@ export function StatusBand(
               title={`${key} - clique para filtrar`}
               aria-pressed={isA}
               style={{
-                flex: Math.max(count, 1),
+                flex: 1,
                 background: AURORA.seg,
                 border: isA
                   ? `1px solid ${AURORA.value}`
@@ -149,7 +149,7 @@ export function StatusBand(
               title={`${seg.label} - clique para ver`}
               aria-pressed={isA}
               style={{
-                flex: Math.max(seg.count, 1),
+                flex: 1,
                 background: AURORA.seg,
                 border: isA
                   ? `1px solid ${AURORA.value}`
