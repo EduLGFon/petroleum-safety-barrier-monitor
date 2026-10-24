@@ -250,13 +250,16 @@ export type SortableColumn = keyof Pick<
 
 export interface FilterState {
   query: string;
-  availability: string;
-  compliance: string;
-  category: string;
-  // Installation typology (Tipologia column filter, "" = all).
-  typology: string;
+  // Categorical filters accept either a single value (legacy) or a list of
+  // values (multi-select), so several statuses/categories can be picked at
+  // once. Empty string / empty array both mean "no filter".
+  availability: string | string[];
+  compliance: string | string[];
+  category: string | string[];
+  // Installation typology (Tipologia column filter, "" / [] = all).
+  typology: string | string[];
   // Sheet GERAL Criticidade (all critical in the managed scope).
-  criticality: string;
+  criticality: string | string[];
   // Rank gate: true restricts to the critical tiers (ESO/A); false or
   // absent lists every rank. Defaults true so the full-equipment catalog
   // still opens on the safety-relevant subset.

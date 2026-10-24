@@ -110,12 +110,12 @@ export interface WireCategoryCompliance {
 export type RowScope = "active" | "inactive" | "deleted" | "all";
 export interface BarriersQuery {
   locationId?: number;
-  availabilityId?: number;
-  complianceId?: number;
-  categoryId?: number;
-  criticalityId?: number;
+  availabilityId?: number | number[];
+  complianceId?: number | number[];
+  categoryId?: number | number[];
+  criticalityId?: number | number[];
   // Installation typology filter (Tipologia column).
-  typologyId?: number;
+  typologyId?: number | number[];
   // Action-plan presence: true = with plan, false = without.
   hasActionPlan?: boolean;
   // Critical-tiers gate: true lists only ESO/A ranks. Absent (or false)

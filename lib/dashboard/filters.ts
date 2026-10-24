@@ -36,13 +36,20 @@ export function applyFilters(b: Barrier[], f: FilterState): Barrier[] {
       x.category.toLowerCase().includes(q)
     );
   }
-  if (f.availability) {
-    d = d.filter((x) => x.availability === f.availability);
-  }
-  if (f.compliance) d = d.filter((x) => x.compliance === f.compliance);
-  if (f.category) d = d.filter((x) => x.category === f.category);
-  if (f.typology) d = d.filter((x) => x.typology === f.typology);
-  if (f.criticality) d = d.filter((x) => x.criticality === f.criticality);
+  // Categorical filters may carry a single value or a list (multi-select);
+  // an empty string/array means "no filter". Normalise to a list up front.
+  const asList = (v: string | string[] | undefined): string[] =>
+    Array.isArray(v) ? v.filter((s) => !!s) : v ? [v] : [];
+  const avail = asList(f.availability);
+  if (avail.length) d = d.filter((x) => avail.includes(x.availability));
+  const conf = asList(f.compliance);
+  if (conf.length) d = d.filter((x) => conf.includes(x.compliance));
+  const cat = asList(f.category);
+  if (cat.length) d = d.filter((x) => cat.includes(x.category));
+  const typo = asList(f.typology);
+  if (typo.length) d = d.filter((x) => typo.includes(x.typology));
+  const crit = asList(f.criticality);
+  if (crit.length) d = d.filter((x) => crit.includes(x.criticality));
   if (f.criticalOnly === true) {
     d = d.filter((x) => isCriticalRankLabel(x.criticality));
   }
@@ -143,22 +150,37 @@ export function sanitizeFilterPatch(raw: unknown): Partial<FilterState> {
   const patch: Partial<FilterState> = {};
   const text = (v: unknown) =>
     typeof v === "string" ? v.trim().slice(0, 200) : undefined;
+  // Categorical filters may arrive as a single string or a list (multi-select).
+  // Normalise to the same shape, dropping empties and non-strings.
+  const textOrList = (v: unknown): string | string[] | undefined => {
+    if (Array.isArray(v)) {
+      const out = v
+        .filter((x) => typeof x === "string")
+        .map((x) => (x as string).trim().slice(0, 200))
+        .filter((x) => x !== "");
+      return out;
+    }
+    return text(v);
+  };
   const query = text(r.query);
   if (query !== undefined) patch.query = query;
-  const disp = text(r.availability);
+  const disp = textOrList(r.availability);
   if (disp !== undefined) patch.availability = disp;
-  const conf = text(r.compliance);
+  const conf = textOrList(r.compliance);
   if (conf !== undefined) patch.compliance = conf;
-  const cat = text(r.category);
+  const cat = textOrList(r.category);
   if (cat !== undefined) patch.category = cat;
-  const typo = text(r.typology);
+  const typo = textOrList(r.typology);
   if (typo !== undefined) patch.typology = typo;
-  const crit = text(r.criticality);
+  const crit = textOrList(r.criticality);
   if (crit !== undefined) patch.criticality = crit;
   if (typeof r.criticalOnly === "boolean") patch.criticalOnly = r.criticalOnly;
   // Conflict from the old checkbox UI (explicit rank + gate on): the rank
   // wins, otherwise B/C/D rows would self-empty with no way to see why.
-  if (patch.criticality && patch.criticalOnly) patch.criticalOnly = false;
+  const critHas = Array.isArray(patch.criticality)
+    ? patch.criticality.length > 0
+    : !!patch.criticality;
+  if (critHas && patch.criticalOnly) patch.criticalOnly = false;
   const plan = text(r.plan);
   if (plan === "Com plano" || plan === "Sem plano" || plan === "") {
     patch.plan = plan;

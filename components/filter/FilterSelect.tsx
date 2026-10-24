@@ -292,3 +292,171 @@ export function Combo(
     </div>
   );
 }
+
+// MultiCombo: multiple-selection menu (checkboxes) for one filter category.
+export function MultiCombo(
+  { values, onChange, placeholder, opts }: {
+    values: string[];
+    onChange: (v: string[]) => void;
+    placeholder: string;
+    opts: string[];
+  },
+) {
+  const [open, setOpen] = useState(false);
+  const [anchor, setAnchor] = useState({ left: 0, top: 0, min: 0 });
+  const input = useRef<HTMLInputElement>(null);
+  const active = values.length > 0;
+  useEffect(() => {
+    if (!open) return;
+    let raf = 0;
+    const place = () => {
+      cancelAnimationFrame(raf);
+      raf = requestAnimationFrame(() => {
+        const r = input.current?.getBoundingClientRect();
+        if (!r) return;
+        const next = {
+          left: Math.round(r.left),
+          top: Math.round(r.bottom + 4),
+          min: Math.round(r.width),
+        };
+        setAnchor((prev) =>
+          prev.left === next.left && prev.top === next.top &&
+            prev.min === next.min
+            ? prev
+            : next
+        );
+      });
+    };
+    place();
+    globalThis.addEventListener("scroll", place, { passive: true });
+    globalThis.addEventListener("resize", place);
+    return () => {
+      cancelAnimationFrame(raf);
+      globalThis.removeEventListener("scroll", place);
+      globalThis.removeEventListener("resize", place);
+    };
+  }, [open]);
+  const toggle = (o: string) => {
+    const next = values.includes(o)
+      ? values.filter((x) => x !== o)
+      : [...values, o];
+    onChange(next);
+  };
+  const label = values.length ? values.join(", ") : "";
+  const narrow = `${placeholder.length + 4}ch`;
+  const wide = `${
+    Math.min(Math.max(placeholder.length, widest(opts), label.length) + 4, 42)
+  }ch`;
+  return (
+    <div
+      style={{
+        position: "relative",
+        flex: "0 1 auto",
+        minWidth: 0,
+        width: open ? wide : narrow,
+        transition: "width .2s var(--ease-out)",
+      }}
+    >
+      <input
+        ref={input}
+        type="text"
+        value={open ? "" : label}
+        placeholder={placeholder}
+        aria-label={placeholder}
+        readOnly
+        onFocus={() => setOpen(true)}
+        onClick={() => {
+          if (!open) setOpen(true);
+        }}
+        onBlur={() => setOpen(false)}
+        className={active ? "animate-filter-on" : ""}
+        style={{
+          width: "100%",
+          boxSizing: "border-box",
+          padding: "var(--d-sel-pad)",
+          fontSize: "var(--d-body)",
+          ...GLASS_INPUT,
+          border: active || open
+            ? "1px solid var(--accent)"
+            : `1px solid ${AURORA.segBorder}`,
+          color: active || open ? AURORA.value : AURORA.label,
+          fontWeight: active ? 700 : 400,
+          boxShadow: active || open ? "0 0 0 3px var(--glow)" : "none",
+          cursor: "pointer",
+          textOverflow: "ellipsis",
+        }}
+      />
+      {open && anchor.min > 0 && (
+        <MenuPortal
+          left={anchor.left}
+          top={anchor.top}
+          width={`max(${wide}, ${anchor.min}px)`}
+        >
+          <ul
+            role="listbox"
+            style={{
+              margin: 0,
+              padding: 4,
+              listStyle: "none",
+              maxHeight: 240,
+              overflowY: "auto",
+              background: AURORA.dialog,
+              backdropFilter: "blur(16px) saturate(1.25)",
+              WebkitBackdropFilter: "blur(16px) saturate(1.25)",
+              border: `1px solid ${AURORA.segBorder}`,
+              borderRadius: 10,
+              boxShadow: "0 12px 32px rgba(0,0,0,.35)",
+            }}
+          >
+            {opts.map((o) => (
+              <li
+                key={o}
+                role="option"
+                aria-selected={values.includes(o)}
+                onMouseDown={(e) => {
+                  e.preventDefault();
+                  toggle(o);
+                }}
+                style={{
+                  padding: "6px 10px",
+                  fontSize: "var(--d-body)",
+                  borderRadius: 7,
+                  cursor: "pointer",
+                  whiteSpace: "nowrap",
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
+                  color: values.includes(o) ? "var(--accent-2)" : AURORA.pillText,
+                  fontWeight: values.includes(o) ? 700 : 400,
+                  background: values.includes(o) ? "var(--glow)" : "transparent",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 8,
+                }}
+              >
+                <input
+                  type="checkbox"
+                  checked={values.includes(o)}
+                  readOnly
+                  tabIndex={-1}
+                />
+                {o}
+              </li>
+            ))}
+            {opts.length === 0 && (
+              <li
+                style={{
+                  padding: "6px 10px",
+                  fontSize: "var(--d-body)",
+                  color: "var(--text-muted)",
+                  fontStyle: "italic",
+                }}
+              >
+                Sem opções
+              </li>
+            )}
+          </ul>
+        </MenuPortal>
+      )}
+    </div>
+  );
+}

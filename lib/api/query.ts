@@ -43,31 +43,54 @@ export function toWireQuery(
       console.warn(`[toWireQuery] unknown location: ${f.location}`);
     } else q.locationId = id;
   }
-  if (f.availability) {
-    const id = toAvailabilityId(f.availability as never);
-    if (id === undefined) {
-      console.warn(
-        `[toWireQuery] unknown availability: ${f.availability}`,
-      );
-    } else q.availabilityId = id;
-  }
-  if (f.compliance) {
-    const id = toComplianceId(f.compliance as never);
-    if (id === undefined) {
-      console.warn(`[toWireQuery] unknown compliance: ${f.compliance}`);
-    } else q.complianceId = id;
-  }
-  if (f.category) {
-    const id = overrides?.categoryIds?.[f.category] ?? toCategoryId(f.category);
-    if (id === undefined) {
-      console.warn(`[toWireQuery] unknown category: ${f.category}`);
-    } else q.categoryId = id;
-  }
-  if (f.typology) {
-    const id = overrides?.typologyIds?.[f.typology] ?? toTypologyId(f.typology);
-    if (id === undefined) {
-      console.warn(`[toWireQuery] unknown typology: ${f.typology}`);
-    } else q.typologyId = id;
+  const toIdList = <T>(
+    v: string | string[] | undefined,
+    resolve: (s: string) => T | undefined,
+    label: string,
+  ): T[] | undefined => {
+    const vals = Array.isArray(v) ? v : v ? [v] : [];
+    if (vals.length === 0) return undefined;
+    const ids: T[] = [];
+    for (const s of vals) {
+      const id = resolve(s);
+      if (id === undefined) console.warn(`[toWireQuery] unknown ${label}: ${s}`);
+      else ids.push(id);
+    }
+    return ids.length ? ids : undefined;
+  };
+  const availIds = toIdList(
+    f.availability as string | string[] | undefined,
+    (s) => toAvailabilityId(s as never),
+    "availability",
+  );
+  if (availIds) q.availabilityId = availIds.length === 1 ? availIds[0] : availIds;
+  const confIds = toIdList(
+    f.compliance as string | string[] | undefined,
+    (s) => toComplianceId(s as never),
+    "compliance",
+  );
+  if (confIds) q.complianceId = confIds.length === 1 ? confIds[0] : confIds;
+  const catIds = toIdList(
+    f.category as string | string[] | undefined,
+    (s) => overrides?.categoryIds?.[s] ?? toCategoryId(s),
+    "category",
+  );
+  if (catIds) q.categoryId = catIds.length === 1 ? catIds[0] : catIds;
+  const typoIds = toIdList(
+    f.typology as string | string[] | undefined,
+    (s) => overrides?.typologyIds?.[s] ?? toTypologyId(s),
+    "typology",
+  );
+  if (typoIds) q.typologyId = typoIds.length === 1 ? typoIds[0] : typoIds;
+  if (f.criticality) {
+    // criticality may be a list too; resolve each, keep single for compat
+    const critVals = Array.isArray(f.criticality) ? f.criticality : [f.criticality];
+    const critIds = critVals
+      .map((s) => toCriticalityId(s as never))
+      .filter((x) => x !== undefined) as number[];
+    if (critIds.length) {
+      q.criticalityId = critIds.length === 1 ? critIds[0] : critIds;
+    }
   }
   if (f.plan === "Com plano") q.hasActionPlan = true;
   else if (f.plan === "Sem plano") q.hasActionPlan = false;

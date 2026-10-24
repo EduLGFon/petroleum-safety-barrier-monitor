@@ -80,9 +80,21 @@ export function useFilterState(defaultLocation = "ALL") {
   // exactly when the gate was the only active filter.
   const hasActiveFilters = state.location !== "ALL" ||
     !!state.filters.query ||
-    !!state.filters.availability || !!state.filters.compliance ||
-    !!state.filters.category || !!state.filters.typology ||
-    !!state.filters.criticality ||
+    (Array.isArray(state.filters.availability)
+      ? state.filters.availability.length > 0
+      : !!state.filters.availability) ||
+    (Array.isArray(state.filters.compliance)
+      ? state.filters.compliance.length > 0
+      : !!state.filters.compliance) ||
+    (Array.isArray(state.filters.category)
+      ? state.filters.category.length > 0
+      : !!state.filters.category) ||
+    (Array.isArray(state.filters.typology)
+      ? state.filters.typology.length > 0
+      : !!state.filters.typology) ||
+    (Array.isArray(state.filters.criticality)
+      ? state.filters.criticality.length > 0
+      : !!state.filters.criticality) ||
     state.filters.criticalOnly === true ||
     state.filters.rowScope !== "active" ||
     !!state.filters.plan || !!state.filters.since ||

@@ -6,7 +6,7 @@
 // stays on the location tabs; plan and date boxes hide via the Columns
 // dialog filters toggles; the rank gate is an opt-in focus filter (off by
 // default, so the table opens on every rank).
-import { Combo, GLASS_INPUT } from "./filter/FilterSelect.tsx";
+import { Combo, GLASS_INPUT, MultiCombo } from "./filter/FilterSelect.tsx";
 
 import type { ColumnKey, PinnedKey } from "./table/columns.ts";
 
@@ -243,19 +243,22 @@ export function FilterBar(
       </div>
 
       <Combo
-        value={filters.typology}
+        value={Array.isArray(filters.typology) ? (filters.typology[0] ?? "") : filters.typology}
         onChange={(v) => onFilter({ typology: v })}
         placeholder={`Tipologia (${vocabs.typologies.length})`}
         opts={vocabs.typologies}
       />
       <Combo
-        value={filters.category}
+        value={Array.isArray(filters.category) ? (filters.category[0] ?? "") : filters.category}
         onChange={(v) => onFilter({ category: v })}
         placeholder={`Categoria (${vocabs.categories.length})`}
         opts={vocabs.categories}
       />
       <Combo
-        value={critComboValue(filters.criticality, filters.criticalOnly)}
+        value={critComboValue(
+          Array.isArray(filters.criticality) ? (filters.criticality[0] ?? "") : filters.criticality,
+          filters.criticalOnly,
+        )}
         onChange={(v) =>
           onFilter(
             v === CRIT_ONLY_OPTION
@@ -265,14 +268,18 @@ export function FilterBar(
         placeholder="Criticidade"
         opts={critComboOpts(vocabs.criticalities)}
       />
-      <Combo
-        value={filters.availability}
+      <MultiCombo
+        values={Array.isArray(filters.availability)
+          ? filters.availability
+          : filters.availability
+          ? [filters.availability]
+          : []}
         onChange={(v) => onFilter({ availability: v })}
         placeholder="Disponibilidade"
         opts={vocabs.availabilities}
       />
       <Combo
-        value={filters.compliance}
+        value={Array.isArray(filters.compliance) ? (filters.compliance[0] ?? "") : filters.compliance}
         onChange={(v) => onFilter({ compliance: v })}
         placeholder="Conformidade"
         opts={vocabs.compliances}

@@ -46,40 +46,74 @@ export function buildWhere(
   if (q.locationId !== undefined && q.locationId !== 0) {
     push("and b.location_id = ", q.locationId);
   }
-  if (q.availabilityId !== undefined) {
+  const availIds = Array.isArray(q.availabilityId)
+    ? q.availabilityId
+    : q.availabilityId !== undefined
+    ? [q.availabilityId]
+    : [];
+  if (availIds.length) {
     // Effective availability (docs/STATUSES.md display overlay): a stored
     // Degradado/Indisponível with Há Contingência?=Sim reads as its
     // contingenciado state, so the filter matches display, not just the
     // stored id. Mirrors effectiveAvailabilityId() in barrier-rules.
-    args.push(q.availabilityId);
+    args.push(availIds);
     conds.push(
-      `and (case when b.availability_id in (4, 5) and lower(trim(coalesce(b.has_contingency, ''))) = 'sim' then case when b.availability_id = 4 then 3 else 2 end else b.availability_id end) = $${args.length}`,
+      `and (case when b.availability_id in (4, 5) and lower(trim(coalesce(b.has_contingency, ''))) = 'sim' then case when b.availability_id = 4 then 3 else 2 end else b.availability_id end) = any($${args.length})`,
     );
   }
-  if (q.complianceId !== undefined) {
+  const compIds = Array.isArray(q.complianceId)
+    ? q.complianceId
+    : q.complianceId !== undefined
+    ? [q.complianceId]
+    : [];
+  if (compIds.length) {
     // Compliance derives from the effective availability (2/3 count as
     // compliant, like isCompliant), not from the stored compliance_id which
     // still reflects the base id until the next materializing write.
-    if (q.complianceId === 0) {
+    const hasCompliant = compIds.includes(0);
+    const hasNonCompliant = compIds.includes(1);
+    const otherIds = compIds.filter((x) => x !== 0 && x !== 1);
+    if (hasCompliant) {
       conds.push(
         `and (case when b.availability_id in (4, 5) and lower(trim(coalesce(b.has_contingency, ''))) = 'sim' then case when b.availability_id = 4 then 3 else 2 end else b.availability_id end) in (0, 1, 2, 3)`,
       );
-    } else if (q.complianceId === 1) {
+    }
+    if (hasNonCompliant) {
       conds.push(
         `and (case when b.availability_id in (4, 5) and lower(trim(coalesce(b.has_contingency, ''))) = 'sim' then case when b.availability_id = 4 then 3 else 2 end else b.availability_id end) in (4, 5)`,
       );
-    } else {
-      push("and b.compliance_id = ", q.complianceId);
+    }
+    if (otherIds.length) {
+      args.push(otherIds);
+      conds.push(`and b.compliance_id = any($${args.length})`);
     }
   }
-  if (q.categoryId !== undefined) {
-    push("and b.category_id = ", q.categoryId);
+  const catIds = Array.isArray(q.categoryId)
+    ? q.categoryId
+    : q.categoryId !== undefined
+    ? [q.categoryId]
+    : [];
+  if (catIds.length) {
+    args.push(catIds);
+    conds.push(`and b.category_id = any($${args.length})`);
   }
-  if (q.typologyId !== undefined) {
-    push("and b.typology_id = ", q.typologyId);
+  const typoIds = Array.isArray(q.typologyId)
+    ? q.typologyId
+    : q.typologyId !== undefined
+    ? [q.typologyId]
+    : [];
+  if (typoIds.length) {
+    args.push(typoIds);
+    conds.push(`and b.typology_id = any($${args.length})`);
   }
-  if (q.criticalityId !== undefined) {
-    push("and b.criticality_id = ", q.criticalityId);
+  const critIds = Array.isArray(q.criticalityId)
+    ? q.criticalityId
+    : q.criticalityId !== undefined
+    ? [q.criticalityId]
+    : [];
+  if (critIds.length) {
+    args.push(critIds);
+    conds.push(`and b.criticality_id = any($${args.length})`);
   }
   // Row whitelist (export selection). Passed as one array parameter so an
   // 18k-row selection costs a single bind instead of 18k placeholders.
