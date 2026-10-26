@@ -13,6 +13,7 @@ import {
   hasContingencySignal,
   isClosedRequestStatus,
   isoDate,
+  isPreventiveWork,
   mergeEvent,
   type StatusEvent,
 } from "./barrier-rules.ts";
@@ -25,6 +26,10 @@ import type { FracttalWorkOrder, FracttalWorkRequest } from "./types.ts";
 export interface WorkSlot {
   urgent: StatusEvent | null;
   planned: StatusEvent | null;
+  // Open preventive work drives Plano Cumprido? only; it never changes
+  // availability. A row without corrective/preventive classification still
+  // carries its stop flag.
+  preventive: StatusEvent | null;
   stopAssets: boolean;
   hasContingency: boolean;
 }
@@ -33,6 +38,7 @@ export interface WorkSlot {
 export interface WorkEvents {
   urgent: StatusEvent | null;
   planned: StatusEvent | null;
+  preventive: StatusEvent | null;
   stopAssets: boolean;
   hasContingency?: boolean;
   contingencySource?: string;
@@ -58,10 +64,14 @@ export function parseWorkOrder(raw: unknown): FracttalWorkOrder {
     code: row.code,
     done: bool("done"),
     tasks_log_types_description: str("tasks_log_types_description"),
+    tasks_log_types_2_description: str("tasks_log_types_2_description"),
+    tasks_log_task_type_main: str("tasks_log_task_type_main"),
     types_description: str("types_description"),
     stop_assets: bool("stop_assets"),
     wo_folio: str("wo_folio"),
     description: str("description"),
+    task_note: str("task_note"),
+    note: str("note"),
     initial_date: str("initial_date"),
     date_maintenance: str("date_maintenance"),
     creation_date: str("creation_date"),
@@ -83,14 +93,18 @@ export function parseWorkRequest(raw: unknown): FracttalWorkRequest {
     code_item: row.code_item,
     id_status: num("id_status"),
     types_2_description: str("types_2_description"),
+    types_description: str("types_description"),
     wo_folio: str("wo_folio"),
     description: str("description"),
+    observation: str("observation"),
     date_maintenance: str("date_maintenance"),
   };
 }
 
 // workOrderEvent distills a row to a shared status event: earliest of the
 // candidate date fields plus folio + description (capped like the import).
+// detail is the action note the technician sees (task_note wins over note);
+// trade is the discipline label used by the owner heuristic.
 function workOrderEvent(wo: FracttalWorkOrder): StatusEvent {
   const folio = (wo.wo_folio ?? "").trim();
   const desc = (wo.description ?? "").trim();
@@ -100,17 +114,23 @@ function workOrderEvent(wo: FracttalWorkOrder): StatusEvent {
       earliestDate(isoDate(wo.date_maintenance), isoDate(wo.creation_date)),
     ),
     source: (folio ? `${folio}: ${desc}` : desc).slice(0, 800),
+    detail: ((wo.task_note ?? "").trim() || (wo.note ?? "").trim() || desc)
+      .slice(0, 800),
+    trade: ((wo.tasks_log_types_2_description ?? "").trim() ||
+      (wo.tasks_log_task_type_main ?? "").trim()).slice(0, 120),
   };
 }
 
 // workRequestEvent distills a request the same way (maintenance date only,
-// mirroring the import extractor).
+// mirroring the import extractor). observation is the closer's action note.
 function workRequestEvent(wr: FracttalWorkRequest): StatusEvent {
   const folio = (wr.wo_folio ?? "").trim();
   const desc = (wr.description ?? "").trim();
   return {
     date: isoDate(wr.date_maintenance),
     source: (folio ? `${folio}: ${desc}` : desc).slice(0, 800),
+    detail: ((wr.observation ?? "").trim() || desc).slice(0, 800),
+    trade: (wr.types_description ?? "").trim().slice(0, 120),
   };
 }
 
@@ -127,9 +147,16 @@ export function workOrderSlot(wo: FracttalWorkOrder): WorkSlot | null {
     wo.types_description,
   );
   const event = workOrderEvent(wo);
+  const preventive = isPreventiveWork(
+      wo.tasks_log_types_description,
+      wo.tasks_log_types_2_description,
+    )
+    ? event
+    : null;
   return {
     urgent: slot === "urgent" ? event : null,
     planned: slot === "planned" ? event : null,
+    preventive,
     stopAssets: wo.stop_assets === true,
     hasContingency: hasContingencySignal(wo.description, wo.wo_folio),
   };
@@ -145,6 +172,7 @@ export function workRequestSlot(wr: FracttalWorkRequest): WorkSlot | null {
   return {
     urgent: slot === "urgent" ? event : null,
     planned: slot === "planned" ? event : null,
+    preventive: null,
     stopAssets: false,
     hasContingency: hasContingencySignal(wr.description, wr.wo_folio),
   };
@@ -163,6 +191,7 @@ export function contingencyFromRaw(raw: unknown): boolean {
     const key of [
       "description",
       "task_note",
+      "note",
       "notes",
       "task_description",
       "work_orders_status_custom_description",
@@ -213,6 +242,7 @@ export function buildWorkEvents(
   const blank = (): WorkEvents => ({
     urgent: null,
     planned: null,
+    preventive: null,
     stopAssets: false,
     hasContingency: false,
     contingencySource: "",
@@ -233,6 +263,9 @@ export function buildWorkEvents(
       const acc = events.get(wo.code) ?? blank();
       if (slot.urgent) acc.urgent = mergeEvent(acc.urgent, slot.urgent);
       if (slot.planned) acc.planned = mergeEvent(acc.planned, slot.planned);
+      if (slot.preventive) {
+        acc.preventive = mergeEvent(acc.preventive, slot.preventive);
+      }
       acc.stopAssets = acc.stopAssets || slot.stopAssets;
       const cont = slot.hasContingency || contingencyFromRaw(patched.row);
       if (cont && (acc.contingencySource ?? "") === "") {

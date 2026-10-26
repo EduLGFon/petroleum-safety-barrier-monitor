@@ -25,6 +25,17 @@ export interface FracttalAsset {
   is_serial_control: boolean | null;
   initial_date_out_of_service: string | null;
   last_final_date_available: string | null;
+  // Free-text inventory columns (GERAL sheet) and the attached maintenance
+  // plan. They are nullable upstream, including on rows that have no plan.
+  field_1: string | null;
+  field_2: string | null;
+  field_3: string | null;
+  field_4: string | null;
+  field_5: string | null;
+  field_6: string | null;
+  notes: string | null;
+  id_group_task: number | null;
+  groups_tasks_description: string | null;
 }
 
 // FracttalPage: one normalized /items page plus the server-side total.
@@ -61,10 +72,14 @@ export interface FracttalWorkOrder {
   code: string;
   done: boolean | null;
   tasks_log_types_description: string | null;
+  tasks_log_types_2_description: string | null;
+  tasks_log_task_type_main: string | null;
   types_description: string | null;
   stop_assets: boolean | null;
   wo_folio: string | null;
   description: string | null;
+  task_note: string | null;
+  note: string | null;
   initial_date: string | null;
   date_maintenance: string | null;
   creation_date: string | null;
@@ -78,8 +93,10 @@ export interface FracttalWorkRequest {
   code_item: string;
   id_status: number | null;
   types_2_description: string | null;
+  types_description: string | null;
   wo_folio: string | null;
   description: string | null;
+  observation: string | null;
   date_maintenance: string | null;
 }
 

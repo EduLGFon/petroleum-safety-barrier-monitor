@@ -285,6 +285,19 @@ export function classifyRequest(
   return type.includes("emergencial") ? "urgent" : "planned";
 }
 
+// isPreventiveWork reports whether an open work row belongs to a preventive
+// maintenance plan (Fracttal labels: "PREV - Sistemática", "PREV -
+// Calibração"). It only feeds the plan-followed column; preventive work never
+// changes availability.
+export function isPreventiveWork(
+  ...texts: Array<string | null | undefined>
+): boolean {
+  return texts.some((text) => {
+    const folded = foldText(text);
+    return /\bprev\b/.test(folded) || folded.includes("preventiv");
+  });
+}
+
 // Work-order open statuses (reference: Query tasks in WOs, ot_status as
 // text: 1 in process, 2 review). 3 completed and 4 cancelled carry no
 // signal (the same closed gate as done !== false). Used for the open-only
@@ -311,16 +324,21 @@ export function isClosedRequestStatus(statusId: number | null): boolean {
   return statusId !== null && CLOSED_REQUEST_STATUSES.has(statusId);
 }
 
-// StatusEvent is one corrective signal: its earliest date drives
-// status_since and its source composes the barrier comments.
+// StatusEvent is one work signal: its earliest date drives status_since and
+// its source composes the barrier comments. detail is the operator's action
+// note (task_note/observation); trade is the maintenance discipline label
+// used only for owner heuristics. Both stay optional so old fixtures and
+// callers that only need date/source keep compiling.
 export interface StatusEvent {
   date: string | null;
   source: string;
+  detail?: string;
+  trade?: string;
 }
 
-// mergeEvent keeps the earliest date and the first non-empty source; an
-// event without a date is still kept (status derives to open, status_since
-// then falls back to today).
+// mergeEvent keeps the earliest date and the first non-empty source, detail
+// and trade; an event without a date is still kept (status derives to open,
+// status_since then falls back to today).
 export function mergeEvent(
   current: StatusEvent | null,
   incoming: StatusEvent,
@@ -329,6 +347,8 @@ export function mergeEvent(
   return {
     date: current.date ?? incoming.date,
     source: current.source ? current.source : incoming.source,
+    detail: current.detail || incoming.detail,
+    trade: current.trade || incoming.trade,
   };
 }
 

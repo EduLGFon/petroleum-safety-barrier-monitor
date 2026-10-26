@@ -150,6 +150,15 @@ export function parseAsset(raw: unknown): FracttalAsset {
     is_serial_control: bool("is_serial_control"),
     initial_date_out_of_service: str("initial_date_out_of_service"),
     last_final_date_available: str("last_final_date_available"),
+    field_1: str("field_1"),
+    field_2: str("field_2"),
+    field_3: str("field_3"),
+    field_4: str("field_4"),
+    field_5: str("field_5"),
+    field_6: str("field_6"),
+    notes: str("notes"),
+    id_group_task: num("id_group_task"),
+    groups_tasks_description: str("groups_tasks_description"),
   };
 }
 
