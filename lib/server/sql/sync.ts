@@ -243,12 +243,29 @@ export const defaultSyncIo: SyncIo = {
       comments: string;
       action_plan: string;
       scope_source: string | null;
+      origin: string | null;
+      install_local: string | null;
+      equip_typology: string | null;
+      field_installed: string | null;
+      field_operational: string | null;
+      op_status: string | null;
+      has_maint_plan: string | null;
+      plan_followed: string | null;
+      failure_free: string | null;
+      maint_status: string | null;
+      evidence_code: string | null;
+      degradation_desc: string | null;
+      extra_comments: string | null;
     }>(
       `select id, external_code, location_id, availability_id, deleted_at,
          is_active,
          tag, typology_id, loc_desc_id, criticality_id, category_id,
          grouping_id, owner_id, comments, action_plan,
-         coalesce(scope_source, '') as scope_source
+         coalesce(scope_source, '') as scope_source,
+         origin, install_local, equip_typology, field_installed,
+         field_operational, op_status, has_maint_plan, plan_followed,
+         failure_free, maint_status, evidence_code, degradation_desc,
+         extra_comments
         from barriers
         where external_code is not null
           and (location_id = any($1) or external_code = any($2))
@@ -270,6 +287,19 @@ export const defaultSyncIo: SyncIo = {
         // Pre-migration rows read null; treat as enabled (the old default).
         isActive: r.is_active ?? true,
         scopeSource: r.scope_source ?? "",
+        origin: r.origin ?? "",
+        installLocal: r.install_local ?? "",
+        equipTypology: r.equip_typology ?? "",
+        fieldInstalled: r.field_installed ?? "",
+        fieldOperational: r.field_operational ?? "",
+        opStatus: r.op_status ?? "",
+        hasMaintPlan: r.has_maint_plan ?? "",
+        planFollowed: r.plan_followed ?? "",
+        failureFree: r.failure_free ?? "",
+        maintStatus: r.maint_status ?? "",
+        evidenceCode: r.evidence_code ?? "",
+        degradationDesc: r.degradation_desc ?? "",
+        extraComments: r.extra_comments ?? "",
       };
       return {
         id: r.id,
@@ -431,9 +461,14 @@ export const defaultSyncIo: SyncIo = {
                owner_id = $9, comments = $10, action_plan = $11,
                source_updated_at = $12, scope_source = $13, is_active = $14,
                deleted_at = case when $15 then null else deleted_at end,
-               has_contingency = coalesce($16, has_contingency),
+               has_contingency = coalesce($16, has_contingency, 'Não'),
                contingency_desc = case when $16 is not null
-                 then $17 else contingency_desc end
+                 then $17 else contingency_desc end,
+               origin = $18, install_local = $19, equip_typology = $20,
+               field_installed = $21, field_operational = $22, op_status = $23,
+               has_maint_plan = $24, plan_followed = $25, failure_free = $26,
+               maint_status = $27, evidence_code = $28, degradation_desc = $29,
+               extra_comments = $30
              where id = $1`,
             [
               entry.local.id,
@@ -453,6 +488,19 @@ export const defaultSyncIo: SyncIo = {
               entry.kind === "restore",
               input.hasContingency ?? null,
               input.contingencyDesc ?? null,
+              input.origin,
+              input.installLocal,
+              input.equipTypology,
+              input.fieldInstalled,
+              input.fieldOperational,
+              input.opStatus,
+              input.hasMaintPlan,
+              input.planFollowed,
+              input.failureFree,
+              input.maintStatus,
+              input.evidenceCode,
+              input.degradationDesc,
+              input.extraComments,
             ],
           );
           // Every sync-touched id is pre-seeded with null, so this is never
@@ -562,6 +610,19 @@ async function insertBarrier(input: {
   sourceUpdatedAt: string | null;
   hasContingency?: string | null;
   contingencyDesc?: string;
+  origin: string;
+  installLocal: string;
+  equipTypology: string;
+  fieldInstalled: string;
+  fieldOperational: string;
+  opStatus: string;
+  hasMaintPlan: string;
+  planFollowed: string;
+  failureFree: string;
+  maintStatus: string;
+  evidenceCode: string;
+  degradationDesc: string;
+  extraComments: string;
 }, query: TxQuery = queryRows): Promise<number | null> {
   const rows = await query<{ id: number }>(
     `insert into barriers
@@ -569,8 +630,13 @@ async function insertBarrier(input: {
         criticality_id, category_id, grouping_id, owner_id,
         availability_id, comments, action_plan, status_since,
         source_updated_at, scope_source, is_active,
-        has_contingency, contingency_desc)
-     values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, current_date, $13, $14, $15, $16, $17)
+        has_contingency, contingency_desc,
+        origin, install_local, equip_typology, field_installed,
+        field_operational, op_status, has_maint_plan, plan_followed,
+        failure_free, maint_status, evidence_code, degradation_desc,
+        extra_comments)
+     values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, current_date, $13, $14, $15, $16, $17,
+        $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30)
      on conflict (external_code) do nothing
      returning id`,
     [
@@ -591,6 +657,19 @@ async function insertBarrier(input: {
       input.isActive,
       input.hasContingency ?? null,
       input.contingencyDesc ?? null,
+      input.origin,
+      input.installLocal,
+      input.equipTypology,
+      input.fieldInstalled,
+      input.fieldOperational,
+      input.opStatus,
+      input.hasMaintPlan,
+      input.planFollowed,
+      input.failureFree,
+      input.maintStatus,
+      input.evidenceCode,
+      input.degradationDesc,
+      input.extraComments,
     ],
   );
   return rows[0]?.id ?? null;

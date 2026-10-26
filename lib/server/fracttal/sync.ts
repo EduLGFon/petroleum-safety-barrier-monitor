@@ -123,6 +123,19 @@ export type SignatureSource = Pick<
   | "actionPlan"
   | "isActive"
   | "scopeSource"
+  | "origin"
+  | "installLocal"
+  | "equipTypology"
+  | "fieldInstalled"
+  | "fieldOperational"
+  | "opStatus"
+  | "hasMaintPlan"
+  | "planFollowed"
+  | "failureFree"
+  | "maintStatus"
+  | "evidenceCode"
+  | "degradationDesc"
+  | "extraComments"
 >;
 
 // fieldsSignature: two rows with the same signature and status are identical
@@ -142,6 +155,19 @@ export function fieldsSignature(input: SignatureSource): string {
     input.actionPlan,
     input.isActive,
     input.scopeSource,
+    input.origin,
+    input.installLocal,
+    input.equipTypology,
+    input.fieldInstalled,
+    input.fieldOperational,
+    input.opStatus,
+    input.hasMaintPlan,
+    input.planFollowed,
+    input.failureFree,
+    input.maintStatus,
+    input.evidenceCode,
+    input.degradationDesc,
+    input.extraComments,
   ]);
 }
 
@@ -162,6 +188,19 @@ export const SIGNATURE_FIELD_KEYS = [
   "actionPlan",
   "isActive",
   "scopeSource",
+  "origin",
+  "installLocal",
+  "equipTypology",
+  "fieldInstalled",
+  "fieldOperational",
+  "opStatus",
+  "hasMaintPlan",
+  "planFollowed",
+  "failureFree",
+  "maintStatus",
+  "evidenceCode",
+  "degradationDesc",
+  "extraComments",
 ] as const;
 export function diffSignatureFields(
   oldFields: SignatureSource | undefined,

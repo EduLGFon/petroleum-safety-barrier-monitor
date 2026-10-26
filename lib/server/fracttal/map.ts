@@ -35,6 +35,13 @@ export { AVAILABILITY_AVAILABLE, AVAILABILITY_UNAVAILABLE };
 
 import type { FracttalAsset } from "./types.ts";
 
+import {
+  deriveSheetFields,
+  groupingIdOf,
+  ownerIdOf,
+  type SheetFields,
+} from "./sheet-fields.ts";
+
 // IMPORT_DEFAULTS: fields Fracttal does not carry, given stable documented
 // application defaults (review team decision, not silent guess). locDescId
 // is storage-only (NOT NULL FK): Fracttal carries no location text and the
@@ -55,7 +62,11 @@ export interface MapContext {
 }
 
 // SyncBarrierInput: one fully-resolved row ready for the upsert planner.
-export interface SyncBarrierInput {
+// The sheet inventory fields (GERAL) ride along so the sync is their single
+// writer; hasContingency/contingencyDesc stay optional because the sync only
+// auto-writes Sim and must never clear a manual value (D11).
+export interface SyncBarrierInput
+  extends Omit<SheetFields, "hasContingency" | "contingencyDesc"> {
   externalCode: string;
   tag: string;
   locationId: number;
@@ -67,7 +78,6 @@ export interface SyncBarrierInput {
   ownerId: number | null;
   availabilityId: number;
   comments: string;
-  actionPlan: string;
   sourceUpdatedAt: string | null;
   // Upstream enable flag (Fracttal `active`, default true). False marks a
   // Desativada row; it never changes availability derivation, only the
@@ -91,6 +101,7 @@ export interface MapOptions {
   work?: {
     urgent?: StatusEvent | null;
     planned?: StatusEvent | null;
+    preventive?: StatusEvent | null;
     stopAssets?: boolean;
     hasContingency?: boolean;
     contingencySource?: string;
@@ -197,11 +208,30 @@ export function mapAsset(
   );
   const autoCont = work?.hasContingency === true &&
     (status.availabilityId === 2 || status.availabilityId === 3);
+  // Sheet derivation reads the same signals as availability. Only a promoted
+  // corrective contingency drives hasContingency; preventive text stays inert
+  // (D11) and the SQL update preserves any manual Sim.
+  const {
+    hasContingency: _sheetContingency,
+    contingencyDesc: _sheetContingencyDesc,
+    ...sheetFields
+  } = deriveSheetFields(
+    asset,
+    {
+      urgent: work?.urgent ?? null,
+      planned: work?.planned ?? null,
+      preventive: work?.preventive ?? null,
+      hasContingency: autoCont,
+      contingencySource: autoCont ? work?.contingencySource ?? "" : "",
+    },
+    { availabilityId: status.availabilityId, today },
+  );
 
   return {
     ok: true,
     warnings,
     input: {
+      ...sheetFields,
       externalCode: code,
       tag: tagFor(asset.description, code),
       locationId,
@@ -211,11 +241,10 @@ export function mapAsset(
       locDescId: IMPORT_DEFAULTS.locDescId,
       criticalityId,
       categoryId,
-      groupingId: IMPORT_DEFAULTS.groupingId,
-      ownerId: IMPORT_DEFAULTS.ownerId,
+      groupingId: groupingIdOf(asset),
+      ownerId: ownerIdOf(asset, work ?? undefined),
       availabilityId: status.availabilityId,
       comments: status.note,
-      actionPlan: "",
       // sourceUpdatedAt is the best remote state signal: the winning work
       // event date, else the out-of-service date, else unknown (null).
       sourceUpdatedAt: work?.urgent?.date ?? work?.planned?.date ??
