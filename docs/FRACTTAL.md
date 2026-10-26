@@ -423,3 +423,26 @@ select scope, started_at, finished_at as last_heartbeat from sync_state
 -- died mid-sweep, next startRun reaped it), not real fetch/map/apply errors;
 -- the dashboard shows them amber as Interrompida, never red.
 ```
+
+## Sheet inventory field sources (GERAL)
+
+Every barrier sheet column is now sync-owned and derived from Fracttal so
+no modal field stays blank forever. The dump import and the live sync use
+the same `deriveSheetFields`/`ownerIdOf`/`groupingIdOf` helpers in
+`lib/server/fracttal/sheet-fields.ts`.
+
+| Column                                             | Upstream source                                                                                    | Fallback                                                             |
+| -------------------------------------------------- | -------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------- |
+| origin                                             | HAZOP/APR/SGSO reference parsed from `notes`                                                       | `Gerenciamento das Barreiras de Segurança Operacional: SGSO-PG-0016` |
+| install_local                                      | immediate `parent_description` segment                                                             | `location_code`                                                      |
+| equip_typology                                     | `field_1`                                                                                          | `groups_description` / `description`                                 |
+| field_installed                                    | `active === false` or reserve/stock/scrap keyword in `parent_description`                          | `Sim`                                                                |
+| field_operational / op_status / maint_status       | derived availability id                                                                            | (derived)                                                            |
+| has_maint_plan                                     | `groups_tasks_description` / `id_group_task`, overridden by `N/A PLANO`/`PLANO TCOM` in `field_6`  | `Não`                                                                |
+| plan_followed                                      | plan presence plus overdue open preventive work                                                    | `Não`                                                                |
+| failure_free                                       | absence of open planned/urgent corrective work                                                     | (derived)                                                            |
+| has_contingency / contingency_desc / evidence_code | contingency detection (GM/CEC)                                                                     | `Não` / notes                                                        |
+| degradation_desc                                   | open corrective event `source`                                                                     | `""`                                                                 |
+| action_plan                                        | open corrective event `detail`/`source`                                                            | `""`                                                                 |
+| extra_comments                                     | `notes`, useful `field_6`, technical `field_2/3/4`, then a `field_1`-based identification fallback | (never empty)                                                        |
+| owner_id / grouping_id                             | asset family plus open work trade                                                                  | heuristic defaults                                                   |

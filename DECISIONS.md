@@ -316,3 +316,19 @@ scripts.
 Verification: `deno test lib/server/alerts/` (37 passed), full
 `deno task test` (592 passed), homologation A/B proof (422 vs 202) plus
 `--apply --reprocess --only-barrier 427` delivering 4 dispatches.
+
+## D13 - Sheet inventory columns are sync-owned and never blank forever (2026-10-26)
+
+Context: the barrier details modal rendered several GERAL inventory fields
+as "Não informado" forever because the import wrote nulls and the sync
+never touched them.
+
+Decision: all 15 sheet columns (plus action_plan) are derived from
+Fracttal asset fields, maintenance plan metadata, notes and open work via
+`lib/server/fracttal/sheet-fields.ts`, shared by the dump import and the
+live sync. `has_contingency` remains manual-safe via
+`coalesce($new, has_contingency, 'Não')`; every other column is
+overwritten on each sweep. `owner_id` and `grouping_id` are now derived
+heuristically instead of hardcoded defaults. Preventive open work drives
+`plan_followed` only and never availability. `extra_comments` always has
+a `field_1`-based fallback so it is never empty.

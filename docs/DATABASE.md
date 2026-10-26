@@ -248,11 +248,14 @@ intact, but `buildWhere`/`scopeText` and the `chart.ts` /
 (default `active`: `deleted_at is null and is_active`) instead of showing
 everything; the dashboard Situacao filter (admin only) lists `inactive`
 (`is_active = false`), `deleted`, or `all`. `is_active` mirrors the upstream
-`active` flag and never changes availability derivation. Contingency
-sheet columns are sync-owned only when auto-detected
-(`has_contingency = coalesce($new, has_contingency)`): an
+`active` flag and never changes availability derivation. All 15 sheet
+inventory columns are now sync-owned (derived in
+`lib/server/fracttal/sheet-fields.ts`), so a sync sweep backfills them on
+existing rows via the signature change. `has_contingency` stays
+manual-safe (`coalesce($new, has_contingency, 'Não')`): an
 auto-detected row writes `Sim` plus the source snippet, rows without a
-work-text signal keep their manual values. `sync_state` records one row
+work-text signal keep their manual values and otherwise default to `Não`.
+`sync_state` records one row
 per run (inserts/updates/deletes/skips counts, `status`, `note`).
 `sync_barrier_changes` records one row per barrier touched by a run (kind,
 old/new availability, `changed_fields`, compact old/new snapshots) so the
