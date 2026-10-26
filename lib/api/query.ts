@@ -53,8 +53,9 @@ export function toWireQuery(
     const ids: T[] = [];
     for (const s of vals) {
       const id = resolve(s);
-      if (id === undefined) console.warn(`[toWireQuery] unknown ${label}: ${s}`);
-      else ids.push(id);
+      if (id === undefined) {
+        console.warn(`[toWireQuery] unknown ${label}: ${s}`);
+      } else ids.push(id);
     }
     return ids.length ? ids : undefined;
   };
@@ -63,7 +64,9 @@ export function toWireQuery(
     (s) => toAvailabilityId(s as never),
     "availability",
   );
-  if (availIds) q.availabilityId = availIds.length === 1 ? availIds[0] : availIds;
+  if (availIds) {
+    q.availabilityId = availIds.length === 1 ? availIds[0] : availIds;
+  }
   const confIds = toIdList(
     f.compliance as string | string[] | undefined,
     (s) => toComplianceId(s as never),
@@ -84,7 +87,9 @@ export function toWireQuery(
   if (typoIds) q.typologyId = typoIds.length === 1 ? typoIds[0] : typoIds;
   if (f.criticality) {
     // criticality may be a list too; resolve each, keep single for compat
-    const critVals = Array.isArray(f.criticality) ? f.criticality : [f.criticality];
+    const critVals = Array.isArray(f.criticality)
+      ? f.criticality
+      : [f.criticality];
     const critIds = critVals
       .map((s) => toCriticalityId(s as never))
       .filter((x) => x !== undefined) as number[];

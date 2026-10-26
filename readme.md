@@ -720,7 +720,7 @@ These rules are enforced in review (`agents.md` holds the full list):
 
 | Document                     | Covers                                                               |
 | ---------------------------- | -------------------------------------------------------------------- |
-| `docs/USO.md`                | End-user manual in Portuguese (pt-BR)                               |
+| `docs/USO.md`                | End-user manual in Portuguese (pt-BR)                                |
 | `docs/ARCHITECTURE.md`       | Modules, data flows, runtime lifecycle, island topology, config      |
 | `docs/API.md`                | Wire contract, every endpoint, auth, throttling, operations          |
 | `docs/DATABASE.md`           | Schema, invariants, setup walkthrough                                |

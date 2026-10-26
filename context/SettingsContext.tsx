@@ -91,7 +91,7 @@ export function SettingsProvider(
     applyAccent(s.accentColor);
     applyDensity(s.density);
     applyMotion(s.reduceMotion);
-     applyBlur(s.disableBlur);
+    applyBlur(s.disableBlur);
   }, []);
 
   // Merges a patch into the current settings, publishes it and persists it to

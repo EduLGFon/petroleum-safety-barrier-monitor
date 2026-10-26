@@ -243,13 +243,21 @@ export function FilterBar(
       </div>
 
       <MultiCombo
-        values={Array.isArray(filters.typology) ? filters.typology : filters.typology ? [filters.typology] : []}
+        values={Array.isArray(filters.typology)
+          ? filters.typology
+          : filters.typology
+          ? [filters.typology]
+          : []}
         onChange={(v) => onFilter({ typology: v })}
         placeholder={`Tipologia (${vocabs.typologies.length})`}
         opts={vocabs.typologies}
       />
       <MultiCombo
-        values={Array.isArray(filters.category) ? filters.category : filters.category ? [filters.category] : []}
+        values={Array.isArray(filters.category)
+          ? filters.category
+          : filters.category
+          ? [filters.category]
+          : []}
         onChange={(v) => onFilter({ category: v })}
         placeholder={`Categoria (${vocabs.categories.length})`}
         opts={vocabs.categories}
@@ -275,7 +283,11 @@ export function FilterBar(
         opts={vocabs.availabilities}
       />
       <MultiCombo
-        values={Array.isArray(filters.compliance) ? filters.compliance : filters.compliance ? [filters.compliance] : []}
+        values={Array.isArray(filters.compliance)
+          ? filters.compliance
+          : filters.compliance
+          ? [filters.compliance]
+          : []}
         onChange={(v) => onFilter({ compliance: v })}
         placeholder="Conformidade"
         opts={vocabs.compliances}

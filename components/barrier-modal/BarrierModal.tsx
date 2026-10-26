@@ -3,7 +3,12 @@
 // chronological statusHistory without leaving the dashboard grid.
 import { useCallback, useEffect, useRef, useState } from "preact/hooks";
 
-import { HistoryIcon, InfoIcon, PencilIcon, ShieldCheckIcon } from "../ui/Icons.tsx";
+import {
+  HistoryIcon,
+  InfoIcon,
+  PencilIcon,
+  ShieldCheckIcon,
+} from "../ui/Icons.tsx";
 
 import { UnsavedChangesDialog } from "./UnsavedChangesDialog.tsx";
 

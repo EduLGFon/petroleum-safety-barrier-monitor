@@ -425,9 +425,13 @@ export function MultiCombo(
                   whiteSpace: "nowrap",
                   overflow: "hidden",
                   textOverflow: "ellipsis",
-                  color: values.includes(o) ? "var(--accent-2)" : AURORA.pillText,
+                  color: values.includes(o)
+                    ? "var(--accent-2)"
+                    : AURORA.pillText,
                   fontWeight: values.includes(o) ? 700 : 400,
-                  background: values.includes(o) ? "var(--glow)" : "transparent",
+                  background: values.includes(o)
+                    ? "var(--glow)"
+                    : "transparent",
                   display: "flex",
                   alignItems: "center",
                   gap: 8,

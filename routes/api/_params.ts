@@ -15,7 +15,9 @@ export function parseIntParam(v: string | null): number | undefined {
 
 // Parses a comma-separated list of integers (multi-select filters).
 // Single value returns a number for backward compat? Keep array when multiple.
-export function parseIntArrayParam(v: string | null): number | number[] | undefined {
+export function parseIntArrayParam(
+  v: string | null,
+): number | number[] | undefined {
   if (v === null || v === "") return undefined;
   const parts = v.split(",").map((x) => x.trim()).filter(Boolean);
   const nums: number[] = [];

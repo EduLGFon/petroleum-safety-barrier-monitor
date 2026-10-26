@@ -64,7 +64,7 @@ export function SettingsPanel(
     setDefaultLoc,
     resetFilterDefaults,
     setReduceMotion,
-  setDisableBlur,
+    setDisableBlur,
   } = useSettings();
   const [section, setSection] = useState<
     "appearance" | "filters" | "account" | "admin"
