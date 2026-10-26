@@ -25,6 +25,19 @@ export const SYNC_FIELD_LABELS: Record<string, string> = {
   actionPlan: "Plano de ação",
   scopeSource: "Origem do escopo",
   availabilityId: "Status",
+  origin: "Origem",
+  installLocal: "Local de Instalação",
+  equipTypology: "Tipologia Equipamento",
+  fieldInstalled: "Elemento em Campo?",
+  fieldOperational: "Elemento Operacional?",
+  opStatus: "Status Operacional",
+  hasMaintPlan: "Possui Plano?",
+  planFollowed: "Plano Cumprido?",
+  failureFree: "Sem Falha?",
+  maintStatus: "Status Manutenção",
+  evidenceCode: "Código Evidência",
+  degradationDesc: "Degradação",
+  extraComments: "Comentários 2",
 };
 
 export function syncFieldLabel(key: string): string {

@@ -1,10 +1,7 @@
 // BarrierContingency - Contingency section for the barrier dialog.
-import {
-  BuildingIcon,
-  ShieldCheckIcon,
-} from "../ui/Icons.tsx";
+import { BuildingIcon, ShieldCheckIcon } from "../ui/Icons.tsx";
 
-import { Div, FR, Sec, Txt } from "./primitives.tsx";
+import { FR, Sec, Txt } from "./primitives.tsx";
 
 import type { Barrier } from "../../lib/types.ts";
 
