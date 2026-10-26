@@ -22,6 +22,7 @@ import {
   IMPORT_NOTE,
   isClosedRequestStatus,
   isoDate,
+  isPreventiveWork,
   locationTypeOf,
   mergeEvent,
   resolveAvailability,
@@ -32,6 +33,13 @@ import {
   tagFor,
   typologyIdOf,
 } from "../lib/server/fracttal/barrier-rules.ts";
+
+import {
+  deriveSheetFields,
+  groupingIdOf,
+  ownerIdOf,
+  type SheetAsset,
+} from "../lib/server/fracttal/sheet-fields.ts";
 
 import { Pool } from "@db/postgres";
 
@@ -171,6 +179,16 @@ interface EquipmentRow {
   outOfServiceDate: string | null;
   // Upstream enable flag; unknown values default to enabled downstream.
   isActive: boolean;
+  locationCode: string;
+  field1: string;
+  field2: string;
+  field3: string;
+  field4: string;
+  field5: string;
+  field6: string;
+  notes: string;
+  idGroupTask: number | null;
+  groupsTasksDescription: string;
 }
 
 // Aggregated per-barrier state built while scanning WOs/WRs. Work-event
@@ -181,6 +199,7 @@ interface BarrierAcc extends EquipmentRow {
   scope: string;
   planned: StatusEvent | null;
   urgent: StatusEvent | null;
+  preventive: StatusEvent | null;
   stopAssets: boolean;
   hasContingency: boolean;
   contingencySource: string;
@@ -222,12 +241,18 @@ function contingencyTexts(row: Record<string, unknown>): string[] {
 function extractEvent(row: Record<string, unknown>): StatusEvent {
   const folio = str(row.wo_folio);
   const desc = str(row.description);
+  const detail = str(row.task_note) || str(row.note) ||
+    str(row.observation) || desc;
   return {
     date: earliestDate(
       isoDate(row.initial_date),
       earliestDate(isoDate(row.date_maintenance), isoDate(row.creation_date)),
     ),
     source: (folio ? `${folio}: ${desc}` : desc).slice(0, 800),
+    detail: detail.slice(0, 800),
+    trade: (str(row.tasks_log_types_2_description) ||
+      str(row.tasks_log_task_type_main) || str(row.types_description))
+      .slice(0, 120),
   };
 }
 
@@ -239,19 +264,45 @@ function applyWorkOrder(
   const acc = barriers.get(str(wo.code));
   if (!acc) return "unmatched";
   if (wo.done !== false) return "not-corrective";
+  const event = extractEvent(wo);
   const slot = classifyCorrective(
     str(wo.tasks_log_types_description),
     str(wo.types_description),
   );
   if (slot === "planned") {
-    acc.planned = mergeEvent(acc.planned, extractEvent(wo));
+    acc.planned = mergeEvent(acc.planned, event);
   } else if (slot === "urgent") {
-    acc.urgent = mergeEvent(acc.urgent, extractEvent(wo));
+    acc.urgent = mergeEvent(acc.urgent, event);
+  }
+  // Preventive work only feeds Plano Cumprido? and never availability. Use the
+  // scheduled maintenance date so future-dated open plans are not flagged
+  // overdue (creation date would otherwise always be in the past).
+  if (
+    isPreventiveWork(
+      str(wo.tasks_log_types_description),
+      str(wo.tasks_log_types_2_description),
+    )
+  ) {
+    const preventiveDate = earliestDate(
+      isoDate(wo.initial_date),
+      isoDate(wo.date_maintenance),
+    );
+    acc.preventive = mergeEvent(acc.preventive, {
+      ...event,
+      date: preventiveDate,
+    });
   }
   if (wo.stop_assets === true) acc.stopAssets = true;
-  if (hasContingencySignal(...contingencyTexts(wo)) && !acc.hasContingency) {
+  // Contingency only comes from corrective work (D11); preventive notes stay
+  // inert even if they carry a GM/CEC token.
+  const correctiveSlot = slot === "planned" || slot === "urgent";
+  if (
+    correctiveSlot &&
+    hasContingencySignal(...contingencyTexts(wo)) &&
+    !acc.hasContingency
+  ) {
     acc.hasContingency = true;
-    acc.contingencySource = extractEvent(wo).source;
+    acc.contingencySource = event.source;
   }
   return "matched";
 }
@@ -274,6 +325,27 @@ function applyWorkRequest(
     acc.contingencySource = extractEvent(wr).source;
   }
   return "matched";
+}
+
+function sheetAssetOf(acc: BarrierAcc): SheetAsset {
+  return {
+    description: acc.description,
+    parent_description: acc.parentDescription,
+    location_code: acc.locationCode,
+    groups_description: acc.groupsDescription,
+    groups_2_description: acc.groups2Description,
+    field_1: acc.field1,
+    field_2: acc.field2,
+    field_3: acc.field3,
+    field_4: acc.field4,
+    field_5: acc.field5,
+    field_6: acc.field6,
+    notes: acc.notes,
+    id_group_task: acc.idGroupTask,
+    groups_tasks_description: acc.groupsTasksDescription,
+    active: acc.isActive,
+    available: true,
+  };
 }
 
 function buildInsert(
@@ -382,11 +454,24 @@ async function main() {
       // the flag itself is preserved so the admin Situacao filter can list
       // Desativada rows. Non-boolean values default to enabled.
       isActive: row.active === false ? false : true,
+      locationCode: str(row.location_code),
+      field1: str(row.field_1),
+      field2: str(row.field_2),
+      field3: str(row.field_3),
+      field4: str(row.field_4),
+      field5: str(row.field_5),
+      field6: str(row.field_6),
+      notes: str(row.notes),
+      idGroupTask: typeof row.id_group_task === "number"
+        ? row.id_group_task
+        : null,
+      groupsTasksDescription: str(row.groups_tasks_description),
       station,
       category,
       scope: sources.join("+") || "all",
       planned: null,
       urgent: null,
+      preventive: null,
       stopAssets: false,
       hasContingency: false,
       contingencySource: "",
@@ -536,6 +621,18 @@ async function main() {
       const s = statusOf(acc);
       const autoCont = acc.hasContingency &&
         (s.availabilityId === 2 || s.availabilityId === 3);
+      const sheetAsset = sheetAssetOf(acc);
+      const sheet = deriveSheetFields(
+        sheetAsset,
+        {
+          urgent: acc.urgent,
+          planned: acc.planned,
+          preventive: acc.preventive,
+          hasContingency: autoCont,
+          contingencySource: autoCont ? acc.contingencySource : "",
+        },
+        { availabilityId: s.availabilityId, today },
+      );
       return {
         tag: tagFor(acc.description, acc.code),
         typology_id: typologyIdOf(acc.parentDescription),
@@ -546,20 +643,34 @@ async function main() {
         // null, so the suffix is the signal.
         criticality_id: rankIdOf(acc),
         category_id: categoryIds.get(acc.category) ?? 0,
-        grouping_id: 0,
-        owner_id: null,
+        grouping_id: groupingIdOf(sheetAsset),
+        owner_id: ownerIdOf(sheetAsset, {
+          urgent: acc.urgent,
+          planned: acc.planned,
+          preventive: acc.preventive,
+        }),
         availability_id: s.availabilityId,
         comments: s.note,
-        action_plan: "",
+        action_plan: sheet.actionPlan,
         status_since: s.statusSince,
         external_code: acc.code,
         scope_source: acc.scope,
         is_active: acc.isActive,
-        has_contingency: autoCont ? "Sim" : null,
-        contingency_desc: autoCont ? acc.contingencySource.slice(0, 800) : null,
-        evidence_code: null,
-        degradation_desc: null,
-        extra_comments: null,
+        origin: sheet.origin,
+        install_local: sheet.installLocal,
+        equip_typology: sheet.equipTypology,
+        field_installed: sheet.fieldInstalled,
+        field_operational: sheet.fieldOperational,
+        op_status: sheet.opStatus,
+        has_maint_plan: sheet.hasMaintPlan,
+        plan_followed: sheet.planFollowed,
+        failure_free: sheet.failureFree,
+        maint_status: sheet.maintStatus,
+        has_contingency: sheet.hasContingency,
+        contingency_desc: sheet.contingencyDesc || null,
+        evidence_code: sheet.evidenceCode || null,
+        degradation_desc: sheet.degradationDesc || null,
+        extra_comments: sheet.extraComments,
       };
     });
     const insert = buildInsert(
