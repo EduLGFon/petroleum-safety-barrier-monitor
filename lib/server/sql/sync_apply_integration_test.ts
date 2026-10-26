@@ -37,6 +37,19 @@ interface BarrierRow {
   scope_source: string;
   is_active: boolean;
   availability_id: number;
+  origin: string | null;
+  install_local: string | null;
+  equip_typology: string | null;
+  field_installed: string | null;
+  field_operational: string | null;
+  op_status: string | null;
+  has_maint_plan: string | null;
+  plan_followed: string | null;
+  failure_free: string | null;
+  maint_status: string | null;
+  evidence_code: string | null;
+  degradation_desc: string | null;
+  extra_comments: string | null;
 }
 
 async function firstBarrier(): Promise<BarrierRow | null> {
@@ -44,7 +57,10 @@ async function firstBarrier(): Promise<BarrierRow | null> {
     `select id, external_code, tag, location_id, typology_id, loc_desc_id,
             criticality_id, category_id, grouping_id, owner_id, comments,
             action_plan, source_updated_at, scope_source, is_active,
-            availability_id
+            availability_id, origin, install_local, equip_typology,
+            field_installed, field_operational, op_status, has_maint_plan,
+            plan_followed, failure_free, maint_status, evidence_code,
+            degradation_desc, extra_comments
      from barriers where deleted_at is null order by id limit 1`,
   );
   return rows[0] ?? null;
@@ -81,6 +97,19 @@ function toInput(row: BarrierRow, availabilityId: number): SyncBarrierInput {
     availabilityId,
     comments: row.comments,
     actionPlan: row.action_plan,
+    origin: row.origin ?? "",
+    installLocal: row.install_local ?? "",
+    equipTypology: row.equip_typology ?? "",
+    fieldInstalled: row.field_installed ?? "",
+    fieldOperational: row.field_operational ?? "",
+    opStatus: row.op_status ?? "",
+    hasMaintPlan: row.has_maint_plan ?? "",
+    planFollowed: row.plan_followed ?? "",
+    failureFree: row.failure_free ?? "",
+    maintStatus: row.maint_status ?? "",
+    evidenceCode: row.evidence_code ?? "",
+    degradationDesc: row.degradation_desc ?? "",
+    extraComments: row.extra_comments ?? "",
     sourceUpdatedAt: row.source_updated_at,
     isActive: row.is_active,
     scopeSource: row.scope_source,
@@ -99,6 +128,19 @@ function toLocal(row: BarrierRow): LocalBarrier {
     ownerId: row.owner_id,
     comments: row.comments,
     actionPlan: row.action_plan,
+    origin: row.origin ?? "",
+    installLocal: row.install_local ?? "",
+    equipTypology: row.equip_typology ?? "",
+    fieldInstalled: row.field_installed ?? "",
+    fieldOperational: row.field_operational ?? "",
+    opStatus: row.op_status ?? "",
+    hasMaintPlan: row.has_maint_plan ?? "",
+    planFollowed: row.plan_followed ?? "",
+    failureFree: row.failure_free ?? "",
+    maintStatus: row.maint_status ?? "",
+    evidenceCode: row.evidence_code ?? "",
+    degradationDesc: row.degradation_desc ?? "",
+    extraComments: row.extra_comments ?? "",
     isActive: row.is_active,
     scopeSource: row.scope_source,
   };

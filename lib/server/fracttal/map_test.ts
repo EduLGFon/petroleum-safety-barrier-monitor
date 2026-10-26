@@ -42,6 +42,15 @@ function asset(over: Partial<FracttalAsset> = {}): FracttalAsset {
     is_serial_control: true,
     initial_date_out_of_service: null,
     last_final_date_available: null,
+    field_1: null,
+    field_2: null,
+    field_3: null,
+    field_4: null,
+    field_5: null,
+    field_6: null,
+    notes: null,
+    id_group_task: null,
+    groups_tasks_description: null,
     ...over,
   };
 }
@@ -70,9 +79,9 @@ Deno.test("mapAsset resolves labels case-insensitively and applies defaults", ()
   assertStrictEquals(mapped.input.categoryId, 7);
   assertStrictEquals(mapped.input.criticalityId, 1);
   assertStrictEquals(mapped.input.typologyId, IMPORT_DEFAULTS.typologyId);
-  assertStrictEquals(mapped.input.groupingId, IMPORT_DEFAULTS.groupingId);
+  assertStrictEquals(mapped.input.groupingId, 3); // Resposta à Emergência da Brigada
   assertStrictEquals(mapped.input.locDescId, IMPORT_DEFAULTS.locDescId);
-  assertStrictEquals(mapped.input.ownerId, null);
+  assertStrictEquals(mapped.input.ownerId, 1); // SMS
   assertStrictEquals(mapped.input.comments, "");
   assertStrictEquals(mapped.input.actionPlan, "");
   assertStrictEquals(mapped.input.sourceUpdatedAt, null);

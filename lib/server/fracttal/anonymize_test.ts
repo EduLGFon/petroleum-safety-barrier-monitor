@@ -23,6 +23,15 @@ const base: FracttalAsset = {
   is_serial_control: true,
   initial_date_out_of_service: "2026-01-10",
   last_final_date_available: "2026-01-09",
+  field_1: null,
+  field_2: null,
+  field_3: null,
+  field_4: null,
+  field_5: null,
+  field_6: null,
+  notes: null,
+  id_group_task: null,
+  groups_tasks_description: null,
 };
 
 Deno.test("anonymizeAsset nulls the free-text fields", () => {

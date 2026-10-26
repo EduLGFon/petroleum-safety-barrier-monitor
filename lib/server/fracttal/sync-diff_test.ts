@@ -19,6 +19,19 @@ Deno.test("diffSignatureFields names changed keys plus availability", () => {
     actionPlan: "",
     isActive: true,
     scopeSource: "all",
+    origin: "",
+    installLocal: "",
+    equipTypology: "",
+    fieldInstalled: "",
+    fieldOperational: "",
+    opStatus: "",
+    hasMaintPlan: "",
+    planFollowed: "",
+    failureFree: "",
+    maintStatus: "",
+    evidenceCode: "",
+    degradationDesc: "",
+    extraComments: "",
   };
   const same = { ...old };
   assertEquals(diffSignatureFields(old, same, false), []);
