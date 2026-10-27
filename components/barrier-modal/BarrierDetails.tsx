@@ -58,6 +58,8 @@ export function BarrierDetails({ b }: { b: Barrier }) {
   const missing = (v: string): boolean => !v;
   const durDays = b.statusSince ? daysSince(b.statusSince) : 0;
   const isNC = b.compliance === "Não Conforme";
+  const comments = b.comments.trim();
+  const showComments = hasDistinctComments(comments, b.degradationDesc);
   return (
     <div style={{ padding: "var(--d-dialog-body)" }}>
       <div
@@ -211,7 +213,7 @@ export function BarrierDetails({ b }: { b: Barrier }) {
         />
         <FR
           Icon={ShieldCheckIcon}
-          label="Plano Cumprido?"
+          label="Plano Preventivo Cumprido?"
           value={na(b.planFollowed)}
           italic={missing(b.planFollowed)}
         />
@@ -228,12 +230,13 @@ export function BarrierDetails({ b }: { b: Barrier }) {
         value={b.degradationDesc || "Sem degradação registrada."}
         muted={!b.degradationDesc}
       />
-      <Div />
-      <Sec>Comentários</Sec>
-      <Txt
-        value={b.comments || "Sem comentários registrados."}
-        muted={!b.comments}
-      />
+      {showComments && (
+        <>
+          <Div />
+          <Sec>Comentários</Sec>
+          <Txt value={comments} />
+        </>
+      )}
       <Div />
       <Sec>Comentários 2</Sec>
       <Txt
@@ -249,4 +252,12 @@ export function BarrierDetails({ b }: { b: Barrier }) {
       />
     </div>
   );
+}
+
+export function hasDistinctComments(
+  comments: string,
+  degradation: string,
+): boolean {
+  const value = comments.trim();
+  return value !== "" && value !== degradation.trim();
 }

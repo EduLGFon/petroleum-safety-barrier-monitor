@@ -115,17 +115,27 @@ function sheetText(asset: SheetAsset): string {
 function parentSegments(
   parentDescription: string | null | undefined,
 ): string[] {
-  return (parentDescription ?? "").split("/").map((s) => s.trim()).filter(
-    Boolean,
-  );
+  return (parentDescription ?? "").replace(/^\/+/, "").split(/\/\s+/).map((
+    s,
+  ) => s.trim()).filter(Boolean);
 }
 
-// installLocalOf uses the immediate parent (the system/conjunto that owns
-// the asset) as the installation location; older rows without a chain fall
-// back to the station code so the field is never empty.
+// installLocalOf uses the nearest hierarchy node above the asset. Fracttal's
+// parent chain can include the asset itself as its final segment.
 export function installLocalOf(asset: SheetAsset): string {
   const segments = parentSegments(asset.parent_description);
-  const parent = segments.length > 0 ? segments[segments.length - 1]! : "";
+  const leaf = segments[segments.length - 1] ?? "";
+  const assetLabel = fieldValue(asset.field_1);
+  const descriptionLabel = fieldValue(asset.description).replace(
+    /\s*\{[^}]*\}\s*[A-Z]?\s*$/,
+    "",
+  ).trim();
+  const isAssetLeaf = leaf !== "" &&
+    [assetLabel, descriptionLabel].some((label) =>
+      label !== "" && foldText(label) === foldText(leaf)
+    );
+  const parentIndex = segments.length - (isAssetLeaf ? 2 : 1);
+  const parent = parentIndex >= 0 ? segments[parentIndex]! : "";
   return parent || fieldValue(asset.location_code) || "Não informado";
 }
 
@@ -136,14 +146,14 @@ export function equipTypologyOf(asset: SheetAsset): string {
     fieldValue(asset.description) || "Não informado";
 }
 
-// originOf extracts a HAZOP/APR or SGSO procedure reference from the free-text
-// notes. The dump notes carry one document reference per barrier; rows without
-// one use the program reference that governs this barrier catalog.
+// originOf extracts a HAZOP/APR, SGI-LEC or SGSO procedure reference from
+// free-text notes; rows without one use the governing program reference.
 export function originOf(asset: SheetAsset): string {
   const notes = fieldValue(asset.notes);
   const document = notes.match(
     /\b(?:HAZOP|APR)\s*[-:=]?\s*[A-Z0-9][A-Z0-9._/-]*\d[A-Z0-9._/-]*/i,
-  )?.[0] ?? notes.match(/\bSGSO-PG-\d{2,4}\b/i)?.[0];
+  )?.[0] ?? notes.match(/\bSGI-LEC[-_ ]?[A-Z0-9][A-Z0-9._/-]*/i)?.[0] ??
+    notes.match(/\bSGSO-PG-\d{2,4}\b/i)?.[0];
   return (document ?? "").replace(/\s+/g, " ").trim().slice(0, 160) ||
     ORIGIN_PROGRAM_REFERENCE;
 }
@@ -325,27 +335,10 @@ export function deriveSheetFields(
   };
 }
 
-// ownerIdOf assigns the barrier owner team from the asset family and, when
-// present, the open work trade. Safety devices go to SMS, process equipment
-// to Operação, and the remaining maintenance families to Manutenção.
+// ownerIdOf assigns stable ownership from the asset family first. Open-work
+// trade is only a fallback for families that do not identify an owner.
 export function ownerIdOf(asset: SheetAsset, work?: SheetWork): number {
   const text = sheetText(asset);
-  const open = work?.urgent ?? work?.planned ?? null;
-  const trade = foldText(
-    [
-      open?.trade,
-      open?.detail,
-      open?.source,
-      work?.preventive?.trade,
-      work?.preventive?.detail,
-    ].filter(Boolean).join(" "),
-  );
-  if (
-    /manutencao|eletric|mecanic|instrument|caldeiraria|automacao/.test(trade)
-  ) {
-    return OWNER_MAINTENANCE;
-  }
-  if (/operacao|medicao|integridade|sonda/.test(trade)) return OWNER_OPERATION;
   if (
     /extintor|hidrante|incend|detec|alarme|sirene|emerg|spda|aterr|para.?raio|chuveiro|lava.?olho|bastao|corta.?chamas/
       .test(
@@ -358,6 +351,24 @@ export function ownerIdOf(asset: SheetAsset, work?: SheetWork): number {
         text,
       )
   ) return OWNER_OPERATION;
+  const open = work?.urgent ?? work?.planned ?? null;
+  const trade = foldText(
+    [
+      open?.trade,
+      open?.detail,
+      open?.source,
+      work?.preventive?.trade,
+      work?.preventive?.detail,
+    ].filter(Boolean).join(" "),
+  );
+  if (/operacao|medicao|integridade|sonda/.test(trade)) {
+    return OWNER_OPERATION;
+  }
+  if (
+    /manutencao|eletric|mecanic|instrument|caldeiraria|automacao/.test(trade)
+  ) {
+    return OWNER_MAINTENANCE;
+  }
   return OWNER_MAINTENANCE;
 }
 

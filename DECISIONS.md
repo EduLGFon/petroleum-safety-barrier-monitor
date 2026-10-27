@@ -370,3 +370,25 @@ one owner plus one `ScopeBusyError`; it self-skips when `DATABASE_URL` is
 unset. `deno task check` and `deno task test` run after the change. The
 race test requires the migrated Postgres schema and is not exercised by the
 standard test command when `DATABASE_URL` is unset.
+
+## D16 - Align Fracttal detail derivations with asset hierarchy (2026-10-26)
+
+Context: review of barrier `1009435` found that a trailing asset leaf was
+shown as its own installation location, SGI-LEC source references fell back
+to the generic program origin, open-work trade overrode stable valve
+ownership, and the same work description appeared under both Degradação and
+Comentários.
+
+Decision: derive `install_local` from the closest parent above a matching
+asset leaf, recognize SGI-LEC references in notes, resolve owner from the
+asset family before using open-work trade as a fallback, and omit the
+Comentários section when its text duplicates Degradação. Clarify that
+`plan_followed` concerns overdue preventive tasks only; corrective work does
+not change that field. Keep the existing status date and history behavior
+unchanged.
+
+Verification: add sanitized synthetic mapping tests for the observed asset
+hierarchy, SGI-LEC origin, valve owner with Instrumentação corrective work,
+unknown-family trade fallback, and preventive-only plan semantics; add a
+modal rendering regression test for duplicate comments and the clarified
+label. Run `deno task check`, `deno task test`, and `deno task build`.
