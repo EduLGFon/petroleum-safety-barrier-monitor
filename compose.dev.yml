@@ -34,6 +34,7 @@ services:
       - deno-dir:/deno-dir
     environment:
       DENO_DIR: /deno-dir
+      DEV: true
     ports:
       - "5173:5173"
     healthcheck:
