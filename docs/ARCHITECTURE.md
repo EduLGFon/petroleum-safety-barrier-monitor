@@ -252,7 +252,9 @@ Full contract lives in `docs/API.md`. Summary:
   creates missing rows between rebuilds (unknown labels converge instead
   of skipping).
 - Postgres (`docs/DATABASE.md`): lookup tables + `barriers` +
-  `barrier_status_history` + `users`/`sessions` (cookie logins, two roles) +
+  `barrier_status_history` (including retained Fracttal work-order author,
+  participant names/roles, explanation text, and sync-run link) +
+  `users`/`sessions` (cookie logins, two roles) +
   `alert_rules` (per-category triggers) + `alert_events`/`alert_recipients`.
   `compliance_id` is trigger-derived, the only
   write path is `record_status_change()` (DB-enforced by

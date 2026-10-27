@@ -65,6 +65,14 @@ listed here exactly, so the codebase does not fork.
 | Desativada (barreira)       | `inactive` (`is_active = false`)                 |
 | Excluída (barreira)         | `deleted` (`deleted_at IS NOT NULL`)             |
 | Situação (filtro)           | `rowScope` (`active`/`inactive`/`deleted`/`all`) |
+| Histórico de status         | `statusHistory`                                  |
+| Envolvidos                  | `participants`                                   |
+| Criado por                  | `created_by` (Fracttal author preference)        |
+| Solicitado por              | `requested_by` (author fallback)                |
+| Executor                    | `personnel_description`                         |
+| Responsável                 | `user_assigned`                                 |
+| Recursos humanos            | `resources_human_resources`                     |
+| Validado por                | `validated_by_description`                     |
 
 ## Type / property renames
 

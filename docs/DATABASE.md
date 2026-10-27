@@ -167,7 +167,10 @@ alert_rules
 barrier_status_history
   id                    identity, PK
   barrier_id            → barriers, on delete cascade
-  date, status_id, author_id, note
+  date, status_id, author_id, note (may include Fracttal operation free text)
+  sync_run_id           → sync_state, on delete set null (null = non-sync change)
+  source_author         Fracttal created_by/requested_by snapshot
+  participants          JSON array of {name, role} snapshots
 ```
 
 ### Lookup tables = contract with `lib/enums/`
@@ -218,10 +221,18 @@ availability_id = ...` - that would leave
 `status_since` (when the current status started) and `barrier_status_history`
 (the timeline shown in the details modal) stale. The SQL function
 `record_status_change(
-barrier_id, status_id, author_id, note)` does both
-things atomically: it updates `availability_id` + `status_since`
+barrier_id, status_id, author_id, note, sync_run_id, source_author,
+participants)` does both things atomically: it updates `availability_id` + `status_since`
 (`current_date`), raises `barrier % does not exist` if missing, and inserts
-the corresponding row in the history.
+the corresponding row in the history. The last three parameters default for
+existing app-status callers. Sync writes preserve the Fracttal creator (or
+requester fallback), people/roles, explanation, and run id in that row;
+`sync_run_id` plus `barrier_id` joins the history entry to the sync audit row.
+The displayed author prefers `source_author`; `author_id` remains the
+technical sync identity so the admin-override guard keeps its existing
+semantics. Fracttal names/roles and operation text are exposed with the
+existing authenticated barrier-history response and retained with that row;
+soft deletion keeps them, while hard deletion cascades as before.
 `transitionBarrierStatus()` in `lib/server/sql/barriers.ts` calls exactly
 that function - it is the only place in the application code that should do
 this. Same-status calls are a no-op (no history row, no alert fan-out), so

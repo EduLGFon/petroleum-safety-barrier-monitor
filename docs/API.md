@@ -81,7 +81,10 @@ value, the filter is skipped with a warning) and `fromXId(number) -> string`
 - **`lib/wireTypes.ts`** - `WireBarrier`, `WireStatusHistoryEntry`,
   `WireKpiSnapshot`, `WireCategoryCompliance`, `BarriersQuery`,
   `BarriersResponse`: exactly what travels over the network (only numbers + a
-  few free-text fields like `tag`, `comments`, `actionPlan`).
+  few free-text fields like `tag`, `comments`, `actionPlan`). Sync-generated
+  history entries also carry the Fracttal author and participant snapshots,
+  explanation text, and optional `syncRunId`; legacy and manually written
+  entries omit those optional fields.
 - **`lib/types.ts`** - `Barrier`, `KpiSnapshot`, `CategoryCompliance`,
   `Vocabularies`, `FilterState`, `SortableColumn`, `StatusHistoryEntry`: the
   domain types the UI uses, always with already-resolved, readable strings.

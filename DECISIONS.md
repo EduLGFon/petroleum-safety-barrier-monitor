@@ -392,3 +392,30 @@ hierarchy, SGI-LEC origin, valve owner with Instrumentação corrective work,
 unknown-family trade fallback, and preventive-only plan semantics; add a
 modal rendering regression test for duplicate comments and the clarified
 label. Run `deno task check`, `deno task test`, and `deno task build`.
+
+## D17 - Attribute and explain sync-generated status history (2026-10-27)
+
+Context: status history recorded the sync service as author and a generic
+sync note, while the per-barrier sync audit separately held the status diff.
+An anonymized Fracttal work-order shape confirmed `created_by`,
+`requested_by`, `personnel_description`, `user_assigned`,
+`resources_human_resources`, and `validated_by_description`.
+
+Decision: for new sync-generated history, display `created_by` as author and
+fall back to `requested_by`. Snapshot the people and roles from those
+Fracttal fields, explain the winning status signal using its classification,
+reference, notes, and contingency/out-of-service evidence, and store
+`sync_run_id` so `(sync_run_id, barrier_id)` joins to the per-barrier audit.
+The existing `author_id` remains the sync identity because status ownership
+and admin-override detection depend on it. If Fracttal provides no person,
+the existing technical author remains visible. Existing history is not
+backfilled. Work-request actor-field parity remains optional until observed.
+
+The name/role snapshots and source explanation are retained with the
+existing status-history row lifecycle and returned under the same barrier
+read authorization; no new audience or retention period is introduced.
+Fracttal operation text may contain identifying free text, so the history
+entry preserves that text only when a new sync status entry is written.
+
+Verification: pending `deno task check`, `deno task test`, and `deno task
+build`.

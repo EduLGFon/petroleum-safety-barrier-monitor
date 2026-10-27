@@ -197,6 +197,24 @@ Two 60k slices analyzed; date range in first 60k rows: 2026-09-11 to
 `final_date` and `initial_date` are null on ~93% of rows (started but
 planned tasks); `wo_final_date` exists on completed WOs.
 
+### People retained in sync-generated status history
+
+An anonymized work-order response confirmed these display-name fields:
+
+| Field | History role |
+| ----- | ------------ |
+| `created_by` | primary author (preferred) |
+| `requested_by` | author fallback and requester participant |
+| `personnel_description` | executor |
+| `user_assigned` | responsible person |
+| `resources_human_resources` | one or more semicolon-separated human resources |
+| `validated_by_description` | validator |
+
+The sync snapshots names and roles only when it writes a new status-history
+row. Employee codes, personnel ids, signatures, and image paths are not
+stored. Work-request actor-field parity is not verified; the parser uses
+these fields only if the endpoint includes them.
+
 ### Summary status derivation rule
 
 Open corrective WO on an asset:

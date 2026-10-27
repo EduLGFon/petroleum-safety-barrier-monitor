@@ -170,14 +170,22 @@ only the work pass stays eager so its failure aborts with zero writes).
   `parseWorkRequest` validators, `workOrderSlot` / `workRequestSlot`
   (same open/closed gates and classifiers as the import), `buildWorkEvents`
   (per-code merge; malformed rows listed, never thrown), `resolverFor`.
+  Work-order history attribution reads `created_by` (then `requested_by`)
+  and snapshots names from `personnel_description`, `user_assigned`,
+  `resources_human_resources`, and `validated_by_description`; request rows
+  use those fields only if present.
   `source_updated_at` is the winning work-event date, else the
   out-of-service date, else null.
 - `lib/server/sql/sync.ts` - the default `SyncIo`: builds label→id context
   from the lookup tables, loads scoped locals, applies the plan (inserts via
   `INSERT ... ON CONFLICT (external_code) DO NOTHING` - the UNIQUE constraint
   is the dedup authority; status changes go through the one sanctioned
-  `record_status_change()` with author 10 "Sincronização Fracttal"), and
-  writes the run audit. `startRun` is an atomic claim (`INSERT ... WHERE NOT
+  `record_status_change()` with author 10 as the technical sync identity).
+  New sync history snapshots the Fracttal creator (requester fallback),
+  participants and roles, explanation, and `sync_run_id`; history plus
+  barrier id joins to the per-barrier run audit. The history UI displays the
+  Fracttal person as author while retaining the technical author id for the
+  admin-override guard. `startRun` is an atomic claim (`INSERT ... WHERE NOT
   EXISTS` a fresh lease plus `ON CONFLICT ... DO NOTHING` against the partial
   unique index) so two racers cannot both open a run; the loser gets
   `ScopeBusyError` without a PostgreSQL error log. Every live run heartbeats
