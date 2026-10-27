@@ -33,6 +33,7 @@ interface OverlaysProps {
   settingsOpen: boolean;
   onCloseSettings: () => void;
   sessionUser?: AuthUser | null;
+  devFracttalRaw?: boolean;
   // Live vocabularies forwarded to the settings filters section.
   locations?: { code: string; name: string; type: string }[];
   availabilities?: string[];
@@ -51,6 +52,7 @@ export function DashboardOverlays(
     settingsOpen,
     onCloseSettings,
     sessionUser = null,
+    devFracttalRaw = false,
     locations,
     availabilities,
     compliances,
@@ -65,6 +67,7 @@ export function DashboardOverlays(
         barrier={openBarrier}
         onClose={onCloseBarrier}
         sessionUser={sessionUser}
+        devFracttalRaw={devFracttalRaw}
         onSaved={onBarrierSaved}
       />
       <SettingsPanel

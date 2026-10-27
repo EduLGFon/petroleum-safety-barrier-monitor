@@ -6,6 +6,8 @@ import { requirePageSession, toLogin } from "../lib/server/page-auth.ts";
 
 import { getVocabularies } from "../lib/server/sql/vocabularies.ts";
 
+import { isDevFracttalRawEnabled } from "../lib/server/config.ts";
+
 import { Dashboard } from "../islands/Dashboard.tsx";
 
 import type { Vocabularies } from "../lib/types.ts";
@@ -49,6 +51,7 @@ export default define.page(async function Home(
   const apiMode = getApiMode();
   const companyName = getCompanyName();
   const sessionUser = session.user;
+  const devFracttalRaw = apiMode === "http" && isDevFracttalRawEnabled();
   if (apiMode === "http") {
     // Empty PUBLIC_API_BASE_URL means "same origin": the island fetches
     // relative /api/* paths, so each browser uses the host it actually
@@ -74,6 +77,7 @@ export default define.page(async function Home(
           apiBaseUrl={baseUrl}
           vocabularies={vocabularies}
           sessionUser={sessionUser}
+          devFracttalRaw={devFracttalRaw}
         />
       </main>
     );
@@ -92,6 +96,7 @@ export default define.page(async function Home(
         apiBaseUrl=""
         vocabularies={null}
         sessionUser={sessionUser}
+        devFracttalRaw={devFracttalRaw}
       />
     </main>
   );

@@ -20,6 +20,8 @@ import { BarrierContingency } from "./BarrierContingency.tsx";
 
 import type { AuthUser, Barrier } from "../../lib/types.ts";
 
+import { FracttalRawData } from "./FracttalRawData.tsx";
+
 import { BarrierDetails } from "./BarrierDetails.tsx";
 
 import { BarrierHistory } from "./BarrierHistory.tsx";
@@ -33,6 +35,7 @@ interface Props {
   onClose: () => void;
   sessionUser?: AuthUser | null;
   onSaved?: () => void;
+  devFracttalRaw?: boolean;
 }
 
 // canEditBarrier: the Editar tab is an admin tool on live rows only.
@@ -47,7 +50,7 @@ export function canEditBarrier(
 }
 // BarrierModal renders the detail dialog shell; handles ESC close, body scroll-lock, and backdrop dismiss.
 export function BarrierModal(
-  { barrier, onClose, sessionUser, onSaved }: Props,
+  { barrier, onClose, sessionUser, onSaved, devFracttalRaw = false }: Props,
 ) {
   const [tab, setTab] = useState<Tab>("details");
   const [isDirty, setIsDirty] = useState(false);
@@ -194,6 +197,7 @@ export function BarrierModal(
               onSavedClean={() => setIsDirty(false)}
               sessionUser={sessionUser}
               onSaved={onSaved}
+              devFracttalRaw={devFracttalRaw}
             />
           )}
         </div>
@@ -229,6 +233,7 @@ function Content(
     onSavedClean,
     sessionUser,
     onSaved,
+    devFracttalRaw,
   }: {
     b: Barrier;
     onClose: () => void;
@@ -239,6 +244,7 @@ function Content(
     onSavedClean: () => void;
     sessionUser?: AuthUser | null;
     onSaved?: () => void;
+    devFracttalRaw: boolean;
   },
 ) {
   // Local copy so a save refreshes Details without closing the dialog.
@@ -301,7 +307,19 @@ function Content(
       </div>
       {/* Body */}
       <div style={{ overflowY: "auto", flex: 1 }}>
-        {tab === "details" && <BarrierDetails b={local} />}
+        {tab === "details" && (
+          <>
+            <BarrierDetails b={local} />
+            {devFracttalRaw && isAdmin && (
+              <div style={{ padding: "0 var(--d-dialog-body)" }}>
+                <FracttalRawData
+                  key={`${local.id}:${local.externalCode}`}
+                  barrier={local}
+                />
+              </div>
+            )}
+          </>
+        )}
         {tab === "contingency" && <BarrierContingency b={local} />}
         {tab === "history" && <BarrierHistory b={local} />}
         {tab === "edit" && canEditBarrier(local, isAdmin) && (

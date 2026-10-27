@@ -20,6 +20,7 @@ interface Props {
   apiBaseUrl: string;
   vocabularies: Vocabularies | null;
   sessionUser: AuthUser | null;
+  devFracttalRaw?: boolean;
 }
 
 // Dashboard: island root; wraps DashboardView in Settings + Theme providers since server route context does not reach hydrated islands.
@@ -31,6 +32,7 @@ export function Dashboard(
     apiBaseUrl,
     vocabularies,
     sessionUser,
+    devFracttalRaw,
   }: Props,
 ) {
   // Providers must wrap the island content itself: context from a server
@@ -46,6 +48,7 @@ export function Dashboard(
             apiBaseUrl={apiBaseUrl}
             vocabularies={vocabularies}
             sessionUser={sessionUser}
+            devFracttalRaw={devFracttalRaw}
           />
         </ErrorBoundary>
       </ThemeProvider>

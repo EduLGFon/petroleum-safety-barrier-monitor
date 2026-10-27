@@ -73,6 +73,7 @@ interface SectionsProps {
   // Authenticated session identity for the Header user menu. Null when the
   // island renders without SSR identity (never in production page flow).
   sessionUser?: AuthUser | null;
+  devFracttalRaw?: boolean;
   // Origin of the API for the header health probe. Empty = same origin.
   apiBaseUrl?: string;
   // Server mode only: exports the whole selection through /api/export. Absent
@@ -102,6 +103,7 @@ export function DashboardSections(
     companyName,
     serverMode,
     sessionUser = null,
+    devFracttalRaw = false,
     syncStatus = null,
     apiBaseUrl = "",
     onServerExport,
@@ -200,8 +202,7 @@ export function DashboardSections(
     : filters.compliance
     ? [filters.compliance]
     : [];
-  const isUrgentActive =
-    complianceVals.length === 1 &&
+  const isUrgentActive = complianceVals.length === 1 &&
     complianceVals[0] === "Não Conforme" &&
     filters.sortCol === "statusSince";
 
@@ -350,6 +351,7 @@ export function DashboardSections(
         settingsOpen={settingsOpen}
         onCloseSettings={() => setSettingsOpen(false)}
         sessionUser={sessionUser}
+        devFracttalRaw={devFracttalRaw}
         locations={settingLocations}
         availabilities={dispOpts}
         compliances={confOpts}

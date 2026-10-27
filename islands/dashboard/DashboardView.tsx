@@ -28,6 +28,7 @@ interface Props {
   apiBaseUrl: string;
   vocabularies: Vocabularies | null;
   sessionUser: AuthUser | null;
+  devFracttalRaw?: boolean;
 }
 
 // DashboardView: picks the data mode; splash, settings, and sections live
@@ -40,6 +41,7 @@ export function DashboardView(
     apiBaseUrl,
     vocabularies,
     sessionUser,
+    devFracttalRaw = false,
   }: Props,
 ) {
   const { settings } = useSettings();
@@ -51,6 +53,7 @@ export function DashboardView(
         companyName={companyName}
         defaultLocation={settings.defaultLocation}
         sessionUser={sessionUser}
+        devFracttalRaw={devFracttalRaw}
       />
     );
   }
@@ -116,12 +119,20 @@ function ClientView(
 // ServerView: HTTP-mode dashboard paging from the API per scope change,
 // refreshing data + vocabularies on a 5-minute cadence (hidden tabs skip).
 function ServerView(
-  { baseUrl, vocabularies, companyName, defaultLocation, sessionUser }: {
+  {
+    baseUrl,
+    vocabularies,
+    companyName,
+    defaultLocation,
+    sessionUser,
+    devFracttalRaw,
+  }: {
     baseUrl: string;
     vocabularies: Vocabularies | null;
     companyName: string;
     defaultLocation: string;
     sessionUser: AuthUser | null;
+    devFracttalRaw: boolean;
   },
 ) {
   const [splashDone, setSplashDone] = useState(false);
@@ -221,6 +232,7 @@ function ServerView(
         companyName={companyName}
         serverMode
         sessionUser={sessionUser}
+        devFracttalRaw={devFracttalRaw}
         syncStatus={syncStatus}
         apiBaseUrl={baseUrl}
         onServerExport={exportServer}
