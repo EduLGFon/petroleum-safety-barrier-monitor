@@ -20,9 +20,21 @@ import { getWireBarriers } from "../data.ts";
 
 const COMPLIANT_STATUS_IDS = new Set([0, 1, 2, 3]); // available, out-of-service, contingency, degraded-contingency
 
+// Effective availability (display overlay): Degradado/Indisponível with
+// Há Contingência?=Sim reads as its contingenciado state. Mirrors
+// effectiveAvailabilityId() in barrier-rules and the SQL CASE in buildWhere.
+function effectiveAvailabilityId(baseId: number, hasContingency: string): number {
+  const flag = (hasContingency ?? "").trim().toLowerCase();
+  if (flag !== "sim") return baseId;
+  if (baseId === 4) return 3;
+  if (baseId === 5) return 2;
+  return baseId;
+}
+
 // Derives compliance id (0 compliant / 1 non-compliant) from availability id.
-function wireComplianceId(dispId: number): number {
-  return COMPLIANT_STATUS_IDS.has(dispId) ? 0 : 1; // 0=compliant 1=non-compliant
+function wireComplianceId(w: WireBarrier): number {
+  const eff = effectiveAvailabilityId(w.availabilityId, w.hasContingency);
+  return COMPLIANT_STATUS_IDS.has(eff) ? 0 : 1; // 0=compliant 1=non-compliant
 }
 
 // Checks a wire barrier against numeric query filters (mock WHERE clause).
@@ -38,27 +50,24 @@ function matchesQuery(w: WireBarrier, q: BarriersQuery): boolean {
     return false;
   }
   if (scope === "active" && (deleted !== null || active !== true)) return false;
+  const inFilter = (qval: number | number[] | undefined, actual: number): boolean => {
+    if (qval === undefined) return true;
+    const ids = Array.isArray(qval) ? qval : [qval];
+    return ids.includes(actual);
+  };
   if (
     q.locationId !== undefined && q.locationId !== 0 &&
     w.locationId !== q.locationId
   ) return false;
-  if (
-    q.availabilityId !== undefined &&
-    w.availabilityId !== q.availabilityId
-  ) return false;
-  if (
-    q.complianceId !== undefined &&
-    wireComplianceId(w.availabilityId) !== q.complianceId
-  ) return false;
-  if (q.categoryId !== undefined && w.categoryId !== q.categoryId) {
-    return false;
+  const effAvail = effectiveAvailabilityId(w.availabilityId, w.hasContingency);
+  if (!inFilter(q.availabilityId, effAvail)) return false;
+  if (q.complianceId !== undefined) {
+    const compIds = Array.isArray(q.complianceId) ? q.complianceId : [q.complianceId];
+    if (!compIds.includes(wireComplianceId(w))) return false;
   }
-  if (q.typologyId !== undefined && w.typologyId !== q.typologyId) {
-    return false;
-  }
-  if (
-    q.criticalityId !== undefined && w.criticalityId !== q.criticalityId
-  ) return false;
+  if (!inFilter(q.categoryId, w.categoryId)) return false;
+  if (!inFilter(q.typologyId, w.typologyId)) return false;
+  if (!inFilter(q.criticalityId, w.criticalityId)) return false;
   if (q.criticalOnly === true && !isCriticalRankId(w.criticalityId)) {
     return false;
   }
@@ -106,8 +115,8 @@ function sortWire(
       case "availability":
         return (a.availabilityId - b.availabilityId) * dir;
       case "compliance":
-        return (wireComplianceId(a.availabilityId) -
-          wireComplianceId(b.availabilityId)) * dir;
+        return (wireComplianceId(a) -
+          wireComplianceId(b)) * dir;
       case "statusSince":
         return a.statusSince.localeCompare(b.statusSince) * dir;
       default:

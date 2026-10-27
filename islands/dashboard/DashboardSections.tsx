@@ -195,7 +195,14 @@ export function DashboardSections(
   // Unified NC count: every non-Conforme barrier (fail-closed, novel statuses
   // included) drives the alert, matching KpiGrid and the chart.
   const ncCount = kpi.nonCompliant;
-  const isUrgentActive = filters.compliance === "Não Conforme" &&
+  const complianceVals = Array.isArray(filters.compliance)
+    ? filters.compliance
+    : filters.compliance
+    ? [filters.compliance]
+    : [];
+  const isUrgentActive =
+    complianceVals.length === 1 &&
+    complianceVals[0] === "Não Conforme" &&
     filters.sortCol === "statusSince";
 
   return (

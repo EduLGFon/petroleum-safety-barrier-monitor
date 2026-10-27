@@ -73,19 +73,19 @@ export function buildWhere(
     const hasCompliant = compIds.includes(0);
     const hasNonCompliant = compIds.includes(1);
     const otherIds = compIds.filter((x) => x !== 0 && x !== 1);
-    if (hasCompliant) {
-      conds.push(
-        `and (case when b.availability_id in (4, 5) and lower(trim(coalesce(b.has_contingency, ''))) = 'sim' then case when b.availability_id = 4 then 3 else 2 end else b.availability_id end) in (0, 1, 2, 3)`,
-      );
-    }
-    if (hasNonCompliant) {
-      conds.push(
-        `and (case when b.availability_id in (4, 5) and lower(trim(coalesce(b.has_contingency, ''))) = 'sim' then case when b.availability_id = 4 then 3 else 2 end else b.availability_id end) in (4, 5)`,
-      );
-    }
+    const effAvail =
+      `(case when b.availability_id in (4, 5) and lower(trim(coalesce(b.has_contingency, ''))) = 'sim' then case when b.availability_id = 4 then 3 else 2 end else b.availability_id end)`;
+    const branches: string[] = [];
+    if (hasCompliant) branches.push(`${effAvail} in (0, 1, 2, 3)`);
+    if (hasNonCompliant) branches.push(`${effAvail} in (4, 5)`);
     if (otherIds.length) {
       args.push(otherIds);
-      conds.push(`and b.compliance_id = any($${args.length})`);
+      branches.push(`b.compliance_id = any($${args.length})`);
+    }
+    if (branches.length === 1) {
+      conds.push(`and ${branches[0]}`);
+    } else if (branches.length > 1) {
+      conds.push(`and (${branches.join(" or ")})`);
     }
   }
   const catIds = Array.isArray(q.categoryId)
