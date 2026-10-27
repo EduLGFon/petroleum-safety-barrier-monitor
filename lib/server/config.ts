@@ -62,3 +62,15 @@ export function loadSyncConfig(
       (Number(get("FRACTTAL_SYNC_ITEM_TYPE")) || 2),
   };
 }
+
+// isDevFracttalRawEnabled: exact opt-in for the sensitive, read-only raw
+// Fracttal detail endpoint. Environment access failure keeps it disabled.
+export function isDevFracttalRawEnabled(
+  get: EnvGetter = defaultEnv,
+): boolean {
+  try {
+    return get("DEV") === "true";
+  } catch {
+    return false;
+  }
+}

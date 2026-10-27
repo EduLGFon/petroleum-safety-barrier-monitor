@@ -293,9 +293,17 @@ Deno.test("collectAssets surfaces malformed rows in the report", async () => {
   assertEquals(report.collected, 1);
 });
 
-Deno.test("buildWorkQuery serializes paging plus the ot_status filter", () => {
-  const q = buildWorkQuery({ start: -2, limit: 500, otStatus: "1" });
+Deno.test("buildWorkQuery serializes paging and supported work filters", () => {
+  const q = buildWorkQuery({
+    start: -2,
+    limit: 500,
+    otStatus: "1",
+    codeAsset: "EQ-1 /A",
+    codeItem: "EQ-2",
+  });
   assertStrictEquals(q.get("ot_status"), "1");
+  assertStrictEquals(q.get("code_asset"), "EQ-1 /A");
+  assertStrictEquals(q.get("code_item"), "EQ-2");
   assertStrictEquals(q.get("since"), null);
   assertStrictEquals(q.get("date[gte]"), null);
   assertStrictEquals(q.get("start"), "0");

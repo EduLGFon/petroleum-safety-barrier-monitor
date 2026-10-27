@@ -23,7 +23,10 @@ const COMPLIANT_STATUS_IDS = new Set([0, 1, 2, 3]); // available, out-of-service
 // Effective availability (display overlay): Degradado/Indisponível with
 // Há Contingência?=Sim reads as its contingenciado state. Mirrors
 // effectiveAvailabilityId() in barrier-rules and the SQL CASE in buildWhere.
-function effectiveAvailabilityId(baseId: number, hasContingency: string): number {
+function effectiveAvailabilityId(
+  baseId: number,
+  hasContingency: string,
+): number {
   const flag = (hasContingency ?? "").trim().toLowerCase();
   if (flag !== "sim") return baseId;
   if (baseId === 4) return 3;
@@ -50,7 +53,10 @@ function matchesQuery(w: WireBarrier, q: BarriersQuery): boolean {
     return false;
   }
   if (scope === "active" && (deleted !== null || active !== true)) return false;
-  const inFilter = (qval: number | number[] | undefined, actual: number): boolean => {
+  const inFilter = (
+    qval: number | number[] | undefined,
+    actual: number,
+  ): boolean => {
     if (qval === undefined) return true;
     const ids = Array.isArray(qval) ? qval : [qval];
     return ids.includes(actual);
@@ -62,7 +68,9 @@ function matchesQuery(w: WireBarrier, q: BarriersQuery): boolean {
   const effAvail = effectiveAvailabilityId(w.availabilityId, w.hasContingency);
   if (!inFilter(q.availabilityId, effAvail)) return false;
   if (q.complianceId !== undefined) {
-    const compIds = Array.isArray(q.complianceId) ? q.complianceId : [q.complianceId];
+    const compIds = Array.isArray(q.complianceId)
+      ? q.complianceId
+      : [q.complianceId];
     if (!compIds.includes(wireComplianceId(w))) return false;
   }
   if (!inFilter(q.categoryId, w.categoryId)) return false;

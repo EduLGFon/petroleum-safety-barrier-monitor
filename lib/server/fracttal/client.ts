@@ -209,10 +209,13 @@ export function buildListQuery(q: FracttalListQuery): URLSearchParams {
 // buildWorkQuery: same paging plus the ot_status filter (reference: Query
 // tasks in WOs). No since/until window: a live probe showed since has no
 // effect, so the status pass is newest-N-pages (or the open-status sweep).
-// No invented filters: scoping beyond this is client-side.
+// code_asset and code_item are documented upstream filters for targeted
+// detail requests.
 export function buildWorkQuery(q: FracttalWorkQuery): URLSearchParams {
   const params = new URLSearchParams();
   if (q.otStatus !== undefined) params.set("ot_status", q.otStatus);
+  if (q.codeAsset !== undefined) params.set("code_asset", q.codeAsset);
+  if (q.codeItem !== undefined) params.set("code_item", q.codeItem);
   const start = Math.max(0, Math.floor(q.start ?? 0));
   const limit = Math.min(
     MAX_PAGE_SIZE,

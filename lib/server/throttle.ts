@@ -68,6 +68,11 @@ export const passwordThrottle = createThrottle({
   limit: 10,
   windowMs: 60_000,
 });
+// Raw Fracttal detail can fan out to eleven upstream GETs per click.
+export const fracttalRawThrottle = createThrottle({
+  limit: 5,
+  windowMs: 60_000,
+});
 
 // routeClientKey: extracts the client identity from a Fresh route context
 // without importing Fresh types (unknown in, string out). Falls back to

@@ -11,6 +11,20 @@
 // concurrently and reassemble in page order; throughput stays capped by the
 // client's token bucket, so concurrency can never threaten the rate ceiling.
 import {
+  DEFAULT_FETCH_CONCURRENCY,
+  DEFAULT_WORK_MAX_PAGES,
+  SCOPE_PAGE_SIZE,
+  WORK_PAGE_SIZE,
+} from "./limits.ts";
+
+export {
+  DEFAULT_FETCH_CONCURRENCY,
+  DEFAULT_WORK_MAX_PAGES,
+  SCOPE_PAGE_SIZE,
+  WORK_PAGE_SIZE,
+} from "./limits.ts";
+
+import {
   buildWorkEvents,
   resolverFor,
   type WorkEventsResolver,
@@ -23,23 +37,6 @@ import type { ItemTypeValue } from "./itemType.ts";
 import type { FracttalClient } from "./client.ts";
 
 import { assertCompletePage } from "./sync.ts";
-
-export const SCOPE_PAGE_SIZE = 100;
-export const WORK_PAGE_SIZE = 100;
-
-// DEFAULT_FETCH_CONCURRENCY bounds parallel page requests per fetch. Wall
-// time drops toward (pages / concurrency) x latency; the token bucket keeps
-// the aggregate under the ceiling regardless of this number.
-export const DEFAULT_FETCH_CONCURRENCY = 4;
-
-// DEFAULT_WORK_MAX_PAGES bounds the status pass to the newest N pages per
-// work endpoint (500 rows each at N=5). The full history (120k+ orders) can
-// never page per tick, so recency is the viable signal: asset flags and
-// out-of-service dates (complete per scope) stay the primary derivation and
-// the work pass catches recently opened corrective work. A wider window only
-// widens recency; sticky open work older than the window still needs the
-// import rebuild or a future open-status filter (see docs/FRACTTAL.md).
-export const DEFAULT_WORK_MAX_PAGES = 5;
 
 export interface ScopeFetchOptions {
   itemType: ItemTypeValue;

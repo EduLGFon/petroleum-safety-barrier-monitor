@@ -1,6 +1,10 @@
 // Unit tests for server boot config (P4) - injected env getters, no
 // Deno.env permission needed.
-import { loadServerConfig, loadSyncConfig } from "./config.ts";
+import {
+  isDevFracttalRawEnabled,
+  loadServerConfig,
+  loadSyncConfig,
+} from "./config.ts";
 
 import { assertStrictEquals } from "jsr:@std/assert@^1";
 
@@ -63,4 +67,11 @@ Deno.test("loadSyncConfig falls back to env then defaults", () => {
   const cfg = loadSyncConfig(env({ FRACTTAL_KEY: "k", FRACTTAL_SECRET: "s" }));
   assertStrictEquals(cfg.baseUrl, "https://app.fracttal.com/api");
   assertStrictEquals(cfg.itemType, 2);
+});
+
+Deno.test("raw Fracttal detail requires DEV=true exactly", () => {
+  assertStrictEquals(isDevFracttalRawEnabled(env({ DEV: "true" })), true);
+  assertStrictEquals(isDevFracttalRawEnabled(env({ DEV: "1" })), false);
+  assertStrictEquals(isDevFracttalRawEnabled(env({ DEV: "false" })), false);
+  assertStrictEquals(isDevFracttalRawEnabled(env({})), false);
 });

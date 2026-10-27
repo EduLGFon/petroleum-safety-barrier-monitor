@@ -109,4 +109,6 @@ export interface FracttalWorkQuery {
   start?: number;
   limit?: number;
   otStatus?: string;
+  codeAsset?: string;
+  codeItem?: string;
 }
