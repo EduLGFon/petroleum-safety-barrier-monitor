@@ -258,7 +258,10 @@ export function DashboardSections(
             const next = cur.includes(v)
               ? cur.filter((x) => x !== v)
               : [...cur, v];
-            setFilter({ availability: next });
+            // Normalise empty selection back to "" so isA checks in
+            // StatusBand (which test activeFilter === key or [].includes(key))
+            // correctly see no active filter and allow re-clicking.
+            setFilter({ availability: next.length > 0 ? next : "" });
           }}
           onSelectCategory={(v) =>
             setFilter({ category: filters.category === v ? "" : v })}

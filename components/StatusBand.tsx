@@ -87,7 +87,7 @@ export function StatusBand(
             <button
               type="button"
               key={key}
-              onClick={() => onFilter(isA ? "" : key)}
+              onClick={() => onFilter(key)}
               title={`${key} - clique para filtrar`}
               aria-pressed={isA}
               style={{
