@@ -416,9 +416,11 @@ existing status-history row lifecycle and returned under the same barrier
 read authorization; no new audience or retention period is introduced.
 Fracttal operation text may contain identifying free text, so the history
 entry preserves that text only when a new sync status entry is written.
+These sync names and notes are not copied into alert emails; sync remains
+identified as the source in that separate notification channel.
 
 Verification: `deno task check`, import-order check, `deno task test`
-(615 passed; database integration tests self-skipped because
+(616 passed; database integration tests self-skipped because
 `DATABASE_URL` is unset), and `deno task build` passed. Applying the schema
 and exercising the PostgreSQL integration test were not possible without a
 disposable database; no live sync was run.

@@ -114,13 +114,17 @@ Deno.test("extractDetail hides service and unknown authors", () => {
         date: "2026-09-13",
         statusId: 5,
         authorId: 10,
-        note: "",
+        note: "Justificativa sintética",
+        sourceAuthor: "Pessoa autora",
+        participants: [{ name: "Pessoa participante", role: "Pessoal" }],
       }],
     }),
     "2026-09-13",
     5,
   );
   assertStrictEquals(sync.author, undefined);
+  assertStrictEquals(sync.note, undefined);
+  assertStrictEquals(sync.source, "Sincronização Fracttal");
   const unknown = extractDetail(
     wire({
       statusHistory: [{
@@ -134,6 +138,34 @@ Deno.test("extractDetail hides service and unknown authors", () => {
     5,
   );
   assertStrictEquals(unknown.author, undefined);
+});
+
+Deno.test("extractDetail excludes sync names and notes from alert trails", () => {
+  const detail = extractDetail(
+    wire({
+      statusHistory: [
+        {
+          date: "2026-09-10",
+          statusId: 0,
+          authorId: 10,
+          note: "Nota sync sintética",
+          sourceAuthor: "Pessoa autora",
+        },
+        {
+          date: "2026-09-13",
+          statusId: 5,
+          authorId: 11,
+          note: "Nota manual",
+        },
+      ],
+    }),
+    "2026-09-13",
+    5,
+    { authors: { 10: "Sincronização Fracttal", 11: "Pessoa manual" } },
+  );
+  assertStrictEquals(detail.historyTrail?.length, 1);
+  assertStrictEquals(detail.historyTrail?.[0]?.author, undefined);
+  assertStrictEquals(detail.historyTrail?.[0]?.note, undefined);
 });
 
 Deno.test("extractDetail falls back to the latest entry without history match", () => {

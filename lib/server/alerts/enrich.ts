@@ -6,8 +6,11 @@
 // at enqueue time; the template renders what is present and skips the rest,
 // keeping rows enqueued before this change readable.
 import { resolveBarrier, type ResolverLabels } from "../../resolve.ts";
+
+import { fromAuthorId, fromAvailabilityId } from "../../enums.ts";
+
 import type { WireBarrier } from "../../wireTypes.ts";
-import { fromAvailabilityId } from "../../enums.ts";
+
 import { isCompliant } from "../../constants.ts";
 
 export interface HistoryTrailEntry {
@@ -81,11 +84,16 @@ export function extractDetail(
     : wire.statusHistory.length > 0
     ? wire.statusHistory[wire.statusHistory.length - 1]
     : undefined;
+  const rawAuthor = latestRaw === undefined
+    ? latest?.author
+    : labels?.authors?.[latestRaw.authorId] ??
+      fromAuthorId(latestRaw.authorId);
   const author = nonEmpty(latest?.author);
+  const syncAuthored = rawAuthor === "Sincronização Fracttal";
   // Seed enums label unknown ids "Autor (n)" / sync rows carry the
-  // "Sincronização Fracttal" service name - both are noise in an inbox,
-  // so only human attribution is kept.
-  const humanAuthor = author !== undefined &&
+  // service name - both are noise in an inbox, so only manual attribution is
+  // kept. Sync operation names and notes stay in the authenticated history.
+  const humanAuthor = !syncAuthored && author !== undefined &&
       !/^autor \(\d+\)$/i.test(author) &&
       author !== "Sincronização Fracttal"
     ? author
@@ -103,9 +111,6 @@ export function extractDetail(
     ? (isCompliant(oldAvailability) ? "Conforme" : "Não Conforme")
     : undefined;
   const previousDate = prevResolved?.date?.slice(0, 10);
-  const rawAuthor = (latestRaw !== undefined && labels?.authors !== undefined)
-    ? labels.authors[latestRaw.authorId]
-    : latest?.author;
   const source: BarrierDetail["source"] = rawAuthor === "Sincronização Fracttal"
     ? "Sincronização Fracttal"
     : "Manual";
@@ -119,9 +124,12 @@ export function extractDetail(
     trailEnd - trailStart > 0
       ? history.slice(trailStart, trailEnd).map((h, i) => {
         const raw = wire.statusHistory[trailStart + i];
-        void raw;
+        const trailRawAuthor = raw === undefined
+          ? h.author
+          : labels?.authors?.[raw.authorId] ?? fromAuthorId(raw.authorId);
+        const trailIsSync = trailRawAuthor === "Sincronização Fracttal";
         const a = nonEmpty(h.author);
-        const cleanAuthor = a !== undefined &&
+        const cleanAuthor = !trailIsSync && a !== undefined &&
             !/^autor \(\d+\)$/i.test(a) &&
             a !== "Sincronização Fracttal"
           ? a
@@ -130,7 +138,7 @@ export function extractDetail(
           date: h.date.slice(0, 10),
           status: h.status,
           ...(cleanAuthor !== undefined ? { author: cleanAuthor } : {}),
-          ...(h.note.trim() !== "" ? { note: h.note } : {}),
+          ...(!trailIsSync && h.note.trim() !== "" ? { note: h.note } : {}),
         };
       })
       : undefined;
@@ -142,7 +150,7 @@ export function extractDetail(
     locationName: nonEmpty(resolved.locationName),
     category: nonEmpty(resolved.category),
     author: humanAuthor,
-    note: nonEmpty(latest?.note),
+    note: syncAuthored ? undefined : nonEmpty(latest?.note),
     actionPlan: nonEmpty(resolved.actionPlan),
     ...(oldAvailability !== undefined ? { oldAvailability } : {}),
     ...(oldCompliance !== undefined ? { oldCompliance } : {}),
