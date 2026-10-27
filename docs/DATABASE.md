@@ -106,6 +106,15 @@ barriers
   is_active             boolean, not null default true (Fracttal enable flag; false = Desativada)
   created_at / updated_at
 
+barrier_contingencies
+  barrier_id             → barriers, on delete cascade
+  contingency_barrier_id → barriers, on delete cascade
+  management_change      text, nullable (Gestão de Mudança reference)
+  risk_analysis          text, nullable (Análise de Risco reference)
+  created_at / updated_at
+                        composite primary key prevents duplicate links;
+                        check prevents a barrier contingencing itself
+
 sync_state
   id                    identity, PK
   scope                 text (ex: "fixture:..." / "fracttal-live:FAL")

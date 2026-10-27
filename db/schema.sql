@@ -166,6 +166,23 @@ alter table barriers add column if not exists extra_comments text;
 alter table barriers add column if not exists is_active boolean not null default true;
 create index if not exists idx_barriers_is_active on barriers(is_active);
 
+-- A barrier may rely on several contingency barriers, and each eligible
+-- barrier may support several others. References remain even if eligibility
+-- later changes so operators can review the prior decision.
+create table if not exists barrier_contingencies (
+  barrier_id             integer not null references barriers(id) on delete cascade,
+  contingency_barrier_id integer not null references barriers(id) on delete cascade,
+  management_change      text,
+  risk_analysis          text,
+  created_at             timestamptz not null default now(),
+  updated_at             timestamptz not null default now(),
+  primary key (barrier_id, contingency_barrier_id),
+  check (barrier_id <> contingency_barrier_id)
+);
+
+create index if not exists idx_barrier_contingencies_contingency
+  on barrier_contingencies(contingency_barrier_id, barrier_id);
+
 -- Pre-existing databases created external_code as nullable: enforce the
 -- NOT NULL contract idempotently. Fail-closed when legacy NULL rows
 -- exist (Postgres raises naming the column) so the owner resolves them

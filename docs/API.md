@@ -128,10 +128,11 @@ table by exact category).
 The handlers `httpAdapterFactory` expects (barriers, `:id`, kpi, chart) plus
 the write/admin/export ones are already implemented in `routes/api/`, on
 PostgreSQL (no ORM - pure SQL via `jsr:@db/postgres`, values bound as `$1/$2`).
-Full inventory (36 method+path combos): `GET /api/health`, `GET /api/barriers`,
+Full inventory (40 method+path combos): `GET /api/health`, `GET /api/barriers`,
 `GET /api/barriers/deleted`, `GET /api/barriers/:id`, `PATCH /api/barriers/:id`,
 `PATCH /api/barriers/:id/status`, `GET /api/barriers/:id/sync-detail`,
 `GET /api/barriers/:id/fracttal-raw`,
+`GET|POST|PATCH|DELETE /api/barriers/:id/contingencies`,
 `GET|POST /api/export`, `GET /api/kpi`, `GET /api/chart`,
 `GET /api/vocabularies`, `GET /api/lookups`, `GET|PUT /api/field-options`,
 `GET /api/sync-status`, `GET /api/sync-runs`, `GET /api/sync-changes`,
@@ -161,6 +162,32 @@ both never routes, `_` prefix / no handler):
     requestId }` envelope on DB failure (see the P4 section below).
 - `GET /api/barriers/:id` → `200 WireBarrier` (`400` invalid id, `404` missing).
   Admins see soft-deleted rows (`includeDeleted: true`), others live-only.
+- `GET /api/barriers/:id/contingencies?q=TAG` → outgoing contingency links,
+  incoming links that use this barrier, and eligible alternatives. The response
+  includes `outgoing` and `incoming` arrays of
+  `{ barrierId, barrierTag, contingencyBarrierId, contingencyTag,
+  managementChange, riskAnalysis, eligible }`, plus `candidates:
+  { id, tag }[]` and `candidatesHaveMore`. Candidate results are limited to
+  the first 50 sorted tags; refine `q` to find additional results. Eligibility
+  is enforced by the server: active, not soft-deleted, same installation,
+  availability exactly `Disponível`, and compliant. Existing links remain
+  visible to admins with `eligible: false` if those conditions later stop
+  holding. Readers need a session or `ADMIN_TOKEN`; non-admins only see
+  relationships involving active, non-deleted barriers.
+- `POST /api/barriers/:id/contingencies` with
+  `{ contingencyBarrierId: positive integer, managementChange?: string,
+  riskAnalysis?: string }` creates a many-to-many link. `PATCH` on the same
+  path updates those two optional reference strings for the named
+  `contingencyBarrierId`; `DELETE` on the same path takes that id as a query
+  parameter and removes the link. References are capped at 2,000 characters
+  each and request bodies at 10,000 bytes. Writes require an admin session or
+  `ADMIN_TOKEN`; insertion locks and rechecks eligibility in the database,
+  rejects self-links and duplicates, and does not permit status changes.
+  Reads and writes use the standard per-address throttle and API error
+  envelope. The modal shows both tag directions and the Gestão de Mudança /
+  Análise de Risco references. For a `Não Conforme` barrier with no currently
+  eligible outgoing link, it displays a recommendation to put the barrier out
+  of operation. This is text only and never updates status.
 - `GET /api/barriers/:id/fracttal-raw` → raw Fracttal asset plus raw
   work-order and work-request rows for the barrier's stored `external_code`.
   Enabled only with `DEV=true`; requires an admin session or `ADMIN_TOKEN`.

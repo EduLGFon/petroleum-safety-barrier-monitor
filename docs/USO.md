@@ -84,9 +84,9 @@ A seleção é preservada durante as mudanças de página e de filtro. Ao restau
 - Os tamanhos de página disponíveis são 25, 50 e 100 registros.
 - As linhas de barreiras não conformes exibem o indicador **Dias sem contingência**.
 
-## 6. Detalhes e histórico da barreira
+## 6. Detalhes, contingências e histórico da barreira
 
-Ao clicar em uma linha da tabela, abre-se uma janela com as informações detalhadas da barreira. Essa janela possui três abas.
+Ao clicar em uma linha da tabela, abre-se uma janela com as informações detalhadas da barreira. Ela possui abas de detalhes, contingência e histórico; administradores também veem a aba de edição.
 
 ### 6.1. Detalhes
 
@@ -103,11 +103,32 @@ Apresenta os dados da barreira, incluindo:
 O campo **Plano Preventivo Cumprido?** considera apenas tarefas preventivas
 em aberto vencidas. Uma ordem corretiva em aberto não altera esse campo.
 
-### 6.2. Histórico
+### 6.2. Contingência
+
+A aba **Contingência** apresenta os vínculos desta barreira com todas as
+barreiras de contingência e também os vínculos em que ela é usada como
+contingência de outra barreira. Cada vínculo mostra as tags da barreira e da
+contingência, além das referências de **Gestão de Mudança** e **Análise de
+Risco**.
+
+As alternativas elegíveis são barreiras ativas, não excluídas, com
+disponibilidade **Disponível**, conformidade **Conforme** e na mesma
+instalação. A busca por tag ajuda a localizar outras alternativas. Os
+administradores podem criar e remover vínculos e preencher as referências;
+os demais usuários autenticados podem consultar essas informações. Se uma
+barreira continuar ativa e não excluída, mas deixar de atender aos critérios,
+o vínculo continua visível e será indicado como não elegível. Vínculos com
+barreiras inativas ou excluídas ficam restritos à consulta administrativa.
+
+Quando a barreira estiver **Não Conforme** e não houver contingência elegível
+vinculada, a tela recomenda colocá-la fora de operação. A recomendação é
+somente textual: o sistema não altera disponibilidade nem histórico.
+
+### 6.3. Histórico
 
 Apresenta uma linha do tempo com as alterações de status da barreira, permitindo consultar a evolução de seu estado operacional.
 
-### 6.3. Edição
+### 6.4. Edição
 
 Disponível exclusivamente para administradores. Permite alterar os campos autorizados do registro, conforme descrito na seção 7.
 

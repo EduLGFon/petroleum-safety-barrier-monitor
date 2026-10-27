@@ -192,9 +192,14 @@ Full contract lives in `docs/API.md`. Summary:
 - `BarriersApi` (`lib/api/types.ts`): `getBarriers`, `getAllBarriers`
   (http forces `pageSize: 100000`), `getBarrierById` (`null` only on 404),
   `getKpi` / `getChartData` (full filter subset, minus paging/sort).
+- Contingency client (`lib/api/contingencies.ts`) loads and mutates explicit
+  barrier-to-barrier links through authenticated API routes. It is only
+  enabled in HTTP mode; mock mode does not imply persisted relationships.
 - Routes: `GET /api/barriers`, `GET /api/barriers/:id`,
   `GET /api/barriers/:id/fracttal-raw` (admin + `DEV=true`, bounded
   read-only raw upstream data, no-store),
+  `GET|POST|PATCH|DELETE /api/barriers/:id/contingencies` (authenticated
+  relationship read and admin-only link management),
   `PATCH /api/barriers/:id/status` (admin write via `record_status_change()`,
   author derives from session), `GET /api/barriers/deleted` (admin, legacy
   alias for `?rowScope=deleted`),
@@ -252,6 +257,8 @@ Full contract lives in `docs/API.md`. Summary:
   creates missing rows between rebuilds (unknown labels converge instead
   of skipping).
 - Postgres (`docs/DATABASE.md`): lookup tables + `barriers` +
+  `barrier_contingencies` (many-to-many links with optional Management Change
+  and Risk Analysis references) +
   `barrier_status_history` (including retained Fracttal work-order author,
   participant names/roles, explanation text, and sync-run link) +
   `users`/`sessions` (cookie logins, two roles) +
@@ -270,6 +277,14 @@ Full contract lives in `docs/API.md`. Summary:
   the soft delete; list/KPI/chart/export honor the admin `rowScope`
   (`active`/`inactive`/`deleted`/`all`, default `active`) and the dashboard
   Situacao combo (admin only) switches it with row badges on off-scope rows.
+  Contingency links are local records, independent of upstream sync. Candidate
+  creation is rechecked server-side and requires a live active `Disponível` /
+  `Conforme` barrier at the same location. Existing links remain auditable
+  when eligibility later changes; admins can review off-scope links, while
+  other users only see links between active, non-deleted barriers. The details
+  modal marks visible ineligible links and recommends out-of-operation only
+  for a non-compliant barrier with no eligible outgoing link. The
+  recommendation never writes status.
   `scripts/migrate.ts` applies `db/schema.sql` + `db/seed_lookups.sql`
   (idempotent, seed approximates the imported catalog); `scripts/seed.ts`
   bulk-inserts `getWireBarriers()` output in batches of 500 (`--force`

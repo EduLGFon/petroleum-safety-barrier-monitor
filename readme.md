@@ -50,8 +50,10 @@ dashboard island, the upstream sync loop and the alert digest loop. There is no
 - Filter bar: debounced text search, typology, category, criticality rank gate
   (one tap for the critical tiers), availability, compliance, action plan,
   date range.
-- Barrier modal with a details tab, a status history timeline, and an admin
-  editing tab.
+- Barrier modal with details, full incoming/outgoing contingency links and
+  candidate barriers, optional Management Change and Risk Analysis references,
+  a text-only out-of-operation recommendation when no eligible contingency is
+  linked to a non-compliant barrier, status history, and admin-only editing.
 - Exports: CSV, XLSX and real PDF bytes over the whole selected set
   (streamed from the server as file downloads, never a preview), with KPI
   summary blocks and branded headers.

@@ -424,3 +424,34 @@ Verification: `deno task check`, import-order check, `deno task test`
 `DATABASE_URL` is unset), and `deno task build` passed. Applying the schema
 and exercising the PostgreSQL integration test were not possible without a
 disposable database; no live sync was run.
+
+## D18 - Explicit barrier contingency links (2026-10-27)
+
+Context: operators need to identify the barrier tag that is backed by each
+contingency barrier, review the reverse relationships, see the Gestão de
+Mudança and Análise de Risco references, and know when a non-compliant barrier
+has no eligible contingency. Existing `has_contingency` and
+`contingency_desc` fields do not encode barrier-to-barrier relationships.
+
+Decision: store links in a separate many-to-many `barrier_contingencies`
+table, with optional text references per link. A candidate must be active,
+not deleted, in the same location, exactly `Disponível`, and compliant;
+the server rechecks this rule while locking both barriers before creating a
+link. Keep existing links if later changes make them ineligible; admins can
+review all links, while other users see links to active, non-deleted
+barriers. Any authenticated user can read; admins alone can create, update,
+and remove links. For a `Não Conforme` barrier with no currently eligible
+outgoing link, show a text-only recommendation to put it out of operation.
+Never change status from this feature. Mock mode does not pretend that an
+in-memory relationship is persisted.
+
+Consequences: upstream sync does not own or clear these local relationships.
+The relationship endpoint returns at most 50 candidate tags per search and
+signals more results so the operator can refine by tag. Management Change and
+Risk Analysis are references, not uploaded documents or links.
+
+Verification: `deno task check`, `deno run -A scripts/import-sort.ts`,
+`deno task test` (620 passed; PostgreSQL integration test skipped because
+`DATABASE_URL` is unset), and `deno task build` passed. Applying the schema
+and exercising the PostgreSQL integration test were not possible without a
+disposable database.
