@@ -265,7 +265,9 @@ before/after diff on demand. `UNIQUE(run_id, barrier_id)` plus
 allocation (`ensureCatalog`, `getOrCreateAuthor`) serializes `max(id)+1`
 with transaction-scoped advisory locks. One `running` lease per scope is
 DB-enforced by the `uniq_sync_state_running_scope` partial unique index;
-`startRun()` maps the unique violation to `ScopeBusyError`.
+`startRun()` uses `ON CONFLICT ... DO NOTHING` against that index and maps
+an empty insert result to `ScopeBusyError`, avoiding error-level logs for
+routine lease contention.
 
 ### Alerts (P5 + rules)
 

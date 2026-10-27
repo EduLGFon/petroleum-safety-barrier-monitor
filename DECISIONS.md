@@ -353,3 +353,20 @@ lists `GET /items/{code}`, `code_asset` for work orders, and `code_item` for
 work requests. The current official docs endpoint could not be fetched during
 implementation, and no live tenant request was made; those filters therefore
 remain unverified against the connected tenant.
+
+## D15 - Quiet handling of concurrent sync lease claims (2026-10-26)
+
+Context: concurrent pollers correctly left one `sync_state` lease owner, but
+the losing insert still raised a PostgreSQL unique-constraint error that
+appeared in Docker logs despite being caught and treated as normal contention.
+
+Decision: retain `uniq_sync_state_running_scope` as the database authority and
+use `ON CONFLICT (scope) WHERE status = 'running' DO NOTHING` in `startRun()`.
+An empty result maps to `ScopeBusyError`, preserving the existing skipped
+poller behavior without logging a routine collision as a database error.
+
+Verification: the DB integration test now races two lease claims and asserts
+one owner plus one `ScopeBusyError`; it self-skips when `DATABASE_URL` is
+unset. `deno task check` and `deno task test` run after the change. The
+race test requires the migrated Postgres schema and is not exercised by the
+standard test command when `DATABASE_URL` is unset.

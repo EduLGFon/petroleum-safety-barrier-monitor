@@ -178,8 +178,9 @@ only the work pass stays eager so its failure aborts with zero writes).
   is the dedup authority; status changes go through the one sanctioned
   `record_status_change()` with author 10 "Sincronização Fracttal"), and
   writes the run audit. `startRun` is an atomic claim (`INSERT ... WHERE NOT
-  EXISTS` a fresh lease) so two racers cannot both open a run; the loser gets
-  `ScopeBusyError`. Every live run heartbeats `finished_at` forward every 60s
+  EXISTS` a fresh lease plus `ON CONFLICT ... DO NOTHING` against the partial
+  unique index) so two racers cannot both open a run; the loser gets
+  `ScopeBusyError` without a PostgreSQL error log. Every live run heartbeats `finished_at` forward every 60s
   (`touchSyncRun`), so liveness rides the heartbeat, never `started_at` - a
   slow-but-alive sweep cannot reap itself or expire its own lock. Also exposes
   `syncScopeRunning(scope, staleMinutes=10)` as the poll lock: true while a
