@@ -417,5 +417,8 @@ read authorization; no new audience or retention period is introduced.
 Fracttal operation text may contain identifying free text, so the history
 entry preserves that text only when a new sync status entry is written.
 
-Verification: pending `deno task check`, `deno task test`, and `deno task
-build`.
+Verification: `deno task check`, import-order check, `deno task test`
+(615 passed; database integration tests self-skipped because
+`DATABASE_URL` is unset), and `deno task build` passed. Applying the schema
+and exercising the PostgreSQL integration test were not possible without a
+disposable database; no live sync was run.

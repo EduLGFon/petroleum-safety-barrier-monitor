@@ -250,13 +250,22 @@ create trigger trg_barriers_updated_at
 -- availability_id directly, or status_since/history will fall out of
 -- sync with it.
 
+-- Replace the previous four-argument signature. The replacement keeps its
+-- four-argument call shape through defaults while accepting sync provenance.
+drop function if exists record_status_change(integer, integer, integer, text);
 create or replace function record_status_change(
   p_barrier_id integer,
   p_status_id  integer,
   p_author_id  integer,
-  p_note       text default ''
+  p_note       text default '',
+  p_sync_run_id integer default null,
+  p_source_author text default null,
+  p_participants jsonb default '[]'::jsonb
 ) returns void as $$
 begin
+  if jsonb_typeof(coalesce(p_participants, '[]'::jsonb)) <> 'array' then
+    raise exception 'status history participants must be a JSON array';
+  end if;
   -- Marks this transaction as a sanctioned status write so the guard
   -- trigger below lets the UPDATE through. Transaction-local: it never
   -- leaks past COMMIT/ROLLBACK.
@@ -270,8 +279,13 @@ begin
     raise exception 'barrier % does not exist', p_barrier_id;
   end if;
 
-  insert into barrier_status_history (barrier_id, date, status_id, author_id, note)
-  values (p_barrier_id, current_date, p_status_id, p_author_id, p_note);
+  insert into barrier_status_history
+    (barrier_id, date, status_id, author_id, note, sync_run_id,
+     source_author, participants)
+  values
+    (p_barrier_id, current_date, p_status_id, p_author_id, p_note,
+     p_sync_run_id, nullif(trim(p_source_author), ''),
+     coalesce(p_participants, '[]'::jsonb));
 end;
 $$ language plpgsql;
 
@@ -338,6 +352,18 @@ update sync_state set status = 'failed',
   );
 create unique index if not exists uniq_sync_state_running_scope
   on sync_state(scope) where status = 'running';
+
+-- Future sync-authored history rows correlate to the exact run and preserve
+-- Fracttal-provided attribution for the timeline. Existing rows stay intact.
+alter table barrier_status_history
+  add column if not exists sync_run_id integer
+    references sync_state(id) on delete set null;
+alter table barrier_status_history
+  add column if not exists source_author text;
+alter table barrier_status_history
+  add column if not exists participants jsonb not null default '[]'::jsonb;
+create index if not exists idx_history_sync_run_barrier
+  on barrier_status_history(sync_run_id, barrier_id);
 
 -- ─── Per-barrier sync changes (what changed, per run, per barrier) ─────────
 -- One row per barrier touched by a run (insert / update / restore / delete).

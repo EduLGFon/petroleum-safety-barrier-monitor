@@ -201,14 +201,14 @@ planned tasks); `wo_final_date` exists on completed WOs.
 
 An anonymized work-order response confirmed these display-name fields:
 
-| Field | History role |
-| ----- | ------------ |
-| `created_by` | primary author (preferred) |
-| `requested_by` | author fallback and requester participant |
-| `personnel_description` | executor |
-| `user_assigned` | responsible person |
+| Field                       | History role                                    |
+| --------------------------- | ----------------------------------------------- |
+| `created_by`                | primary author (preferred)                      |
+| `requested_by`              | author fallback and requester participant       |
+| `personnel_description`     | personnel                                       |
+| `user_assigned`             | assigned user                                   |
 | `resources_human_resources` | one or more semicolon-separated human resources |
-| `validated_by_description` | validator |
+| `validated_by_description`  | validator                                       |
 
 The sync snapshots names and roles only when it writes a new status-history
 row. Employee codes, personnel ids, signatures, and image paths are not

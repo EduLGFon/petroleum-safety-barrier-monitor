@@ -68,11 +68,11 @@ listed here exactly, so the codebase does not fork.
 | Histórico de status         | `statusHistory`                                  |
 | Envolvidos                  | `participants`                                   |
 | Criado por                  | `created_by` (Fracttal author preference)        |
-| Solicitado por              | `requested_by` (author fallback)                |
-| Executor                    | `personnel_description`                         |
-| Responsável                 | `user_assigned`                                 |
-| Recursos humanos            | `resources_human_resources`                     |
-| Validado por                | `validated_by_description`                     |
+| Solicitado por              | `requested_by` (author fallback)                 |
+| Pessoal                     | `personnel_description`                          |
+| Usuário atribuído           | `user_assigned`                                  |
+| Recursos humanos            | `resources_human_resources`                      |
+| Validado por                | `validated_by_description`                       |
 
 ## Type / property renames
 
