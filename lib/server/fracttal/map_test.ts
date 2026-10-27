@@ -274,6 +274,40 @@ Deno.test("mapAsset promotes corrective work with contingency to 2/3", () => {
   assertStrictEquals(ind.input.availabilityId, 2);
 });
 
+Deno.test("mapAsset builds explanatory history from the winning work event", () => {
+  const mapped = mapAsset(asset(), ctx, {
+    work: {
+      planned: {
+        date: "2026-09-11",
+        source: "OS sintética: corretiva",
+        detail: "Evidência sintética",
+        sourceType: "Ordem de serviço",
+        classification: "CORR - Corretiva Planejada",
+        operationState: "Em aberto",
+        sourceAuthor: "Pessoa autora",
+        participants: [{ name: "Pessoa executora", role: "Executor" }],
+      },
+      hasContingency: true,
+      contingencySource: "OS sintética: contingência",
+    },
+    today: "2026-09-15",
+  });
+  if (!mapped.ok) throw new Error("expected ok");
+  assertStrictEquals(mapped.input.history.sourceAuthor, "Pessoa autora");
+  assertStrictEquals(
+    mapped.input.history.participants[0]?.name,
+    "Pessoa executora",
+  );
+  assertStrictEquals(
+    mapped.input.history.note.includes("CORR - Corretiva Planejada"),
+    true,
+  );
+  assertStrictEquals(
+    mapped.input.history.note.includes("Sinal de contingência"),
+    true,
+  );
+});
+
 Deno.test("mapAsset admits out-of-scope families with scope 'all'", () => {
   const allCtx: MapContext = {
     ...ctx,

@@ -150,9 +150,35 @@ export function BarrierHistory({ b }: { b: Barrier }) {
                       color: "var(--text-muted)",
                     }}
                   >
-                    {entry.author}
+                    Autor: {entry.author}
                   </span>
                 </div>
+                {entry.participants && entry.participants.length > 0 && (
+                  <div
+                    style={{
+                      marginTop: "var(--d-field-gap)",
+                      fontSize: "var(--d-small)",
+                      color: "var(--text-muted)",
+                      lineHeight: 1.6,
+                    }}
+                  >
+                    <strong>Envolvidos:</strong>{" "}
+                    {entry.participants.map((person) =>
+                      `${person.role}: ${person.name}`
+                    ).join(" · ")}
+                  </div>
+                )}
+                {entry.syncRunId != null && (
+                  <div
+                    style={{
+                      marginTop: "var(--d-field-gap)",
+                      fontSize: "var(--d-small)",
+                      color: "var(--text-muted)",
+                    }}
+                  >
+                    Vinculado à sincronização #{entry.syncRunId}
+                  </div>
+                )}
               </div>
             </div>
           );

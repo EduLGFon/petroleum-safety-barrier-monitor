@@ -114,6 +114,35 @@ Deno.test("buildWorkEvents merges per code keeping the first event", () => {
   );
 });
 
+Deno.test("work event carries the Fracttal author and involved people", () => {
+  const { events } = buildWorkEvents(
+    [
+      order({
+        created_by: "Pessoa criadora",
+        requested_by: "Pessoa solicitante",
+        personnel_description: "Pessoa executora",
+        user_assigned: "Pessoa responsável",
+        resources_human_resources: "Pessoa técnica A; Pessoa técnica B",
+        validated_by_description: "Pessoa validadora",
+      }),
+    ],
+    [],
+  );
+  const event = events.get("FAL-EQ-001")?.planned;
+  assertStrictEquals(event?.sourceAuthor, "Pessoa criadora");
+  assertStrictEquals(event?.sourceType, "Ordem de serviço");
+  assertStrictEquals(event?.operationState, "Em aberto");
+  assertEquals(event?.participants, [
+    { name: "Pessoa criadora", role: "Criado por" },
+    { name: "Pessoa solicitante", role: "Solicitado por" },
+    { name: "Pessoa executora", role: "Executor" },
+    { name: "Pessoa responsável", role: "Responsável" },
+    { name: "Pessoa técnica A", role: "Recursos humanos" },
+    { name: "Pessoa técnica B", role: "Recursos humanos" },
+    { name: "Pessoa validadora", role: "Validado por" },
+  ]);
+});
+
 Deno.test("buildWorkEvents recovers empty-code orders via itemIdToCode", () => {
   const itemIdToCode = (id: number) => id === 15413228 ? "FAL-EQ-001" : null;
   const built = buildWorkEvents(

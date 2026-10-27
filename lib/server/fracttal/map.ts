@@ -18,6 +18,7 @@
 import {
   AVAILABILITY_AVAILABLE,
   AVAILABILITY_CONTINGENCY_OUTAGE,
+  AVAILABILITY_DEGRADED,
   AVAILABILITY_DEGRADED_CONTINGENCY,
   AVAILABILITY_OUT_OF_SERVICE,
   AVAILABILITY_UNAVAILABLE,
@@ -217,6 +218,9 @@ export function mapAsset(
     },
     today,
   );
+  const autoCont = work?.hasContingency === true &&
+    (status.availabilityId === AVAILABILITY_CONTINGENCY_OUTAGE ||
+      status.availabilityId === AVAILABILITY_DEGRADED_CONTINGENCY);
   const historyEvent = status.availabilityId === AVAILABILITY_UNAVAILABLE ||
       status.availabilityId === AVAILABILITY_CONTINGENCY_OUTAGE
     ? work?.urgent
@@ -232,12 +236,9 @@ export function mapAsset(
     outOfServiceDate,
     assetAvailable: asset.available ?? null,
     stopAssets: work?.stopAssets ?? false,
-    hasContingency: work?.hasContingency ?? false,
+    hasContingency: autoCont,
     contingencySource: work?.contingencySource ?? "",
   });
-  const autoCont = work?.hasContingency === true &&
-    (status.availabilityId === AVAILABILITY_CONTINGENCY_OUTAGE ||
-      status.availabilityId === AVAILABILITY_DEGRADED_CONTINGENCY);
   // Sheet derivation reads the same signals as availability. Only a promoted
   // corrective contingency drives hasContingency; preventive text stays inert
   // (D11) and the SQL update preserves any manual Sim.
@@ -325,7 +326,9 @@ function historyExplanation(args: {
   } else if (
     args.statusId === AVAILABILITY_OUT_OF_SERVICE && args.outOfServiceDate
   ) {
-    parts.push(`Fracttal informa fora de operação desde ${args.outOfServiceDate}`);
+    parts.push(
+      `Fracttal informa fora de operação desde ${args.outOfServiceDate}`,
+    );
   } else if (args.statusId === AVAILABILITY_UNAVAILABLE) {
     parts.push(
       args.assetAvailable === false
@@ -334,7 +337,9 @@ function historyExplanation(args: {
     );
   } else {
     parts.push(
-      "Fracttal não retornou sinal de corretiva aberta ou de equipamento parado nos dados consultados neste ciclo",
+      args.assetAvailable === true
+        ? "O ativo consta como disponível e não houve sinal de corretiva aberta ou equipamento parado nos dados consultados neste ciclo"
+        : "Fracttal não retornou sinal de corretiva aberta ou de equipamento parado nos dados consultados neste ciclo",
     );
   }
   if (args.hasContingency) {

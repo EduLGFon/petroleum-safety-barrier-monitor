@@ -370,7 +370,9 @@ function mergeParticipants(
   incoming: Array<{ name: string; role: string }>,
 ): Array<{ name: string; role: string }> {
   const seen = new Set(
-    current.map((person) => `${person.name.toLocaleLowerCase()}|${person.role}`),
+    current.map((person) =>
+      `${person.name.toLocaleLowerCase()}|${person.role}`
+    ),
   );
   const merged = [...current];
   for (const person of incoming) {

@@ -203,6 +203,23 @@ Deno.test("resolveHistoryEntry maps ids and passes date/note through", () => {
   assertStrictEquals(e.note, "teste");
 });
 
+Deno.test("resolveHistoryEntry prefers the Fracttal author and maps sync metadata", () => {
+  const entry = resolveHistoryEntry({
+    date: "2026-02-01",
+    statusId: 5,
+    authorId: 10,
+    note: "Justificativa sintética",
+    sourceAuthor: "Pessoa autora",
+    participants: [{ name: "Pessoa executora", role: "Executor" }],
+    syncRunId: 42,
+  });
+  assertStrictEquals(entry.author, "Pessoa autora");
+  assertEquals(entry.participants, [
+    { name: "Pessoa executora", role: "Executor" },
+  ]);
+  assertStrictEquals(entry.syncRunId, 42);
+});
+
 Deno.test("resolveBarriers preserves order and stays empty for empty input", () => {
   const list = resolveBarriers([
     wireBarrier({ id: 2 }),

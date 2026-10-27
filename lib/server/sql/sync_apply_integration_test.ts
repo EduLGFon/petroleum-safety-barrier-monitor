@@ -95,7 +95,11 @@ function toInput(row: BarrierRow, availabilityId: number): SyncBarrierInput {
     groupingId: row.grouping_id,
     ownerId: row.owner_id,
     availabilityId,
-    history: { note: "synthetic sync explanation", sourceAuthor: null, participants: [] },
+    history: {
+      note: "synthetic sync explanation",
+      sourceAuthor: null,
+      participants: [],
+    },
     comments: row.comments,
     actionPlan: row.action_plan,
     origin: row.origin ?? "",
@@ -266,11 +270,17 @@ Deno.test("sync still propagates a remote change to a sync-owned status", async 
     [row.id, row.availability_id, SYNC_AUTHOR_ID],
   );
   const runId = await openRun();
+  const input = toInput(row, remoteStatus);
+  input.history = {
+    note: "Justificativa sintética",
+    sourceAuthor: "Pessoa autora",
+    participants: [{ name: "Pessoa executora", role: "Executor" }],
+  };
   try {
     const entry: PlanEntry = {
       kind: "update",
       local: toLocal(row),
-      input: toInput(row, remoteStatus),
+      input,
       statusChanged: true,
     };
     await defaultSyncIo.applyPlan([entry], runId);
@@ -282,6 +292,25 @@ Deno.test("sync still propagates a remote change to a sync-owned status", async 
     current!.availabilityId,
     remoteStatus,
     "sync-owned status was not propagated to upstream",
+  );
+  const history = await queryRows<{
+    sync_run_id: number | null;
+    source_author: string | null;
+    participants: unknown;
+    note: string;
+  }>(
+    `select sync_run_id, source_author, participants, note
+     from barrier_status_history
+     where barrier_id = $1 and sync_run_id = $2`,
+    [row.id, runId],
+  );
+  assertStrictEquals(history.length, 1);
+  assertStrictEquals(history[0]?.sync_run_id, runId);
+  assertStrictEquals(history[0]?.source_author, "Pessoa autora");
+  assertStrictEquals(history[0]?.note, "Justificativa sintética");
+  assertStrictEquals(
+    JSON.stringify(history[0]?.participants).includes("Pessoa executora"),
+    true,
   );
   // Restore the seed barrier and remove the setup history row.
   await queryRows(
