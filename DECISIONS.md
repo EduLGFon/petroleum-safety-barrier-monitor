@@ -332,3 +332,24 @@ overwritten on each sweep. `owner_id` and `grouping_id` are now derived
 heuristically instead of hardcoded defaults. Preventive open work drives
 `plan_followed` only and never availability. `extra_comments` always has
 a `field_1`-based fallback so it is never empty.
+
+## D14 - DEV-gated raw Fracttal detail inspection (2026-10-26)
+
+Context: admins need to compare modal values with the upstream asset and its
+related work rows while developing in HTTP mode.
+
+Decision: `DEV=true` enables an on-demand raw-data panel for admins only.
+The server resolves the selected barrier ID to its stored `external_code`;
+clients cannot choose an arbitrary upstream code. It fetches the raw item,
+plus code-filtered work orders and requests, returning original fields only
+for exact-code matches. Related endpoints are capped at five 100-row pages
+each, with excluded-row and truncation indicators. The API is read-only,
+rate-limited to five requests/address/minute, and returns `private, no-store`;
+raw payloads are not logged, cached, or persisted. Existing Fracttal adaptive
+pacing and GET-only behavior remain in force.
+
+Upstream basis: the documented Fracttal API reference in `docs/FRACTTAL.md`
+lists `GET /items/{code}`, `code_asset` for work orders, and `code_item` for
+work requests. The current official docs endpoint could not be fetched during
+implementation, and no live tenant request was made; those filters therefore
+remain unverified against the connected tenant.

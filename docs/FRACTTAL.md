@@ -4,8 +4,9 @@
 > This note records what the real API looks like, how provenance is designed,
 > and the field-to-enum mapping draft. Source: official Fracttal docs
 > (api.fracttal.com) captured 2026-09-12; verified against the documented
-> contract only - no live calls were made (Fracttal access is
-> production-only by locked decision).
+> contract only - no live calls were made. Tenant credentials are
+> production-only; `DEV=true` now enables an admin-only, bounded, on-demand
+> raw detail GET in the HTTP-mode barrier modal.
 
 ## Safe-harbor rules
 
@@ -15,6 +16,11 @@
   (`FRACTTAL_KEY`/`FRACTTAL_SECRET`), never from code or fixtures.
 - Capture runs are bounded: one `location_code`, capped pages (default 1,
   i.e. up to 100 items). Replay fixtures, never prod.
+- The modal's raw-detail GET fetches one selected item plus up to five
+  100-row pages each of work orders and requests using `code_asset` and
+  `code_item`; only exact-code rows are returned and truncation is flagged.
+  It requires `DEV=true` and an admin credential, uses the shared read-only
+  client/rate bucket, and never persists or logs raw response bodies.
 - Ops contact for real calls happens against a tenant in prod, reviewed and
   rate-limit aware (200 req/min per IP).
 

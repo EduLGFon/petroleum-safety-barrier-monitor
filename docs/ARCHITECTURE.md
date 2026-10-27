@@ -193,6 +193,8 @@ Full contract lives in `docs/API.md`. Summary:
   (http forces `pageSize: 100000`), `getBarrierById` (`null` only on 404),
   `getKpi` / `getChartData` (full filter subset, minus paging/sort).
 - Routes: `GET /api/barriers`, `GET /api/barriers/:id`,
+  `GET /api/barriers/:id/fracttal-raw` (admin + `DEV=true`, bounded
+  read-only raw upstream data, no-store),
   `PATCH /api/barriers/:id/status` (admin write via `record_status_change()`,
   author derives from session), `GET /api/barriers/deleted` (admin, legacy
   alias for `?rowScope=deleted`),
@@ -285,6 +287,9 @@ the author signature, the settings panel and loading splash have no brand
 copy, and the login footer is an unbranded session marker.
 `PUBLIC_API_MODE` (`mock`/`http`) + `PUBLIC_API_BASE_URL` select the
 adapter. `DATABASE_URL` feeds `lib/server/db.ts` and both `db:*` tasks.
+`DEV=true` enables the admin-only raw Fracttal detail panel and its server
+route; it never replaces authentication. Raw responses are fetched on demand,
+not cached or persisted, and related work rows are capped at 500 per endpoint.
 `dev` needs shell exports; `start`/`db:*`/`fracttal:poll` read `.env`.
 
 ## Design principles
