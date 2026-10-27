@@ -10,7 +10,13 @@ import {
   createContingencyApi,
 } from "../../lib/api.ts";
 
-import { useCallback, useEffect, useMemo, useState } from "preact/hooks";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "preact/hooks";
 
 import { shouldRecommendOutOfOperation } from "../../lib/contingency.ts";
 
@@ -34,8 +40,10 @@ const EMPTY_REFERENCES: References = {
   riskAnalysis: "",
 };
 
-export function BarrierContingency(
-  { b, apiBaseUrl, connected, isAdmin }: Props,
+export function useContingencyState(
+  barrierId: number,
+  connected: boolean,
+  apiBaseUrl: string,
 ) {
   const api = useMemo(() => createContingencyApi(apiBaseUrl), [apiBaseUrl]);
   const [data, setData] = useState<BarrierContingencies | null>(null);
@@ -46,16 +54,20 @@ export function BarrierContingency(
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
-  const canManage = isAdmin && !b.deletedAt;
+  const prevBarrierIdRef = useRef(barrierId);
 
   useEffect(() => {
     if (!connected) return;
     let active = true;
-    setData(null);
+    if (prevBarrierIdRef.current !== barrierId) {
+      prevBarrierIdRef.current = barrierId;
+      setData(null);
+      setQuery("");
+    }
     setLoading(true);
     const timer = setTimeout(() => {
       setError("");
-      void api.get(b.id, query).then((result) => {
+      void api.get(barrierId, query).then((result) => {
         if (!active) return;
         setData(result);
         setDrafts((current) => {
@@ -86,7 +98,7 @@ export function BarrierContingency(
       active = false;
       clearTimeout(timer);
     };
-  }, [api, b.id, connected, query, reloadId]);
+  }, [api, barrierId, connected, query, reloadId]);
 
   const reload = useCallback(() => setReloadId((id) => id + 1), []);
   const updateDraft = useCallback((
@@ -119,6 +131,39 @@ export function BarrierContingency(
       setBusy(false);
     }
   }, [reload]);
+
+  return {
+    api,
+    data,
+    query,
+    setQuery,
+    drafts,
+    loading,
+    busy,
+    error,
+    message,
+    updateDraft,
+    mutate,
+  };
+}
+
+export function BarrierContingency(
+  { b, apiBaseUrl, connected, isAdmin }: Props,
+) {
+  const {
+    api,
+    data,
+    query,
+    setQuery,
+    drafts,
+    loading,
+    busy,
+    error,
+    message,
+    updateDraft,
+    mutate,
+  } = useContingencyState(b.id, connected, apiBaseUrl);
+  const canManage = isAdmin && !b.deletedAt;
 
   const recommendation = data !== null &&
     shouldRecommendOutOfOperation(b.compliance, data.outgoing);
@@ -170,7 +215,7 @@ export function BarrierContingency(
                 {message}
               </p>
             )}
-            {recommendation && !loading && (
+            {recommendation && (
               <p
                 role="alert"
                 style={{
@@ -187,7 +232,7 @@ export function BarrierContingency(
                 status da barreira não foi alterado.
               </p>
             )}
-            {loading && (
+            {loading && !data && (
               <p role="status" style={{ color: "var(--text-muted)" }}>
                 Carregando contingências...
               </p>
