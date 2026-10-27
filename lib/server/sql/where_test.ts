@@ -54,9 +54,9 @@ Deno.test("buildWhere rowScope wins over legacy includeDeleted", () => {
 
 Deno.test("buildWhere binds ids as numbered args", () => {
   const { text, args } = buildWhere({ locationId: 1, categoryId: 4 });
-  assertEquals(args, [1, 4]);
+  assertEquals(args, [1, [4]]);
   assert(text.includes("b.location_id = $1"));
-  assert(text.includes("b.category_id = $2"));
+  assert(text.includes("b.category_id = any($2)"));
   assert(text.includes("b.deleted_at is null"));
 });
 
