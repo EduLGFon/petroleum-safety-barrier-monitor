@@ -403,6 +403,7 @@ instead of full JSON bodies. The pipeline order is fixed
 everywhere: throttle -> `loadServerConfig` -> auth -> validation -> DB.
 
 Login => Dashboard: **dashboard GETs require auth** (`barriers`, `:id`,
+`:id/contingencies`,
 `:id/sync-detail`, `kpi`, `chart`, `export`, `vocabularies`, `sync-status`,
 `sync-runs`, `sync-changes`, `field-options` GET) - session cookie
 or `ADMIN_TOKEN`. Anonymous callers get `404` camouflage (`NOT_FOUND`, same
@@ -410,8 +411,9 @@ shape as a missing route); dead credentials get `401`. A throwing session
 store (DB blip) answers `503 UNAVAILABLE` + `Retry-After`, never `401`, so
 the dashboard backs off instead of dropping the user to login.
 **Writes and admin data require admin** (admin session cookie or `ADMIN_TOKEN`):
-`PATCH .../status`, `PATCH .../:id`, `PUT .../field-options`, recipients,
-users, alert-rules (including `preview`), `GET /api/barriers/deleted`.
+`PATCH .../status`, `PATCH .../:id`, `POST|PATCH|DELETE
+.../:id/contingencies`, `PUT .../field-options`, recipients, users,
+alert-rules (including `preview`), `GET /api/barriers/deleted`.
 `GET /api/lookups` and `POST /api/auth/password` require any authenticated
 caller (session or token), with password additionally requiring the session
 path (`ADMIN_TOKEN` alone gets `401 session required`).
@@ -487,98 +489,99 @@ toWireQuery({ location: "FAL", availability: "Degradado", page: 1 });
 
 ## Files in this layer
 
-| File                                       | Responsibility                                                                                                |
-| ------------------------------------------ | ------------------------------------------------------------------------------------------------------------- |
-| `lib/api.ts`                               | Barrel: picks mock vs HTTP via `PUBLIC_API_MODE`, re-exports `toWireQuery` + `mockApi`                        |
-| `lib/api/types.ts`                         | `BarriersApi` (5 methods) + `DomainQuery` (string filters)                                                    |
-| `lib/api/query.ts`                         | `toWireQuery`, `cleanDateParam`, `buildQueryString`                                                           |
-| `lib/api/mock.ts`                          | `mockAdapter`: numeric `matchesQuery` + `sortWire`, resolves only the final page                              |
-| `lib/api/http.ts`                          | `httpAdapterFactory(baseUrl)`: fetch over `routes/api/*`; `null` only on 404                                  |
-| `lib/enums.ts`                             | Barrel over `lib/enums/`                                                                                      |
-| `lib/enums/codes.ts`                       | `LOCATION/AVAILABILITY/COMPLIANCE/CRITICALITY` + `to/fromXId`                                                 |
-| `lib/enums/taxonomy.ts`                    | `CATEGORY/GROUPING/TYPOLOGY/OWNER` (`ownerId -1` = empty)                                                     |
-| `lib/enums/context.ts`                     | `LOC_DESC/AUTHOR` (from* only)                                                                                |
-| `lib/wireTypes.ts`                         | Wire format (numeric ids; no `complianceId` in `WireBarrier`)                                                 |
-| `lib/types.ts`                             | UI domain (resolved strings, open unions, `Vocabularies`)                                                     |
-| `lib/resolve.ts`                           | `resolveBarrier(s)`, `resolveHistoryEntry`, `resolveKpi`, `resolveChartData`                                  |
-| `lib/data.ts`                              | Barrel over `lib/mock/` (deterministic generator)                                                             |
-| `lib/mock/generator.ts`                    | `getWireBarriers()` cached (`0xdeadbeef`, status/station distributions)                                       |
-| `lib/mock/history.ts`                      | `generateHistory` + comments/plans/notes per status                                                           |
-| `lib/mock/tags.ts`                         | `buildTag` + prefixes per category                                                                            |
-| `lib/mock/rng.ts`                          | PRNG with seed (`next/int/pick/bool`)                                                                         |
-| `lib/constants.ts`                         | Barrel over `lib/constants/`                                                                                  |
-| `lib/constants/locations.ts`               | `LOCATIONS`, `LOCATION_DIST_BY_ID`, `SIM_DATE`, `PAGE_SIZE(_OPTS)`                                            |
-| `lib/constants/catalog.ts`                 | Seed lists (categories, groupings, typologies, owners, locs, authors)                                         |
-| `lib/constants/helpers.ts`                 | `isCompliant()` + `distinctBy()`                                                                              |
-| `lib/constants/colors.ts`                  | Colors per status + `DISP_KNOWN_ORDER`, `shortStatusLabel`                                                    |
-| `lib/server/db.ts`                         | Lazy server-only Postgres pool (`globalThis.__barrierPool`)                                                   |
-| `lib/server/sql/barriers.ts`               | `listBarriers`, `listBarrierWindow` (export paging), `getBarrierById`, `getKpi`, `transitionBarrierStatus`    |
-| `lib/server/sql/chart.ts`                  | `getChartData` (`GROUP BY category_id`)                                                                       |
-| `lib/server/sql/vocabularies.ts`           | `getVocabularies()` (SSR seed + `GET /api/vocabularies` refresh)                                              |
-| `lib/server/sql/where.ts`                  | `buildWhere`, `resolveOrderBy` (whitelist), `escapeLike`                                                      |
-| `lib/server/sql/mappers.ts`                | `SELECT_COLUMNS`, `HISTORY_JOIN` (lateral `json_agg`), `toWireBarrier`                                        |
-| `routes/api/_params.ts`                    | Strict parsers (`parseInt/parseDate/parseQueryParam`); never a route (`_` prefix)                             |
-| `routes/api/barriers.ts`                   | `GET /api/barriers` (session/token, read throttle)                                                            |
-| `routes/api/barriers/deleted.ts`           | `GET /api/barriers/deleted` (deleted only, admin session or token)                                            |
-| `routes/api/barriers/[id].ts`              | `GET/PATCH /api/barriers/:id` (GET any reader, PATCH admin field update)                                      |
-| `routes/api/barriers/[id]/fracttal-raw.ts` | `GET /api/barriers/:id/fracttal-raw` (admin + `DEV=true`, capped raw upstream detail)                         |
-| `routes/api/barriers/[id]/status.ts`       | `PATCH /api/barriers/:id/status` (requires admin, write throttle; author derives from session)                |
-| `routes/api/barriers/[id]/sync-detail.ts`  | `GET /api/barriers/:id/sync-detail` (session/token, read throttle; pinned run or 24h window)                  |
-| `routes/api/export.ts`                     | `GET/POST /api/export` (csv/xlsx/pdf; session/token, export throttle, streamed, selection via `ids`)          |
-| `routes/api/kpi.ts`                        | `GET /api/kpi` (session/token, read throttle)                                                                 |
-| `routes/api/chart.ts`                      | `GET /api/chart` (session/token, read throttle)                                                               |
-| `routes/api/sync-status.ts`                | `GET /api/sync-status` (session/token, read throttle; dashboard indicator)                                    |
-| `routes/api/sync-runs.ts`                  | `GET /api/sync-runs` (session/token, read throttle; `?limit=` 1..50)                                          |
-| `routes/api/sync-changes.ts`               | `GET /api/sync-changes` (session/token, read throttle; paged + legacy `?limit=` shape)                        |
-| `routes/api/vocabularies.ts`               | `GET /api/vocabularies` (session/token, read throttle; refresh cadence)                                       |
-| `routes/api/health.ts`                     | `GET /api/health` (liveness, no DB, no auth, no throttle)                                                     |
-| `routes/api/recipients.ts`                 | `GET/POST /api/recipients` (admin, upsert by email)                                                           |
-| `routes/api/recipients/[id].ts`            | `PATCH/DELETE /api/recipients/:id` (admin)                                                                    |
-| `routes/api/auth/login.ts`                 | `POST /api/auth/login` (credentials → session cookie)                                                         |
-| `routes/api/auth/logout.ts`                | `POST /api/auth/logout` (revoke + clear cookie)                                                               |
-| `routes/api/auth/me.ts`                    | `GET /api/auth/me` (session user for islands)                                                                 |
-| `routes/api/auth/password.ts`              | `POST /api/auth/password` (own password change, session-only)                                                 |
-| `routes/api/users.ts`                      | `GET/POST /api/users` (admin only; first account via CLI)                                                     |
-| `routes/api/users/[id].ts`                 | `PATCH/DELETE /api/users/:id` (admin, last-admin guard)                                                       |
-| `routes/api/alert-rules.ts`                | `GET/POST /api/alert-rules` (admin, scoped triggers + anti-noise windows)                                     |
-| `routes/api/alert-rules/[id].ts`           | `PATCH/DELETE /api/alert-rules/:id` (admin)                                                                   |
-| `routes/api/alert-rules/preview.ts`        | `GET /api/alert-rules/preview` (admin dry-run count + sample tags)                                            |
-| `routes/api/lookups.ts`                    | `GET /api/lookups` (authenticated id lists for admin forms)                                                   |
-| `routes/api/field-options.ts`              | `GET/PUT /api/field-options` (GET any reader, PUT admin only)                                                 |
-| `lib/server/sql/field-options.ts`          | `field_option_sets` store + GERAL seed defaults                                                               |
-| `lib/server/sql/barriers.ts`               | `updateBarrier` (metadata + sheet fields; status via transition)                                              |
-| `lib/field-options.ts`                     | Field registry, pt-BR labels, seed defaults, option validation                                                |
-| `islands/BarrierEditor.tsx`                | Admin barrier edit form (modal Editar tab)                                                                    |
-| `lib/server/config.ts`                     | `loadServerConfig` (http boot), `loadSyncConfig` (Fracttal credentials for scripts)                           |
-| `lib/server/errors.ts`                     | Envelope `{ error, code, requestId }` + `x-request-id`                                                        |
-| `lib/server/auth.ts`                       | `checkAdminAuth` (Bearer) + `resolveRequestAuth`/`requireAdminAuth`/`requireAuthenticated` (session or token) |
-| `lib/server/throttle.ts`                   | `createThrottle` (fixed window, no deps) + per-route buckets                                                  |
-| `lib/server/sql/throttle.ts`               | Postgres `throttle_buckets` budget shared across isolates (memory fallback)                                   |
-| `lib/server/exportRows.ts`                 | `resolveExportScope` (scope KPI) + `exportBatches` (5,000-row paged batches)                                  |
-| `lib/server/exportStream.ts`               | `textStream` (head / batch / tail skeleton shared by the CSV format)                                          |
-| `lib/server/exportCsv.ts`                  | `streamExportCsv` (BOM + `row()` + `summaryRowsFrom()`)                                                       |
-| `lib/server/exportXlsx.ts`                 | `streamExportXlsx` (workbook streamed out of the ZIP writer, batch by batch)                                  |
-| `lib/server/exportPdf.ts`                  | `streamExportPdf` (report streamed page by page, batch by batch)                                              |
-| `lib/server/sql/recipients.ts`             | CRUD `alert_recipients` (pure validation + thin store)                                                        |
-| `lib/server/sql/users.ts`                  | CRUD `users` (roles, last-admin guard, no hashes in JSON)                                                     |
-| `lib/server/sql/sessions.ts`               | Opaque `sessions` (hash lookup, revoke, expiry sweep)                                                         |
-| `lib/server/sql/authors.ts`                | `listAuthors` + `getOrCreateAuthor` (session → author id)                                                     |
-| `lib/server/sql/alert_rules.ts`            | CRUD `alert_rules` + `listStaleBarriers` (time trigger)                                                       |
-| `lib/server/auth/password.ts`              | PBKDF2-SHA256 hash/verify + 12-char policy (WebCrypto only)                                                   |
-| `lib/server/auth/session.ts`               | Opaque token, SHA-256 hash, HttpOnly cookie builders                                                          |
-| `lib/server/alerts/store.ts`               | `AlertStore` contract (dedup, `delivered[]` per recipient)                                                    |
-| `lib/server/alerts/rules.ts`               | Pure rule matching (category scope, critical, recovery, immediacy)                                            |
-| `lib/server/alerts/detect.ts`              | `detectUrgentTransitions` (history → rules, legacy fallback)                                                  |
-| `lib/server/alerts/immediate.ts`           | `maybeSendImmediate` (PATCH fan-out: enqueue always, at-once send on immediate rules)                         |
-| `lib/server/alerts/run.ts`                 | `runAlertCycle` (detect→stale→enqueue→digest→mark, dry-run default, `--reprocess`)                            |
-| `lib/server/alerts/mailer.ts`              | `AlertMailer` + SMTP provider (P3 reuse) + `sendWithRetry`                                                    |
-| `lib/server/alerts/provider.ts`            | Generic provider payload (`canal: email                                                                       |
-| `lib/server/alerts/templates.ts`           | Urgent digest pt-BR (subject counts criticals, body lists criticals first)                                    |
-| `lib/server/sql/alerts.ts`                 | `sqlAlertStore` (`ON CONFLICT dedup_key DO NOTHING`, dead-letter in payload)                                  |
-| `lib/dashboard/urgent.ts`                  | `urgencyOf`/`isUrgent`/`compareUrgency`/`urgentBarriers` (fail-closed baseline = NcAlert)                     |
-| `islands/dashboard/vocabularies.ts`        | Client hook `useDashboardVocabularies` (mock mode only)                                                       |
-| `db/schema.sql`                            | DDL: lookup tables, `barriers`, `barrier_status_history`                                                      |
-| `db/seed_lookups.sql`                      | Seeds the static lookups, mirroring `lib/enums/`                                                              |
+| File                                        | Responsibility                                                                                                |
+| ------------------------------------------- | ------------------------------------------------------------------------------------------------------------- |
+| `lib/api.ts`                                | Barrel: picks mock vs HTTP via `PUBLIC_API_MODE`, re-exports `toWireQuery` + `mockApi`                        |
+| `lib/api/types.ts`                          | `BarriersApi` (5 methods) + `DomainQuery` (string filters)                                                    |
+| `lib/api/query.ts`                          | `toWireQuery`, `cleanDateParam`, `buildQueryString`                                                           |
+| `lib/api/mock.ts`                           | `mockAdapter`: numeric `matchesQuery` + `sortWire`, resolves only the final page                              |
+| `lib/api/http.ts`                           | `httpAdapterFactory(baseUrl)`: fetch over `routes/api/*`; `null` only on 404                                  |
+| `lib/enums.ts`                              | Barrel over `lib/enums/`                                                                                      |
+| `lib/enums/codes.ts`                        | `LOCATION/AVAILABILITY/COMPLIANCE/CRITICALITY` + `to/fromXId`                                                 |
+| `lib/enums/taxonomy.ts`                     | `CATEGORY/GROUPING/TYPOLOGY/OWNER` (`ownerId -1` = empty)                                                     |
+| `lib/enums/context.ts`                      | `LOC_DESC/AUTHOR` (from* only)                                                                                |
+| `lib/wireTypes.ts`                          | Wire format (numeric ids; no `complianceId` in `WireBarrier`)                                                 |
+| `lib/types.ts`                              | UI domain (resolved strings, open unions, `Vocabularies`)                                                     |
+| `lib/resolve.ts`                            | `resolveBarrier(s)`, `resolveHistoryEntry`, `resolveKpi`, `resolveChartData`                                  |
+| `lib/data.ts`                               | Barrel over `lib/mock/` (deterministic generator)                                                             |
+| `lib/mock/generator.ts`                     | `getWireBarriers()` cached (`0xdeadbeef`, status/station distributions)                                       |
+| `lib/mock/history.ts`                       | `generateHistory` + comments/plans/notes per status                                                           |
+| `lib/mock/tags.ts`                          | `buildTag` + prefixes per category                                                                            |
+| `lib/mock/rng.ts`                           | PRNG with seed (`next/int/pick/bool`)                                                                         |
+| `lib/constants.ts`                          | Barrel over `lib/constants/`                                                                                  |
+| `lib/constants/locations.ts`                | `LOCATIONS`, `LOCATION_DIST_BY_ID`, `SIM_DATE`, `PAGE_SIZE(_OPTS)`                                            |
+| `lib/constants/catalog.ts`                  | Seed lists (categories, groupings, typologies, owners, locs, authors)                                         |
+| `lib/constants/helpers.ts`                  | `isCompliant()` + `distinctBy()`                                                                              |
+| `lib/constants/colors.ts`                   | Colors per status + `DISP_KNOWN_ORDER`, `shortStatusLabel`                                                    |
+| `lib/server/db.ts`                          | Lazy server-only Postgres pool (`globalThis.__barrierPool`)                                                   |
+| `lib/server/sql/barriers.ts`                | `listBarriers`, `listBarrierWindow` (export paging), `getBarrierById`, `getKpi`, `transitionBarrierStatus`    |
+| `lib/server/sql/chart.ts`                   | `getChartData` (`GROUP BY category_id`)                                                                       |
+| `lib/server/sql/vocabularies.ts`            | `getVocabularies()` (SSR seed + `GET /api/vocabularies` refresh)                                              |
+| `lib/server/sql/where.ts`                   | `buildWhere`, `resolveOrderBy` (whitelist), `escapeLike`                                                      |
+| `lib/server/sql/mappers.ts`                 | `SELECT_COLUMNS`, `HISTORY_JOIN` (lateral `json_agg`), `toWireBarrier`                                        |
+| `routes/api/_params.ts`                     | Strict parsers (`parseInt/parseDate/parseQueryParam`); never a route (`_` prefix)                             |
+| `routes/api/barriers.ts`                    | `GET /api/barriers` (session/token, read throttle)                                                            |
+| `routes/api/barriers/deleted.ts`            | `GET /api/barriers/deleted` (deleted only, admin session or token)                                            |
+| `routes/api/barriers/[id].ts`               | `GET/PATCH /api/barriers/:id` (GET any reader, PATCH admin field update)                                      |
+| `routes/api/barriers/[id]/fracttal-raw.ts`  | `GET /api/barriers/:id/fracttal-raw` (admin + `DEV=true`, capped raw upstream detail)                         |
+| `routes/api/barriers/[id]/status.ts`        | `PATCH /api/barriers/:id/status` (requires admin, write throttle; author derives from session)                |
+| `routes/api/barriers/[id]/contingencies.ts` | `GET` contingency links/candidates (session/token); `POST/PATCH/DELETE` links (admin, write throttle)         |
+| `routes/api/barriers/[id]/sync-detail.ts`   | `GET /api/barriers/:id/sync-detail` (session/token, read throttle; pinned run or 24h window)                  |
+| `routes/api/export.ts`                      | `GET/POST /api/export` (csv/xlsx/pdf; session/token, export throttle, streamed, selection via `ids`)          |
+| `routes/api/kpi.ts`                         | `GET /api/kpi` (session/token, read throttle)                                                                 |
+| `routes/api/chart.ts`                       | `GET /api/chart` (session/token, read throttle)                                                               |
+| `routes/api/sync-status.ts`                 | `GET /api/sync-status` (session/token, read throttle; dashboard indicator)                                    |
+| `routes/api/sync-runs.ts`                   | `GET /api/sync-runs` (session/token, read throttle; `?limit=` 1..50)                                          |
+| `routes/api/sync-changes.ts`                | `GET /api/sync-changes` (session/token, read throttle; paged + legacy `?limit=` shape)                        |
+| `routes/api/vocabularies.ts`                | `GET /api/vocabularies` (session/token, read throttle; refresh cadence)                                       |
+| `routes/api/health.ts`                      | `GET /api/health` (liveness, no DB, no auth, no throttle)                                                     |
+| `routes/api/recipients.ts`                  | `GET/POST /api/recipients` (admin, upsert by email)                                                           |
+| `routes/api/recipients/[id].ts`             | `PATCH/DELETE /api/recipients/:id` (admin)                                                                    |
+| `routes/api/auth/login.ts`                  | `POST /api/auth/login` (credentials → session cookie)                                                         |
+| `routes/api/auth/logout.ts`                 | `POST /api/auth/logout` (revoke + clear cookie)                                                               |
+| `routes/api/auth/me.ts`                     | `GET /api/auth/me` (session user for islands)                                                                 |
+| `routes/api/auth/password.ts`               | `POST /api/auth/password` (own password change, session-only)                                                 |
+| `routes/api/users.ts`                       | `GET/POST /api/users` (admin only; first account via CLI)                                                     |
+| `routes/api/users/[id].ts`                  | `PATCH/DELETE /api/users/:id` (admin, last-admin guard)                                                       |
+| `routes/api/alert-rules.ts`                 | `GET/POST /api/alert-rules` (admin, scoped triggers + anti-noise windows)                                     |
+| `routes/api/alert-rules/[id].ts`            | `PATCH/DELETE /api/alert-rules/:id` (admin)                                                                   |
+| `routes/api/alert-rules/preview.ts`         | `GET /api/alert-rules/preview` (admin dry-run count + sample tags)                                            |
+| `routes/api/lookups.ts`                     | `GET /api/lookups` (authenticated id lists for admin forms)                                                   |
+| `routes/api/field-options.ts`               | `GET/PUT /api/field-options` (GET any reader, PUT admin only)                                                 |
+| `lib/server/sql/field-options.ts`           | `field_option_sets` store + GERAL seed defaults                                                               |
+| `lib/server/sql/barriers.ts`                | `updateBarrier` (metadata + sheet fields; status via transition)                                              |
+| `lib/field-options.ts`                      | Field registry, pt-BR labels, seed defaults, option validation                                                |
+| `islands/BarrierEditor.tsx`                 | Admin barrier edit form (modal Editar tab)                                                                    |
+| `lib/server/config.ts`                      | `loadServerConfig` (http boot), `loadSyncConfig` (Fracttal credentials for scripts)                           |
+| `lib/server/errors.ts`                      | Envelope `{ error, code, requestId }` + `x-request-id`                                                        |
+| `lib/server/auth.ts`                        | `checkAdminAuth` (Bearer) + `resolveRequestAuth`/`requireAdminAuth`/`requireAuthenticated` (session or token) |
+| `lib/server/throttle.ts`                    | `createThrottle` (fixed window, no deps) + per-route buckets                                                  |
+| `lib/server/sql/throttle.ts`                | Postgres `throttle_buckets` budget shared across isolates (memory fallback)                                   |
+| `lib/server/exportRows.ts`                  | `resolveExportScope` (scope KPI) + `exportBatches` (5,000-row paged batches)                                  |
+| `lib/server/exportStream.ts`                | `textStream` (head / batch / tail skeleton shared by the CSV format)                                          |
+| `lib/server/exportCsv.ts`                   | `streamExportCsv` (BOM + `row()` + `summaryRowsFrom()`)                                                       |
+| `lib/server/exportXlsx.ts`                  | `streamExportXlsx` (workbook streamed out of the ZIP writer, batch by batch)                                  |
+| `lib/server/exportPdf.ts`                   | `streamExportPdf` (report streamed page by page, batch by batch)                                              |
+| `lib/server/sql/recipients.ts`              | CRUD `alert_recipients` (pure validation + thin store)                                                        |
+| `lib/server/sql/users.ts`                   | CRUD `users` (roles, last-admin guard, no hashes in JSON)                                                     |
+| `lib/server/sql/sessions.ts`                | Opaque `sessions` (hash lookup, revoke, expiry sweep)                                                         |
+| `lib/server/sql/authors.ts`                 | `listAuthors` + `getOrCreateAuthor` (session → author id)                                                     |
+| `lib/server/sql/alert_rules.ts`             | CRUD `alert_rules` + `listStaleBarriers` (time trigger)                                                       |
+| `lib/server/auth/password.ts`               | PBKDF2-SHA256 hash/verify + 12-char policy (WebCrypto only)                                                   |
+| `lib/server/auth/session.ts`                | Opaque token, SHA-256 hash, HttpOnly cookie builders                                                          |
+| `lib/server/alerts/store.ts`                | `AlertStore` contract (dedup, `delivered[]` per recipient)                                                    |
+| `lib/server/alerts/rules.ts`                | Pure rule matching (category scope, critical, recovery, immediacy)                                            |
+| `lib/server/alerts/detect.ts`               | `detectUrgentTransitions` (history → rules, legacy fallback)                                                  |
+| `lib/server/alerts/immediate.ts`            | `maybeSendImmediate` (PATCH fan-out: enqueue always, at-once send on immediate rules)                         |
+| `lib/server/alerts/run.ts`                  | `runAlertCycle` (detect→stale→enqueue→digest→mark, dry-run default, `--reprocess`)                            |
+| `lib/server/alerts/mailer.ts`               | `AlertMailer` + SMTP provider (P3 reuse) + `sendWithRetry`                                                    |
+| `lib/server/alerts/provider.ts`             | Generic provider payload (`canal: email                                                                       |
+| `lib/server/alerts/templates.ts`            | Urgent digest pt-BR (subject counts criticals, body lists criticals first)                                    |
+| `lib/server/sql/alerts.ts`                  | `sqlAlertStore` (`ON CONFLICT dedup_key DO NOTHING`, dead-letter in payload)                                  |
+| `lib/dashboard/urgent.ts`                   | `urgencyOf`/`isUrgent`/`compareUrgency`/`urgentBarriers` (fail-closed baseline = NcAlert)                     |
+| `islands/dashboard/vocabularies.ts`         | Client hook `useDashboardVocabularies` (mock mode only)                                                       |
+| `db/schema.sql`                             | DDL: lookup tables, `barriers`, `barrier_status_history`                                                      |
+| `db/seed_lookups.sql`                       | Seeds the static lookups, mirroring `lib/enums/`                                                              |
 
 See **docs/DATABASE.md** for the full schema and setup walkthrough, and
 **docs/ARCHITECTURE.md** for the mock vs http flows and the island topology.

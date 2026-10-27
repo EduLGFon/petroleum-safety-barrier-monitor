@@ -115,6 +115,10 @@ barrier_contingencies
                         composite primary key prevents duplicate links;
                         check prevents a barrier contingencing itself
 
+These are local operator-managed relationships, separate from Fracttal sync.
+Soft-deleting a barrier preserves its links for admin review; hard deletion
+cascades the related links.
+
 sync_state
   id                    identity, PK
   scope                 text (ex: "fixture:..." / "fracttal-live:FAL")

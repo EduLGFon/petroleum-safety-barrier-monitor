@@ -36,6 +36,8 @@ interface Props {
   sessionUser?: AuthUser | null;
   onSaved?: () => void;
   devFracttalRaw?: boolean;
+  apiBaseUrl?: string;
+  connected?: boolean;
 }
 
 // canEditBarrier: the Editar tab is an admin tool on live rows only.
@@ -50,7 +52,15 @@ export function canEditBarrier(
 }
 // BarrierModal renders the detail dialog shell; handles ESC close, body scroll-lock, and backdrop dismiss.
 export function BarrierModal(
-  { barrier, onClose, sessionUser, onSaved, devFracttalRaw = false }: Props,
+  {
+    barrier,
+    onClose,
+    sessionUser,
+    onSaved,
+    devFracttalRaw = false,
+    apiBaseUrl = "",
+    connected = false,
+  }: Props,
 ) {
   const [tab, setTab] = useState<Tab>("details");
   const [isDirty, setIsDirty] = useState(false);
@@ -198,6 +208,8 @@ export function BarrierModal(
               sessionUser={sessionUser}
               onSaved={onSaved}
               devFracttalRaw={devFracttalRaw}
+              apiBaseUrl={apiBaseUrl}
+              connected={connected}
             />
           )}
         </div>
@@ -234,6 +246,8 @@ function Content(
     sessionUser,
     onSaved,
     devFracttalRaw,
+    apiBaseUrl,
+    connected,
   }: {
     b: Barrier;
     onClose: () => void;
@@ -245,6 +259,8 @@ function Content(
     sessionUser?: AuthUser | null;
     onSaved?: () => void;
     devFracttalRaw: boolean;
+    apiBaseUrl: string;
+    connected: boolean;
   },
 ) {
   // Local copy so a save refreshes Details without closing the dialog.
@@ -320,7 +336,15 @@ function Content(
             )}
           </>
         )}
-        {tab === "contingency" && <BarrierContingency b={local} />}
+        {tab === "contingency" && (
+          <BarrierContingency
+            key={local.id}
+            b={local}
+            apiBaseUrl={apiBaseUrl}
+            connected={connected}
+            isAdmin={isAdmin}
+          />
+        )}
         {tab === "history" && <BarrierHistory b={local} />}
         {tab === "edit" && canEditBarrier(local, isAdmin) && (
           <BarrierEditor

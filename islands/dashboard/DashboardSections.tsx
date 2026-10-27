@@ -352,6 +352,8 @@ export function DashboardSections(
         onCloseSettings={() => setSettingsOpen(false)}
         sessionUser={sessionUser}
         devFracttalRaw={devFracttalRaw}
+        serverMode={serverMode}
+        apiBaseUrl={apiBaseUrl}
         locations={settingLocations}
         availabilities={dispOpts}
         compliances={confOpts}
