@@ -285,7 +285,7 @@ Deno.test("mapAsset builds explanatory history from the winning work event", () 
         classification: "CORR - Corretiva Planejada",
         operationState: "Em aberto",
         sourceAuthor: "Pessoa autora",
-        participants: [{ name: "Pessoa executora", role: "Executor" }],
+        participants: [{ name: "Pessoa executora", role: "Pessoal" }],
       },
       hasContingency: true,
       contingencySource: "OS sintética: contingência",

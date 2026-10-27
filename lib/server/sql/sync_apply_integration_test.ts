@@ -274,7 +274,7 @@ Deno.test("sync still propagates a remote change to a sync-owned status", async 
   input.history = {
     note: "Justificativa sintética",
     sourceAuthor: "Pessoa autora",
-    participants: [{ name: "Pessoa executora", role: "Executor" }],
+    participants: [{ name: "Pessoa executora", role: "Pessoal" }],
   };
   try {
     const entry: PlanEntry = {

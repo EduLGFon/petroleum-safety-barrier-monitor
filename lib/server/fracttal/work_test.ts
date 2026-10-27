@@ -120,8 +120,8 @@ Deno.test("work event carries the Fracttal author and involved people", () => {
       order({
         created_by: "Pessoa criadora",
         requested_by: "Pessoa solicitante",
-        personnel_description: "Pessoa executora",
-        user_assigned: "Pessoa responsável",
+        personnel_description: "Pessoa atribuída",
+        user_assigned: "Pessoa atribuída",
         resources_human_resources: "Pessoa técnica A; Pessoa técnica B",
         validated_by_description: "Pessoa validadora",
       }),
@@ -135,8 +135,7 @@ Deno.test("work event carries the Fracttal author and involved people", () => {
   assertEquals(event?.participants, [
     { name: "Pessoa criadora", role: "Criado por" },
     { name: "Pessoa solicitante", role: "Solicitado por" },
-    { name: "Pessoa executora", role: "Executor" },
-    { name: "Pessoa responsável", role: "Responsável" },
+    { name: "Pessoa atribuída", role: "Pessoal, Usuário atribuído" },
     { name: "Pessoa técnica A", role: "Recursos humanos" },
     { name: "Pessoa técnica B", role: "Recursos humanos" },
     { name: "Pessoa validadora", role: "Validado por" },

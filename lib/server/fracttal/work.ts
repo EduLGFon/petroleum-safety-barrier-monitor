@@ -183,22 +183,24 @@ function peopleFromFields(
   const add = (value: string | null, role: string): void => {
     for (const name of (value ?? "").split(";")) {
       const clean = name.trim();
-      if (clean !== "") people.push({ name: clean, role });
+      if (clean === "") continue;
+      const current = people.find((person) =>
+        person.name.toLowerCase() === clean.toLowerCase()
+      );
+      if (!current) {
+        people.push({ name: clean, role });
+      } else if (!current.role.split(", ").includes(role)) {
+        current.role = `${current.role}, ${role}`;
+      }
     }
   };
   add(row.created_by, "Criado por");
   add(row.requested_by, "Solicitado por");
-  add(row.personnel_description, "Executor");
-  add(row.user_assigned, "Responsável");
+  add(row.personnel_description, "Pessoal");
+  add(row.user_assigned, "Usuário atribuído");
   add(row.resources_human_resources, "Recursos humanos");
   add(row.validated_by_description, "Validado por");
-  const seen = new Set<string>();
-  return people.filter((person) => {
-    const key = `${person.name.toLowerCase()}|${person.role}`;
-    if (seen.has(key)) return false;
-    seen.add(key);
-    return true;
-  });
+  return people;
 }
 
 // workOrderSlot sorts one order: closed rows (done !== false) carry no

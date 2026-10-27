@@ -210,12 +210,12 @@ Deno.test("resolveHistoryEntry prefers the Fracttal author and maps sync metadat
     authorId: 10,
     note: "Justificativa sintética",
     sourceAuthor: "Pessoa autora",
-    participants: [{ name: "Pessoa executora", role: "Executor" }],
+    participants: [{ name: "Pessoa executora", role: "Pessoal" }],
     syncRunId: 42,
   });
   assertStrictEquals(entry.author, "Pessoa autora");
   assertEquals(entry.participants, [
-    { name: "Pessoa executora", role: "Executor" },
+    { name: "Pessoa executora", role: "Pessoal" },
   ]);
   assertStrictEquals(entry.syncRunId, 42);
 });

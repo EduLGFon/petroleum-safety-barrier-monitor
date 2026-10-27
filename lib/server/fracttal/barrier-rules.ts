@@ -369,17 +369,16 @@ function mergeParticipants(
   current: Array<{ name: string; role: string }>,
   incoming: Array<{ name: string; role: string }>,
 ): Array<{ name: string; role: string }> {
-  const seen = new Set(
-    current.map((person) =>
-      `${person.name.toLocaleLowerCase()}|${person.role}`
-    ),
-  );
   const merged = [...current];
   for (const person of incoming) {
-    const key = `${person.name.toLocaleLowerCase()}|${person.role}`;
-    if (seen.has(key)) continue;
-    seen.add(key);
-    merged.push(person);
+    const existing = merged.find((candidate) =>
+      candidate.name.toLowerCase() === person.name.toLowerCase()
+    );
+    if (!existing) {
+      merged.push(person);
+    } else if (!existing.role.split(", ").includes(person.role)) {
+      existing.role = `${existing.role}, ${person.role}`;
+    }
   }
   return merged;
 }

@@ -44,9 +44,9 @@ import {
 
 export { AVAILABILITY_AVAILABLE, AVAILABILITY_UNAVAILABLE };
 
-import type { FracttalAsset } from "./types.ts";
-
 import type { StatusParticipant } from "../../types.ts";
+
+import type { FracttalAsset } from "./types.ts";
 
 // IMPORT_DEFAULTS: fields Fracttal does not carry, given stable documented
 // application defaults (review team decision, not silent guess). locDescId
