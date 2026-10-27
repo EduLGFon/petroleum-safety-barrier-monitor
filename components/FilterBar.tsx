@@ -12,9 +12,9 @@ import type { ColumnKey, PinnedKey } from "./table/columns.ts";
 
 import type { FilterState, RowScope } from "../lib/types.ts";
 
-import { ColumnsMenu } from "./table/ColumnsMenu.tsx";
-
 import { useEffect, useRef, useState } from "preact/hooks";
+
+import { ColumnsMenu } from "./table/ColumnsMenu.tsx";
 
 import type { ComponentChildren } from "preact";
 

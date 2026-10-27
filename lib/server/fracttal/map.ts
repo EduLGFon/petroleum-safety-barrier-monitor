@@ -31,16 +31,16 @@ import {
   typologyIdOf,
 } from "./barrier-rules.ts";
 
-export { AVAILABILITY_AVAILABLE, AVAILABILITY_UNAVAILABLE };
-
-import type { FracttalAsset } from "./types.ts";
-
 import {
   deriveSheetFields,
   groupingIdOf,
   ownerIdOf,
   type SheetFields,
 } from "./sheet-fields.ts";
+
+export { AVAILABILITY_AVAILABLE, AVAILABILITY_UNAVAILABLE };
+
+import type { FracttalAsset } from "./types.ts";
 
 // IMPORT_DEFAULTS: fields Fracttal does not carry, given stable documented
 // application defaults (review team decision, not silent guess). locDescId

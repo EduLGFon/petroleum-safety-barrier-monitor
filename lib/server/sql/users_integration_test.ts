@@ -2,11 +2,11 @@
 // admin-only PATCH /api/users/:id path. Skipped without DATABASE_URL.
 import { createUser, deleteUser, getUserById, updateUser } from "./users.ts";
 
-import { createSession } from "./sessions.ts";
-
 import { hashPassword, verifyPassword } from "../auth/password.ts";
 
 import { assertStrictEquals } from "jsr:@std/assert@^1";
+
+import { createSession } from "./sessions.ts";
 
 import { queryRows } from "../db.ts";
 

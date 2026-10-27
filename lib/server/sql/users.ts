@@ -4,9 +4,9 @@
 // session-or-token guard. Password hashing lives in lib/server/auth/.
 import { normalizeEmail, normalizeName } from "../validation.ts";
 
-export { normalizeEmail, normalizeName };
-
 import { queryRows, type TxQuery, withTx } from "../db.ts";
+
+export { normalizeEmail, normalizeName };
 
 export type UserRole = "admin" | "user";
 

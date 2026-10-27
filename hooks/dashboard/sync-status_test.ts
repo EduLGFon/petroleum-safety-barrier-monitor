@@ -1,9 +1,9 @@
 // Hook test for hooks/dashboard/sync-status.ts - an empty baseUrl means
 // same-origin (relative /api/*), so the indicator must still poll instead of
 // treating the dashboard as unconfigured.
-import { assertStrictEquals } from "jsr:@std/assert@^1";
-
 import { renderHook, waitFor } from "../../scripts/test-dom.ts";
+
+import { assertStrictEquals } from "jsr:@std/assert@^1";
 
 import type { SyncStatus } from "../../lib/types.ts";
 

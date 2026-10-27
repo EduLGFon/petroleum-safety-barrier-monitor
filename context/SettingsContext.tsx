@@ -2,19 +2,19 @@
 // This is why it exists: single store for appearance and filter defaults,
 // hydrated from localStorage after mount for SSR consistency.
 import {
-  type AccentColor,
-  DEFAULTS,
-  type Density,
-  type SettingsState,
-} from "./settings/presets.ts";
-
-import {
   applyAccent,
   applyBlur,
   applyDensity,
   applyMotion,
   applyTheme,
 } from "./settings/appliers.ts";
+
+import {
+  type AccentColor,
+  DEFAULTS,
+  type Density,
+  type SettingsState,
+} from "./settings/presets.ts";
 
 export {
   ACCENT_PRESETS,

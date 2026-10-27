@@ -5,18 +5,18 @@
 // what sync retired. Same filters and shape as /api/barriers; every item
 // in it is deleted by construction.
 import {
-  authStoreUnavailable,
-  denyByCredentials,
-  requireAdminAuth,
-} from "../../../lib/server/auth.ts";
-
-import {
   parseBooleanParam,
   parseDateParam,
   parseIntArrayParam,
   parseIntParam,
   parseQueryParam,
 } from "../_params.ts";
+
+import {
+  authStoreUnavailable,
+  denyByCredentials,
+  requireAdminAuth,
+} from "../../../lib/server/auth.ts";
 
 import {
   internal,

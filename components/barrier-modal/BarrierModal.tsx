@@ -1,8 +1,6 @@
 // BarrierModal - detail dialog for a selected barrier with Details / History tabs.
 // This is why it exists: surfaces full metadata, status badges, NC alert, and
 // chronological statusHistory without leaving the dashboard grid.
-import { useCallback, useEffect, useRef, useState } from "preact/hooks";
-
 import {
   HistoryIcon,
   InfoIcon,
@@ -10,16 +8,19 @@ import {
   ShieldCheckIcon,
 } from "../ui/Icons.tsx";
 
+import { useCallback, useEffect, useRef, useState } from "preact/hooks";
+
 import { UnsavedChangesDialog } from "./UnsavedChangesDialog.tsx";
 
 import { BarrierEditor } from "../../islands/BarrierEditor.tsx";
 
 import { lockBody, unlockBody } from "../../lib/body-lock.ts";
 
+import { BarrierContingency } from "./BarrierContingency.tsx";
+
 import type { AuthUser, Barrier } from "../../lib/types.ts";
 
 import { BarrierDetails } from "./BarrierDetails.tsx";
-import { BarrierContingency } from "./BarrierContingency.tsx";
 
 import { BarrierHistory } from "./BarrierHistory.tsx";
 

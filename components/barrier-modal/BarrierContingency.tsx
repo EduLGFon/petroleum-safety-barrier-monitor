@@ -1,9 +1,9 @@
 // BarrierContingency - Contingency section for the barrier dialog.
 import { BuildingIcon, ShieldCheckIcon } from "../ui/Icons.tsx";
 
-import { FR, Sec, Txt } from "./primitives.tsx";
-
 import type { Barrier } from "../../lib/types.ts";
+
+import { FR, Sec, Txt } from "./primitives.tsx";
 
 export function BarrierContingency({ b }: { b: Barrier }) {
   const na = (v: string): string => v || "Não informado";
