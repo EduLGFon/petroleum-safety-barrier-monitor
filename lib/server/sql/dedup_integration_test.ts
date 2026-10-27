@@ -3,15 +3,11 @@
 // audit retries, and racing sync leases each had a duplication path;
 // these tests pin the fixes. Skipped when DATABASE_URL is unset, and
 // each test cleans up its own rows.
-import {
-  defaultSyncIo,
-  isUniqueViolation,
-  recordBarrierChange,
-} from "./sync.ts";
-
 import { getBarrierById, transitionBarrierStatus } from "./barriers.ts";
 
 import { assert, assertStrictEquals } from "jsr:@std/assert@^1";
+
+import { defaultSyncIo, recordBarrierChange } from "./sync.ts";
 
 import { ScopeBusyError } from "../fracttal/sync.ts";
 
@@ -96,7 +92,6 @@ Deno.test("direct availability UPDATE is rejected by the guard", async () => {
     threw.includes("record_status_change"),
     `expected guard rejection, got: ${threw}`,
   );
-  assert(isUniqueViolation({ code: "23505" }), "helper sanity");
   const current = await getBarrierById(seed.id);
   assertStrictEquals(current!.availabilityId, seed.availability_id);
 });
@@ -143,7 +138,7 @@ Deno.test("audit retry for the same run inserts once", async () => {
   }
 });
 
-Deno.test("second running lease for a scope is busy", async () => {
+Deno.test("racing running lease claims leave one owner and one busy result", async () => {
   if (!Deno.env.get("DATABASE_URL")) {
     console.log("skip: DATABASE_URL unset - needs a real Postgres");
     return;
@@ -153,8 +148,27 @@ Deno.test("second running lease for a scope is busy", async () => {
     `delete from sync_state where scope = $1 and status = 'running'`,
     [scope],
   );
-  const runId = await defaultSyncIo.startRun(scope);
+  const results = await Promise.allSettled([
+    defaultSyncIo.startRun(scope),
+    defaultSyncIo.startRun(scope),
+  ]);
+  const owners = results.filter(
+    (result): result is PromiseFulfilledResult<number> =>
+      result.status === "fulfilled",
+  );
+  const rejected = results.filter((result) => result.status === "rejected");
   try {
+    assertStrictEquals(
+      owners.length,
+      1,
+      "exactly one poller must claim the lease",
+    );
+    assertStrictEquals(rejected.length, 1, "the competing poller must be busy");
+    assert(
+      rejected[0]?.status === "rejected" &&
+        rejected[0].reason instanceof ScopeBusyError,
+      "lease conflict must be reported as routine contention",
+    );
     let busy = false;
     try {
       await defaultSyncIo.startRun(scope);
@@ -163,11 +177,15 @@ Deno.test("second running lease for a scope is busy", async () => {
     }
     assertStrictEquals(busy, true);
   } finally {
-    await defaultSyncIo.finishRun(
-      runId,
-      "ok",
-      { inserts: 0, updates: 0, deletes: 0, skips: 0 },
-      "dedup-test",
+    await Promise.all(
+      owners.map(({ value: runId }) =>
+        defaultSyncIo.finishRun(
+          runId,
+          "ok",
+          { inserts: 0, updates: 0, deletes: 0, skips: 0 },
+          "dedup-test",
+        )
+      ),
     );
   }
 });

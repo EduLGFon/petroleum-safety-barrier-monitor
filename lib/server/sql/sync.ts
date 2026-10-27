@@ -55,19 +55,6 @@ export const SYNC_STALE_MINUTES = 15;
 // the audit batch (8 params per row) well under protocol limits.
 export const SYNC_APPLY_CHUNK = 200;
 
-// isUniqueViolation: true for Postgres unique violations (SQLSTATE 23505,
-// including the uniq_sync_state_running_scope race loser). The Deno
-// postgres driver surfaces the code either as err.code or inside the
-// message, so both shapes are accepted.
-export function isUniqueViolation(err: unknown): boolean {
-  if (err !== null && typeof err === "object" && "code" in err) {
-    if ((err as { code?: unknown }).code === "23505") return true;
-  }
-  const msg = err instanceof Error ? err.message : String(err);
-  return /23505|duplicate key|unique constraint|uniq_sync_state_running_scope/i
-    .test(msg);
-}
-
 // syncScopeRunning: poll lock - true while a run for the scope is still
 // 'running'. A crashed run would block polls forever, so the lock is stale
 // once the lease lapses. Liveness rides finished_at (rewritten as a
@@ -330,28 +317,21 @@ export const defaultSyncIo: SyncIo = {
     // Atomic claim: the INSERT only fires when no fresh lease exists, so
     // two processes racing past the pollOnce lock cannot both open a run.
     // The loser gets ScopeBusyError (mapped to `skipped`, never a failure).
-    // The uniq_sync_state_running_scope partial index is the backstop for
-    // the check-then-insert race: under READ COMMITTED both racers can
-    // pass NOT EXISTS, and the loser hits a unique violation instead.
-    let rows: Array<{ id: number }>;
-    try {
-      rows = await queryRows<{ id: number }>(
-        `insert into sync_state (scope, status, started_at, finished_at)
+    // The partial unique index is the backstop for the check-then-insert
+    // race. ON CONFLICT turns a routine loser into an empty result without
+    // emitting a PostgreSQL ERROR log.
+    const rows = await queryRows<{ id: number }>(
+      `insert into sync_state (scope, status, started_at, finished_at)
        select $1, 'running', now(), now()
        where not exists (
          select 1 from sync_state
          where scope = $1 and status = 'running'
            and finished_at >= now() - make_interval(mins => $2)
        )
+       on conflict (scope) where status = 'running' do nothing
        returning id`,
-        [scope, SYNC_FRESH_MINUTES],
-      );
-    } catch (err) {
-      if (isUniqueViolation(err)) {
-        throw new ScopeBusyError(`[sync] scope ${scope} already running`);
-      }
-      throw err;
-    }
+      [scope, SYNC_FRESH_MINUTES],
+    );
     const started = rows[0];
     if (!started) {
       throw new ScopeBusyError(`[sync] scope ${scope} already running`);
