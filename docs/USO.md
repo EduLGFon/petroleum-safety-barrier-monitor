@@ -97,8 +97,11 @@ Apresenta os dados da barreira, incluindo:
 - Grupo e proprietário.
 - Disponibilidade e conformidade.
 - Data da última alteração de status.
-- Comentários e plano de ação.
+- Degradação, comentários distintos e plano de ação.
 - Campos de texto livre provenientes da ficha de inventário.
+
+O campo **Plano Preventivo Cumprido?** considera apenas tarefas preventivas
+em aberto vencidas. Uma ordem corretiva em aberto não altera esse campo.
 
 ### 6.2. Histórico
 

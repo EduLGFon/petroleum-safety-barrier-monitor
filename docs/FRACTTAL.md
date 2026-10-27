@@ -441,16 +441,22 @@ the same `deriveSheetFields`/`ownerIdOf`/`groupingIdOf` helpers in
 
 | Column                                             | Upstream source                                                                                    | Fallback                                                             |
 | -------------------------------------------------- | -------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------- |
-| origin                                             | HAZOP/APR/SGSO reference parsed from `notes`                                                       | `Gerenciamento das Barreiras de Segurança Operacional: SGSO-PG-0016` |
-| install_local                                      | immediate `parent_description` segment                                                             | `location_code`                                                      |
+| origin                                             | HAZOP/APR/SGI-LEC/SGSO reference parsed from `notes`                                               | `Gerenciamento das Barreiras de Segurança Operacional: SGSO-PG-0016` |
+| install_local                                      | nearest `parent_description` segment above the asset (asset leaf excluded)                         | `location_code`                                                      |
 | equip_typology                                     | `field_1`                                                                                          | `groups_description` / `description`                                 |
 | field_installed                                    | `active === false` or reserve/stock/scrap keyword in `parent_description`                          | `Sim`                                                                |
 | field_operational / op_status / maint_status       | derived availability id                                                                            | (derived)                                                            |
 | has_maint_plan                                     | `groups_tasks_description` / `id_group_task`, overridden by `N/A PLANO`/`PLANO TCOM` in `field_6`  | `Não`                                                                |
-| plan_followed                                      | plan presence plus overdue open preventive work                                                    | `Não`                                                                |
+| plan_followed                                      | plan presence plus overdue open preventive work only                                               | `Não`                                                                |
 | failure_free                                       | absence of open planned/urgent corrective work                                                     | (derived)                                                            |
 | has_contingency / contingency_desc / evidence_code | contingency detection (GM/CEC)                                                                     | `Não` / notes                                                        |
 | degradation_desc                                   | open corrective event `source`                                                                     | `""`                                                                 |
 | action_plan                                        | open corrective event `detail`/`source`                                                            | `""`                                                                 |
 | extra_comments                                     | `notes`, useful `field_6`, technical `field_2/3/4`, then a `field_1`-based identification fallback | (never empty)                                                        |
-| owner_id / grouping_id                             | asset family plus open work trade                                                                  | heuristic defaults                                                   |
+| owner_id / grouping_id                             | owner: asset family first, work trade fallback; grouping: asset family                             | `Manutenção` / grouping fallback                                     |
+
+`Plano Preventivo Cumprido?` is intentionally about preventive tasks; an open
+corrective order does not make it `Não`. The modal omits `Comentários` when it
+duplicates `Degradação`, while retaining the distinct comments value when one
+exists. `Dono` is stable by equipment family where that family is recognized;
+an open work trade only supplies ownership when the family is not classified.
