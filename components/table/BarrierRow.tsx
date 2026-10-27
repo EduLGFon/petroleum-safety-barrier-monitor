@@ -306,6 +306,23 @@ function Cell({ col, barrier: b, onSelect }: CellProps) {
           <Badge label={b.compliance} {...confColorFor(b.compliance)} />
         </td>
       );
+    case "contingency": {
+      const tag = b.contingency || b.contingencyTag;
+      return (
+        <td
+          onClick={() => onSelect(b)}
+          className="tnum trow-ellipsis"
+          style={{
+            ...tdC,
+            fontSize: "var(--d-body)",
+            fontFamily: tag ? "var(--font-mono)" : undefined,
+            color: tag ? "var(--text-primary)" : "var(--text-muted)",
+          }}
+        >
+          {tag || "-"}
+        </td>
+      );
+    }
     case "statusSince":
       return (
         <td

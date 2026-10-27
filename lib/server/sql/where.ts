@@ -17,6 +17,7 @@ export const SORTABLE: Record<string, string> = {
   owner: "b.owner_id",
   availability: "b.availability_id",
   compliance: "b.compliance_id",
+  contingency: "cont.contingency_tag",
   statusSince: "b.status_since",
 };
 

@@ -146,12 +146,22 @@ function cursorPredicate(
 ): string {
   const cast = sortKey === "statusSince"
     ? "date"
-    : sortKey === "tag" || sortKey === "location"
+    : sortKey === "tag" || sortKey === "location" || sortKey === "contingency"
     ? "text"
     : "int";
   if (sortKey === "id") return ""; // handled inline (id-only bind)
   const expr = SORTABLE[sortKey];
   const cmp = dir === "asc" ? ">" : "<";
+  if (sortKey === "contingency") {
+    return dir === "asc"
+      ? `((cont.contingency_tag > $${valIdx}::text) or ` +
+        `(cont.contingency_tag = $${valIdx}::text and b.id > $${idIdx}) or ` +
+        `(cont.contingency_tag is null and ($${valIdx}::text is not null or b.id > $${idIdx})))`
+      : `((cont.contingency_tag < $${valIdx}::text) or ` +
+        `(cont.contingency_tag = $${valIdx}::text and b.id > $${idIdx}) or ` +
+        `(cont.contingency_tag is null and $${valIdx}::text is null and b.id > $${idIdx}) or ` +
+        `($${valIdx}::text is null and cont.contingency_tag is not null))`;
+  }
   if (sortKey !== "owner") {
     return `(${expr} ${cmp} $${valIdx}::${cast} or ` +
       `(${expr} = $${valIdx}::${cast} and b.id > $${idIdx}))`;

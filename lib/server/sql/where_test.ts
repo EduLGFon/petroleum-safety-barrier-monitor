@@ -4,6 +4,10 @@ import { buildWhere, resolveOrderBy } from "./where.ts";
 
 Deno.test("resolveOrderBy whitelists columns, coerces direction", () => {
   assertStrictEquals(resolveOrderBy("tag", "desc"), "b.tag desc");
+  assertStrictEquals(
+    resolveOrderBy("contingency", "desc"),
+    "cont.contingency_tag desc",
+  );
   assertStrictEquals(resolveOrderBy("hacker", "desc"), "b.id desc");
   assertStrictEquals(resolveOrderBy("id", "sideways"), "b.id asc");
   assertStrictEquals(resolveOrderBy(undefined, undefined), "b.id asc");

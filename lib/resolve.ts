@@ -117,6 +117,8 @@ export function resolveBarrier(
     maintStatus: w.maintStatus,
     hasContingency: w.hasContingency,
     contingencyDesc: w.contingencyDesc,
+    contingency: w.contingency ?? w.contingencyTag ?? "",
+    contingencyTag: w.contingencyTag ?? w.contingency ?? "",
     evidenceCode: w.evidenceCode,
     degradationDesc: w.degradationDesc,
     extraComments: w.extraComments,

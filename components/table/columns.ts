@@ -20,6 +20,7 @@ export type ColumnKey =
   | "owner"
   | "availability"
   | "compliance"
+  | "contingency"
   | "statusSince";
 
 // FilterKind selects the control rendered in the header filter row under a
@@ -56,11 +57,12 @@ export const COLUMN_DEFS: ColumnDef[] = [
   { key: "owner", label: "Dono", filter: "none" },
   { key: "availability", label: "Disponibilidade", filter: "availability" },
   { key: "compliance", label: "Conformidade", filter: "compliance" },
+  { key: "contingency", label: "Contingência", filter: "none" },
   { key: "statusSince", label: "Desde", filter: "none" },
 ];
 
 // Default visible set: ID | TAG | typology | location | category |
-// availability | compliance. criticality, owner and statusSince toggle back
+// availability | compliance | contingency. criticality, owner and statusSince toggle back
 // on from the Columns menu.
 export const DEFAULT_VISIBLE_COLS: ColumnKey[] = [
   "id",
@@ -70,6 +72,7 @@ export const DEFAULT_VISIBLE_COLS: ColumnKey[] = [
   "category",
   "availability",
   "compliance",
+  "contingency",
 ];
 
 // MENU_ORDER: registry keys in canonical slots for the Columns menu list.

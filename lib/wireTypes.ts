@@ -55,6 +55,8 @@ export interface WireBarrier {
   maintStatus: string;
   hasContingency: string;
   contingencyDesc: string;
+  contingency?: string;
+  contingencyTag?: string;
   evidenceCode: string;
   degradationDesc: string;
   extraComments: string;

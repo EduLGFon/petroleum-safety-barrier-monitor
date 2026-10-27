@@ -66,6 +66,8 @@ export function genSheetFields(rng: Rng): {
   maintStatus: string;
   hasContingency: string;
   contingencyDesc: string;
+  contingency?: string;
+  contingencyTag?: string;
   evidenceCode: string;
   degradationDesc: string;
   extraComments: string;
@@ -88,6 +90,8 @@ export function genSheetFields(rng: Rng): {
     maintStatus,
     hasContingency: conting ? "Sim" : "Não",
     contingencyDesc: conting ? "Contingência operacional aplicada" : "",
+    contingency: conting ? `CONT-${rng.int(100, 999)}` : "",
+    contingencyTag: conting ? `CONT-${rng.int(100, 999)}` : "",
     evidenceCode: conting && rng.bool(0.5) ? "GM-3655.01-2024-T-005" : "",
     degradationDesc: degr
       ? "Leitura instável detectada em inspeção de campo"

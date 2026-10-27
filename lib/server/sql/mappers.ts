@@ -38,6 +38,7 @@ export interface BarrierRow {
   maint_status: string | null;
   has_contingency: string | null;
   contingency_desc: string | null;
+  contingency_tag: string | null;
   evidence_code: string | null;
   degradation_desc: string | null;
   extra_comments: string | null;
@@ -102,6 +103,8 @@ export function toWireBarrier(r: BarrierRow): WireBarrier {
     maintStatus: sheet(r.maint_status),
     hasContingency: sheet(r.has_contingency),
     contingencyDesc: sheet(r.contingency_desc),
+    contingency: sheet(r.contingency_tag),
+    contingencyTag: sheet(r.contingency_tag),
     evidenceCode: sheet(r.evidence_code),
     degradationDesc: sheet(r.degradation_desc),
     extraComments: sheet(r.extra_comments),
@@ -122,7 +125,7 @@ export const SELECT_COLUMNS = `
   b.equip_typology, b.field_installed, b.field_operational, b.op_status,
   b.has_maint_plan, b.plan_followed, b.failure_free, b.maint_status,
   b.has_contingency, b.contingency_desc, b.evidence_code, b.degradation_desc,
-  b.extra_comments
+  b.extra_comments, cont.contingency_tag
 `;
 
 export const HISTORY_JOIN = `
@@ -141,4 +144,10 @@ export const HISTORY_JOIN = `
     from barrier_status_history bsh
     where bsh.barrier_id = b.id
   ) h on true
+  left join lateral (
+    select string_agg(c.tag, ', ' order by c.tag) as contingency_tag
+    from barrier_contingencies bc
+    join barriers c on c.id = bc.contingency_barrier_id
+    where bc.barrier_id = b.id and c.deleted_at is null and c.is_active
+  ) cont on true
 `;

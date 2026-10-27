@@ -89,6 +89,8 @@ export interface Barrier {
   maintStatus: string;
   hasContingency: string;
   contingencyDesc: string;
+  contingency?: string;
+  contingencyTag?: string;
   evidenceCode: string;
   degradationDesc: string;
   extraComments: string;
@@ -252,6 +254,7 @@ export type SortableColumn = keyof Pick<
   | "owner"
   | "availability"
   | "compliance"
+  | "contingency"
   | "statusSince"
 >;
 

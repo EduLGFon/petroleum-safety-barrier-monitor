@@ -143,7 +143,14 @@ Deno.test("resolveBarrier passes sheet inventory columns through", () => {
   assertStrictEquals(b.failureFree, "Sim");
   assertStrictEquals(b.maintStatus, "Degradada");
   assertStrictEquals(b.hasContingency, "Não");
+  assertStrictEquals(b.contingency, "");
   assertStrictEquals(b.extraComments, "");
+});
+
+Deno.test("resolveBarrier passes contingency tag through", () => {
+  const b = resolveBarrier(wireBarrier({ contingencyTag: "TAG-CONT-99" }));
+  assertStrictEquals(b.contingency, "TAG-CONT-99");
+  assertStrictEquals(b.contingencyTag, "TAG-CONT-99");
 });
 
 Deno.test("resolveBarrier maps unknown numeric ids to explicit sentinels", () => {

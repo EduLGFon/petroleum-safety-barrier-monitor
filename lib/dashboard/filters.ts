@@ -138,6 +138,7 @@ const SORT_COLS: SortableColumn[] = [
   "owner",
   "availability",
   "compliance",
+  "contingency",
   "statusSince",
 ];
 

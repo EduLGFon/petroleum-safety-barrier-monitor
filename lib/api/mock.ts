@@ -125,6 +125,11 @@ function sortWire(
       case "compliance":
         return (wireComplianceId(a) -
           wireComplianceId(b)) * dir;
+      case "contingency":
+        return (a.contingency ?? a.contingencyTag ?? "").localeCompare(
+          b.contingency ?? b.contingencyTag ?? "",
+          "pt-BR",
+        ) * dir;
       case "statusSince":
         return a.statusSince.localeCompare(b.statusSince) * dir;
       default:
