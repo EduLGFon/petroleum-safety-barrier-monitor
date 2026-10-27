@@ -1,7 +1,13 @@
 // Unit tests for shared server validation normalizers.
-import { assert, assertStrictEquals, assertThrows } from "jsr:@std/assert@^1";
+import {
+  normalizeEmail,
+  normalizeName,
+  normalizeOptionalReference,
+  parsePositiveId,
+  readJsonBodyCapped,
+} from "./validation.ts";
 
-import { normalizeEmail, normalizeName } from "./validation.ts";
+import { assert, assertStrictEquals, assertThrows } from "jsr:@std/assert@^1";
 
 import { parseIdParam, readJsonBody } from "./validation.ts";
 
@@ -34,6 +40,19 @@ Deno.test("parseIdParam accepts positive safe integers only", () => {
   assertStrictEquals(parseIdParam(undefined), undefined);
 });
 
+Deno.test("contingency inputs validate ids and optional references", () => {
+  assertStrictEquals(parsePositiveId(42, "id"), 42);
+  assertThrows(() => parsePositiveId(0, "id"), Error, "positive integer");
+  assertThrows(() => parsePositiveId("42", "id"), Error, "positive integer");
+  assertStrictEquals(normalizeOptionalReference(undefined, "ref"), "");
+  assertStrictEquals(normalizeOptionalReference("  GM-12 ", "ref"), "GM-12");
+  assertThrows(
+    () => normalizeOptionalReference("x".repeat(2001), "ref"),
+    Error,
+    "too long",
+  );
+});
+
 Deno.test("readJsonBody parses objects, rejects the rest", async () => {
   const good = await readJsonBody(
     new Request("http://x", {
@@ -57,4 +76,24 @@ Deno.test("readJsonBody parses objects, rejects the rest", async () => {
     )).ok,
     false,
   );
+});
+
+Deno.test("readJsonBodyCapped rejects invalid and oversized request bodies", async () => {
+  const good = await readJsonBodyCapped(
+    new Request("http://x", {
+      method: "POST",
+      body: JSON.stringify({ ref: "GM-12" }),
+    }),
+    100,
+  );
+  assert(good.ok && good.body.ref === "GM-12");
+  const tooLarge = await readJsonBodyCapped(
+    new Request("http://x", {
+      method: "POST",
+      body: JSON.stringify({ ref: "x".repeat(100) }),
+    }),
+    20,
+  );
+  assertStrictEquals(tooLarge.ok, false);
+  if (!tooLarge.ok) assertStrictEquals(tooLarge.reason, "too-large");
 });

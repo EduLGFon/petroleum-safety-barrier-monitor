@@ -43,6 +43,72 @@ export function parseIdParam(raw: string | undefined): number | undefined {
   return Number.isSafeInteger(n) && n > 0 ? n : undefined;
 }
 
+export function parsePositiveId(raw: unknown, name: string): number {
+  if (typeof raw !== "number" || !Number.isSafeInteger(raw) || raw <= 0) {
+    throw new Error(`${name} must be a positive integer`);
+  }
+  return raw;
+}
+
+export function normalizeOptionalReference(
+  raw: unknown,
+  name: string,
+): string {
+  if (raw === undefined || raw === null) return "";
+  if (typeof raw !== "string") throw new Error(`${name} must be a string`);
+  const value = raw.trim();
+  if (value.length > 2000) throw new Error(`${name} is too long`);
+  return value;
+}
+
+export async function readJsonBodyCapped(
+  req: Request,
+  maxBytes: number,
+): Promise<
+  | { ok: true; body: Record<string, unknown> }
+  | { ok: false; reason: "invalid" | "too-large" }
+> {
+  const declaredBytes = Number(req.headers.get("content-length"));
+  if (Number.isFinite(declaredBytes) && declaredBytes > maxBytes) {
+    return { ok: false, reason: "too-large" };
+  }
+  const reader = req.body?.getReader();
+  if (!reader) return { ok: false, reason: "invalid" };
+  const chunks: Uint8Array[] = [];
+  let totalBytes = 0;
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      totalBytes += value.byteLength;
+      if (totalBytes > maxBytes) {
+        await reader.cancel();
+        return { ok: false, reason: "too-large" };
+      }
+      chunks.push(value);
+    }
+  } catch {
+    return { ok: false, reason: "invalid" };
+  }
+  const bytes = new Uint8Array(totalBytes);
+  let offset = 0;
+  for (const chunk of chunks) {
+    bytes.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  try {
+    const parsed: unknown = JSON.parse(
+      new TextDecoder("utf-8", { fatal: true }).decode(bytes),
+    );
+    if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+      return { ok: true, body: parsed as Record<string, unknown> };
+    }
+  } catch {
+    return { ok: false, reason: "invalid" };
+  }
+  return { ok: false, reason: "invalid" };
+}
+
 // readJsonBody: parses a JSON object body. Returns { ok: true, body } for an
 // object payload, { ok: false } for missing/non-JSON/non-object bodies, so
 // routes answer 400 "Invalid JSON body" uniformly. Export-shaped routes with

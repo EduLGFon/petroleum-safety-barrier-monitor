@@ -8,10 +8,23 @@
 //
 // To go live: set PUBLIC_API_MODE=http and PUBLIC_API_BASE_URL to
 // your backend root. No other file in the app needs to change.
+export type {
+  BarrierContingencies,
+  ContingencyCandidate,
+  ContingencyLink,
+  ContingencyReferenceInput,
+} from "./api/contingencies.ts";
+
 export type { BarriersApi, DomainQuery } from "./api/types.ts";
+
+export { createContingencyApi } from "./api/contingencies.ts";
+
 import { httpAdapterFactory } from "./api/http.ts";
+
 import type { BarriersApi } from "./api/types.ts";
+
 export { toWireQuery } from "./api/query.ts";
+
 import { mockAdapter } from "./api/mock.ts";
 
 // Reads env on the server via Deno. On the client (island) Deno is absent,
