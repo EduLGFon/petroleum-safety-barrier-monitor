@@ -41,8 +41,11 @@ export function resolveHistoryEntry(
   return {
     date: w.date,
     status: fromAvailabilityId(w.statusId),
-    author: labels?.authors?.[w.authorId] ?? fromAuthorId(w.authorId),
+    author: w.sourceAuthor?.trim() ||
+      labels?.authors?.[w.authorId] || fromAuthorId(w.authorId),
     note: w.note,
+    ...(w.participants !== undefined ? { participants: w.participants } : {}),
+    ...(w.syncRunId !== undefined ? { syncRunId: w.syncRunId } : {}),
   };
 }
 

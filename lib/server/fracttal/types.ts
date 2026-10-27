@@ -83,6 +83,12 @@ export interface FracttalWorkOrder {
   initial_date: string | null;
   date_maintenance: string | null;
   creation_date: string | null;
+  created_by: string | null;
+  requested_by: string | null;
+  personnel_description: string | null;
+  user_assigned: string | null;
+  resources_human_resources: string | null;
+  validated_by_description: string | null;
 }
 
 // FracttalWorkRequest: the slice of GET /work_requests output that status
@@ -98,6 +104,12 @@ export interface FracttalWorkRequest {
   description: string | null;
   observation: string | null;
   date_maintenance: string | null;
+  created_by: string | null;
+  requested_by: string | null;
+  personnel_description: string | null;
+  user_assigned: string | null;
+  resources_human_resources: string | null;
+  validated_by_description: string | null;
 }
 
 // FracttalWorkQuery mirrors the documented query params for the work

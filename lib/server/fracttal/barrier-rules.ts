@@ -334,6 +334,11 @@ export interface StatusEvent {
   source: string;
   detail?: string;
   trade?: string;
+  sourceType?: "Ordem de serviço" | "Solicitação de serviço";
+  classification?: string;
+  operationState?: string;
+  sourceAuthor?: string | null;
+  participants?: Array<{ name: string; role: string }>;
 }
 
 // mergeEvent keeps the earliest date and the first non-empty source, detail
@@ -349,7 +354,32 @@ export function mergeEvent(
     source: current.source ? current.source : incoming.source,
     detail: current.detail || incoming.detail,
     trade: current.trade || incoming.trade,
+    sourceType: current.sourceType ?? incoming.sourceType,
+    classification: current.classification || incoming.classification,
+    operationState: current.operationState || incoming.operationState,
+    sourceAuthor: current.sourceAuthor || incoming.sourceAuthor,
+    participants: mergeParticipants(
+      current.participants ?? [],
+      incoming.participants ?? [],
+    ),
   };
+}
+
+function mergeParticipants(
+  current: Array<{ name: string; role: string }>,
+  incoming: Array<{ name: string; role: string }>,
+): Array<{ name: string; role: string }> {
+  const seen = new Set(
+    current.map((person) => `${person.name.toLocaleLowerCase()}|${person.role}`),
+  );
+  const merged = [...current];
+  for (const person of incoming) {
+    const key = `${person.name.toLocaleLowerCase()}|${person.role}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    merged.push(person);
+  }
+  return merged;
 }
 
 // isoDate takes the first 10 chars of an ISO timestamp as YYYY-MM-DD.

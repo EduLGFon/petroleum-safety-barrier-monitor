@@ -10,6 +10,9 @@ export interface WireStatusHistoryEntry {
   statusId: number; // -> availability status via fromAvailabilityId
   authorId: number; // -> author name via fromAuthorId
   note: string;
+  sourceAuthor?: string | null;
+  participants?: Array<{ name: string; role: string }>;
+  syncRunId?: number | null;
 }
 
 export interface WireBarrier {

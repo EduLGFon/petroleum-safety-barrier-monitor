@@ -43,6 +43,13 @@ export interface StatusHistoryEntry {
   status: Availability;
   author: string;
   note: string;
+  participants?: Array<{ name: string; role: string }>;
+  syncRunId?: number | null;
+}
+
+export interface StatusParticipant {
+  name: string;
+  role: string;
 }
 
 export interface Barrier {

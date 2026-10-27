@@ -17,6 +17,9 @@
 // with lib/enums, not free-text labels.
 import {
   AVAILABILITY_AVAILABLE,
+  AVAILABILITY_CONTINGENCY_OUTAGE,
+  AVAILABILITY_DEGRADED_CONTINGENCY,
+  AVAILABILITY_OUT_OF_SERVICE,
   AVAILABILITY_UNAVAILABLE,
   categoryFor,
   criticalityLabelFor,
@@ -41,6 +44,8 @@ import {
 export { AVAILABILITY_AVAILABLE, AVAILABILITY_UNAVAILABLE };
 
 import type { FracttalAsset } from "./types.ts";
+
+import type { StatusParticipant } from "../../types.ts";
 
 // IMPORT_DEFAULTS: fields Fracttal does not carry, given stable documented
 // application defaults (review team decision, not silent guess). locDescId
@@ -77,6 +82,11 @@ export interface SyncBarrierInput
   groupingId: number;
   ownerId: number | null;
   availabilityId: number;
+  history: {
+    note: string;
+    sourceAuthor: string | null;
+    participants: StatusParticipant[];
+  };
   comments: string;
   sourceUpdatedAt: string | null;
   // Upstream enable flag (Fracttal `active`, default true). False marks a
@@ -103,6 +113,7 @@ export interface MapOptions {
     planned?: StatusEvent | null;
     preventive?: StatusEvent | null;
     stopAssets?: boolean;
+    stopEvent?: StatusEvent | null;
     hasContingency?: boolean;
     contingencySource?: string;
   } | null;
@@ -206,8 +217,27 @@ export function mapAsset(
     },
     today,
   );
+  const historyEvent = status.availabilityId === AVAILABILITY_UNAVAILABLE ||
+      status.availabilityId === AVAILABILITY_CONTINGENCY_OUTAGE
+    ? work?.urgent
+    : status.availabilityId === AVAILABILITY_DEGRADED ||
+        status.availabilityId === AVAILABILITY_DEGRADED_CONTINGENCY
+    ? work?.planned
+    : status.availabilityId === AVAILABILITY_OUT_OF_SERVICE
+    ? work?.stopEvent ?? null
+    : null;
+  const historyNote = historyExplanation({
+    statusId: status.availabilityId,
+    event: historyEvent ?? null,
+    outOfServiceDate,
+    assetAvailable: asset.available ?? null,
+    stopAssets: work?.stopAssets ?? false,
+    hasContingency: work?.hasContingency ?? false,
+    contingencySource: work?.contingencySource ?? "",
+  });
   const autoCont = work?.hasContingency === true &&
-    (status.availabilityId === 2 || status.availabilityId === 3);
+    (status.availabilityId === AVAILABILITY_CONTINGENCY_OUTAGE ||
+      status.availabilityId === AVAILABILITY_DEGRADED_CONTINGENCY);
   // Sheet derivation reads the same signals as availability. Only a promoted
   // corrective contingency drives hasContingency; preventive text stays inert
   // (D11) and the SQL update preserves any manual Sim.
@@ -244,6 +274,11 @@ export function mapAsset(
       groupingId: groupingIdOf(asset),
       ownerId: ownerIdOf(asset, work ?? undefined),
       availabilityId: status.availabilityId,
+      history: {
+        note: historyNote,
+        sourceAuthor: historyEvent?.sourceAuthor ?? null,
+        participants: historyEvent?.participants ?? [],
+      },
       comments: status.note,
       // sourceUpdatedAt is the best remote state signal: the winning work
       // event date, else the out-of-service date, else unknown (null).
@@ -261,6 +296,55 @@ export function mapAsset(
         : {}),
     },
   };
+}
+
+function historyExplanation(args: {
+  statusId: number;
+  event: StatusEvent | null;
+  outOfServiceDate: string | null;
+  assetAvailable: boolean | null;
+  stopAssets: boolean;
+  hasContingency: boolean;
+  contingencySource: string;
+}): string {
+  const parts: string[] = [];
+  if (args.event) {
+    const operation = args.event.sourceType ?? "Operação Fracttal";
+    parts.push(
+      `${operation} ${args.event.operationState?.toLowerCase() ?? "em aberto"}`,
+    );
+    if (args.event.classification) {
+      parts.push(`Classificação: ${args.event.classification}`);
+    }
+    if (args.event.source) parts.push(`Referência: ${args.event.source}`);
+    if (args.event.detail && args.event.detail !== args.event.source) {
+      parts.push(`Detalhe: ${args.event.detail}`);
+    }
+  } else if (args.statusId === AVAILABILITY_OUT_OF_SERVICE && args.stopAssets) {
+    parts.push("Ordem de serviço aberta indica equipamento parado");
+  } else if (
+    args.statusId === AVAILABILITY_OUT_OF_SERVICE && args.outOfServiceDate
+  ) {
+    parts.push(`Fracttal informa fora de operação desde ${args.outOfServiceDate}`);
+  } else if (args.statusId === AVAILABILITY_UNAVAILABLE) {
+    parts.push(
+      args.assetAvailable === false
+        ? "Fracttal indica o ativo como indisponível"
+        : "Foi identificada uma condição de indisponibilidade",
+    );
+  } else {
+    parts.push(
+      "Fracttal não retornou sinal de corretiva aberta ou de equipamento parado nos dados consultados neste ciclo",
+    );
+  }
+  if (args.hasContingency) {
+    parts.push(
+      args.contingencySource
+        ? `Sinal de contingência: ${args.contingencySource}`
+        : "Sinal de contingência identificado nos dados Fracttal",
+    );
+  }
+  return parts.join(". ");
 }
 
 // CatalogNeeds: the distinct free-text labels one sweep needs present in

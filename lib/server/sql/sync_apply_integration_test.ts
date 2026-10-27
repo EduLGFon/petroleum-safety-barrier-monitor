@@ -95,6 +95,7 @@ function toInput(row: BarrierRow, availabilityId: number): SyncBarrierInput {
     groupingId: row.grouping_id,
     ownerId: row.owner_id,
     availabilityId,
+    history: { note: "synthetic sync explanation", sourceAuthor: null, participants: [] },
     comments: row.comments,
     actionPlan: row.action_plan,
     origin: row.origin ?? "",

@@ -48,6 +48,9 @@ export interface HistoryEntry {
   statusId: number;
   authorId: number;
   note: string;
+  sourceAuthor?: string | null;
+  participants?: Array<{ name: string; role: string }>;
+  syncRunId?: number | null;
 }
 
 // Normalizes DB json (array or string) to HistoryEntry[]; [] on garbage.
@@ -129,8 +132,11 @@ export const HISTORY_JOIN = `
         'date',     to_char(bsh.date, 'YYYY-MM-DD'),
         'statusId', bsh.status_id,
         'authorId', bsh.author_id,
-        'note',     bsh.note
-      ) order by bsh.date asc
+        'note',     bsh.note,
+        'sourceAuthor', bsh.source_author,
+        'participants', bsh.participants,
+        'syncRunId', bsh.sync_run_id
+      ) order by bsh.date asc, bsh.created_at asc, bsh.id asc
     ) as history
     from barrier_status_history bsh
     where bsh.barrier_id = b.id

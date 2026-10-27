@@ -404,12 +404,15 @@ export const defaultSyncIo: SyncIo = {
               // Stamp the initial history row so the transition timeline is
               // not empty for a freshly imported barrier.
               await tx(
-                "select record_status_change($1, $2, $3, $4)",
+                "select record_status_change($1, $2, $3, $4, $5, $6, $7::jsonb)",
                 [
                   id,
                   input.availabilityId,
                   SYNC_AUTHOR_ID,
-                  "Importado do Fracttal",
+                  input.history.note,
+                  rid,
+                  input.history.sourceAuthor,
+                  JSON.stringify(input.history.participants),
                 ],
               );
               counts.inserts++;
@@ -494,12 +497,15 @@ export const defaultSyncIo: SyncIo = {
           const propagateStatus = entry.statusChanged && !adminOwnsStatus;
           if (propagateStatus) {
             await tx(
-              "select record_status_change($1, $2, $3, $4)",
+              "select record_status_change($1, $2, $3, $4, $5, $6, $7::jsonb)",
               [
                 entry.local.id,
                 input.availabilityId,
                 SYNC_AUTHOR_ID,
-                "Sincronização Fracttal",
+                input.history.note,
+                rid,
+                input.history.sourceAuthor,
+                JSON.stringify(input.history.participants),
               ],
             );
           }

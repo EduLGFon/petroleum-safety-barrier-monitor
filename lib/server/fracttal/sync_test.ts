@@ -36,6 +36,7 @@ function baseInput(over: Partial<SyncBarrierInput> = {}): SyncBarrierInput {
     groupingId: 0,
     ownerId: null,
     availabilityId: 0,
+    history: { note: "", sourceAuthor: null, participants: [] },
     comments: "",
     actionPlan: "",
     origin: "",

@@ -20,6 +20,8 @@ import {
 
 import type { FracttalWorkOrder, FracttalWorkRequest } from "./types.ts";
 
+import type { StatusParticipant } from "../../types.ts";
+
 // WorkSlot is one row's contribution: an event per slot plus the stop flag.
 // A row can carry a stop flag with no slot (open preventive WO on a stopped
 // asset still drives out-of-service, matching the import).
@@ -31,6 +33,7 @@ export interface WorkSlot {
   // carries its stop flag.
   preventive: StatusEvent | null;
   stopAssets: boolean;
+  stopEvent: StatusEvent | null;
   hasContingency: boolean;
 }
 
@@ -40,6 +43,7 @@ export interface WorkEvents {
   planned: StatusEvent | null;
   preventive: StatusEvent | null;
   stopAssets: boolean;
+  stopEvent?: StatusEvent | null;
   hasContingency?: boolean;
   contingencySource?: string;
 }
@@ -75,6 +79,12 @@ export function parseWorkOrder(raw: unknown): FracttalWorkOrder {
     initial_date: str("initial_date"),
     date_maintenance: str("date_maintenance"),
     creation_date: str("creation_date"),
+    created_by: str("created_by"),
+    requested_by: str("requested_by"),
+    personnel_description: str("personnel_description"),
+    user_assigned: str("user_assigned"),
+    resources_human_resources: str("resources_human_resources"),
+    validated_by_description: str("validated_by_description"),
   };
 }
 
@@ -98,6 +108,12 @@ export function parseWorkRequest(raw: unknown): FracttalWorkRequest {
     description: str("description"),
     observation: str("observation"),
     date_maintenance: str("date_maintenance"),
+    created_by: str("created_by"),
+    requested_by: str("requested_by"),
+    personnel_description: str("personnel_description"),
+    user_assigned: str("user_assigned"),
+    resources_human_resources: str("resources_human_resources"),
+    validated_by_description: str("validated_by_description"),
   };
 }
 
@@ -118,6 +134,12 @@ function workOrderEvent(wo: FracttalWorkOrder): StatusEvent {
       .slice(0, 800),
     trade: ((wo.tasks_log_types_2_description ?? "").trim() ||
       (wo.tasks_log_task_type_main ?? "").trim()).slice(0, 120),
+    sourceType: "Ordem de serviço",
+    classification: (wo.tasks_log_types_description ?? wo.types_description ??
+      "").trim(),
+    operationState: wo.done === false ? "Em aberto" : "Concluída",
+    sourceAuthor: preferredAuthor(wo.created_by, wo.requested_by),
+    participants: peopleFromFields(wo),
   };
 }
 
@@ -131,7 +153,52 @@ function workRequestEvent(wr: FracttalWorkRequest): StatusEvent {
     source: (folio ? `${folio}: ${desc}` : desc).slice(0, 800),
     detail: ((wr.observation ?? "").trim() || desc).slice(0, 800),
     trade: (wr.types_description ?? "").trim().slice(0, 120),
+    sourceType: "Solicitação de serviço",
+    classification: (wr.types_2_description ?? "").trim(),
+    operationState: "Em aberto",
+    sourceAuthor: preferredAuthor(wr.created_by, wr.requested_by),
+    participants: peopleFromFields(wr),
   };
+}
+
+function preferredAuthor(
+  creator: string | null,
+  requester: string | null,
+): string | null {
+  return creator?.trim() || requester?.trim() || null;
+}
+
+function peopleFromFields(
+  row: Pick<
+    FracttalWorkOrder,
+    | "created_by"
+    | "requested_by"
+    | "personnel_description"
+    | "user_assigned"
+    | "resources_human_resources"
+    | "validated_by_description"
+  >,
+): StatusParticipant[] {
+  const people: StatusParticipant[] = [];
+  const add = (value: string | null, role: string): void => {
+    for (const name of (value ?? "").split(";")) {
+      const clean = name.trim();
+      if (clean !== "") people.push({ name: clean, role });
+    }
+  };
+  add(row.created_by, "Criado por");
+  add(row.requested_by, "Solicitado por");
+  add(row.personnel_description, "Executor");
+  add(row.user_assigned, "Responsável");
+  add(row.resources_human_resources, "Recursos humanos");
+  add(row.validated_by_description, "Validado por");
+  const seen = new Set<string>();
+  return people.filter((person) => {
+    const key = `${person.name.toLowerCase()}|${person.role}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
 }
 
 // workOrderSlot sorts one order: closed rows (done !== false) carry no
@@ -158,6 +225,7 @@ export function workOrderSlot(wo: FracttalWorkOrder): WorkSlot | null {
     planned: slot === "planned" ? event : null,
     preventive,
     stopAssets: wo.stop_assets === true,
+    stopEvent: wo.stop_assets === true ? event : null,
     hasContingency: hasContingencySignal(wo.description, wo.wo_folio),
   };
 }
@@ -174,6 +242,7 @@ export function workRequestSlot(wr: FracttalWorkRequest): WorkSlot | null {
     planned: slot === "planned" ? event : null,
     preventive: null,
     stopAssets: false,
+    stopEvent: null,
     hasContingency: hasContingencySignal(wr.description, wr.wo_folio),
   };
 }
@@ -244,6 +313,7 @@ export function buildWorkEvents(
     planned: null,
     preventive: null,
     stopAssets: false,
+    stopEvent: null,
     hasContingency: false,
     contingencySource: "",
   });
@@ -267,6 +337,9 @@ export function buildWorkEvents(
         acc.preventive = mergeEvent(acc.preventive, slot.preventive);
       }
       acc.stopAssets = acc.stopAssets || slot.stopAssets;
+      if (slot.stopEvent) {
+        acc.stopEvent = mergeEvent(acc.stopEvent ?? null, slot.stopEvent);
+      }
       const cont = slot.hasContingency || contingencyFromRaw(patched.row);
       if (cont && (acc.contingencySource ?? "") === "") {
         const folio = (wo.wo_folio ?? "").trim();
