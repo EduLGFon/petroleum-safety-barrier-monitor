@@ -56,11 +56,11 @@ export interface BarriersApi {
 
 export interface DomainQuery {
   location?: string; // e.g. 'FAL' | 'ALL'
-  availability?: string; // display string or ''
-  compliance?: string;
-  category?: string;
-  typology?: string;
-  criticality?: string;
+  availability?: string | string[]; // display string or ''
+  compliance?: string | string[];
+  category?: string | string[];
+  typology?: string | string[];
+  criticality?: string | string[];
   plan?: string; // '' | 'Com plano' | 'Sem plano'
   // Rank gate passthrough (true = ESO/A only); undefined = every rank.
   criticalOnly?: boolean;

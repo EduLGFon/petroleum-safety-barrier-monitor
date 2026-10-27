@@ -91,7 +91,13 @@ export function toWireQuery(
       ? f.criticality
       : [f.criticality];
     const critIds = critVals
-      .map((s) => toCriticalityId(s as never))
+      .map((s) => {
+        const id = toCriticalityId(s as never);
+        if (id === undefined) {
+          console.warn(`[toWireQuery] unknown criticality: ${s}`);
+        }
+        return id;
+      })
       .filter((x) => x !== undefined) as number[];
     if (critIds.length) {
       q.criticalityId = critIds.length === 1 ? critIds[0] : critIds;
@@ -108,12 +114,6 @@ export function toWireQuery(
     q.rowScope = f.rowScope;
   } else if (f.rowScope !== undefined) {
     console.warn(`[toWireQuery] unknown rowScope: ${f.rowScope}`);
-  }
-  if (f.criticality) {
-    const id = toCriticalityId(f.criticality as never);
-    if (id === undefined) {
-      console.warn(`[toWireQuery] unknown criticality: ${f.criticality}`);
-    } else q.criticalityId = id;
   }
   if (f.query) q.query = f.query;
   const since = cleanDateParam(f.since);
