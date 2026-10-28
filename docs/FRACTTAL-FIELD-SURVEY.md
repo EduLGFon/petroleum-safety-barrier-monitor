@@ -30,16 +30,16 @@ Live row carries 50 fields. Captured by `FracttalAsset` (28 fields):
 
 Not captured (22 fields), grouped by likely value:
 
-| Field | Value to us | Recommendation |
-|---|---|---|
-| `custom_fields_values` (+ `custom_fields_groups_description`) | Per-asset custom attributes (labels/values). Could hold barrier-specific data (test dates, certifications, set-points) that today has nowhere to go. | **Inspect tenant values** before deciding; if they carry barrier evidence, add a JSONB column + sync. |
-| `startup_date`, `purchase_date` | Commissioning / age context for the barrier. | Nice-to-have for lifecycle/KPI; low priority. |
-| `hours_average_daily_use` | Running hours per day (e.g. `86400`). Useful for maintenance-interval reasoning. | Could feed plan-followed heuristics later. |
-| `costs_center_description`, `budgets_description` | Cost center / budget. | Reporting only; not needed for status. |
-| `units_code` | Unit code (vs `units_description`). | Cosmetic; skip unless exports need it. |
-| `id_company`, `visible_to_all`, `id_parent` (captured), `item_url` | Access/company/link metadata. | Skip (`item_url` could be a convenience link). |
-| `barcode`, `weight`, `lead_time`, `min_stock_warning`, `salvage_value`, `anual_depreciation`, `total_cost`, `total_replacement_cost` | Inventory/accounting. | Skip for a safety-barrier monitor. |
-| `latitude`, `longitud` | Geolocation. | Skip unless a map view is added. |
+| Field                                                                                                                                | Value to us                                                                                                                                          | Recommendation                                                                                        |
+| ------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------- |
+| `custom_fields_values` (+ `custom_fields_groups_description`)                                                                        | Per-asset custom attributes (labels/values). Could hold barrier-specific data (test dates, certifications, set-points) that today has nowhere to go. | **Inspect tenant values** before deciding; if they carry barrier evidence, add a JSONB column + sync. |
+| `startup_date`, `purchase_date`                                                                                                      | Commissioning / age context for the barrier.                                                                                                         | Nice-to-have for lifecycle/KPI; low priority.                                                         |
+| `hours_average_daily_use`                                                                                                            | Running hours per day (e.g. `86400`). Useful for maintenance-interval reasoning.                                                                     | Could feed plan-followed heuristics later.                                                            |
+| `costs_center_description`, `budgets_description`                                                                                    | Cost center / budget.                                                                                                                                | Reporting only; not needed for status.                                                                |
+| `units_code`                                                                                                                         | Unit code (vs `units_description`).                                                                                                                  | Cosmetic; skip unless exports need it.                                                                |
+| `id_company`, `visible_to_all`, `id_parent` (captured), `item_url`                                                                   | Access/company/link metadata.                                                                                                                        | Skip (`item_url` could be a convenience link).                                                        |
+| `barcode`, `weight`, `lead_time`, `min_stock_warning`, `salvage_value`, `anual_depreciation`, `total_cost`, `total_replacement_cost` | Inventory/accounting.                                                                                                                                | Skip for a safety-barrier monitor.                                                                    |
+| `latitude`, `longitud`                                                                                                               | Geolocation.                                                                                                                                         | Skip unless a map view is added.                                                                      |
 
 Already-dead/ignored upstream signals (documented in `docs/FRACTTAL-DATA.md`):
 `priorities_description` is null on ~18k/18k rows; criticality is derived from
@@ -62,23 +62,23 @@ Live row carries 87 fields. Captured by `FracttalWorkOrder` (19 fields):
 
 Not captured (68 fields). Important candidates:
 
-| Field | Value to us | Recommendation |
-|---|---|---|
-| `id_status_work_order` | Open (1) vs closed (4). Today we infer from `done !== false`, which is coarser. | Add to `FracttalWorkOrder`; use in `workOrderSlot` gate instead of `done`. |
-| `event_date`, `final_date`, `wo_final_date`, `cal_date_maintenance`, `first_date_task` | Richer dates for the status-event timeline; today only `initial_date`/`date_maintenance`/`creation_date` are used. | Add to `earliestDate` candidate set in `workOrderEvent`. |
-| `causes_description`, `severiry_description`, `damages_types_description`, `detection_method_description` | Failure analysis behind a degraded/unavailable barrier. | Append to `degradationDesc`/action text or store for reports. |
-| `priorities_description` | WO priority (VERY_HIGH/HIGH/...). | Could drive alert urgency; today ignored. |
-| `trigger_description` | Scheduled (`DATE$EVERY$...`) vs ad-hoc (`NO_SCHEDULE_TASK`). | Maintenance-compliance/KPI signal (planned vs reactive). |
-| `work_orders_status_custom_description`, `labels` | Contingency signal (GM/CEC). Already scanned via `contingencyFromRaw` on the **raw** row, so no derivation gap; only the typed struct lacks them. | Keep raw scan (already done); optionally type them for clarity. |
-| `stop_assets_sec`, `real_stop_assets_sec`, `time_disruption` | Downtime duration while stopped. | KPI/reporting (MTTR-ish); not status. |
-| `resources_inventory`, `resources_services`, `resources_hours` | Parts/services/hours consumed. | Reporting/cost; skip for status. |
-| `completed_percentage`, `duration`, `tasks_duration`, `real_duration` | Progress. | Reporting. |
-| `annotations`, `rating`, `review_date` | Audit/quality. | Nice-to-have. |
-| `code_create_by`, `code_responsible`, `id_item`, `id_request`, `id_personnel`, `id_personnel_log` | Traceability and WR↔WO linkage (`id_request` already links WR→WO). | `id_request`/`id_item` useful for joins; others audit. |
-| `parent_description`, `groups_*` | Asset context (already on barrier). | Skip (duplicate). |
-| `is_offline` | Data-quality flag. | Skip unless auditing. |
-| `personnel_path_image`, `signature`, `*_path_signature`, `details_signature`, `validator_path_signature` | Signatures/images. | Skip (binary-ish paths). |
-| `id_items_availability` | **Dead field** (always null). | Intentionally ignored. |
+| Field                                                                                                     | Value to us                                                                                                                                       | Recommendation                                                             |
+| --------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------- |
+| `id_status_work_order`                                                                                    | Open (1) vs closed (4). Today we infer from `done !== false`, which is coarser.                                                                   | Add to `FracttalWorkOrder`; use in `workOrderSlot` gate instead of `done`. |
+| `event_date`, `final_date`, `wo_final_date`, `cal_date_maintenance`, `first_date_task`                    | Richer dates for the status-event timeline; today only `initial_date`/`date_maintenance`/`creation_date` are used.                                | Add to `earliestDate` candidate set in `workOrderEvent`.                   |
+| `causes_description`, `severiry_description`, `damages_types_description`, `detection_method_description` | Failure analysis behind a degraded/unavailable barrier.                                                                                           | Append to `degradationDesc`/action text or store for reports.              |
+| `priorities_description`                                                                                  | WO priority (VERY_HIGH/HIGH/...).                                                                                                                 | Could drive alert urgency; today ignored.                                  |
+| `trigger_description`                                                                                     | Scheduled (`DATE$EVERY$...`) vs ad-hoc (`NO_SCHEDULE_TASK`).                                                                                      | Maintenance-compliance/KPI signal (planned vs reactive).                   |
+| `work_orders_status_custom_description`, `labels`                                                         | Contingency signal (GM/CEC). Already scanned via `contingencyFromRaw` on the **raw** row, so no derivation gap; only the typed struct lacks them. | Keep raw scan (already done); optionally type them for clarity.            |
+| `stop_assets_sec`, `real_stop_assets_sec`, `time_disruption`                                              | Downtime duration while stopped.                                                                                                                  | KPI/reporting (MTTR-ish); not status.                                      |
+| `resources_inventory`, `resources_services`, `resources_hours`                                            | Parts/services/hours consumed.                                                                                                                    | Reporting/cost; skip for status.                                           |
+| `completed_percentage`, `duration`, `tasks_duration`, `real_duration`                                     | Progress.                                                                                                                                         | Reporting.                                                                 |
+| `annotations`, `rating`, `review_date`                                                                    | Audit/quality.                                                                                                                                    | Nice-to-have.                                                              |
+| `code_create_by`, `code_responsible`, `id_item`, `id_request`, `id_personnel`, `id_personnel_log`         | Traceability and WR↔WO linkage (`id_request` already links WR→WO).                                                                                | `id_request`/`id_item` useful for joins; others audit.                     |
+| `parent_description`, `groups_*`                                                                          | Asset context (already on barrier).                                                                                                               | Skip (duplicate).                                                          |
+| `is_offline`                                                                                              | Data-quality flag.                                                                                                                                | Skip unless auditing.                                                      |
+| `personnel_path_image`, `signature`, `*_path_signature`, `details_signature`, `validator_path_signature`  | Signatures/images.                                                                                                                                | Skip (binary-ish paths).                                                   |
+| `id_items_availability`                                                                                   | **Dead field** (always null).                                                                                                                     | Intentionally ignored.                                                     |
 
 ## 3. Work request (`/work_requests`)
 
@@ -94,26 +94,26 @@ Live row carries 62 fields. Captured by `FracttalWorkRequest` (14 fields):
 
 Not captured (48 fields). Important candidates:
 
-| Field | Value to us | Recommendation |
-|---|---|---|
-| `is_urgent` | 29% of WRs are urgent. Today dropped; could prioritize alerts/queue. | Add to `FracttalWorkRequest` and surface in UI/alerts. |
-| `date`, `date_incident`, `date_solution`, `date_status` | Timeline; `date_incident` is when the failure started (better than `date_maintenance`). | Use `date_incident`/`date` as event date fallback. |
-| `id_work_order` | Direct WR→WO link (today only matched by code/text). | Use for correlation when present. |
-| `types_1_description` | Request category (e.g. "Patrimônio"). | Reporting/grouping. |
-| `priorities_description` | Request priority (null in dump, but live may populate). | Check live; probably skip if always null. |
-| `rating`, `rating_notes` | Quality feedback. | Reporting. |
-| `requests_x_status_notes`, `requests_x_status_description`, `requests_x_status_accounts_name`, `requests_x_status_third_parties_name` | Status-transition detail/owner. | Could enrich history participants. |
-| `requests_x_key_words_descriptions` | Tags. | Could feed contingency/keyword search. |
-| `accounts_name`, `accounts_email`, `code_creator`, `email_requested_by`, `requested_by` (captured) | Requester identity. | Already have `requested_by`; email/account add contactability. |
-| `costs_center_description` | Cost center. | Reporting. |
-| `items_description`, `parent_description`, `parent_path_node` | Asset context (duplicate of barrier). | Skip. |
-| `geolocation` | Location of request. | Skip unless map view. |
-| `visible_to_all`, `id_company`, `id_*` (cost center, group, account, user, personnel log, contact log) | Access/audit metadata. | Skip except `id_work_order`. |
-| `from_guest_portal`, `identifier`, `annotations`, `status_path_image`, `types_color` | UI/portal metadata. | Skip. |
+| Field                                                                                                                                 | Value to us                                                                             | Recommendation                                                 |
+| ------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------- | -------------------------------------------------------------- |
+| `is_urgent`                                                                                                                           | 29% of WRs are urgent. Today dropped; could prioritize alerts/queue.                    | Add to `FracttalWorkRequest` and surface in UI/alerts.         |
+| `date`, `date_incident`, `date_solution`, `date_status`                                                                               | Timeline; `date_incident` is when the failure started (better than `date_maintenance`). | Use `date_incident`/`date` as event date fallback.             |
+| `id_work_order`                                                                                                                       | Direct WR→WO link (today only matched by code/text).                                    | Use for correlation when present.                              |
+| `types_1_description`                                                                                                                 | Request category (e.g. "Patrimônio").                                                   | Reporting/grouping.                                            |
+| `priorities_description`                                                                                                              | Request priority (null in dump, but live may populate).                                 | Check live; probably skip if always null.                      |
+| `rating`, `rating_notes`                                                                                                              | Quality feedback.                                                                       | Reporting.                                                     |
+| `requests_x_status_notes`, `requests_x_status_description`, `requests_x_status_accounts_name`, `requests_x_status_third_parties_name` | Status-transition detail/owner.                                                         | Could enrich history participants.                             |
+| `requests_x_key_words_descriptions`                                                                                                   | Tags.                                                                                   | Could feed contingency/keyword search.                         |
+| `accounts_name`, `accounts_email`, `code_creator`, `email_requested_by`, `requested_by` (captured)                                    | Requester identity.                                                                     | Already have `requested_by`; email/account add contactability. |
+| `costs_center_description`                                                                                                            | Cost center.                                                                            | Reporting.                                                     |
+| `items_description`, `parent_description`, `parent_path_node`                                                                         | Asset context (duplicate of barrier).                                                   | Skip.                                                          |
+| `geolocation`                                                                                                                         | Location of request.                                                                    | Skip unless map view.                                          |
+| `visible_to_all`, `id_company`, `id_*` (cost center, group, account, user, personnel log, contact log)                                | Access/audit metadata.                                                                  | Skip except `id_work_order`.                                   |
+| `from_guest_portal`, `identifier`, `annotations`, `status_path_image`, `types_color`                                                  | UI/portal metadata.                                                                     | Skip.                                                          |
 
 ## 4. Cross-cutting observations
 
-1. **Contingency** is the one signal we deliberately read from the *raw* row
+1. **Contingency** is the one signal we deliberately read from the _raw_ row
    (labels + `work_orders_status_custom_description`) via `contingencyFromRaw`,
    because the typed structs drop those fields. That coverage is already
    correct; the gap is only typing, not data.
@@ -133,7 +133,15 @@ Not captured (48 fields). Important candidates:
    `field_1..field_6` but not `custom_fields_values`. A tenant probe of those
    values is the next step before deciding whether they warrant a column.
 
-## 5. Suggested priority order
+## 5. Custom-field probe result (2026-10-27)
+
+Scanned all equipment rows: `custom_fields_values` carries a single
+empty-label entry with empty values on every row, and `field_5` is just the
+criticality letter (A/B/C/D) already derived from the TAG suffix. **No
+barrier-relevant data is hidden in custom fields**, so no new column is
+warranted. `field_5` remains redundant with the derived criticality rank.
+
+## 6. Suggested priority order
 
 1. WO/WR additional dates → `status_since` accuracy (medium effort, high value).
 2. WO failure context → better `degradationDesc`/`actionPlan` (low effort).
