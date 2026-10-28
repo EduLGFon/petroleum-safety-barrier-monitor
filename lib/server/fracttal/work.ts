@@ -178,7 +178,10 @@ function workOrderEvent(wo: FracttalWorkOrder): StatusEvent {
   const failureContext = failureParts.join("; ").slice(0, 800);
   const note = ((wo.task_note ?? "").trim() || (wo.note ?? "").trim() || desc)
     .trim();
-  const detail = [note, failureContext].filter(Boolean).join("\n").slice(0, 800);
+  const detail = [note, failureContext].filter(Boolean).join("\n").slice(
+    0,
+    800,
+  );
   return {
     date: earliestDate(
       isoDate(wo.initial_date),

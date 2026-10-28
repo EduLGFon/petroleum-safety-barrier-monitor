@@ -17,9 +17,16 @@ import { routeClientKey, writeThrottle } from "../../../lib/server/throttle.ts";
 
 import { hashSessionToken } from "../../../lib/server/auth/session.ts";
 
-import { deleteSession } from "../../../lib/server/sql/sessions.ts";
+import {
+  deleteSession,
+  getSessionUser,
+} from "../../../lib/server/sql/sessions.ts";
 
 import { loadServerConfig } from "../../../lib/server/config.ts";
+
+import { loadAuthConfig } from "../../../lib/server/config.ts";
+
+import { buildEntraLogoutUrl } from "../../../lib/server/auth/entra/logout.ts";
 
 import { define } from "../../../utils.ts";
 
@@ -43,8 +50,20 @@ export const handler = define.handlers({
     }
     try {
       const raw = getSessionTokenFromRequest(ctx.req);
-      if (raw) await deleteSession(await hashSessionToken(raw));
-      return ok({ ok: true }, requestId, {
+      let ssoLogoutUrl: string | null = null;
+      if (raw) {
+        const tokenHash = await hashSessionToken(raw);
+        const user = await getSessionUser(tokenHash).catch(() => null);
+        if (user?.auth_method === "entra") {
+          try {
+            ssoLogoutUrl = buildEntraLogoutUrl(loadAuthConfig());
+          } catch {
+            ssoLogoutUrl = null;
+          }
+        }
+        await deleteSession(tokenHash);
+      }
+      return ok({ ok: true, ssoLogoutUrl }, requestId, {
         headers: { "set-cookie": buildExpiredCookie() },
       });
     } catch (err) {

@@ -89,15 +89,22 @@ export const handler = define.handlers({
       if (!row || !row.active) {
         return unauthorized("not authenticated", requestId);
       }
+      if (row.auth_source !== "local" || row.password_hash === null) {
+        return badRequest(
+          "password login is not enabled for this account",
+          requestId,
+        );
+      }
+      const passwordHash = row.password_hash;
       const matches = await verifyPassword(
         body.currentPassword,
-        row.password_hash,
+        passwordHash,
       );
       if (!matches) {
         return unauthorized("current password is incorrect", requestId);
       }
       const next = validateNewPassword(body.newPassword);
-      if (await verifyPassword(next, row.password_hash)) {
+      if (await verifyPassword(next, passwordHash)) {
         return badRequest("new password must differ", requestId);
       }
       // updateUser revokes every session, including this one, in the same
@@ -107,7 +114,7 @@ export const handler = define.handlers({
       const updated = await updateUser(
         row.id,
         { passwordHash: await hashPassword(next) },
-        { expectedPasswordHash: row.password_hash, requireActive: true },
+        { expectedPasswordHash: passwordHash, requireActive: true },
       );
       if (!updated) return unauthorized("not authenticated", requestId);
       return ok({ ok: true }, requestId, {

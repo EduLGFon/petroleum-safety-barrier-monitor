@@ -42,8 +42,10 @@ export async function validateEntraClaims(
 
   if (claims.ver !== "2.0") throw new Error("invalid_claims");
 
-  if (typeof claims.nonce !== "string" ||
-    !constantTimeEqual(claims.nonce, expectedNonce)) {
+  if (
+    typeof claims.nonce !== "string" ||
+    !constantTimeEqual(claims.nonce, expectedNonce)
+  ) {
     throw new Error("invalid_claims");
   }
 
@@ -53,8 +55,10 @@ export async function validateEntraClaims(
 
   let sidHash: string | null = null;
   if (claims.sid !== undefined) {
-    if (typeof claims.sid !== "string" || claims.sid === "" ||
-      claims.sid.length > 256) {
+    if (
+      typeof claims.sid !== "string" || claims.sid === "" ||
+      claims.sid.length > 256
+    ) {
       throw new Error("invalid_claims");
     }
     const data = new TextEncoder().encode(

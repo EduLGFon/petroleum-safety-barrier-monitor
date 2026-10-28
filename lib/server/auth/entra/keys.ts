@@ -34,7 +34,10 @@ export function pemToDer(pem: string, label: string): Uint8Array {
 export function base64Url(bytes: Uint8Array): string {
   let binary = "";
   for (const byte of bytes) binary += String.fromCharCode(byte);
-  return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
+  return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(
+    /=+$/g,
+    "",
+  );
 }
 
 export async function loadPrivateKey(config: EntraConfig): Promise<CryptoKey> {
@@ -56,7 +59,11 @@ export async function loadPrivateKey(config: EntraConfig): Promise<CryptoKey> {
         ["sign"],
       );
     } catch (err) {
-      throw new Error(`could not import the Entra private key: ${err instanceof Error ? err.name : "error"}`);
+      throw new Error(
+        `could not import the Entra private key: ${
+          err instanceof Error ? err.name : "error"
+        }`,
+      );
     }
   })();
   keyCache.set(path, promise);
@@ -68,7 +75,9 @@ export async function loadPrivateKey(config: EntraConfig): Promise<CryptoKey> {
   }
 }
 
-export async function loadCertificateThumbprint(config: EntraConfig): Promise<string> {
+export async function loadCertificateThumbprint(
+  config: EntraConfig,
+): Promise<string> {
   if (config.credential.type !== "key") {
     throw new Error("certificate is not configured");
   }
@@ -78,7 +87,10 @@ export async function loadCertificateThumbprint(config: EntraConfig): Promise<st
   const promise = (async () => {
     const pem = await Deno.readTextFile(path);
     const der = pemToDer(pem, "CERTIFICATE");
-    const digest = await crypto.subtle.digest("SHA-256", der as unknown as BufferSource);
+    const digest = await crypto.subtle.digest(
+      "SHA-256",
+      der as unknown as BufferSource,
+    );
     return base64Url(new Uint8Array(digest));
   })();
   thumbprintCache.set(path, promise);

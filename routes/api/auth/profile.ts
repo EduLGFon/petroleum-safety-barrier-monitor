@@ -79,8 +79,15 @@ export const handler = define.handlers({
       if (!row || !row.active) {
         return unauthorized("not authenticated", requestId);
       }
+      const currentPasswordHash = row.password_hash;
       let passwordHash: string | undefined;
       if (body.newPassword !== undefined && body.newPassword !== "") {
+        if (row.auth_source !== "local" || currentPasswordHash === null) {
+          return badRequest(
+            "password login is not enabled for this account",
+            requestId,
+          );
+        }
         if (
           typeof body.currentPassword !== "string" ||
           body.currentPassword === ""
@@ -92,13 +99,13 @@ export const handler = define.handlers({
         }
         const matches = await verifyPassword(
           body.currentPassword,
-          row.password_hash,
+          currentPasswordHash,
         );
         if (!matches) {
           return unauthorized("current password is incorrect", requestId);
         }
         const next = validateNewPassword(body.newPassword);
-        if (await verifyPassword(next, row.password_hash)) {
+        if (await verifyPassword(next, currentPasswordHash)) {
           return badRequest("new password must differ", requestId);
         }
         passwordHash = await hashPassword(next);
@@ -112,7 +119,10 @@ export const handler = define.handlers({
           passwordHash,
         },
         passwordHash
-          ? { expectedPasswordHash: row.password_hash, requireActive: true }
+          ? {
+            expectedPasswordHash: currentPasswordHash as string,
+            requireActive: true,
+          }
           : {},
       );
       if (!updated) return unauthorized("not authenticated", requestId);

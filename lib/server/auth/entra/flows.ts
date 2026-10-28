@@ -1,7 +1,12 @@
 // Entra flow helpers - state, PKCE, nonce, and browser binding.
 // This is why it exists: the callback must prove that the same browser that
 // started the flow is completing it, and that the flow is one-time.
-import { createAuthFlow, consumeAuthFlow, deleteExpiredAuthFlows, countAuthFlows } from "../../sql/auth-flows.ts";
+import {
+  consumeAuthFlow,
+  countAuthFlows,
+  createAuthFlow,
+  deleteExpiredAuthFlows,
+} from "../../sql/auth-flows.ts";
 
 import { constantTimeEqual } from "../constant-time.ts";
 
@@ -18,7 +23,10 @@ function randomBytes(length: number): Uint8Array {
 function base64Url(bytes: Uint8Array): string {
   let binary = "";
   for (const byte of bytes) binary += String.fromCharCode(byte);
-  return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
+  return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(
+    /=+$/g,
+    "",
+  );
 }
 
 export function generateState(): string {

@@ -81,7 +81,13 @@ export const handler = define.handlers({
         return badRequest("email and password are required", requestId);
       }
       const user = await getUserByEmail(email);
-      const activeUser = user !== null && user.active ? user : null;
+      // SSO users have no local password. Treat them like unknown accounts so
+      // timing and enumeration behavior stay unchanged.
+      const activeUser =
+        user !== null && user.active && user.auth_source === "local" &&
+          typeof user.password_hash === "string"
+          ? user
+          : null;
       // Unknown and inactive accounts verify against the dummy digest so the
       // KDF costs the same as a real wrong-password attempt.
       const credentialsOk = await verifyPassword(

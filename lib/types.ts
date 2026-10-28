@@ -297,4 +297,5 @@ export interface AuthUser {
   phone: string;
   role: "admin" | "user";
   allowedLocationIds: number[] | null;
+  authSource: "local" | "entra";
 }

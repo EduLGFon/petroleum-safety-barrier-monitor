@@ -37,6 +37,7 @@ export async function requirePageSession(req: Request): Promise<PageSession> {
         phone: user.phone ?? "",
         role: user.role,
         allowedLocationIds: user.allowedLocationIds,
+        authSource: user.auth_source,
       },
     };
   } catch {
@@ -54,6 +55,57 @@ export function safeNext(raw: string | null, fallback = "/"): string {
     return fallback;
   }
   return raw;
+}
+
+// safeAuthNext: stricter return-target validation for SSO flows. It rejects
+// auth, API, and login paths in addition to the usual open-redirect checks.
+export function safeAuthNext(
+  raw: string | null,
+  appBaseUrl?: string,
+  fallback = "/",
+): string {
+  if (!raw) return fallback;
+  const value = raw.trim();
+  if (value === "" || !value.startsWith("/") || value.startsWith("//")) {
+    return fallback;
+  }
+  if (value.length > 2048) return fallback;
+  let hasControl = false;
+  for (let i = 0; i < value.length; i++) {
+    const code = value.charCodeAt(i);
+    if (code < 0x20 || code === 0x7f) {
+      hasControl = true;
+      break;
+    }
+  }
+  if (value.includes("\\") || hasControl) {
+    return fallback;
+  }
+  if (/^[a-zA-Z][a-zA-Z0-9+.-]*:/.test(value)) return fallback;
+  let decoded: string;
+  try {
+    decoded = decodeURIComponent(value);
+  } catch {
+    return fallback;
+  }
+  if (decoded.startsWith("//") || decoded.includes("\\")) return fallback;
+  const pathOnly = value.split("?")[0].split("#")[0];
+  if (
+    pathOnly === "/login" || pathOnly.startsWith("/login/") ||
+    pathOnly.startsWith("/auth/") || pathOnly.startsWith("/api/")
+  ) {
+    return fallback;
+  }
+  if (appBaseUrl) {
+    try {
+      const base = new URL(appBaseUrl);
+      const target = new URL(value, appBaseUrl);
+      if (target.origin !== base.origin) return fallback;
+    } catch {
+      return fallback;
+    }
+  }
+  return value;
 }
 
 // camouflage: generic 404 with no product hints for anonymous visitors.

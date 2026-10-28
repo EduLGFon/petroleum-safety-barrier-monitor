@@ -39,7 +39,9 @@ export function normalizePhone(raw: unknown): string {
 // normalizeEntraObjectId: validates and normalizes a Microsoft Entra object id.
 // Object ids are GUIDs; store them lowercase to keep uniqueness predictable.
 export function normalizeEntraObjectId(raw: unknown): string {
-  if (typeof raw !== "string") throw new Error("entraObjectId must be a string");
+  if (typeof raw !== "string") {
+    throw new Error("entraObjectId must be a string");
+  }
   const value = raw.trim().toLowerCase();
   if (
     !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(

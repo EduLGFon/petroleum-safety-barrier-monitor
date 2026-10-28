@@ -5,20 +5,22 @@ import {
   authorizationCodeGrant,
   buildAuthorizationUrl,
   ClientSecretPost,
+  type Configuration,
   customFetch,
   discovery,
+  type IDToken,
   modifyAssertion,
   PrivateKeyJwt,
-  type Configuration,
-  type IDToken,
 } from "openid-client";
 
-import { type EntraConfig, type AuthConfig } from "../../config.ts";
+import { type AuthConfig } from "../../config.ts";
 
-import { loadPrivateKey, loadCertificateThumbprint } from "./keys.ts";
+import { loadCertificateThumbprint, loadPrivateKey } from "./keys.ts";
 
-
-const discoveryCache = new Map<string, { value: Configuration; expiresAt: number }>();
+const discoveryCache = new Map<
+  string,
+  { value: Configuration; expiresAt: number }
+>();
 
 function safeFetch(
   input: Parameters<typeof fetch>[0],
@@ -31,14 +33,18 @@ function tokenEndpoint(tenantId: string): string {
   return `https://login.microsoftonline.com/${tenantId}/oauth2/v2.0/token`;
 }
 
-export async function getOidcConfiguration(config: AuthConfig): Promise<Configuration> {
+export async function getOidcConfiguration(
+  config: AuthConfig,
+): Promise<Configuration> {
   const entra = config.entra;
   if (!config.ssoEnabled || !entra) throw new Error("disabled");
   const cacheKey = `${entra.tenantId}:${entra.clientId}`;
   const cached = discoveryCache.get(cacheKey);
   if (cached && cached.expiresAt > Date.now()) return cached.value;
 
-  const issuer = new URL(`https://login.microsoftonline.com/${entra.tenantId}/v2.0`);
+  const issuer = new URL(
+    `https://login.microsoftonline.com/${entra.tenantId}/v2.0`,
+  );
   let resolvedClientAuth;
   if (entra.credential.type === "key") {
     const key = await loadPrivateKey(entra);
@@ -112,7 +118,7 @@ export function buildAuthorizationRequestUrl(
 }
 
 export async function exchangeAuthorizationCode(
-  config: AuthConfig,
+  _config: AuthConfig,
   oidc: Configuration,
   currentUrl: URL,
   checks: {
@@ -121,7 +127,6 @@ export async function exchangeAuthorizationCode(
     pkceCodeVerifier: string;
   },
 ): Promise<IDToken> {
-  const entra = config.entra!;
   const response = await authorizationCodeGrant(oidc, currentUrl, {
     expectedState: checks.expectedState,
     expectedNonce: checks.expectedNonce,

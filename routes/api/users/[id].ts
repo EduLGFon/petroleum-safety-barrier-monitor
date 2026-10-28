@@ -31,9 +31,16 @@ import {
 
 import { routeClientKey, writeThrottle } from "../../../lib/server/throttle.ts";
 
-import { parseIdParam, readJsonBody } from "../../../lib/server/validation.ts";
+import {
+  normalizeEntraObjectId,
+  parseIdParam,
+  readJsonBody,
+} from "../../../lib/server/validation.ts";
 
-import { loadServerConfig } from "../../../lib/server/config.ts";
+import {
+  loadAuthConfig,
+  loadServerConfig,
+} from "../../../lib/server/config.ts";
 
 import { define } from "../../../utils.ts";
 
@@ -75,19 +82,56 @@ export const handler = define.handlers({
       role?: unknown;
       active?: unknown;
       password?: unknown;
+      authSource?: unknown;
+      entraObjectId?: unknown;
     };
     try {
       let passwordHash: string | undefined;
+      let entraTid: string | null | undefined;
+      let entraOid: string | null | undefined;
       if (body.password !== undefined) {
         const target = await getUserById(id);
         if (!target) return notFound("User not found", requestId);
+        if (target.auth_source !== "local" || target.password_hash === null) {
+          return badRequest(
+            "password is not allowed for this account",
+            requestId,
+          );
+        }
         const next = validateNewPassword(body.password);
         // Match the self-service route: a reset must actually change the
         // password, not re-hash the same one.
-        if (await verifyPassword(next, target.password_hash)) {
+        const currentPasswordHash = target.password_hash as string;
+        if (await verifyPassword(next, currentPasswordHash)) {
           return badRequest("new password must differ", requestId);
         }
         passwordHash = await hashPassword(next);
+      }
+      if (body.authSource !== undefined || body.entraObjectId !== undefined) {
+        const target = await getUserById(id);
+        if (!target) return notFound("User not found", requestId);
+        if (body.authSource === "entra" || body.entraObjectId !== undefined) {
+          let authConfig;
+          try {
+            authConfig = loadAuthConfig();
+          } catch (err) {
+            return internal(
+              "PATCH /api/users/:id",
+              err,
+              requestId,
+              "Failed to update user",
+            );
+          }
+          if (!authConfig.ssoEnabled || !authConfig.entra) {
+            return badRequest("SSO is not enabled", requestId);
+          }
+          if (body.authSource === "entra") {
+            entraTid = authConfig.entra.tenantId;
+          }
+          if (body.entraObjectId !== undefined) {
+            entraOid = normalizeEntraObjectId(body.entraObjectId);
+          }
+        }
       }
       // updateUser revokes sessions itself when the password or active state
       // changes, in one transaction with the row update.
@@ -98,6 +142,9 @@ export const handler = define.handlers({
         role: body.role,
         active: body.active,
         passwordHash,
+        authSource: body.authSource,
+        entraTid,
+        entraOid,
       });
       if (!updated) return notFound("User not found", requestId);
       return ok(updated, requestId);
@@ -126,7 +173,9 @@ export const handler = define.handlers({
         message.includes("phone") || message.includes("role") ||
         message.includes("active") || message.includes("password") ||
         message.includes("nothing to update") ||
-        message.includes("last active admin")
+        message.includes("last active") ||
+        message.includes("authSource") || message.includes("entra") ||
+        message.includes("SSO")
       ) {
         return badRequest(publicMessage, requestId);
       }

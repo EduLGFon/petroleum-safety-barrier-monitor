@@ -96,7 +96,11 @@ export function loadSyncConfig(
 const GUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-function parseBoolFlag(name: string, raw: string | undefined, fallback: boolean): boolean {
+function parseBoolFlag(
+  name: string,
+  raw: string | undefined,
+  fallback: boolean,
+): boolean {
   if (raw === undefined || raw.trim() === "") return fallback;
   const value = raw.trim().toLowerCase();
   if (value === "1" || value === "true") return true;
@@ -104,7 +108,13 @@ function parseBoolFlag(name: string, raw: string | undefined, fallback: boolean)
   throw new Error(`${name} must be true or false`);
 }
 
-function clampNumber(name: string, raw: string | undefined, fallback: number, min: number, max: number): number {
+function clampNumber(
+  name: string,
+  raw: string | undefined,
+  fallback: number,
+  min: number,
+  max: number,
+): number {
   if (raw === undefined || raw.trim() === "") return fallback;
   const value = Number(raw.trim());
   if (!Number.isFinite(value) || !Number.isInteger(value)) {
@@ -133,16 +143,22 @@ function normalizePath(name: string, raw: string | undefined): string {
 
 function normalizeAppBaseUrl(raw: string | undefined): string {
   const value = (raw ?? "").trim();
-  if (value === "") throw new Error("APP_BASE_URL is required when SSO is enabled");
+  if (value === "") {
+    throw new Error("APP_BASE_URL is required when SSO is enabled");
+  }
   let url: URL;
   try {
     url = new URL(value);
   } catch {
     throw new Error("APP_BASE_URL must be a valid URL");
   }
-  if (url.username !== "" || url.password !== "" || url.search !== "" ||
-    url.hash !== "") {
-    throw new Error("APP_BASE_URL must not contain credentials, query, or hash");
+  if (
+    url.username !== "" || url.password !== "" || url.search !== "" ||
+    url.hash !== ""
+  ) {
+    throw new Error(
+      "APP_BASE_URL must not contain credentials, query, or hash",
+    );
   }
   if (url.pathname !== "/" && url.pathname !== "") {
     throw new Error("APP_BASE_URL must not contain a path");
@@ -150,8 +166,10 @@ function normalizeAppBaseUrl(raw: string | undefined): string {
   if (url.protocol !== "https:" && url.protocol !== "http:") {
     throw new Error("APP_BASE_URL must use http or https");
   }
-  if (url.protocol === "http:" && url.hostname !== "localhost" &&
-    url.hostname !== "127.0.0.1") {
+  if (
+    url.protocol === "http:" && url.hostname !== "localhost" &&
+    url.hostname !== "127.0.0.1"
+  ) {
     throw new Error("APP_BASE_URL must use https outside local development");
   }
   return `${url.protocol}//${url.host}`;
@@ -179,8 +197,14 @@ export function loadAuthConfig(get: EnvGetter = defaultEnv): AuthConfig {
   if (!ssoEnabled) {
     return { localEnabled, ssoEnabled: false, entra: null };
   }
-  const tenantId = normalizeGuid("AUTH_ENTRA_TENANT_ID", get("AUTH_ENTRA_TENANT_ID"));
-  const clientId = normalizeGuid("AUTH_ENTRA_CLIENT_ID", get("AUTH_ENTRA_CLIENT_ID"));
+  const tenantId = normalizeGuid(
+    "AUTH_ENTRA_TENANT_ID",
+    get("AUTH_ENTRA_TENANT_ID"),
+  );
+  const clientId = normalizeGuid(
+    "AUTH_ENTRA_CLIENT_ID",
+    get("AUTH_ENTRA_CLIENT_ID"),
+  );
   const secretRaw = get("AUTH_ENTRA_CLIENT_SECRET")?.trim();
   const keyPathRaw = get("AUTH_ENTRA_PRIVATE_KEY_PATH")?.trim();
   const certPathRaw = get("AUTH_ENTRA_CERTIFICATE_PATH")?.trim();
@@ -188,13 +212,19 @@ export function loadAuthConfig(get: EnvGetter = defaultEnv): AuthConfig {
   const hasKey = typeof keyPathRaw === "string" && keyPathRaw !== "";
   const hasCert = typeof certPathRaw === "string" && certPathRaw !== "";
   if (hasSecret && (hasKey || hasCert)) {
-    throw new Error("configure either AUTH_ENTRA_CLIENT_SECRET or the key and certificate, not both");
+    throw new Error(
+      "configure either AUTH_ENTRA_CLIENT_SECRET or the key and certificate, not both",
+    );
   }
   if (hasKey !== hasCert) {
-    throw new Error("AUTH_ENTRA_PRIVATE_KEY_PATH and AUTH_ENTRA_CERTIFICATE_PATH must both be set");
+    throw new Error(
+      "AUTH_ENTRA_PRIVATE_KEY_PATH and AUTH_ENTRA_CERTIFICATE_PATH must both be set",
+    );
   }
   if (!hasSecret && !hasKey) {
-    throw new Error("configure AUTH_ENTRA_CLIENT_SECRET or AUTH_ENTRA_PRIVATE_KEY_PATH plus AUTH_ENTRA_CERTIFICATE_PATH");
+    throw new Error(
+      "configure AUTH_ENTRA_CLIENT_SECRET or AUTH_ENTRA_PRIVATE_KEY_PATH plus AUTH_ENTRA_CERTIFICATE_PATH",
+    );
   }
   let credential: EntraCredential;
   if (hasSecret) {
@@ -206,7 +236,10 @@ export function loadAuthConfig(get: EnvGetter = defaultEnv): AuthConfig {
     credential = {
       type: "key",
       privateKeyPath: normalizePath("AUTH_ENTRA_PRIVATE_KEY_PATH", keyPathRaw),
-      certificatePath: normalizePath("AUTH_ENTRA_CERTIFICATE_PATH", certPathRaw),
+      certificatePath: normalizePath(
+        "AUTH_ENTRA_CERTIFICATE_PATH",
+        certPathRaw,
+      ),
     };
   }
   const appBaseUrl = normalizeAppBaseUrl(get("APP_BASE_URL"));

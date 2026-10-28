@@ -54,13 +54,45 @@ function safeNext(raw: string | null): string {
   return raw;
 }
 
+function ssoErrorMessage(code: string | null): string {
+  switch (code) {
+    case "denied":
+      return "Acesso cancelado ou negado pela Microsoft.";
+    case "expired":
+      return "A sessão de login expirou. Tente novamente.";
+    case "no_access":
+      return "Sua conta não tem acesso ao monitor. Procure um administrador.";
+    case "unavailable":
+      return "Não foi possível concluir o login. Tente novamente.";
+    case "disabled":
+      return "Login com Microsoft indisponível.";
+    case "logout":
+      return "Sessão encerrada.";
+    default:
+      return "";
+  }
+}
+
 // LoginForm: blurred preview behind, glass card over it; reloads on success.
-export function LoginForm({ companyName = "" }: { companyName?: string }) {
+export function LoginForm({
+  companyName = "",
+  localEnabled = true,
+  ssoEnabled = false,
+  ssoHref = "",
+  ssoError = null,
+}: {
+  companyName?: string;
+  localEnabled?: boolean;
+  ssoEnabled?: boolean;
+  ssoHref?: string;
+  ssoError?: string | null;
+}) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPw, setShowPw] = useState(false);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+  const ssoMessage = ssoErrorMessage(ssoError);
 
   async function onSubmit(e: Event) {
     e.preventDefault();
@@ -125,110 +157,137 @@ export function LoginForm({ companyName = "" }: { companyName?: string }) {
                 "linear-gradient(90deg,transparent,var(--glow),transparent)",
             }}
           />
-          <form onSubmit={onSubmit} style={{ display: "grid", gap: 14 }}>
-            <label style={labelStyle}>
-              E-mail corporativo
-              <input
-                className="login-input"
-                type="email"
-                required
-                value={email}
-                placeholder="voce@operadora.com"
-                onInput={(e) => setEmail(e.currentTarget.value)}
-                autoComplete="email"
-              />
-            </label>
-            <label style={labelStyle}>
-              <span>
-                Senha
-              </span>
-              <span style={{ position: "relative", display: "block" }}>
-                <input
-                  className="login-input"
-                  type={showPw ? "text" : "password"}
-                  required
-                  value={password}
-                  placeholder="••••••••••••"
-                  onInput={(e) => setPassword(e.currentTarget.value)}
-                  autoComplete="current-password"
-                  style={{ paddingRight: 64 }}
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPw((v) => !v)}
-                  aria-label={showPw ? "Ocultar senha" : "Mostrar senha"}
-                  style={{
-                    position: "absolute",
-                    right: 6,
-                    top: "50%",
-                    transform: "translateY(-50%)",
-                    border: 0,
-                    background: "transparent",
-                    color: "var(--au-sub)",
-                    fontSize: 12,
-                    fontWeight: 600,
-                    cursor: "pointer",
-                    padding: "6px 8px",
-                  }}
-                >
-                  {showPw ? "Ocultar" : "Mostrar"}
-                </button>
-              </span>
-            </label>
-            {error && (
-              <div
-                role="alert"
-                className="animate-fade-in"
-                style={{
-                  background: "var(--au-danger-bg)",
-                  border: "1px solid var(--alert-nc-border)",
-                  color: "var(--au-danger-fg)",
-                  borderRadius: 10,
-                  padding: "10px 12px",
-                  fontSize: 13,
-                  lineHeight: 1.5,
-                }}
-              >
-                {error}
-              </div>
-            )}
-            <button
-              type="submit"
-              disabled={busy}
-              className="lift"
+          {ssoMessage && (
+            <div
+              role="alert"
+              style={{ color: "var(--au-danger-fg)", marginBottom: 14 }}
+            >
+              {ssoMessage}
+            </div>
+          )}
+          {ssoEnabled && (
+            <a
+              href={ssoHref}
               style={{
-                height: 44,
-                border: 0,
-                borderRadius: 10,
-                background: AURORA.grad,
-                color: "#fff",
-                fontSize: 14,
-                fontWeight: 700,
-                letterSpacing: ".01em",
-                cursor: busy ? "wait" : "pointer",
-                opacity: busy ? 0.75 : 1,
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                gap: 10,
-                boxShadow: "0 8px 28px var(--glow)",
+                display: "block",
+                textAlign: "center",
+                marginBottom: 14,
               }}
             >
-              {busy && (
-                <span
-                  style={{
-                    width: 15,
-                    height: 15,
-                    borderRadius: "50%",
-                    border: "2px solid rgba(255,255,255,.4)",
-                    borderTopColor: "#fff",
-                    animation: "spin 0.7s linear infinite",
-                  }}
+              Entrar com Microsoft
+            </a>
+          )}
+          {ssoEnabled && localEnabled && (
+            <div style={{ textAlign: "center", marginBottom: 14 }}>ou</div>
+          )}
+          {localEnabled && (
+            <form onSubmit={onSubmit} style={{ display: "grid", gap: 14 }}>
+              <label style={labelStyle}>
+                E-mail corporativo
+                <input
+                  className="login-input"
+                  type="email"
+                  required
+                  value={email}
+                  placeholder="voce@operadora.com"
+                  onInput={(e) =>
+                    setEmail(e.currentTarget.value)}
+                  autoComplete="email"
                 />
+              </label>
+              <label style={labelStyle}>
+                <span>
+                  Senha
+                </span>
+                <span style={{ position: "relative", display: "block" }}>
+                  <input
+                    className="login-input"
+                    type={showPw ? "text" : "password"}
+                    required
+                    value={password}
+                    placeholder="••••••••••••"
+                    onInput={(e) =>
+                      setPassword(e.currentTarget.value)}
+                    autoComplete="current-password"
+                    style={{ paddingRight: 64 }}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPw((v) => !v)}
+                    aria-label={showPw ? "Ocultar senha" : "Mostrar senha"}
+                    style={{
+                      position: "absolute",
+                      right: 6,
+                      top: "50%",
+                      transform: "translateY(-50%)",
+                      border: 0,
+                      background: "transparent",
+                      color: "var(--au-sub)",
+                      fontSize: 12,
+                      fontWeight: 600,
+                      cursor: "pointer",
+                      padding: "6px 8px",
+                    }}
+                  >
+                    {showPw ? "Ocultar" : "Mostrar"}
+                  </button>
+                </span>
+              </label>
+              {error && (
+                <div
+                  role="alert"
+                  className="animate-fade-in"
+                  style={{
+                    background: "var(--au-danger-bg)",
+                    border: "1px solid var(--alert-nc-border)",
+                    color: "var(--au-danger-fg)",
+                    borderRadius: 10,
+                    padding: "10px 12px",
+                    fontSize: 13,
+                    lineHeight: 1.5,
+                  }}
+                >
+                  {error}
+                </div>
               )}
-              {busy ? "Aguarde…" : "Entrar"}
-            </button>
-          </form>
+              <button
+                type="submit"
+                disabled={busy}
+                className="lift"
+                style={{
+                  height: 44,
+                  border: 0,
+                  borderRadius: 10,
+                  background: AURORA.grad,
+                  color: "#fff",
+                  fontSize: 14,
+                  fontWeight: 700,
+                  letterSpacing: ".01em",
+                  cursor: busy ? "wait" : "pointer",
+                  opacity: busy ? 0.75 : 1,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: 10,
+                  boxShadow: "0 8px 28px var(--glow)",
+                }}
+              >
+                {busy && (
+                  <span
+                    style={{
+                      width: 15,
+                      height: 15,
+                      borderRadius: "50%",
+                      border: "2px solid rgba(255,255,255,.4)",
+                      borderTopColor: "#fff",
+                      animation: "spin 0.7s linear infinite",
+                    }}
+                  />
+                )}
+                {busy ? "Aguarde…" : "Entrar"}
+              </button>
+            </form>
+          )}
           <div style={{ marginTop: 18 }}>
             <TrustFooter />
           </div>

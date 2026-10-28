@@ -34,9 +34,12 @@ import {
   normalizeRole,
 } from "../../lib/server/sql/users.ts";
 
-import { loadServerConfig } from "../../lib/server/config.ts";
+import { loadAuthConfig, loadServerConfig } from "../../lib/server/config.ts";
 
-import { readJsonBody } from "../../lib/server/validation.ts";
+import {
+  normalizeEntraObjectId,
+  readJsonBody,
+} from "../../lib/server/validation.ts";
 
 import { define } from "../../utils.ts";
 
@@ -113,17 +116,47 @@ export const handler = define.handlers({
       phone?: unknown;
       password?: unknown;
       role?: unknown;
+      authSource?: unknown;
+      entraObjectId?: unknown;
     };
     try {
-      const password = validateNewPassword(body.password);
       const role = normalizeRole(body.role ?? "user");
-      const user = await createUser({
-        email: body.email as string,
-        name: (body.name as string | undefined) ?? "",
-        phone: body.phone,
-        passwordHash: await hashPassword(password),
-        role,
-      });
+      const authSource = body.authSource === "entra" ? "entra" : "local";
+      if (
+        body.authSource !== undefined && body.authSource !== "local" &&
+        body.authSource !== "entra"
+      ) {
+        throw new Error("authSource must be local or entra");
+      }
+      let user;
+      if (authSource === "entra") {
+        const authConfig = loadAuthConfig();
+        if (!authConfig.ssoEnabled || !authConfig.entra) {
+          throw new Error("SSO is not enabled");
+        }
+        if (body.password !== undefined) {
+          throw new Error("password is not allowed for Entra users");
+        }
+        user = await createUser({
+          email: body.email as string,
+          name: (body.name as string | undefined) ?? "",
+          phone: body.phone,
+          role,
+          authSource: "entra",
+          entraTid: authConfig.entra.tenantId,
+          entraOid: normalizeEntraObjectId(body.entraObjectId),
+        });
+      } else {
+        const password = validateNewPassword(body.password);
+        user = await createUser({
+          email: body.email as string,
+          name: (body.name as string | undefined) ?? "",
+          phone: body.phone,
+          passwordHash: await hashPassword(password),
+          role,
+          authSource: "local",
+        });
+      }
       return created(user, requestId);
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
