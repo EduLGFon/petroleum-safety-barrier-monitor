@@ -28,6 +28,8 @@ interface PublicUser {
   phone: string;
   role: "admin" | "user";
   active: boolean;
+  auth_source?: "local" | "entra";
+  entra_oid?: string | null;
 }
 
 // EditUserForm: admin edit of all user fields (name, email, password, phone).
@@ -232,6 +234,8 @@ export function UsersManager(
   const [password, setPassword] = useState("");
   const [phone, setPhone] = useState("");
   const [role, setRole] = useState<"admin" | "user">("user");
+  const [authSource, setAuthSource] = useState<"local" | "entra">("local");
+  const [entraObjectId, setEntraObjectId] = useState("");
   const [busy, setBusy] = useState(false);
   const [editFor, setEditFor] = useState<number | null>(null);
   const [notice, setNotice] = useState("");
@@ -250,6 +254,33 @@ export function UsersManager(
     }
   }
 
+  async function revokeSessions(id: number) {
+    if (!confirm("Revogar todas as sessões deste usuário?")) return;
+    try {
+      await adminApi(`/api/users/${id}/sessions`, { method: "DELETE" });
+      setNotice("Sessões revogadas.");
+      if (id === currentUserId) globalThis.location.href = "/login";
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    }
+  }
+
+  async function convertToEntra(user: PublicUser) {
+    const objectId = prompt("Object ID do Microsoft Entra para " + user.email);
+    if (!objectId) return;
+    try {
+      await adminApi(`/api/users/${user.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ authSource: "entra", entraObjectId: objectId }),
+      });
+      setNotice(user.email + " convertido para Entra.");
+      await refresh();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    }
+  }
+
   useEffect(() => {
     void refresh();
     // Refresh once per mount; the count reporter is stable for the session.
@@ -262,12 +293,21 @@ export function UsersManager(
       await adminApi("/api/users", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, name, phone, password, role }),
+        body: JSON.stringify({
+          email,
+          name,
+          phone,
+          role,
+          authSource,
+          ...(authSource === "local" ? { password } : { entraObjectId }),
+        }),
       });
       setEmail("");
       setName("");
       setPhone("");
       setPassword("");
+      setEntraObjectId("");
+      setAuthSource("local");
       await refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
@@ -330,17 +370,43 @@ export function UsersManager(
               style={inputSt}
             />
           </Field>
-          <Field label="Senha (12+)">
-            <input
-              type="password"
-              required
-              minLength={12}
-              placeholder="••••••••••••"
-              value={password}
-              onInput={(e) => setPassword(e.currentTarget.value)}
+          <Field label="Tipo de conta">
+            <select
+              value={authSource}
+              onChange={(e) =>
+                setAuthSource(e.currentTarget.value as "local" | "entra")}
               style={inputSt}
-            />
+            >
+              <option value="local">Senha local</option>
+              <option value="entra">Microsoft Entra</option>
+            </select>
           </Field>
+          {authSource === "local"
+            ? (
+              <Field label="Senha (12+)">
+                <input
+                  type="password"
+                  required
+                  minLength={12}
+                  placeholder="••••••••••••"
+                  value={password}
+                  onInput={(e) => setPassword(e.currentTarget.value)}
+                  style={inputSt}
+                />
+              </Field>
+            )
+            : (
+              <Field label="Object ID do Entra">
+                <input
+                  type="text"
+                  required
+                  placeholder="00000000-0000-0000-0000-000000000000"
+                  value={entraObjectId}
+                  onInput={(e) => setEntraObjectId(e.currentTarget.value)}
+                  style={inputSt}
+                />
+              </Field>
+            )}
           <Field label="Perfil">
             <select
               value={role}
@@ -433,6 +499,11 @@ export function UsersManager(
                   <StatusBadge tone={u.active ? "active" : "inactive"}>
                     {u.active ? "Ativo" : "Inativo"}
                   </StatusBadge>
+                  <StatusBadge
+                    tone={u.auth_source === "entra" ? "admin" : "neutral"}
+                  >
+                    {u.auth_source === "entra" ? "Entra" : "Local"}
+                  </StatusBadge>
                   <span
                     style={{
                       display: "flex",
@@ -458,6 +529,22 @@ export function UsersManager(
                       style={u.active ? dangerBtn : ghostBtn}
                     >
                       {u.active ? "Desativar" : "Ativar"}
+                    </button>
+                    {u.auth_source !== "entra" && (
+                      <button
+                        type="button"
+                        onClick={() => void convertToEntra(u)}
+                        style={ghostBtn}
+                      >
+                        Converter para Entra
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => void revokeSessions(u.id)}
+                      style={ghostBtn}
+                    >
+                      Revogar sessões
                     </button>
                     {currentUserId === u.id
                       ? (

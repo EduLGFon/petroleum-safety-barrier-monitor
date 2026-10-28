@@ -316,6 +316,17 @@ export function AccountSection(
             </a>
           </AdminCard>
         )
+        : sessionUser.authSource === "entra"
+        ? (
+          <AdminCard>
+            <div
+              style={{ color: "var(--text-muted)", fontSize: "var(--d-small)" }}
+            >
+              Sua conta usa Microsoft Entra ID. A senha é gerenciada pela sua
+              organização.
+            </div>
+          </AdminCard>
+        )
         : (
           <AdminCard>
             <div
