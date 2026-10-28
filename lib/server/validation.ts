@@ -36,6 +36,21 @@ export function normalizePhone(raw: unknown): string {
 // parseIdParam: numeric path ids are positive safe integers, nothing else.
 // Returns the id or undefined when the segment is not a valid id, so every
 // route answers 400 the same way instead of hand-rolling Number() checks.
+// normalizeEntraObjectId: validates and normalizes a Microsoft Entra object id.
+// Object ids are GUIDs; store them lowercase to keep uniqueness predictable.
+export function normalizeEntraObjectId(raw: unknown): string {
+  if (typeof raw !== "string") throw new Error("entraObjectId must be a string");
+  const value = raw.trim().toLowerCase();
+  if (
+    !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(
+      value,
+    )
+  ) {
+    throw new Error("entraObjectId must be a GUID");
+  }
+  return value;
+}
+
 export function parseIdParam(raw: string | undefined): number | undefined {
   if (raw === undefined || raw === "") return undefined;
   if (!/^\d+$/.test(raw.trim())) return undefined;

@@ -542,6 +542,32 @@ create table if not exists users (
 
 create index if not exists idx_users_role on users(role);
 
+alter table users add column if not exists auth_source text not null default 'local';
+alter table users add column if not exists entra_tid text;
+alter table users add column if not exists entra_oid text;
+alter table users alter column password_hash drop not null;
+
+alter table users drop constraint if exists users_auth_source_valid;
+alter table users add constraint users_auth_source_valid
+  check (auth_source in ('local', 'entra'));
+
+alter table users drop constraint if exists users_auth_source_shape;
+alter table users add constraint users_auth_source_shape check (
+  (auth_source = 'local'
+    and password_hash is not null
+    and entra_tid is null
+    and entra_oid is null)
+  or
+  (auth_source = 'entra'
+    and password_hash is null
+    and entra_tid is not null
+    and entra_oid is not null)
+);
+
+create unique index if not exists idx_users_entra_identity
+  on users (entra_tid, entra_oid)
+  where auth_source = 'entra';
+
 drop trigger if exists trg_users_updated_at on users;
 create trigger trg_users_updated_at
   before update on users
@@ -558,8 +584,39 @@ create table if not exists sessions (
   created_at  timestamptz not null default now()
 );
 
+alter table sessions add column if not exists auth_method text not null default 'password';
+alter table sessions add column if not exists idp_sid_hash text;
+
+alter table sessions drop constraint if exists sessions_auth_method_shape;
+alter table sessions add constraint sessions_auth_method_shape check (
+  auth_method in ('password', 'entra')
+  and (auth_method <> 'password' or idp_sid_hash is null)
+  and (idp_sid_hash is null or idp_sid_hash ~ '^[0-9a-f]{64}$')
+);
+
 create index if not exists idx_sessions_user on sessions(user_id);
 create index if not exists idx_sessions_expires on sessions(expires_at);
+create index if not exists idx_sessions_idp_sid
+  on sessions (idp_sid_hash)
+  where idp_sid_hash is not null;
+
+create table if not exists auth_flows (
+  state_hash    text        primary key,
+  browser_hash  text        not null,
+  nonce         text        not null,
+  code_verifier text        not null,
+  return_to     text        not null default '/',
+  created_at    timestamptz not null default now(),
+  expires_at    timestamptz not null,
+  check (state_hash ~ '^[0-9a-f]{64}$'),
+  check (browser_hash ~ '^[0-9a-f]{64}$'),
+  check (char_length(nonce) between 32 and 128),
+  check (char_length(code_verifier) between 43 and 128),
+  check (return_to like '/%' and return_to not like '//%'
+    and char_length(return_to) <= 2048)
+);
+
+create index if not exists idx_auth_flows_expires on auth_flows (expires_at);
 
 -- ─── Alert rules (which events trigger email, per category) ─────────────────
 -- One row defines a trigger: transitions landing on to_status_id (null means
