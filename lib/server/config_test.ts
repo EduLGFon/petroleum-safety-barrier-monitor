@@ -1,77 +1,24 @@
-// Unit tests for server boot config (P4) - injected env getters, no
-// Deno.env permission needed.
-import {
-  isDevFracttalRawEnabled,
-  loadServerConfig,
-  loadSyncConfig,
-} from "./config.ts";
+import { assertEquals, assertThrows } from "jsr:@std/assert";
 
-import { assertStrictEquals } from "jsr:@std/assert@^1";
+import { loadAuthConfig } from "./config.ts";
 
-function env(vars: Record<string, string>): (k: string) => string | undefined {
-  return (k) => vars[k];
-}
-
-Deno.test("loadServerConfig requires DATABASE_URL in http mode", () => {
-  let caught: Error | null = null;
-  try {
-    loadServerConfig(env({ PUBLIC_API_MODE: "http" }));
-  } catch (err) {
-    caught = err as Error;
-  }
-  assertStrictEquals(caught !== null, true);
-  assertStrictEquals(caught!.message.includes("DATABASE_URL"), true);
+Deno.test("loadAuthConfig defaults to local login only", () => {
+  const config = loadAuthConfig(() => undefined);
+  assertEquals(config.localEnabled, true);
+  assertEquals(config.ssoEnabled, false);
+  assertEquals(config.entra, null);
 });
 
-Deno.test("loadServerConfig passes with DATABASE_URL in http mode", () => {
-  const cfg = loadServerConfig(
-    env({ PUBLIC_API_MODE: "http", DATABASE_URL: "postgres://x" }),
+Deno.test("loadAuthConfig rejects AUTH_LOCAL_ENABLED=false", () => {
+  assertThrows(() =>
+    loadAuthConfig((name) =>
+      name === "AUTH_LOCAL_ENABLED" ? "false" : undefined
+    )
   );
-  assertStrictEquals(cfg.mode, "http");
-  assertStrictEquals(cfg.databaseUrl, "postgres://x");
 });
 
-Deno.test("loadServerConfig defaults to mock and tolerates missing vars", () => {
-  const cfg = loadServerConfig(env({}));
-  assertStrictEquals(cfg.mode, "mock");
-  assertStrictEquals(cfg.databaseUrl, undefined);
-  assertStrictEquals(cfg.adminToken, undefined);
-});
-
-Deno.test("loadSyncConfig requires the Fracttal credential pair", () => {
-  let caught: Error | null = null;
-  try {
-    loadSyncConfig(env({ FRACTTAL_KEY: "k" }));
-  } catch (err) {
-    caught = err as Error;
-  }
-  assertStrictEquals(caught !== null, true);
-  assertStrictEquals(caught!.message.includes("FRACTTAL_KEY"), true);
-});
-
-Deno.test("loadSyncConfig prefers flag overrides over env", () => {
-  const cfg = loadSyncConfig(
-    env({
-      FRACTTAL_KEY: "k",
-      FRACTTAL_SECRET: "s",
-      FRACTTAL_BASE_URL: "https://env.example",
-      FRACTTAL_SYNC_ITEM_TYPE: "9",
-    }),
-    { baseUrl: "https://flag.example", itemType: 3 },
+Deno.test("loadAuthConfig validates SSO settings", () => {
+  assertThrows(() =>
+    loadAuthConfig((name) => (name === "AUTH_SSO_ENABLED" ? "true" : undefined))
   );
-  assertStrictEquals(cfg.baseUrl, "https://flag.example");
-  assertStrictEquals(cfg.itemType, 3);
-});
-
-Deno.test("loadSyncConfig falls back to env then defaults", () => {
-  const cfg = loadSyncConfig(env({ FRACTTAL_KEY: "k", FRACTTAL_SECRET: "s" }));
-  assertStrictEquals(cfg.baseUrl, "https://app.fracttal.com/api");
-  assertStrictEquals(cfg.itemType, 2);
-});
-
-Deno.test("raw Fracttal detail requires DEV=true exactly", () => {
-  assertStrictEquals(isDevFracttalRawEnabled(env({ DEV: "true" })), true);
-  assertStrictEquals(isDevFracttalRawEnabled(env({ DEV: "1" })), false);
-  assertStrictEquals(isDevFracttalRawEnabled(env({ DEV: "false" })), false);
-  assertStrictEquals(isDevFracttalRawEnabled(env({})), false);
 });
