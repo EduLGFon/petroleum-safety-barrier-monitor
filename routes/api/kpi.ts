@@ -53,7 +53,12 @@ export const handler = define.handlers({
     }
     if (!dataAuth.ok) return denyDataAuth(dataAuth, requestId);
 
-    const filter = parseFilterQuery(ctx.url.searchParams);
+    const filter = {
+      ...parseFilterQuery(ctx.url.searchParams),
+      allowedLocationIds: dataAuth.role === "admin"
+        ? null
+        : (dataAuth.user?.allowedLocationIds ?? []),
+    };
     if (
       (filter.rowScope === "deleted" || filter.rowScope === "all") &&
       dataAuth.role !== "admin"

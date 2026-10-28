@@ -54,7 +54,10 @@ export const handler = define.handlers({
     if (!dataAuth.ok) return denyDataAuth(dataAuth, requestId);
 
     try {
-      return okWithEtag(ctx.req, await getVocabularies(), requestId);
+      const allowed = dataAuth.role === "admin"
+        ? null
+        : (dataAuth.user?.allowedLocationIds ?? []);
+      return okWithEtag(ctx.req, await getVocabularies(allowed), requestId);
     } catch (err) {
       return internal(
         "GET /api/vocabularies",

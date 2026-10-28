@@ -159,6 +159,9 @@ async function stream(
     page: 1,
     sortCol: sp.get("sortCol") ?? undefined,
     sortDir: sp.get("sortDir") === "desc" ? "desc" : "asc",
+    allowedLocationIds: dataAuth.role === "admin"
+      ? null
+      : (dataAuth.user?.allowedLocationIds ?? []),
   };
   if (
     (query.rowScope === "deleted" || query.rowScope === "all") &&

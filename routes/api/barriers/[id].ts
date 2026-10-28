@@ -112,6 +112,13 @@ export const handler = define.handlers({
         includeDeleted: dataAuth.role === "admin",
       });
       if (!barrier) return notFound("Barrier not found", requestId);
+      // SECURITY: station access scope.
+      if (dataAuth.role !== "admin") {
+        const allowed = dataAuth.user?.allowedLocationIds ?? [];
+        if (allowed !== null && !allowed.includes(barrier.locationId)) {
+          return notFound("Barrier not found", requestId);
+        }
+      }
       return okWithEtag(ctx.req, barrier, requestId);
     } catch (err) {
       return internal(

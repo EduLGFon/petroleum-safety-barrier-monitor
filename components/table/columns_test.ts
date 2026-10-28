@@ -6,11 +6,16 @@ import {
   resolveVisibleCols,
   sanitizeVisibleCols,
 } from "./columns.ts";
+
 import { assert, assertEquals, assertStrictEquals } from "jsr:@std/assert@^1";
+
 import { renderToString } from "preact-render-to-string";
-import { createElement as h } from "preact";
-import { BarrierRow } from "./BarrierRow.tsx";
+
 import type { Barrier } from "../../lib/types.ts";
+
+import { BarrierRow } from "./BarrierRow.tsx";
+
+import { createElement as h } from "preact";
 
 Deno.test("registry defaults match the requested base order", () => {
   assertEquals(DEFAULT_VISIBLE_COLS, [

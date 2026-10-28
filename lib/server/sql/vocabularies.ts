@@ -62,7 +62,28 @@ export async function getResolverLabels(): Promise<{
 // Distinct display labels plus per-station counts in one parallel batch.
 // Station names ride along for hover tooltips (null falls back to code);
 // codes stay the filter keys everywhere.
-export async function getVocabularies(): Promise<Vocabularies> {
+export async function getVocabularies(
+  allowedLocationIds?: number[] | null,
+): Promise<Vocabularies> {
+  const allowed = allowedLocationIds === undefined ? null : allowedLocationIds;
+  if (Array.isArray(allowed) && allowed.length === 0) {
+    return {
+      locations: [],
+      availabilities: [],
+      compliances: [],
+      criticalities: [],
+      categories: [],
+      typologies: [],
+      authors: [],
+    };
+  }
+  const locFilter = Array.isArray(allowed)
+    ? `where loc.id = any($1::int[])`
+    : "";
+  const barrierFilter = Array.isArray(allowed)
+    ? `and b.location_id = any($1::int[])`
+    : "";
+  const arg = Array.isArray(allowed) ? allowed : null;
   const [locRows, dispRows, confRows, critRows, catRows, typRows, authorRows] =
     await Promise.all([
       queryRows<{ id: number; code: string; name: string; count: string }>(
@@ -70,44 +91,51 @@ export async function getVocabularies(): Promise<Vocabularies> {
         coalesce(loc.name, loc.code) as name, count(b.id)::text as count
        from locations loc
        left join barriers b on b.location_id = loc.id and b.deleted_at is null
+       where ($1::int[] is null or loc.id = any($1::int[]))
        group by loc.id, loc.code, loc.name
        order by count(b.id) desc, loc.code`,
+        [arg],
       ),
       queryRows<{ label: string }>(
-        // Effective availability labels (display overlay): stored 4/5 with
-        // Há Contingência?=Sim read as 3/2, mirroring effectiveAvailabilityId
-        // and the KPI/filter, so the filter dropdown lists contingenciado
-        // options as soon as any overlay exists, not only after
-        // materialization.
         `select distinct disp.label as label from barriers b
         join availability_statuses disp on disp.id = (case when b.availability_id in (4, 5) and lower(trim(coalesce(b.has_contingency, ''))) = 'sim' then case when b.availability_id = 4 then 3 else 2 end else b.availability_id end)
         where b.deleted_at is null
+          and ($1::int[] is null or b.location_id = any($1::int[]))
         order by disp.label`,
+        [arg],
       ),
       queryRows<{ label: string }>(
         `select distinct case when (case when b.availability_id in (4, 5) and lower(trim(coalesce(b.has_contingency, ''))) = 'sim' then case when b.availability_id = 4 then 3 else 2 end else b.availability_id end) in (0, 1, 2, 3) then 'Conforme'
          else 'Não Conforme' end as label
         from barriers b
         where b.deleted_at is null
+          and ($1::int[] is null or b.location_id = any($1::int[]))
         order by label`,
+        [arg],
       ),
       queryRows<{ label: string }>(
         `select distinct crit.label as label from barriers b
        join criticality_levels crit on crit.id = b.criticality_id
        where b.deleted_at is null
+         and ($1::int[] is null or b.location_id = any($1::int[]))
        order by crit.label`,
+        [arg],
       ),
       queryRows<{ id: number; label: string }>(
         `select distinct cat.id as id, cat.label as label from barriers b
         join categories cat on cat.id = b.category_id
         where b.deleted_at is null
+          and ($1::int[] is null or b.location_id = any($1::int[]))
         order by cat.label`,
+        [arg],
       ),
       queryRows<{ id: number; label: string }>(
         `select distinct typ.id as id, typ.label as label from barriers b
         join typologies typ on typ.id = b.typology_id
         where b.deleted_at is null
+          and ($1::int[] is null or b.location_id = any($1::int[]))
         order by typ.label`,
+        [arg],
       ),
       queryRows<{ id: number; name: string }>(
         `select id, name from authors order by name`,

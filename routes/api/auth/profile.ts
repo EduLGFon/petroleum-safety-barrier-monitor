@@ -82,9 +82,13 @@ export const handler = define.handlers({
       let passwordHash: string | undefined;
       if (body.newPassword !== undefined && body.newPassword !== "") {
         if (
-          typeof body.currentPassword !== "string" || body.currentPassword === ""
+          typeof body.currentPassword !== "string" ||
+          body.currentPassword === ""
         ) {
-          return badRequest("current and new passwords are required", requestId);
+          return badRequest(
+            "current and new passwords are required",
+            requestId,
+          );
         }
         const matches = await verifyPassword(
           body.currentPassword,

@@ -296,4 +296,5 @@ export interface AuthUser {
   name: string;
   phone: string;
   role: "admin" | "user";
+  allowedLocationIds: number[] | null;
 }

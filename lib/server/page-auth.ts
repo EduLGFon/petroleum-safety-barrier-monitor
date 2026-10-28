@@ -35,6 +35,7 @@ export async function requirePageSession(req: Request): Promise<PageSession> {
         email: user.email,
         name: user.name,
         role: user.role,
+        allowedLocationIds: user.allowedLocationIds,
       },
     };
   } catch {

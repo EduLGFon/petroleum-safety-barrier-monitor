@@ -47,6 +47,16 @@ export function buildWhere(
   if (q.locationId !== undefined && q.locationId !== 0) {
     push("and b.location_id = ", q.locationId);
   }
+  // SECURITY: station access scope. Server-enforced allow-list; client
+  // filters can only narrow further, never widen.
+  if (q.allowedLocationIds !== undefined && q.allowedLocationIds !== null) {
+    if (q.allowedLocationIds.length === 0) {
+      conds.push("and false");
+    } else {
+      args.push(q.allowedLocationIds);
+      conds.push(`and b.location_id = any($${args.length})`);
+    }
+  }
   const availIds = Array.isArray(q.availabilityId)
     ? q.availabilityId
     : q.availabilityId !== undefined

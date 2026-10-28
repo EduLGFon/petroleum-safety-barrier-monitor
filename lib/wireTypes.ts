@@ -144,6 +144,9 @@ export interface BarriersQuery {
   includeDeleted?: boolean;
   // Admin Situacao filter scope (see RowScope). Absent means active.
   rowScope?: RowScope;
+  // Server-enforced station allow-list for the authenticated user. Internal
+  // only: never parsed from client input. null/undefined = unrestricted.
+  allowedLocationIds?: number[] | null;
 }
 
 export interface BarriersResponse {

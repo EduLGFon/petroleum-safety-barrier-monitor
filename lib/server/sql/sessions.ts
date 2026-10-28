@@ -1,6 +1,8 @@
 // Sessions SQL - opaque login sessions joining users.
 // This is why it exists: the auth routes create and revoke cookie sessions,
 // while lib/server/auth.ts resolves them per request. Only hashes are stored.
+import { allowedLocationsForUser } from "./access-groups.ts";
+
 import type { UserRole } from "./users.ts";
 
 import { queryRows } from "../db.ts";
@@ -12,6 +14,7 @@ export interface SessionUser {
   phone: string;
   role: UserRole;
   active: boolean;
+  allowedLocationIds: number[] | null;
 }
 
 // createSession: stores a hashed token with an expiry for a user.
@@ -31,13 +34,16 @@ export async function createSession(
 export async function getSessionUser(
   tokenHash: string,
 ): Promise<SessionUser | null> {
-  const rows = await queryRows<SessionUser>(
+  const rows = await queryRows<Omit<SessionUser, "allowedLocationIds">>(
     `select u.id, u.email, u.name, coalesce(u.phone, '') as phone, u.role, u.active
      from sessions s join users u on u.id = s.user_id
      where s.token_hash = $1 and s.expires_at > now() and u.active`,
     [tokenHash],
   );
-  return rows[0] ?? null;
+  const base = rows[0];
+  if (!base) return null;
+  const allowedLocationIds = await allowedLocationsForUser(base.id);
+  return { ...base, allowedLocationIds };
 }
 
 // deleteSession: revokes one token (logout); missing tokens still succeed.

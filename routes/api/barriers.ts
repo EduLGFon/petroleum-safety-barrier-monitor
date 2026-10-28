@@ -66,6 +66,9 @@ export const handler = define.handlers({
       pageSize: parseIntParam(sp.get("pageSize")),
       sortCol: sp.get("sortCol") ?? undefined,
       sortDir: sp.get("sortDir") === "desc" ? "desc" : "asc",
+      allowedLocationIds: dataAuth.role === "admin"
+        ? null
+        : (dataAuth.user?.allowedLocationIds ?? []),
     };
     // Deleted/audit scopes are admin-only; authenticated non-admins get a
     // 403 instead of the rows.

@@ -2,7 +2,11 @@
 // This is why it exists: authentication needs a validated store behind the
 // /api/auth and /api/users routes, while the routes own throttling and the
 // session-or-token guard. Password hashing lives in lib/server/auth/.
-import { normalizeEmail, normalizeName, normalizePhone } from "../validation.ts";
+import {
+  normalizeEmail,
+  normalizeName,
+  normalizePhone,
+} from "../validation.ts";
 
 import { queryRows, type TxQuery, withTx } from "../db.ts";
 
@@ -50,7 +54,8 @@ export function normalizeRole(raw: unknown): UserRole {
   throw new Error("role must be admin or user");
 }
 
-const PUBLIC_COLUMNS = "id, email, name, coalesce(phone, '') as phone, role, active, created_at::text";
+const PUBLIC_COLUMNS =
+  "id, email, name, coalesce(phone, '') as phone, role, active, created_at::text";
 
 export async function listUsers(): Promise<PublicUser[]> {
   const rows = await queryRows<PublicUser>(
