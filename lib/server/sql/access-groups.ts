@@ -225,4 +225,3 @@ export async function allowedLocationsForUser(
   );
   return rows.map((r) => r.location_id);
 }
-PY;

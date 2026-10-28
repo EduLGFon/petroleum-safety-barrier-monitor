@@ -77,12 +77,7 @@ export async function getVocabularies(
       authors: [],
     };
   }
-  const locFilter = Array.isArray(allowed)
-    ? `where loc.id = any($1::int[])`
-    : "";
-  const barrierFilter = Array.isArray(allowed)
-    ? `and b.location_id = any($1::int[])`
-    : "";
+
   const arg = Array.isArray(allowed) ? allowed : null;
   const [locRows, dispRows, confRows, critRows, catRows, typRows, authorRows] =
     await Promise.all([
