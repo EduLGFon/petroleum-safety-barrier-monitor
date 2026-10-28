@@ -50,7 +50,8 @@
     "@std/path": "jsr:@std/path@^1.1.6",
     "@db/postgres": "jsr:@db/postgres@^0.19.5",
     "xlsx": "npm:xlsx@0.18.5",
-    "linkedom": "npm:linkedom@^0.18.13"
+    "linkedom": "npm:linkedom@^0.18.13",
+    "openid-client": "npm:openid-client@6.8.8"
   },
   "lint": {
     "rules": {
