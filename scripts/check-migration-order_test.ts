@@ -2,7 +2,7 @@
 // This is why it exists: an index placed before its ALTER TABLE stanza
 // migrates clean databases but fails pre-existing ones; fixtures pin both
 // the violation shape and the real db/schema.sql staying green.
-import { checkSchemaOrder } from "./check-migration-order.ts";
+import { checkSchemaOrder, checkTableOrder } from "./check-migration-order.ts";
 
 import { assertEquals } from "jsr:@std/assert@^1";
 
@@ -66,9 +66,36 @@ Deno.test("checkSchemaOrder skips expression index items without alarming", () =
   assertEquals(violations, []);
 });
 
+Deno.test("checkTableOrder flags foreign keys to tables created later", () => {
+  const violations = checkTableOrder(`
+    create table if not exists children (
+      parent_id integer references parents(id)
+    );
+    create table if not exists parents (id integer primary key);
+  `);
+  assertEquals(violations, [{
+    line: 2,
+    relation: "parents",
+    operation: "REFERENCES",
+  }]);
+});
+
+Deno.test("checkTableOrder flags ALTER TABLE before its table declaration", () => {
+  const violations = checkTableOrder(`
+    alter table users add column if not exists phone text;
+    create table if not exists users (id integer primary key);
+  `);
+  assertEquals(violations, [{
+    line: 2,
+    relation: "users",
+    operation: "ALTER TABLE",
+  }]);
+});
+
 Deno.test("checkSchemaOrder keeps the real schema green", async () => {
   const text = await Deno.readTextFile(
     new URL("../db/schema.sql", import.meta.url),
   );
   assertEquals(checkSchemaOrder(text), []);
+  assertEquals(checkTableOrder(text), []);
 });

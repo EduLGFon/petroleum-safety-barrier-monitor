@@ -14,6 +14,12 @@ export interface OrderViolation {
   column: string;
 }
 
+export interface TableOrderViolation {
+  line: number;
+  relation: string;
+  operation: "ALTER TABLE" | "REFERENCES";
+}
+
 // Keywords that can open a line inside a CREATE TABLE body without naming
 // a column (table-level constraints). Anything else opening a line is a
 // column definition whose first identifier is the column name.
@@ -125,6 +131,36 @@ export function splitStatements(
   return out;
 }
 
+// checkTableOrder: every relation altered or referenced by a foreign key must
+// already have been created earlier in the schema file.
+export function checkTableOrder(text: string): TableOrderViolation[] {
+  const violations: TableOrderViolation[] = [];
+  const created = new Set<string>();
+  for (const { sql, line } of splitStatements(text)) {
+    const createTable =
+      /create\s+table\s+(?:if\s+not\s+exists\s+)?([A-Za-z_][A-Za-z0-9_]*)/i
+        .exec(sql);
+    if (createTable) created.add(createTable[1].toLowerCase());
+
+    const alterTable = /alter\s+table\s+([A-Za-z_][A-Za-z0-9_]*)/i.exec(sql);
+    if (alterTable) {
+      const relation = alterTable[1].toLowerCase();
+      if (!created.has(relation)) {
+        violations.push({ line, relation, operation: "ALTER TABLE" });
+      }
+    }
+
+    const references = /\breferences\s+([A-Za-z_][A-Za-z0-9_]*)/gi;
+    for (const match of sql.matchAll(references)) {
+      const relation = match[1].toLowerCase();
+      if (!created.has(relation)) {
+        violations.push({ line, relation, operation: "REFERENCES" });
+      }
+    }
+  }
+  return violations;
+}
+
 // Reads the balanced (...) column list starting at an opening paren.
 // Returns the inner text, or null when unbalanced.
 function balancedInner(sql: string, open: number): string | null {
@@ -229,7 +265,8 @@ if (import.meta.main) {
   const path = Deno.args[0] ?? "db/schema.sql";
   const text = await Deno.readTextFile(path);
   const violations = checkSchemaOrder(text);
-  if (violations.length > 0) {
+  const tableViolations = checkTableOrder(text);
+  if (violations.length > 0 || tableViolations.length > 0) {
     for (const v of violations) {
       console.error(
         `${path}:${v.line}: index "${v.index}" on "${v.table}" ` +
@@ -237,7 +274,15 @@ if (import.meta.main) {
           `the ALTER TABLE ... ADD COLUMN stanza`,
       );
     }
+    for (const v of tableViolations) {
+      console.error(
+        `${path}:${v.line}: ${v.operation} uses relation "${v.relation}" ` +
+          "before it is created",
+      );
+    }
     Deno.exit(1);
   }
-  console.log(`ok ${path}: every index follows its column`);
+  console.log(
+    `ok ${path}: every index follows its column and table dependencies are ordered`,
+  );
 }

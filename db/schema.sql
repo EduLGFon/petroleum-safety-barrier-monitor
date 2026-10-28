@@ -70,6 +70,24 @@ create table if not exists authors (
   name  text not null unique
 );
 
+-- ─── Users (auth, two roles: admin and user) ────────────────────────────────
+-- Users own the dashboard login (email + password, cookie session). Role is
+-- 'admin' (full access: status writes, user and alert management) or 'user'
+-- (read-only dashboard). Only admins may promote others to admin or manage
+-- recipients and alert rules. Passwords store a PBKDF2-SHA256 digest in the
+-- `pbkdf2$iterations$salt_b64$hash_b64` format (see lib/server/auth/).
+create table if not exists users (
+  id                  integer generated always as identity primary key,
+  email               text        not null unique,   -- always stored lowercased
+  name                text        not null default '',
+  phone               text        not null default '',
+  password_hash       text        not null,
+  role                text        not null default 'user' check (role in ('admin', 'user')),
+  active              boolean     not null default true,
+  created_at          timestamptz not null default now(),
+  updated_at          timestamptz not null default now()
+);
+
 -- ─── Barriers ──────────────────────────────────────────────────────────────
 
 create table if not exists barriers (
@@ -522,24 +540,7 @@ from users u cross join access_groups g
 where u.role = 'user' and g.name = 'Acesso geral'
 on conflict do nothing;
 
--- ─── Users + sessions (auth, two roles: admin and user) ─────────────────────
--- Users own the dashboard login (email + password, cookie session). Role is
--- 'admin' (full access: status writes, user and alert management) or 'user'
--- (read-only dashboard). Only admins may promote others to admin or manage
--- recipients and alert rules. Passwords store a PBKDF2-SHA256 digest in the
--- `pbkdf2$iterations$salt_b64$hash_b64` format (see lib/server/auth/).
-create table if not exists users (
-  id                  integer generated always as identity primary key,
-  email               text        not null unique,   -- always stored lowercased
-  name                text        not null default '',
-  phone               text        not null default '',
-  password_hash       text        not null,
-  role                text        not null default 'user' check (role in ('admin', 'user')),
-  active              boolean     not null default true,
-  created_at          timestamptz not null default now(),
-  updated_at          timestamptz not null default now()
-);
-
+-- ─── User authentication extensions + sessions ────────────────────────────
 create index if not exists idx_users_role on users(role);
 
 alter table users add column if not exists auth_source text not null default 'local';
