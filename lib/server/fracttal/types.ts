@@ -71,24 +71,49 @@ export interface FracttalReport {
 export interface FracttalWorkOrder {
   code: string;
   done: boolean | null;
+  id_status_work_order: number | null;
   tasks_log_types_description: string | null;
   tasks_log_types_2_description: string | null;
   tasks_log_task_type_main: string | null;
   types_description: string | null;
   stop_assets: boolean | null;
+  stop_assets_sec: number | null;
+  real_stop_assets_sec: number | null;
+  time_disruption: number | null;
   wo_folio: string | null;
   description: string | null;
   task_note: string | null;
   note: string | null;
+  // Failure context behind a degraded/unavailable barrier.
+  causes_description: string | null;
+  severiry_description: string | null;
+  damages_types_description: string | null;
+  detection_method_description: string | null;
+  // WO priority (VERY_HIGH/HIGH/...).
+  priorities_description: string | null;
+  // Scheduled vs ad-hoc.
+  trigger_description: string | null;
+  // Contingency signal (also scanned on the raw row).
+  work_orders_status_custom_description: string | null;
+  labels: unknown;
+  // Date candidates (earliest wins for status_since).
   initial_date: string | null;
   date_maintenance: string | null;
   creation_date: string | null;
+  event_date: string | null;
+  final_date: string | null;
+  wo_final_date: string | null;
+  cal_date_maintenance: string | null;
+  first_date_task: string | null;
   created_by: string | null;
   requested_by: string | null;
   personnel_description: string | null;
   user_assigned: string | null;
   resources_human_resources: string | null;
   validated_by_description: string | null;
+  // Traceability / joins.
+  id_request: number | null;
+  id_item: number | null;
 }
 
 // FracttalWorkRequest: the slice of GET /work_requests output that status
@@ -98,18 +123,37 @@ export interface FracttalWorkOrder {
 export interface FracttalWorkRequest {
   code_item: string;
   id_status: number | null;
+  // Urgency / priority.
+  is_urgent: boolean | null;
+  priorities_description: string | null;
+  types_1_description: string | null;
   types_2_description: string | null;
   types_description: string | null;
   wo_folio: string | null;
   description: string | null;
   observation: string | null;
+  // Dates.
+  date: string | null;
+  date_incident: string | null;
   date_maintenance: string | null;
+  date_solution: string | null;
+  date_status: string | null;
+  // Status-transition detail.
+  requests_x_status_description: string | null;
+  requests_x_status_notes: string | null;
+  requests_x_status_accounts_name: string | null;
+  requests_x_key_words_descriptions: string | null;
+  // Join.
+  id_work_order: number | null;
+  id_item: number | null;
   created_by: string | null;
   requested_by: string | null;
   personnel_description: string | null;
   user_assigned: string | null;
   resources_human_resources: string | null;
   validated_by_description: string | null;
+  accounts_name: string | null;
+  accounts_email: string | null;
 }
 
 // FracttalWorkQuery mirrors the documented query params for the work

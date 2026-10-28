@@ -339,6 +339,10 @@ export interface StatusEvent {
   operationState?: string;
   sourceAuthor?: string | null;
   participants?: Array<{ name: string; role: string }>;
+  // Additional context surfaced from the richer WO/WR rows.
+  priority?: string | null;
+  isUrgent?: boolean;
+  failureContext?: string;
 }
 
 // mergeEvent keeps the earliest date and the first non-empty source, detail
@@ -362,6 +366,9 @@ export function mergeEvent(
       current.participants ?? [],
       incoming.participants ?? [],
     ),
+    priority: current.priority || incoming.priority,
+    isUrgent: (current.isUrgent ?? false) || (incoming.isUrgent ?? false),
+    failureContext: current.failureContext || incoming.failureContext,
   };
 }
 

@@ -64,27 +64,49 @@ export function parseWorkOrder(raw: unknown): FracttalWorkOrder {
   }
   const str = (k: string) => (typeof row[k] === "string" ? row[k] : null);
   const bool = (k: string) => (typeof row[k] === "boolean" ? row[k] : null);
+  const num = (k: string) => (typeof row[k] === "number" ? row[k] : null);
   return {
     code: row.code,
     done: bool("done"),
+    id_status_work_order: num("id_status_work_order"),
     tasks_log_types_description: str("tasks_log_types_description"),
     tasks_log_types_2_description: str("tasks_log_types_2_description"),
     tasks_log_task_type_main: str("tasks_log_task_type_main"),
     types_description: str("types_description"),
     stop_assets: bool("stop_assets"),
+    stop_assets_sec: num("stop_assets_sec"),
+    real_stop_assets_sec: num("real_stop_assets_sec"),
+    time_disruption: num("time_disruption"),
     wo_folio: str("wo_folio"),
     description: str("description"),
     task_note: str("task_note"),
     note: str("note"),
+    causes_description: str("causes_description"),
+    severiry_description: str("severiry_description"),
+    damages_types_description: str("damages_types_description"),
+    detection_method_description: str("detection_method_description"),
+    priorities_description: str("priorities_description"),
+    trigger_description: str("trigger_description"),
+    work_orders_status_custom_description: str(
+      "work_orders_status_custom_description",
+    ),
+    labels: Array.isArray(row["labels"]) ? row["labels"] : null,
     initial_date: str("initial_date"),
     date_maintenance: str("date_maintenance"),
     creation_date: str("creation_date"),
+    event_date: str("event_date"),
+    final_date: str("final_date"),
+    wo_final_date: str("wo_final_date"),
+    cal_date_maintenance: str("cal_date_maintenance"),
+    first_date_task: str("first_date_task"),
     created_by: str("created_by"),
     requested_by: str("requested_by"),
     personnel_description: str("personnel_description"),
     user_assigned: str("user_assigned"),
     resources_human_resources: str("resources_human_resources"),
     validated_by_description: str("validated_by_description"),
+    id_request: num("id_request"),
+    id_item: num("id_item"),
   };
 }
 
@@ -99,21 +121,37 @@ export function parseWorkRequest(raw: unknown): FracttalWorkRequest {
   }
   const str = (k: string) => (typeof row[k] === "string" ? row[k] : null);
   const num = (k: string) => (typeof row[k] === "number" ? row[k] : null);
+  const bool = (k: string) => (typeof row[k] === "boolean" ? row[k] : null);
   return {
     code_item: row.code_item,
     id_status: num("id_status"),
+    is_urgent: bool("is_urgent"),
+    priorities_description: str("priorities_description"),
+    types_1_description: str("types_1_description"),
     types_2_description: str("types_2_description"),
     types_description: str("types_description"),
     wo_folio: str("wo_folio"),
     description: str("description"),
     observation: str("observation"),
+    date: str("date"),
+    date_incident: str("date_incident"),
     date_maintenance: str("date_maintenance"),
+    date_solution: str("date_solution"),
+    date_status: str("date_status"),
+    requests_x_status_description: str("requests_x_status_description"),
+    requests_x_status_notes: str("requests_x_status_notes"),
+    requests_x_status_accounts_name: str("requests_x_status_accounts_name"),
+    requests_x_key_words_descriptions: str("requests_x_key_words_descriptions"),
+    id_work_order: num("id_work_order"),
+    id_item: num("id_item"),
     created_by: str("created_by"),
     requested_by: str("requested_by"),
     personnel_description: str("personnel_description"),
     user_assigned: str("user_assigned"),
     resources_human_resources: str("resources_human_resources"),
     validated_by_description: str("validated_by_description"),
+    accounts_name: str("accounts_name"),
+    accounts_email: str("accounts_email"),
   };
 }
 
@@ -124,14 +162,48 @@ export function parseWorkRequest(raw: unknown): FracttalWorkRequest {
 function workOrderEvent(wo: FracttalWorkOrder): StatusEvent {
   const folio = (wo.wo_folio ?? "").trim();
   const desc = (wo.description ?? "").trim();
+  const failureParts: string[] = [];
+  if (wo.causes_description?.trim()) {
+    failureParts.push(`Causa: ${wo.causes_description.trim()}`);
+  }
+  if (wo.severiry_description?.trim()) {
+    failureParts.push(`Severidade: ${wo.severiry_description.trim()}`);
+  }
+  if (wo.damages_types_description?.trim()) {
+    failureParts.push(`Dano: ${wo.damages_types_description.trim()}`);
+  }
+  if (wo.detection_method_description?.trim()) {
+    failureParts.push(`Detecção: ${wo.detection_method_description.trim()}`);
+  }
+  const failureContext = failureParts.join("; ").slice(0, 800);
+  const note = ((wo.task_note ?? "").trim() || (wo.note ?? "").trim() || desc)
+    .trim();
+  const detail = [note, failureContext].filter(Boolean).join("\n").slice(0, 800);
   return {
     date: earliestDate(
       isoDate(wo.initial_date),
-      earliestDate(isoDate(wo.date_maintenance), isoDate(wo.creation_date)),
+      earliestDate(
+        isoDate(wo.date_maintenance),
+        earliestDate(
+          isoDate(wo.creation_date),
+          earliestDate(
+            isoDate(wo.event_date),
+            earliestDate(
+              isoDate(wo.final_date),
+              earliestDate(
+                isoDate(wo.wo_final_date),
+                earliestDate(
+                  isoDate(wo.cal_date_maintenance),
+                  isoDate(wo.first_date_task),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
     ),
     source: (folio ? `${folio}: ${desc}` : desc).slice(0, 800),
-    detail: ((wo.task_note ?? "").trim() || (wo.note ?? "").trim() || desc)
-      .slice(0, 800),
+    detail,
     trade: ((wo.tasks_log_types_2_description ?? "").trim() ||
       (wo.tasks_log_task_type_main ?? "").trim()).slice(0, 120),
     sourceType: "Ordem de serviço",
@@ -140,6 +212,9 @@ function workOrderEvent(wo: FracttalWorkOrder): StatusEvent {
     operationState: wo.done === false ? "Em aberto" : "Concluída",
     sourceAuthor: preferredAuthor(wo.created_by, wo.requested_by),
     participants: peopleFromFields(wo),
+    priority: wo.priorities_description,
+    isUrgent: false,
+    failureContext,
   };
 }
 
@@ -148,16 +223,36 @@ function workOrderEvent(wo: FracttalWorkOrder): StatusEvent {
 function workRequestEvent(wr: FracttalWorkRequest): StatusEvent {
   const folio = (wr.wo_folio ?? "").trim();
   const desc = (wr.description ?? "").trim();
+  const obs = (wr.observation ?? "").trim();
+  const requestContext = [
+    wr.requests_x_status_description?.trim(),
+    wr.requests_x_status_notes?.trim(),
+    wr.requests_x_key_words_descriptions?.trim(),
+  ].filter(Boolean).join("; ").slice(0, 800);
+  const detail = [obs || desc, requestContext].filter(Boolean).join("\n")
+    .slice(0, 800);
   return {
-    date: isoDate(wr.date_maintenance),
+    date: earliestDate(
+      isoDate(wr.date_incident),
+      earliestDate(
+        isoDate(wr.date_maintenance),
+        earliestDate(isoDate(wr.date), isoDate(wr.date_status)),
+      ),
+    ),
     source: (folio ? `${folio}: ${desc}` : desc).slice(0, 800),
-    detail: ((wr.observation ?? "").trim() || desc).slice(0, 800),
-    trade: (wr.types_description ?? "").trim().slice(0, 120),
+    detail,
+    trade: (wr.types_description ?? wr.types_1_description ?? "").trim().slice(
+      0,
+      120,
+    ),
     sourceType: "Solicitação de serviço",
     classification: (wr.types_2_description ?? "").trim(),
     operationState: "Em aberto",
     sourceAuthor: preferredAuthor(wr.created_by, wr.requested_by),
     participants: peopleFromFields(wr),
+    priority: wr.priorities_description,
+    isUrgent: wr.is_urgent === true,
+    failureContext: requestContext,
   };
 }
 
@@ -210,7 +305,12 @@ function peopleFromFields(
 // only when a corrective slot exists, so preventive contingency notes stay
 // inert by design.
 export function workOrderSlot(wo: FracttalWorkOrder): WorkSlot | null {
-  if (wo.done !== false) return null;
+  // Open when the row is explicitly open (done === false) or carries an open
+  // status id; a closed status id (4) or done === true closes it.
+  const closed = wo.done === true || wo.id_status_work_order === 4;
+  const open = wo.done === false || wo.id_status_work_order === 1 ||
+    wo.id_status_work_order === 2;
+  if (closed || !open) return null;
   const slot = classifyCorrective(
     wo.tasks_log_types_description,
     wo.types_description,
