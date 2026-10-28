@@ -7,7 +7,11 @@ import {
   loadSyncConfig,
 } from "./config.ts";
 
-import { assertStrictEquals, assertEquals, assertThrows } from "jsr:@std/assert@^1";
+import {
+  assertEquals,
+  assertStrictEquals,
+  assertThrows,
+} from "jsr:@std/assert@^1";
 
 function env(vars: Record<string, string>): (k: string) => string | undefined {
   return (k) => vars[k];

@@ -36,7 +36,10 @@ Deno.test("admin password reset replaces the hash and revokes sessions", async (
     otherId = other.id;
     const before = await getUserById(userId);
     assertStrictEquals(
-      await verifyPassword("old-password-1234", before!.password_hash as string),
+      await verifyPassword(
+        "old-password-1234",
+        before!.password_hash as string,
+      ),
       true,
     );
 
@@ -65,7 +68,10 @@ Deno.test("admin password reset replaces the hash and revokes sessions", async (
 
     const otherAfter = await getUserById(otherId);
     assertStrictEquals(
-      await verifyPassword("other-password-9012", otherAfter!.password_hash as string),
+      await verifyPassword(
+        "other-password-9012",
+        otherAfter!.password_hash as string,
+      ),
       true,
     );
   } finally {
@@ -151,11 +157,17 @@ Deno.test("conditional password update rejects a stale hash", async () => {
 
     const after = await getUserById(userId);
     assertStrictEquals(
-      await verifyPassword("second-password-5678", after!.password_hash as string),
+      await verifyPassword(
+        "second-password-5678",
+        after!.password_hash as string,
+      ),
       true,
     );
     assertStrictEquals(
-      await verifyPassword("stale-password-9012", after!.password_hash as string),
+      await verifyPassword(
+        "stale-password-9012",
+        after!.password_hash as string,
+      ),
       false,
     );
   } finally {
