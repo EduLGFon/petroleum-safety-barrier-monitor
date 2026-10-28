@@ -1,10 +1,9 @@
-// RulesManager - customizable alert triggers with preview and inline edit.
-// This is why it exists: admins enable or mute alerts by scope (categories,
-// statuses, locations, criticality and more) and tune trigger, anti-noise
-// windows and delivery without code changes; this manager wraps
-// /api/alert-rules plus the read-only /api/alert-rules/preview counter.
+// RulesManager - alert rule builder with a focused modal editor.
+// This is why it exists: admins enable/mute alerts by scope (categories,
+// statuses, locations, criticality and more) and tune triggers, anti-noise
+// windows and delivery without code changes. The editor keeps the heavy form
+// out of the list view so rules stay scannable.
 import {
-  AdminCard,
   AdminHero,
   AdminRow,
   Avatar,
@@ -22,6 +21,8 @@ import {
 import { adminApi } from "../../../lib/api/admin-client.ts";
 
 import { useEffect, useState } from "preact/hooks";
+
+import { createPortal } from "preact/compat";
 
 interface AlertRule {
   id: number;
@@ -205,7 +206,6 @@ function ruleToDraft(r: AlertRule): Draft {
   };
 }
 
-// CheckGrid: scrollable checkbox multi-select (empty = all).
 function CheckGrid(
   { options, selected, onToggle }: {
     options: { id: number; label: string }[];
@@ -226,7 +226,7 @@ function CheckGrid(
         display: "flex",
         flexWrap: "wrap",
         gap: 6,
-        maxHeight: 132,
+        maxHeight: 120,
         overflowY: "auto",
         border: "1.5px solid var(--border)",
         borderRadius: "var(--d-input-radius)",
@@ -253,7 +253,7 @@ function CheckGrid(
               fontWeight: on ? 700 : 500,
               cursor: "pointer",
               padding: "3px 10px",
-              maxWidth: 220,
+              maxWidth: 200,
               overflow: "hidden",
               textOverflow: "ellipsis",
               whiteSpace: "nowrap",
@@ -288,7 +288,7 @@ function scopeSummary(r: AlertRule): string {
   const loc = n(r.location_ids, "locais");
   if (loc) parts.push(loc);
   const crit = n(r.criticality_ids, "crit.");
-  if (crit) parts.push(crit ?? (r.critical_only ? "só críticas" : ""));
+  if (crit) parts.push(crit);
   else if (r.critical_only) parts.push("só críticas");
   if (r.urgency !== "any") parts.push(r.urgency);
   if (r.stale_days != null) {
@@ -310,23 +310,28 @@ function scopeSummary(r: AlertRule): string {
   return parts.join(" · ");
 }
 
-// RulesManager: alert rule CRUD with scope builder, preview and inline edit.
+type TabKey = "basic" | "scope" | "timing";
+
+const TABS: { key: TabKey; label: string }[] = [
+  { key: "basic", label: "Básico" },
+  { key: "scope", label: "Escopo" },
+  { key: "timing", label: "Anti-ruído" },
+];
+
 export function RulesManager({ onCount }: { onCount?: (n: number) => void }) {
   const [rules, setRules] = useState<AlertRule[]>([]);
   const [lookups, setLookups] = useState<Lookups | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [draft, setDraft] = useState<Draft>(EMPTY_DRAFT);
+  const [form, setForm] = useState<Draft>(EMPTY_DRAFT);
   const [busy, setBusy] = useState(false);
   const [confirmId, setConfirmId] = useState<number | null>(null);
   const [editingId, setEditingId] = useState<number | null>(null);
-  const [editDraft, setEditDraft] = useState<Draft>(EMPTY_DRAFT);
-  const [showAdvanced, setShowAdvanced] = useState(false);
+  const [modalOpen, setModalOpen] = useState(false);
+  const [tab, setTab] = useState<TabKey>("basic");
   const [preview, setPreview] = useState<
     { count: number; tags: string[] } | null
-  >(
-    null,
-  );
+  >(null);
   const [previewBusy, setPreviewBusy] = useState(false);
 
   async function refresh() {
@@ -349,28 +354,55 @@ export function RulesManager({ onCount }: { onCount?: (n: number) => void }) {
 
   useEffect(() => {
     void refresh();
-    // Refresh once per mount; the count reporter is stable for the session.
   }, []);
 
-  function set<K extends keyof Draft>(key: K, value: Draft[K]) {
-    setDraft((d) => ({ ...d, [key]: value }));
+  useEffect(() => {
+    if (!modalOpen) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setModalOpen(false);
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [modalOpen]);
+
+  function update(patch: Partial<Draft>) {
+    setForm((prev) => ({ ...prev, ...patch }));
   }
 
-  function setEdit<K extends keyof Draft>(key: K, value: Draft[K]) {
-    setEditDraft((d) => ({ ...d, [key]: value }));
+  function openCreate() {
+    setEditingId(null);
+    setForm(EMPTY_DRAFT);
+    setPreview(null);
+    setTab("basic");
+    setModalOpen(true);
   }
 
-  async function create(e: Event) {
+  function openEdit(r: AlertRule) {
+    setEditingId(r.id);
+    setForm(ruleToDraft(r));
+    setPreview(null);
+    setTab("basic");
+    setModalOpen(true);
+  }
+
+  async function save(e: Event) {
     e.preventDefault();
     setBusy(true);
     try {
-      await adminApi("/api/alert-rules", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(draftToPayload(draft)),
-      });
-      setDraft(EMPTY_DRAFT);
-      setPreview(null);
+      if (editingId !== null) {
+        await adminApi(`/api/alert-rules/${editingId}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(draftToPayload(form)),
+        });
+      } else {
+        await adminApi("/api/alert-rules", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(draftToPayload(form)),
+        });
+      }
+      setModalOpen(false);
       await refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
@@ -379,38 +411,23 @@ export function RulesManager({ onCount }: { onCount?: (n: number) => void }) {
     }
   }
 
-  async function saveEdit(id: number) {
-    setBusy(true);
-    try {
-      await adminApi(`/api/alert-rules/${id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(draftToPayload(editDraft)),
-      });
-      setEditingId(null);
-      await refresh();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  async function runPreview(d: Draft) {
+  async function runPreview() {
     setPreviewBusy(true);
     try {
       const q = new URLSearchParams();
       const put = (k: string, ids: number[]) => {
         if (ids.length > 0) q.set(k, ids.join(","));
       };
-      put("categoryIds", d.categoryIds);
-      put("locationIds", d.locationIds);
-      put("criticalityIds", d.criticalityIds);
-      put("typologyIds", d.typologyIds);
-      put("groupingIds", d.groupingIds);
-      put("ownerIds", d.ownerIds);
-      if (d.staleDays.trim() !== "") q.set("staleDays", d.staleDays.trim());
-      if (d.onlyNoActionPlan) q.set("onlyNoActionPlan", "1");
+      put("categoryIds", form.categoryIds);
+      put("locationIds", form.locationIds);
+      put("criticalityIds", form.criticalityIds);
+      put("typologyIds", form.typologyIds);
+      put("groupingIds", form.groupingIds);
+      put("ownerIds", form.ownerIds);
+      if (form.staleDays.trim() !== "") {
+        q.set("staleDays", form.staleDays.trim());
+      }
+      if (form.onlyNoActionPlan) q.set("onlyNoActionPlan", "1");
       const res = await adminApi(
         `/api/alert-rules/preview?${q.toString()}`,
       ) as { count: number; tags: string[] };
@@ -464,23 +481,15 @@ export function RulesManager({ onCount }: { onCount?: (n: number) => void }) {
     }
   }
 
-  function renderScopeFields(
-    d: Draft,
-    update: (patch: Partial<Draft>) => void,
-  ) {
-    const merge = (patch: Partial<Draft>) =>
-      update(
-        patch as Partial<Draft> & Record<string, unknown> as Partial<Draft>,
-      );
-    void merge;
+  function renderScopeFields() {
     return (
-      <div style={{ display: "grid", gap: 10 }}>
+      <div style={{ display: "grid", gap: 12 }}>
         <Field label="Categorias (vazio = todas)">
           <CheckGrid
             options={lookups?.categories ?? []}
-            selected={d.categoryIds}
+            selected={form.categoryIds}
             onToggle={(id) =>
-              update({ categoryIds: toggleId(d.categoryIds, id) })}
+              update({ categoryIds: toggleId(form.categoryIds, id) })}
           />
         </Field>
         <div
@@ -493,17 +502,17 @@ export function RulesManager({ onCount }: { onCount?: (n: number) => void }) {
           <Field label="Dispara ao chegar em (vazio = qualquer NC)">
             <CheckGrid
               options={lookups?.availabilities ?? []}
-              selected={d.toStatusIds}
+              selected={form.toStatusIds}
               onToggle={(id) =>
-                update({ toStatusIds: toggleId(d.toStatusIds, id) })}
+                update({ toStatusIds: toggleId(form.toStatusIds, id) })}
             />
           </Field>
           <Field label="Somente vindo de (origem, vazio = qualquer)">
             <CheckGrid
               options={lookups?.availabilities ?? []}
-              selected={d.fromStatusIds}
+              selected={form.fromStatusIds}
               onToggle={(id) =>
-                update({ fromStatusIds: toggleId(d.fromStatusIds, id) })}
+                update({ fromStatusIds: toggleId(form.fromStatusIds, id) })}
             />
           </Field>
         </div>
@@ -520,17 +529,17 @@ export function RulesManager({ onCount }: { onCount?: (n: number) => void }) {
                 id: l.id,
                 label: l.name ? `${l.code} · ${l.name}` : l.code,
               }))}
-              selected={d.locationIds}
+              selected={form.locationIds}
               onToggle={(id) =>
-                update({ locationIds: toggleId(d.locationIds, id) })}
+                update({ locationIds: toggleId(form.locationIds, id) })}
             />
           </Field>
           <Field label="Criticidades (vazio = todas)">
             <CheckGrid
               options={lookups?.criticalities ?? []}
-              selected={d.criticalityIds}
+              selected={form.criticalityIds}
               onToggle={(id) =>
-                update({ criticalityIds: toggleId(d.criticalityIds, id) })}
+                update({ criticalityIds: toggleId(form.criticalityIds, id) })}
             />
           </Field>
         </div>
@@ -538,30 +547,31 @@ export function RulesManager({ onCount }: { onCount?: (n: number) => void }) {
           style={{
             display: "grid",
             gap: 10,
-            gridTemplateColumns: "repeat(auto-fit,minmax(220px,1fr))",
+            gridTemplateColumns: "repeat(auto-fit,minmax(200px,1fr))",
           }}
         >
           <Field label="Tipologias (vazio = todas)">
             <CheckGrid
               options={lookups?.typologies ?? []}
-              selected={d.typologyIds}
+              selected={form.typologyIds}
               onToggle={(id) =>
-                update({ typologyIds: toggleId(d.typologyIds, id) })}
+                update({ typologyIds: toggleId(form.typologyIds, id) })}
             />
           </Field>
           <Field label="Agrupamentos (vazio = todos)">
             <CheckGrid
               options={lookups?.groupings ?? []}
-              selected={d.groupingIds}
+              selected={form.groupingIds}
               onToggle={(id) =>
-                update({ groupingIds: toggleId(d.groupingIds, id) })}
+                update({ groupingIds: toggleId(form.groupingIds, id) })}
             />
           </Field>
           <Field label="Responsáveis (vazio = todos)">
             <CheckGrid
               options={lookups?.owners ?? []}
-              selected={d.ownerIds}
-              onToggle={(id) => update({ ownerIds: toggleId(d.ownerIds, id) })}
+              selected={form.ownerIds}
+              onToggle={(id) =>
+                update({ ownerIds: toggleId(form.ownerIds, id) })}
             />
           </Field>
         </div>
@@ -577,7 +587,7 @@ export function RulesManager({ onCount }: { onCount?: (n: number) => void }) {
           <label style={{ display: "flex", gap: 6, alignItems: "center" }}>
             <input
               type="checkbox"
-              checked={d.criticalOnly}
+              checked={form.criticalOnly}
               onChange={(e) =>
                 update({ criticalOnly: e.currentTarget.checked })}
             />
@@ -586,7 +596,7 @@ export function RulesManager({ onCount }: { onCount?: (n: number) => void }) {
           <label style={{ display: "flex", gap: 6, alignItems: "center" }}>
             <input
               type="checkbox"
-              checked={d.includeRecovery}
+              checked={form.includeRecovery}
               onChange={(e) =>
                 update({ includeRecovery: e.currentTarget.checked })}
             />
@@ -595,7 +605,7 @@ export function RulesManager({ onCount }: { onCount?: (n: number) => void }) {
           <label style={{ display: "flex", gap: 6, alignItems: "center" }}>
             <input
               type="checkbox"
-              checked={d.onTransition}
+              checked={form.onTransition}
               onChange={(e) =>
                 update({ onTransition: e.currentTarget.checked })}
             />
@@ -604,21 +614,18 @@ export function RulesManager({ onCount }: { onCount?: (n: number) => void }) {
           <label style={{ display: "flex", gap: 6, alignItems: "center" }}>
             <input
               type="checkbox"
-              checked={d.onlyNoActionPlan}
+              checked={form.onlyNoActionPlan}
               onChange={(e) =>
                 update({ onlyNoActionPlan: e.currentTarget.checked })}
             />
             Só sem plano de ação
           </label>
-          <label
-            style={{ display: "flex", gap: 6, alignItems: "center" }}
-          >
+          <label style={{ display: "flex", gap: 6, alignItems: "center" }}>
             Urgência
             <select
-              value={d.urgency}
-              onChange={(e) => update({
-                urgency: e.currentTarget.value as Draft["urgency"],
-              })}
+              value={form.urgency}
+              onChange={(e) =>
+                update({ urgency: e.currentTarget.value as Draft["urgency"] })}
               style={inputSt}
             >
               <option value="any">Qualquer</option>
@@ -631,12 +638,9 @@ export function RulesManager({ onCount }: { onCount?: (n: number) => void }) {
     );
   }
 
-  function renderTimingFields(
-    d: Draft,
-    update: (patch: Partial<Draft>) => void,
-  ) {
+  function renderTimingFields() {
     return (
-      <div style={{ display: "grid", gap: 10 }}>
+      <div style={{ display: "grid", gap: 12 }}>
         <div
           style={{
             display: "grid",
@@ -649,7 +653,7 @@ export function RulesManager({ onCount }: { onCount?: (n: number) => void }) {
               type="number"
               min={1}
               placeholder="-"
-              value={d.staleDays}
+              value={form.staleDays}
               onInput={(e) => update({ staleDays: e.currentTarget.value })}
               style={inputSt}
             />
@@ -659,7 +663,7 @@ export function RulesManager({ onCount }: { onCount?: (n: number) => void }) {
               type="number"
               min={1}
               placeholder="1 = diário"
-              value={d.staleRepeatDays}
+              value={form.staleRepeatDays}
               onInput={(e) =>
                 update({ staleRepeatDays: e.currentTarget.value })}
               style={inputSt}
@@ -670,7 +674,7 @@ export function RulesManager({ onCount }: { onCount?: (n: number) => void }) {
               type="number"
               min={1}
               placeholder="-"
-              value={d.cooldownMinutes}
+              value={form.cooldownMinutes}
               onInput={(e) =>
                 update({ cooldownMinutes: e.currentTarget.value })}
               style={inputSt}
@@ -681,7 +685,7 @@ export function RulesManager({ onCount }: { onCount?: (n: number) => void }) {
               type="number"
               min={1}
               placeholder="-"
-              value={d.maxPerDay}
+              value={form.maxPerDay}
               onInput={(e) => update({ maxPerDay: e.currentTarget.value })}
               style={inputSt}
             />
@@ -689,7 +693,7 @@ export function RulesManager({ onCount }: { onCount?: (n: number) => void }) {
           <Field label="Prioridade (maior vence)">
             <input
               type="number"
-              value={d.priority}
+              value={form.priority}
               onInput={(e) => update({ priority: e.currentTarget.value })}
               style={inputSt}
             />
@@ -708,7 +712,7 @@ export function RulesManager({ onCount }: { onCount?: (n: number) => void }) {
               min={0}
               max={23}
               placeholder="-"
-              value={d.quietStart}
+              value={form.quietStart}
               onInput={(e) => update({ quietStart: e.currentTarget.value })}
               style={inputSt}
             />
@@ -719,7 +723,7 @@ export function RulesManager({ onCount }: { onCount?: (n: number) => void }) {
               min={0}
               max={23}
               placeholder="-"
-              value={d.quietEnd}
+              value={form.quietEnd}
               onInput={(e) => update({ quietEnd: e.currentTarget.value })}
               style={inputSt}
             />
@@ -727,7 +731,7 @@ export function RulesManager({ onCount }: { onCount?: (n: number) => void }) {
           <Field label="Válida de">
             <input
               type="date"
-              value={d.validFrom}
+              value={form.validFrom}
               onInput={(e) => update({ validFrom: e.currentTarget.value })}
               style={inputSt}
             />
@@ -735,7 +739,7 @@ export function RulesManager({ onCount }: { onCount?: (n: number) => void }) {
           <Field label="Válida até">
             <input
               type="date"
-              value={d.validTo}
+              value={form.validTo}
               onInput={(e) => update({ validTo: e.currentTarget.value })}
               style={inputSt}
             />
@@ -744,13 +748,13 @@ export function RulesManager({ onCount }: { onCount?: (n: number) => void }) {
         <Field label="Dias ativos (vazio = todos)">
           <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
             {WEEKDAYS.map((label, day) => {
-              const on = d.activeDays.includes(day);
+              const on = form.activeDays.includes(day);
               return (
                 <button
                   key={day}
                   type="button"
                   onClick={() =>
-                    update({ activeDays: toggleId(d.activeDays, day) })}
+                    update({ activeDays: toggleId(form.activeDays, day) })}
                   style={{
                     border: `1.5px solid ${
                       on ? "var(--accent)" : "var(--border)"
@@ -780,123 +784,20 @@ export function RulesManager({ onCount }: { onCount?: (n: number) => void }) {
     <div style={{ display: "grid", gap: 12 }}>
       <AdminHero
         title="Regras de alerta"
-        hint="Sem regras, todo estado não conforme alerta. Com regras, só o que casar com escopo, gatilho e janela anti-ruído alerta - a de maior prioridade vence."
+        hint="Sem regras, todo estado não conforme alerta. Com regras, só o que casar com escopo, gatilho e janela anti-ruído alerta — a de maior prioridade vence."
         count={`${rules.filter((r) => r.active).length} ativas`}
       />
       {error && <ErrorBanner message={error} onRetry={() => void refresh()} />}
-      <AdminCard>
-        <form onSubmit={create} style={{ display: "grid", gap: 12 }}>
-          <div
-            style={{
-              display: "grid",
-              gap: 10,
-              gridTemplateColumns: "repeat(auto-fit,minmax(220px,1fr))",
-            }}
-          >
-            <Field label="Nome da regra">
-              <input
-                type="text"
-                required
-                placeholder="Ex.: Críticas indisponíveis"
-                value={draft.name}
-                onInput={(e) => set("name", e.currentTarget.value)}
-                style={inputSt}
-              />
-            </Field>
-            <Field label="Prioridade / Entrega">
-              <div style={{ display: "flex", gap: 8 }}>
-                <input
-                  type="number"
-                  title="Prioridade"
-                  value={draft.priority}
-                  onInput={(e) => set("priority", e.currentTarget.value)}
-                  style={{ ...inputSt, maxWidth: 90 }}
-                />
-                <select
-                  value={draft.notifyImmediate ? "now" : "digest"}
-                  onChange={(e) =>
-                    set("notifyImmediate", e.currentTarget.value === "now")}
-                  style={inputSt}
-                >
-                  <option value="digest">Digest</option>
-                  <option value="now">Imediato</option>
-                </select>
-                <select
-                  value={draft.urgency}
-                  onChange={(e) =>
-                    set("urgency", e.currentTarget.value as Draft["urgency"])}
-                  style={inputSt}
-                >
-                  <option value="any">Qualquer urgência</option>
-                  <option value="urgent">Urgente+</option>
-                  <option value="critical">Só crítica</option>
-                </select>
-              </div>
-            </Field>
-          </div>
-          <Field label="Descrição (opcional)">
-            <input
-              type="text"
-              placeholder="Para que serve esta regra…"
-              value={draft.description}
-              onInput={(e) => set("description", e.currentTarget.value)}
-              style={inputSt}
-            />
-          </Field>
-          {renderScopeFields(draft, (p) =>
-            setDraft((prev) => ({ ...prev, ...p })))}
-          <button
-            type="button"
-            onClick={() =>
-              setShowAdvanced((v) => !v)}
-            style={{ ...ghostBtn, justifySelf: "start" }}
-          >
-            {showAdvanced
-              ? "▾ Ocultar anti-ruído e janelas"
-              : "▸ Anti-ruído e janelas"}
-          </button>
-          {showAdvanced && renderTimingFields(draft, (p) =>
-            setDraft((prev) => ({ ...prev, ...p })))}
-          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-            <button
-              type="submit"
-              disabled={busy}
-              className="lift"
-              style={{
-                ...primaryBtn,
-                opacity: busy ? 0.7 : 1,
-                flex: "1 1 200px",
-              }}
-            >
-              {busy ? "Criando…" : "Criar regra"}
-            </button>
-            <button
-              type="button"
-              disabled={previewBusy}
-              onClick={() =>
-                void runPreview(draft)}
-              style={ghostBtn}
-            >
-              {previewBusy ? "Testando…" : "Testar escopo"}
-            </button>
-          </div>
-          {preview !== null && (
-            <div
-              style={{
-                fontSize: "var(--d-small)",
-                color: "var(--text-secondary)",
-                background: "var(--bg-surface)",
-                border: "1.5px solid var(--border)",
-                borderRadius: "var(--d-input-radius)",
-                padding: "8px 12px",
-              }}
-            >
-              Escopo atual casa com <strong>{preview.count}</strong> barreira(s)
-              {preview.tags.length > 0 && ` - ex.: ${preview.tags.join(", ")}`}.
-            </div>
-          )}
-        </form>
-      </AdminCard>
+      <div style={{ display: "flex", justifyContent: "flex-end" }}>
+        <button
+          type="button"
+          onClick={openCreate}
+          className="lift"
+          style={{ ...primaryBtn }}
+        >
+          + Nova regra
+        </button>
+      </div>
       {loading
         ? <SkeletonRows />
         : rules.length === 0
@@ -906,184 +807,322 @@ export function RulesManager({ onCount }: { onCount?: (n: number) => void }) {
         : (
           <div style={{ display: "grid", gap: 8 }}>
             {rules.map((r) => (
-              <div key={r.id} style={{ display: "grid", gap: 8 }}>
-                <AdminRow>
-                  <Avatar name={r.name} />
-                  <span style={{ minWidth: 0, flex: "1 1 160px" }}>
+              <AdminRow key={r.id}>
+                <Avatar name={r.name} />
+                <span style={{ minWidth: 0, flex: "1 1 160px" }}>
+                  <div
+                    style={{
+                      fontSize: "var(--d-body)",
+                      fontWeight: 700,
+                      color: "var(--text-primary)",
+                      overflow: "hidden",
+                      textOverflow: "ellipsis",
+                      whiteSpace: "nowrap",
+                    }}
+                  >
+                    {r.name}
+                    <span
+                      style={{
+                        fontWeight: 500,
+                        color: "var(--text-muted)",
+                        marginLeft: 8,
+                      }}
+                    >
+                      prio {r.priority}
+                    </span>
+                  </div>
+                  <div
+                    style={{
+                      fontSize: "var(--d-small)",
+                      color: "var(--text-muted)",
+                    }}
+                  >
+                    {scopeSummary(r)}
+                  </div>
+                  {r.description && (
                     <div
                       style={{
-                        fontSize: "var(--d-body)",
-                        fontWeight: 700,
-                        color: "var(--text-primary)",
+                        fontSize: "var(--d-small)",
+                        color: "var(--text-secondary)",
                         overflow: "hidden",
                         textOverflow: "ellipsis",
                         whiteSpace: "nowrap",
                       }}
                     >
-                      {r.name}
-                      <span
-                        style={{
-                          fontWeight: 500,
-                          color: "var(--text-muted)",
-                          marginLeft: 8,
-                        }}
-                      >
-                        prio {r.priority}
-                      </span>
+                      {r.description}
                     </div>
-                    <div
-                      style={{
-                        fontSize: "var(--d-small)",
-                        color: "var(--text-muted)",
-                      }}
-                    >
-                      {scopeSummary(r)}
-                    </div>
-                    {r.description && (
-                      <div
-                        style={{
-                          fontSize: "var(--d-small)",
-                          color: "var(--text-secondary)",
-                          overflow: "hidden",
-                          textOverflow: "ellipsis",
-                          whiteSpace: "nowrap",
-                        }}
-                      >
-                        {r.description}
-                      </div>
-                    )}
-                  </span>
-                  <StatusBadge tone={r.active ? "active" : "inactive"}>
-                    {r.active ? "Ativa" : "Inativa"}
-                  </StatusBadge>
-                  <StatusBadge tone="neutral">
-                    {r.notify_immediate ? "Imediato" : "Digest"}
-                  </StatusBadge>
-                  <span style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setEditingId(editingId === r.id ? null : r.id);
-                        setEditDraft(ruleToDraft(r));
-                      }}
-                      style={ghostBtn}
-                    >
-                      {editingId === r.id ? "Fechar" : "Editar"}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() =>
-                        void toggle(r)}
-                      style={ghostBtn}
-                    >
-                      {r.active ? "Desativar" : "Ativar"}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() =>
-                        void duplicate(r)}
-                      style={ghostBtn}
-                    >
-                      Duplicar
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => void remove(r)}
-                      style={dangerBtn}
-                    >
-                      {confirmId === r.id ? "Confirmar remoção?" : "Remover"}
-                    </button>
-                  </span>
-                </AdminRow>
-                {editingId === r.id && (
-                  <AdminCard>
-                    <div style={{ display: "grid", gap: 12 }}>
-                      <div
-                        style={{
-                          display: "grid",
-                          gap: 10,
-                          gridTemplateColumns:
-                            "repeat(auto-fit,minmax(220px,1fr))",
-                        }}
-                      >
-                        <Field label="Nome">
-                          <input
-                            type="text"
-                            value={editDraft.name}
-                            onInput={(e) =>
-                              setEdit("name", e.currentTarget.value)}
-                            style={inputSt}
-                          />
-                        </Field>
-                        <Field label="Prioridade / Entrega">
-                          <div style={{ display: "flex", gap: 8 }}>
-                            <input
-                              type="number"
-                              value={editDraft.priority}
-                              onInput={(e) =>
-                                setEdit("priority", e.currentTarget.value)}
-                              style={{ ...inputSt, maxWidth: 90 }}
-                            />
-                            <select
-                              value={editDraft.notifyImmediate
-                                ? "now"
-                                : "digest"}
-                              onChange={(e) =>
-                                setEdit(
-                                  "notifyImmediate",
-                                  e.currentTarget.value === "now",
-                                )}
-                              style={inputSt}
-                            >
-                              <option value="digest">Digest</option>
-                              <option value="now">Imediato</option>
-                            </select>
-                          </div>
-                        </Field>
-                      </div>
-                      <Field label="Descrição">
-                        <input
-                          type="text"
-                          value={editDraft.description}
-                          onInput={(e) =>
-                            setEdit("description", e.currentTarget.value)}
-                          style={inputSt}
-                        />
-                      </Field>
-                      {renderScopeFields(
-                        editDraft,
-                        (p) => setEditDraft((prev) => ({ ...prev, ...p })),
-                      )}
-                      {renderTimingFields(
-                        editDraft,
-                        (p) => setEditDraft((prev) => ({ ...prev, ...p })),
-                      )}
-                      <div
-                        style={{ display: "flex", gap: 8, flexWrap: "wrap" }}
-                      >
-                        <button
-                          type="button"
-                          disabled={busy}
-                          onClick={() => void saveEdit(r.id)}
-                          style={{ ...primaryBtn, opacity: busy ? 0.7 : 1 }}
-                        >
-                          {busy ? "Salvando…" : "Salvar"}
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => void runPreview(editDraft)}
-                          style={ghostBtn}
-                        >
-                          Testar escopo
-                        </button>
-                      </div>
-                    </div>
-                  </AdminCard>
-                )}
-              </div>
+                  )}
+                </span>
+                <StatusBadge tone={r.active ? "active" : "inactive"}>
+                  {r.active ? "Ativa" : "Inativa"}
+                </StatusBadge>
+                <StatusBadge tone="neutral">
+                  {r.notify_immediate ? "Imediato" : "Digest"}
+                </StatusBadge>
+                <span style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                  <button
+                    type="button"
+                    onClick={() => openEdit(r)}
+                    style={ghostBtn}
+                  >
+                    Editar
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => void toggle(r)}
+                    style={ghostBtn}
+                  >
+                    {r.active ? "Desativar" : "Ativar"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => void duplicate(r)}
+                    style={ghostBtn}
+                  >
+                    Duplicar
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => void remove(r)}
+                    style={dangerBtn}
+                  >
+                    {confirmId === r.id ? "Confirmar remoção?" : "Remover"}
+                  </button>
+                </span>
+              </AdminRow>
             ))}
           </div>
         )}
+
+      {modalOpen &&
+        createPortal(
+          <div
+          role="dialog"
+          aria-modal="true"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setModalOpen(false);
+          }}
+          style={{
+            position: "fixed",
+            inset: 0,
+            zIndex: 1200,
+            background: "rgba(0,0,0,.55)",
+            backdropFilter: "blur(4px)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: 16,
+            overflowY: "auto",
+          }}
+        >
+          <div
+            style={{
+              width: "min(920px, 100%)",
+              maxHeight: "calc(100vh - 32px)",
+              overflowY: "auto",
+              background: "var(--bg-elevated)",
+              border: "1.5px solid var(--border)",
+              borderRadius: "var(--d-row-radius)",
+              padding: "var(--d-row-pad)",
+              display: "grid",
+              gap: 12,
+              boxShadow: "0 24px 60px rgba(0,0,0,.35)",
+            }}
+          >
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                gap: 8,
+              }}
+            >
+              <span
+                style={{
+                  fontSize: "var(--d-lead)",
+                  fontWeight: 800,
+                  color: "var(--text-primary)",
+                }}
+              >
+                {editingId !== null ? "Editar regra" : "Nova regra de alerta"}
+              </span>
+              <button
+                type="button"
+                onClick={() => setModalOpen(false)}
+                style={ghostBtn}
+              >
+                Fechar
+              </button>
+            </div>
+            <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+              {TABS.map((t) => {
+                const active = tab === t.key;
+                return (
+                  <button
+                    key={t.key}
+                    type="button"
+                    onClick={() => setTab(t.key)}
+                    style={{
+                      border: "none",
+                      borderRadius: "var(--d-chip-radius)",
+                      padding: "6px 12px",
+                      fontSize: "var(--d-small)",
+                      fontWeight: 700,
+                      cursor: "pointer",
+                      background: active
+                        ? "linear-gradient(90deg,var(--accent),var(--accent-2))"
+                        : "var(--bg-surface)",
+                      color: active ? "#fff" : "var(--text-secondary)",
+                    }}
+                  >
+                    {t.label}
+                  </button>
+                );
+              })}
+            </div>
+            <form onSubmit={save} style={{ display: "grid", gap: 12 }}>
+              {tab === "basic" && (
+                <div style={{ display: "grid", gap: 10 }}>
+                  <div
+                    style={{
+                      display: "grid",
+                      gap: 10,
+                      gridTemplateColumns: "repeat(auto-fit,minmax(220px,1fr))",
+                    }}
+                  >
+                    <Field label="Nome da regra">
+                      <input
+                        type="text"
+                        required
+                        placeholder="Ex.: Críticas indisponíveis"
+                        value={form.name}
+                        onInput={(e) => update({ name: e.currentTarget.value })}
+                        style={inputSt}
+                      />
+                    </Field>
+                    <Field label="Prioridade / Entrega">
+                      <div style={{ display: "flex", gap: 8 }}>
+                        <input
+                          type="number"
+                          title="Prioridade"
+                          value={form.priority}
+                          onInput={(e) =>
+                            update({ priority: e.currentTarget.value })}
+                          style={{ ...inputSt, maxWidth: 90 }}
+                        />
+                        <select
+                          value={form.notifyImmediate ? "now" : "digest"}
+                          onChange={(e) =>
+                            update({
+                              notifyImmediate: e.currentTarget.value === "now",
+                            })}
+                          style={inputSt}
+                        >
+                          <option value="digest">Digest</option>
+                          <option value="now">Imediato</option>
+                        </select>
+                        <select
+                          value={form.urgency}
+                          onChange={(e) =>
+                            update({
+                              urgency: e.currentTarget
+                                .value as Draft["urgency"],
+                            })}
+                          style={inputSt}
+                        >
+                          <option value="any">Qualquer urgência</option>
+                          <option value="urgent">Urgente+</option>
+                          <option value="critical">Só crítica</option>
+                        </select>
+                      </div>
+                    </Field>
+                  </div>
+                  <Field label="Descrição (opcional)">
+                    <input
+                      type="text"
+                      placeholder="Para que serve esta regra…"
+                      value={form.description}
+                      onInput={(e) =>
+                        update({ description: e.currentTarget.value })}
+                      style={inputSt}
+                    />
+                  </Field>
+                  <label
+                    style={{
+                      display: "flex",
+                      gap: 6,
+                      alignItems: "center",
+                      fontSize: "var(--d-small)",
+                      color: "var(--text-secondary)",
+                    }}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={form.active}
+                      onChange={(e) =>
+                        update({ active: e.currentTarget.checked })}
+                    />
+                    Regra ativa
+                  </label>
+                </div>
+              )}
+              {tab === "scope" && renderScopeFields()}
+              {tab === "timing" && renderTimingFields()}
+              <div
+                style={{
+                  display: "flex",
+                  gap: 8,
+                  flexWrap: "wrap",
+                  alignItems: "center",
+                }}
+              >
+                <button
+                  type="submit"
+                  disabled={busy}
+                  className="lift"
+                  style={{
+                    ...primaryBtn,
+                    opacity: busy ? 0.7 : 1,
+                    flex: "1 1 160px",
+                  }}
+                >
+                  {busy
+                    ? "Salvando…"
+                    : editingId !== null
+                    ? "Salvar alterações"
+                    : "Criar regra"}
+                </button>
+                <button
+                  type="button"
+                  disabled={previewBusy}
+                  onClick={() => void runPreview()}
+                  style={ghostBtn}
+                >
+                  {previewBusy ? "Testando…" : "Testar escopo"}
+                </button>
+              </div>
+              {preview !== null && (
+                <div
+                  style={{
+                    fontSize: "var(--d-small)",
+                    color: "var(--text-secondary)",
+                    background: "var(--bg-surface)",
+                    border: "1.5px solid var(--border)",
+                    borderRadius: "var(--d-input-radius)",
+                    padding: "8px 12px",
+                  }}
+                >
+                  Escopo atual casa com <strong>{preview.count}</strong>{" "}
+                  barreira(s)
+                  {preview.tags.length > 0 &&
+                    ` - ex.: ${preview.tags.join(", ")}`}.
+                </div>
+              )}
+            </form>
+          </div>
+        </div>,
+        document.body,
+      )}
     </div>
   );
 }
