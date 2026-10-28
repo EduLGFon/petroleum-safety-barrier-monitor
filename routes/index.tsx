@@ -67,7 +67,11 @@ export default define.page(async function Home(
         return "";
       }
     })();
-    const vocabularies: Vocabularies = await getVocabularies();
+    const vocabularies: Vocabularies = await getVocabularies(
+      sessionUser?.role === "admin"
+        ? null
+        : (sessionUser?.allowedLocationIds ?? []),
+    );
     return (
       <main style={PAGE_STYLE}>
         <Dashboard
