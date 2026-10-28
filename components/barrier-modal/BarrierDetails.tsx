@@ -6,13 +6,13 @@ import {
   UserIcon,
 } from "../ui/Icons.tsx";
 
-import { SCOPE_COLORS } from "../../lib/constants.ts";
-
 import { fmtDate, installationLabel } from "../../lib/utils.ts";
 
-import { FR, Txt } from "./primitives.tsx";
+import { SCOPE_COLORS } from "../../lib/constants.ts";
 
 import type { Barrier } from "../../lib/types.ts";
+
+import { FR, Txt } from "./primitives.tsx";
 
 export function BarrierDetails({ b }: { b: Barrier }) {
   const deleted = (b.deletedAt ?? null) !== null;

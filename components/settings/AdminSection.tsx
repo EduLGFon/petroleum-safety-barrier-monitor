@@ -7,6 +7,8 @@ import { FieldOptionsManager } from "./admin/FieldOptionsManager.tsx";
 
 import { RecipientsManager } from "./admin/RecipientsManager.tsx";
 
+import { GroupsManager } from "./admin/GroupsManager.tsx";
+
 import { RulesManager } from "./admin/RulesManager.tsx";
 
 import { UsersManager } from "./admin/UsersManager.tsx";
@@ -17,7 +19,7 @@ import type { ComponentType } from "preact";
 
 import { useState } from "preact/hooks";
 
-type Sub = "users" | "recipients" | "rules" | "options";
+type Sub = "users" | "groups" | "recipients" | "rules" | "options";
 
 interface SubDef {
   key: Sub;
@@ -28,6 +30,7 @@ interface SubDef {
 // SUBS: admin sub-nav definitions with icons.
 const SUBS: SubDef[] = [
   { key: "users", label: "Usuários", Icon: UsersIcon },
+  { key: "groups", label: "Grupos", Icon: UsersIcon },
   { key: "recipients", label: "Destinatários", Icon: MailIcon },
   { key: "rules", label: "Regras", Icon: BellIcon },
   { key: "options", label: "Opções", Icon: SlidersIcon },
@@ -40,6 +43,7 @@ export function AdminSection(
   const [sub, setSub] = useState<Sub>("users");
   const [counts, setCounts] = useState<Record<Sub, number | null>>({
     users: null,
+    groups: null,
     recipients: null,
     rules: null,
     options: null,
@@ -165,6 +169,11 @@ export function AdminSection(
         <UsersManager
           currentUserId={sessionUser?.id}
           onCount={(n) => setCounts((c) => ({ ...c, users: n }))}
+        />
+      )}
+      {sub === "groups" && (
+        <GroupsManager
+          onCount={(n) => setCounts((c) => ({ ...c, groups: n }))}
         />
       )}
       {sub === "recipients" && (

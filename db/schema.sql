@@ -474,6 +474,54 @@ alter table alert_recipients add column if not exists phone text not null defaul
 -- Users gained an optional phone (second channel) for the mailing list.
 alter table users add column if not exists phone text not null default '';
 
+-- ─── Access groups (station-scoped visibility) ────────────────────────────
+-- A group grants its members read access to a subset of stations (locations).
+-- Admins bypass group scoping entirely. A user with no group sees no stations.
+create table if not exists access_groups (
+  id          integer generated always as identity primary key,
+  name        text        not null unique,
+  description text        not null default '',
+  created_at  timestamptz not null default now(),
+  updated_at  timestamptz not null default now()
+);
+
+create table if not exists access_group_locations (
+  group_id    integer not null references access_groups(id) on delete cascade,
+  location_id integer not null references locations(id) on delete cascade,
+  primary key (group_id, location_id)
+);
+
+create index if not exists idx_agl_group on access_group_locations(group_id);
+
+create table if not exists user_access_groups (
+  user_id  integer not null references users(id) on delete cascade,
+  group_id integer not null references access_groups(id) on delete cascade,
+  primary key (user_id, group_id)
+);
+
+create index if not exists idx_uag_user on user_access_groups(user_id);
+
+drop trigger if exists trg_access_groups_updated_at on access_groups;
+create trigger trg_access_groups_updated_at
+  before update on access_groups
+  for each row execute function set_updated_at();
+
+-- Backward compatibility: preserve existing non-admin access on first migrate.
+insert into access_groups (name, description)
+values ('Acesso geral', 'Grupo padrão criado na migração; acesso a todas as estações.')
+on conflict (name) do nothing;
+
+insert into access_group_locations (group_id, location_id)
+select g.id, l.id from access_groups g cross join locations l
+where g.name = 'Acesso geral'
+on conflict do nothing;
+
+insert into user_access_groups (user_id, group_id)
+select u.id, g.id
+from users u cross join access_groups g
+where u.role = 'user' and g.name = 'Acesso geral'
+on conflict do nothing;
+
 -- ─── Users + sessions (auth, two roles: admin and user) ─────────────────────
 -- Users own the dashboard login (email + password, cookie session). Role is
 -- 'admin' (full access: status writes, user and alert management) or 'user'

@@ -1,7 +1,7 @@
 // BarrierHeader - hero header with decision strip for the barrier dialog.
-import { ClockIcon, CloseIcon, TagIcon } from "../ui/Icons.tsx";
-
 import { daysSince, fmtDate, humanDuration } from "../../lib/utils.ts";
+
+import { ClockIcon, CloseIcon, TagIcon } from "../ui/Icons.tsx";
 
 import { DISP_COLORS } from "../../lib/constants.ts";
 

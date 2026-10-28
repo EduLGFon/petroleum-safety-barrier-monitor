@@ -152,7 +152,14 @@ export function RecipientsManager(
       />
       {error && <ErrorBanner message={error} onRetry={() => void refresh()} />}
       <AdminCard>
-        <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "end" }}>
+        <div
+          style={{
+            display: "flex",
+            gap: 10,
+            flexWrap: "wrap",
+            alignItems: "end",
+          }}
+        >
           <Field label="Selecionar usuário">
             <select
               value={selectedUserId}
@@ -173,7 +180,11 @@ export function RecipientsManager(
               disabled={assignBusy || !selectedUserId}
               className="lift"
               onClick={() => void assignUser()}
-              style={{ ...primaryBtn, opacity: (assignBusy || !selectedUserId) ? 0.7 : 1, width: "100%" }}
+              style={{
+                ...primaryBtn,
+                opacity: (assignBusy || !selectedUserId) ? 0.7 : 1,
+                width: "100%",
+              }}
             >
               {assignBusy ? "Atribuindo…" : "Atribuir à lista"}
             </button>
