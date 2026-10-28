@@ -471,6 +471,9 @@ create table if not exists alert_recipients (
 -- normalizePhone in lib/server/validation.ts.
 alter table alert_recipients add column if not exists phone text not null default '';
 
+-- Users gained an optional phone (second channel) for the mailing list.
+alter table users add column if not exists phone text not null default '';
+
 -- ─── Users + sessions (auth, two roles: admin and user) ─────────────────────
 -- Users own the dashboard login (email + password, cookie session). Role is
 -- 'admin' (full access: status writes, user and alert management) or 'user'
@@ -481,6 +484,7 @@ create table if not exists users (
   id                  integer generated always as identity primary key,
   email               text        not null unique,   -- always stored lowercased
   name                text        not null default '',
+  phone               text        not null default '',
   password_hash       text        not null,
   role                text        not null default 'user' check (role in ('admin', 'user')),
   active              boolean     not null default true,

@@ -25,21 +25,23 @@ interface PublicUser {
   id: number;
   email: string;
   name: string;
+  phone: string;
   role: "admin" | "user";
   active: boolean;
 }
 
-// ResetPasswordForm: admin-issued reset for one user. The target's current
-// password is never required (this is the recovery path), but every session
-// for that user is revoked by the API after the new hash is stored.
-function ResetPasswordForm(
+// EditUserForm: admin edit of all user fields (name, email, password, phone).
+function EditUserForm(
   { user, onCancel, onDone }: {
     user: PublicUser;
     onCancel: () => void;
     onDone: (email: string) => void;
   },
 ) {
-  const [next, setNext] = useState("");
+  const [email, setEmail] = useState(user.email);
+  const [name, setName] = useState(user.name);
+  const [phone, setPhone] = useState(user.phone ?? "");
+  const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
   const [show, setShow] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -47,25 +49,31 @@ function ResetPasswordForm(
 
   async function submit(e: Event) {
     e.preventDefault();
-    if (next !== confirm) {
+    if (password !== "" && password !== confirm) {
       setError("A nova senha e a confirmação não coincidem");
       return;
     }
-    if (next.length < 12) {
+    if (password !== "" && password.length < 12) {
       setError("A nova senha deve ter pelo menos 12 caracteres");
       return;
     }
     setBusy(true);
     try {
       setError("");
+      const body: Record<string, unknown> = {
+        email,
+        name,
+        phone,
+      };
+      if (password !== "") body.password = password;
       await adminApi(`/api/users/${user.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ password: next }),
+        body: JSON.stringify(body),
       });
-      setNext("");
+      setPassword("");
       setConfirm("");
-      onDone(user.email);
+      onDone(email);
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     } finally {
@@ -83,8 +91,7 @@ function ResetPasswordForm(
       <span style={{ position: "relative", display: "block" }}>
         <input
           type={show ? "text" : "password"}
-          required
-          minLength={12}
+          minLength={password ? 12 : undefined}
           autoComplete="new-password"
           placeholder={placeholder}
           value={value}
@@ -126,19 +133,8 @@ function ResetPasswordForm(
           color: "var(--text-primary)",
         }}
       >
-        Redefinir senha de {user.email}
+        Editar usuário {user.email}
       </div>
-      <p
-        style={{
-          margin: 0,
-          fontSize: "var(--d-small)",
-          color: "var(--text-muted)",
-          lineHeight: 1.55,
-        }}
-      >
-        Ao salvar, todas as sessões desse usuário serão encerradas. Ele deverá
-        entrar novamente com a nova senha.
-      </p>
       {error && (
         <div
           role="alert"
@@ -157,13 +153,38 @@ function ResetPasswordForm(
         </div>
       )}
       <form onSubmit={submit} style={{ display: "grid", gap: 10 }}>
+        <Field label="E-mail">
+          <input
+            type="email"
+            required
+            value={email}
+            onInput={(e) => setEmail(e.currentTarget.value)}
+            style={inputSt}
+          />
+        </Field>
+        <Field label="Nome">
+          <input
+            type="text"
+            value={name}
+            onInput={(e) => setName(e.currentTarget.value)}
+            style={inputSt}
+          />
+        </Field>
+        <Field label="Telefone">
+          <input
+            type="tel"
+            value={phone}
+            onInput={(e) => setPhone(e.currentTarget.value)}
+            style={inputSt}
+          />
+        </Field>
         {passwordField(
-          "Nova senha (12+)",
-          next,
-          setNext,
-          "Mínimo 12 caracteres",
+          "Nova senha (12+, opcional)",
+          password,
+          setPassword,
+          "Deixe em branco para manter",
         )}
-        {passwordField(
+        {password !== "" && passwordField(
           "Confirmar nova senha",
           confirm,
           setConfirm,
@@ -180,7 +201,7 @@ function ResetPasswordForm(
               flex: "1 1 160px",
             }}
           >
-            {busy ? "Salvando…" : "Salvar nova senha"}
+            {busy ? "Salvando…" : "Salvar alterações"}
           </button>
           <button
             type="button"
@@ -209,9 +230,10 @@ export function UsersManager(
   const [email, setEmail] = useState("");
   const [name, setName] = useState("");
   const [password, setPassword] = useState("");
+  const [phone, setPhone] = useState("");
   const [role, setRole] = useState<"admin" | "user">("user");
   const [busy, setBusy] = useState(false);
-  const [resetFor, setResetFor] = useState<number | null>(null);
+  const [editFor, setEditFor] = useState<number | null>(null);
   const [notice, setNotice] = useState("");
 
   async function refresh() {
@@ -240,10 +262,11 @@ export function UsersManager(
       await adminApi("/api/users", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, name, password, role }),
+        body: JSON.stringify({ email, name, phone, password, role }),
       });
       setEmail("");
       setName("");
+      setPhone("");
       setPassword("");
       await refresh();
     } catch (err) {
@@ -295,6 +318,15 @@ export function UsersManager(
               placeholder="Nome completo"
               value={name}
               onInput={(e) => setName(e.currentTarget.value)}
+              style={inputSt}
+            />
+          </Field>
+          <Field label="Telefone">
+            <input
+              type="tel"
+              placeholder="DDD + número (opcional)"
+              value={phone}
+              onInput={(e) => setPhone(e.currentTarget.value)}
               style={inputSt}
             />
           </Field>
@@ -442,24 +474,24 @@ export function UsersManager(
                         <button
                           type="button"
                           onClick={() => {
-                            setResetFor(u.id);
+                            setEditFor(u.id);
                             setNotice("");
                           }}
                           style={ghostBtn}
                         >
-                          Redefinir senha
+                          Editar
                         </button>
                       )}
                   </span>
                 </AdminRow>
-                {resetFor === u.id && (
-                  <ResetPasswordForm
+                {editFor === u.id && (
+                  <EditUserForm
                     user={u}
-                    onCancel={() => setResetFor(null)}
+                    onCancel={() => setEditFor(null)}
                     onDone={(email) => {
-                      setResetFor(null);
+                      setEditFor(null);
                       setNotice(
-                        `Senha de ${email} alterada. Todas as sessões desse usuário foram encerradas.`,
+                        `Usuário ${email} atualizado.`,
                       );
                     }}
                   />

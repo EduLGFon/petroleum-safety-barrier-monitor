@@ -2,11 +2,11 @@
 // This is why it exists: authentication needs a validated store behind the
 // /api/auth and /api/users routes, while the routes own throttling and the
 // session-or-token guard. Password hashing lives in lib/server/auth/.
-import { normalizeEmail, normalizeName } from "../validation.ts";
+import { normalizeEmail, normalizeName, normalizePhone } from "../validation.ts";
 
 import { queryRows, type TxQuery, withTx } from "../db.ts";
 
-export { normalizeEmail, normalizeName };
+export { normalizeEmail, normalizeName, normalizePhone };
 
 export type UserRole = "admin" | "user";
 
@@ -14,6 +14,7 @@ export interface UserRow {
   id: number;
   email: string;
   name: string;
+  phone: string;
   password_hash: string;
   role: UserRole;
   active: boolean;
@@ -24,6 +25,7 @@ export interface PublicUser {
   id: number;
   email: string;
   name: string;
+  phone: string;
   role: UserRole;
   active: boolean;
   created_at: string;
@@ -35,6 +37,7 @@ export function toPublicUser(row: UserRow): PublicUser {
     id: row.id,
     email: row.email,
     name: row.name,
+    phone: row.phone,
     role: row.role,
     active: row.active,
     created_at: row.created_at,
@@ -47,7 +50,7 @@ export function normalizeRole(raw: unknown): UserRole {
   throw new Error("role must be admin or user");
 }
 
-const PUBLIC_COLUMNS = "id, email, name, role, active, created_at::text";
+const PUBLIC_COLUMNS = "id, email, name, coalesce(phone, '') as phone, role, active, created_at::text";
 
 export async function listUsers(): Promise<PublicUser[]> {
   const rows = await queryRows<PublicUser>(
@@ -58,7 +61,7 @@ export async function listUsers(): Promise<PublicUser[]> {
 
 export async function getUserByEmail(email: string): Promise<UserRow | null> {
   const rows = await queryRows<UserRow>(
-    `select id, email, name, password_hash, role, active, created_at::text
+    `select id, email, name, coalesce(phone, '') as phone, password_hash, role, active, created_at::text
      from users where email = $1`,
     [email],
   );
@@ -70,7 +73,7 @@ export async function getUserById(
   query: TxQuery = queryRows,
 ): Promise<UserRow | null> {
   const rows = await query<UserRow>(
-    `select id, email, name, password_hash, role, active, created_at::text
+    `select id, email, name, coalesce(phone, '') as phone, password_hash, role, active, created_at::text
      from users where id = $1`,
     [id],
   );
@@ -97,16 +100,18 @@ export async function countActiveAdmins(
 export async function createUser(input: {
   email: string;
   name: string;
+  phone?: unknown;
   passwordHash: string;
   role: UserRole;
 }): Promise<PublicUser> {
   const rows = await queryRows<PublicUser>(
-    `insert into users (email, name, password_hash, role)
-     values ($1, $2, $3, $4)
+    `insert into users (email, name, phone, password_hash, role)
+     values ($1, $2, $3, $4, $5)
      returning ${PUBLIC_COLUMNS}`,
     [
       normalizeEmail(input.email),
       normalizeName(input.name),
+      normalizePhone(input.phone ?? ""),
       input.passwordHash,
       normalizeRole(input.role),
     ],
@@ -134,7 +139,9 @@ async function lockActiveAdmins(query: TxQuery): Promise<void> {
 export async function updateUser(
   id: number,
   patch: {
+    email?: unknown;
     name?: unknown;
+    phone?: unknown;
     role?: unknown;
     active?: unknown;
     passwordHash?: string;
@@ -150,9 +157,17 @@ export async function updateUser(
     if (!current) return null;
     const sets: string[] = [];
     const args: unknown[] = [];
+    if (patch.email !== undefined) {
+      args.push(normalizeEmail(patch.email));
+      sets.push(`email = $${args.length}`);
+    }
     if (patch.name !== undefined) {
       args.push(normalizeName(patch.name));
       sets.push(`name = $${args.length}`);
+    }
+    if (patch.phone !== undefined) {
+      args.push(normalizePhone(patch.phone));
+      sets.push(`phone = $${args.length}`);
     }
     if (patch.role !== undefined) {
       const role = normalizeRole(patch.role);

@@ -294,5 +294,6 @@ export interface AuthUser {
   id: number;
   email: string;
   name: string;
+  phone: string;
   role: "admin" | "user";
 }

@@ -28,6 +28,12 @@ export function AccountSection(
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [done, setDone] = useState(false);
+  const [name, setName] = useState(sessionUser?.name ?? "");
+  const [email, setEmail] = useState(sessionUser?.email ?? "");
+  const [phone, setPhone] = useState(sessionUser?.phone ?? "");
+  const [profileBusy, setProfileBusy] = useState(false);
+  const [profileError, setProfileError] = useState("");
+  const [profileDone, setProfileDone] = useState(false);
 
   if (!sessionUser) {
     return (
@@ -62,6 +68,24 @@ export function AccountSection(
         </div>
       </div>
     );
+  }
+
+  async function submitProfile(e: Event) {
+    e.preventDefault();
+    setProfileBusy(true);
+    setProfileError("");
+    try {
+      await adminApi("/api/auth/profile", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name, email, phone }),
+      });
+      setProfileDone(true);
+    } catch (err) {
+      setProfileError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setProfileBusy(false);
+    }
   }
 
   async function submit(e: Event) {
@@ -178,6 +202,82 @@ export function AccountSection(
             {sessionUser.role === "admin" ? "Admin" : "Usuário"}
           </StatusBadge>
         </div>
+      </AdminCard>
+      <AdminCard>
+        <div
+          style={{
+            fontSize: "var(--d-lead)",
+            fontWeight: 800,
+            color: "var(--text-primary)",
+            letterSpacing: "-0.01em",
+          }}
+        >
+          Editar perfil
+        </div>
+        {profileError && (
+          <div
+            role="alert"
+            className="animate-fade-in"
+            style={{
+              background: "var(--au-danger-bg)",
+              border: "1px solid var(--alert-nc-border)",
+              color: "var(--au-danger-fg)",
+              borderRadius: "var(--d-row-radius)",
+              padding: "10px 12px",
+              fontSize: "var(--d-small)",
+              lineHeight: 1.5,
+            }}
+          >
+            {profileError}
+          </div>
+        )}
+        {profileDone && (
+          <div
+            role="status"
+            style={{
+              fontSize: "var(--d-small)",
+              color: "#10b981",
+              fontWeight: 600,
+            }}
+          >
+            Perfil atualizado.
+          </div>
+        )}
+        <form onSubmit={submitProfile} style={{ display: "grid", gap: 10 }}>
+          <Field label="Nome">
+            <input
+              type="text"
+              value={name}
+              onInput={(e) => setName(e.currentTarget.value)}
+              style={inputSt}
+            />
+          </Field>
+          <Field label="E-mail">
+            <input
+              type="email"
+              required
+              value={email}
+              onInput={(e) => setEmail(e.currentTarget.value)}
+              style={inputSt}
+            />
+          </Field>
+          <Field label="Telefone">
+            <input
+              type="tel"
+              value={phone}
+              onInput={(e) => setPhone(e.currentTarget.value)}
+              style={inputSt}
+            />
+          </Field>
+          <button
+            type="submit"
+            disabled={profileBusy}
+            className="lift"
+            style={{ ...primaryBtn, opacity: profileBusy ? 0.7 : 1 }}
+          >
+            {profileBusy ? "Salvando…" : "Salvar perfil"}
+          </button>
+        </form>
       </AdminCard>
       {done
         ? (

@@ -69,7 +69,9 @@ export const handler = define.handlers({
     const parsed = await readJsonBody(ctx.req);
     if (!parsed.ok) return badRequest("Invalid JSON body", requestId);
     const body = parsed.body as {
+      email?: unknown;
       name?: unknown;
+      phone?: unknown;
       role?: unknown;
       active?: unknown;
       password?: unknown;
@@ -90,7 +92,9 @@ export const handler = define.handlers({
       // updateUser revokes sessions itself when the password or active state
       // changes, in one transaction with the row update.
       const updated = await updateUser(id, {
+        email: body.email,
         name: body.name,
+        phone: body.phone,
         role: body.role,
         active: body.active,
         passwordHash,
@@ -102,6 +106,14 @@ export const handler = define.handlers({
       // A self-demotion/deactivation is still the last-admin guard, but the
       // caller can act on a clearer "your own account" explanation. The wire
       // message stays English; the UI localizes it.
+      if (message.includes("duplicate") || message.includes("unique")) {
+        return badRequest(
+          message.includes("email") || message.includes("users_email")
+            ? "email already exists"
+            : "duplicate value",
+          requestId,
+        );
+      }
       const publicMessage = auth.user?.id === id &&
           message.includes("last active admin")
         ? message.replace(
@@ -110,7 +122,8 @@ export const handler = define.handlers({
         )
         : message;
       if (
-        message.includes("name") || message.includes("role") ||
+        message.includes("email") || message.includes("name") ||
+        message.includes("phone") || message.includes("role") ||
         message.includes("active") || message.includes("password") ||
         message.includes("nothing to update") ||
         message.includes("last active admin")

@@ -29,6 +29,13 @@ interface Recipient {
   active: boolean;
 }
 
+interface UserOption {
+  id: number;
+  email: string;
+  name: string;
+  phone: string;
+}
+
 // RecipientsManager: recipient CRUD; two-click inline confirm on remove.
 export function RecipientsManager(
   { onCount }: { onCount?: (n: number) => void },
@@ -39,6 +46,9 @@ export function RecipientsManager(
   const [email, setEmail] = useState("");
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
+  const [users, setUsers] = useState<UserOption[]>([]);
+  const [selectedUserId, setSelectedUserId] = useState("");
+  const [assignBusy, setAssignBusy] = useState(false);
   const [busy, setBusy] = useState(false);
   const [confirmId, setConfirmId] = useState<number | null>(null);
 
@@ -49,6 +59,12 @@ export function RecipientsManager(
       const list = await adminApi("/api/recipients") as Recipient[];
       setItems(list);
       onCount?.(list.filter((r) => r.active).length);
+      try {
+        const userList = await adminApi("/api/users") as UserOption[];
+        setUsers(userList);
+      } catch {
+        // ignore user list errors; manual entry still works
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     } finally {
@@ -108,6 +124,25 @@ export function RecipientsManager(
     }
   }
 
+  async function assignUser() {
+    const u = users.find((x) => String(x.id) === selectedUserId);
+    if (!u) return;
+    setAssignBusy(true);
+    try {
+      await adminApi("/api/recipients", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: u.email, name: u.name, phone: u.phone }),
+      });
+      setSelectedUserId("");
+      await refresh();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setAssignBusy(false);
+    }
+  }
+
   return (
     <div style={{ display: "grid", gap: 12 }}>
       <AdminHero
@@ -116,6 +151,35 @@ export function RecipientsManager(
         count={`${items.filter((r) => r.active).length} ativos`}
       />
       {error && <ErrorBanner message={error} onRetry={() => void refresh()} />}
+      <AdminCard>
+        <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "end" }}>
+          <Field label="Selecionar usuário">
+            <select
+              value={selectedUserId}
+              onChange={(e) => setSelectedUserId(e.currentTarget.value)}
+              style={inputSt}
+            >
+              <option value="">Escolha um usuário…</option>
+              {users.map((u) => (
+                <option key={u.id} value={u.id}>
+                  {u.name ? `${u.name} — ${u.email}` : u.email}
+                </option>
+              ))}
+            </select>
+          </Field>
+          <div style={{ display: "flex", alignItems: "end", flex: "1 1 100%" }}>
+            <button
+              type="button"
+              disabled={assignBusy || !selectedUserId}
+              className="lift"
+              onClick={() => void assignUser()}
+              style={{ ...primaryBtn, opacity: (assignBusy || !selectedUserId) ? 0.7 : 1, width: "100%" }}
+            >
+              {assignBusy ? "Atribuindo…" : "Atribuir à lista"}
+            </button>
+          </div>
+        </div>
+      </AdminCard>
       <AdminCard>
         <form
           onSubmit={create}

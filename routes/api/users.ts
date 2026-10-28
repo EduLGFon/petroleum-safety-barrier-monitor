@@ -110,6 +110,7 @@ export const handler = define.handlers({
     const body = parsed.body as {
       email?: unknown;
       name?: unknown;
+      phone?: unknown;
       password?: unknown;
       role?: unknown;
     };
@@ -119,6 +120,7 @@ export const handler = define.handlers({
       const user = await createUser({
         email: body.email as string,
         name: (body.name as string | undefined) ?? "",
+        phone: body.phone,
         passwordHash: await hashPassword(password),
         role,
       });

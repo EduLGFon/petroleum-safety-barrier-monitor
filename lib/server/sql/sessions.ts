@@ -9,6 +9,7 @@ export interface SessionUser {
   id: number;
   email: string;
   name: string;
+  phone: string;
   role: UserRole;
   active: boolean;
 }
@@ -31,7 +32,7 @@ export async function getSessionUser(
   tokenHash: string,
 ): Promise<SessionUser | null> {
   const rows = await queryRows<SessionUser>(
-    `select u.id, u.email, u.name, u.role, u.active
+    `select u.id, u.email, u.name, coalesce(u.phone, '') as phone, u.role, u.active
      from sessions s join users u on u.id = s.user_id
      where s.token_hash = $1 and s.expires_at > now() and u.active`,
     [tokenHash],
