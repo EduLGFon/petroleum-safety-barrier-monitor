@@ -91,7 +91,13 @@ export const handler = define.handlers({
         scope === null && runRaw === null && params.get("kind") === null &&
         (params.get("query") === null && params.get("q") === null);
       if (legacy) {
-        const result = await listSyncChanges({ page: 1, pageSize });
+        const result = await listSyncChanges({
+          page: 1,
+          pageSize,
+          allowedLocationIds: dataAuth.role === "admin"
+            ? null
+            : (dataAuth.user?.allowedLocationIds ?? []),
+        });
         const changes = result.items.map((c) => ({
           barrierId: c.barrierId,
           tag: c.tag,
@@ -115,6 +121,9 @@ export const handler = define.handlers({
         query,
         page,
         pageSize,
+        allowedLocationIds: dataAuth.role === "admin"
+          ? null
+          : (dataAuth.user?.allowedLocationIds ?? []),
       });
       // When runId is absent and scope is last-run, listSyncChanges resolves
       // the latest finished run internally.

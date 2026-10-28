@@ -1071,6 +1071,7 @@ export interface ListSyncChangesArgs {
   query?: string | null;
   page?: number;
   pageSize?: number;
+  allowedLocationIds?: number[] | null;
 }
 
 export interface ListSyncChangesResult {
@@ -1160,6 +1161,15 @@ export async function listSyncChanges(
       params.push(`%${q.replace(/[%_\\]/g, (m) => `\\${m}`)}%`);
       conds.push(`b.tag ilike $${params.length} escape '\\'`);
     }
+    // SECURITY: station access scope.
+    if (Array.isArray(args.allowedLocationIds)) {
+      if (args.allowedLocationIds.length === 0) {
+        conds.push("false");
+      } else {
+        params.push(args.allowedLocationIds);
+        conds.push(`b.location_id = any($${params.length})`);
+      }
+    }
     const where = conds.length > 0 ? `where ${conds.join(" and ")}` : "";
     // Single round-trip: the total rides along as count(*) OVER() so the
     // page and the count share one filtered scan. Out-of-range pages take
@@ -1222,7 +1232,11 @@ export async function listSyncChanges(
       changedAt: r.created_at,
       runId: r.run_id,
     }));
-    const summary = await summarizeAuditRows(run?.id ?? null, sinceIso);
+    const summary = await summarizeAuditRows(
+      run?.id ?? null,
+      sinceIso,
+      args.allowedLocationIds,
+    );
     return {
       run,
       items,
@@ -1241,6 +1255,7 @@ export async function listSyncChanges(
       query: q,
       page,
       pageSize,
+      allowedLocationIds: args.allowedLocationIds,
     });
   }
 }
@@ -1264,6 +1279,7 @@ function emptyChangeResult(
 async function summarizeAuditRows(
   runId: number | null,
   sinceIso: string | null,
+  allowedLocationIds?: number[] | null,
 ): Promise<SyncChangeSummary> {
   try {
     const conds: string[] = [];
@@ -1277,10 +1293,17 @@ async function summarizeAuditRows(
     } else {
       return { total: 0, byKind: {}, byStatus: {}, critical: 0 };
     }
+    if (Array.isArray(allowedLocationIds)) {
+      if (allowedLocationIds.length === 0) {
+        return { total: 0, byKind: {}, byStatus: {}, critical: 0 };
+      }
+      params.push(allowedLocationIds);
+      conds.push(`b.location_id = any($${params.length})`);
+    }
     const where = `where ${conds.join(" and ")}`;
     const [kindRows, statusRows, critRows] = await Promise.all([
       queryRows<{ kind: string; n: number }>(
-        `select c.kind, count(*)::int as n from sync_barrier_changes c ${where} group by c.kind`,
+        `select c.kind, count(*)::int as n from sync_barrier_changes c join barriers b on b.id = c.barrier_id ${where} group by c.kind`,
         params,
       ),
       queryRows<{ label: string; n: number }>(
@@ -1321,6 +1344,7 @@ async function listSyncChangesLegacy(args: {
   query: string;
   page: number;
   pageSize: number;
+  allowedLocationIds?: number[] | null;
 }): Promise<ListSyncChangesResult> {
   const take = 200;
   let items: SyncChangeItem[] = [];
@@ -1356,6 +1380,18 @@ async function listSyncChangesLegacy(args: {
   if (args.query !== "") {
     const needle = args.query.toLowerCase();
     items = items.filter((c) => c.tag.toLowerCase().includes(needle));
+  }
+  if (Array.isArray(args.allowedLocationIds)) {
+    if (args.allowedLocationIds.length === 0) {
+      items = [];
+    } else {
+      const allowed = await queryRows<{ code: string }>(
+        `select code from locations where id = any($1)`,
+        [args.allowedLocationIds],
+      );
+      const codes = new Set(allowed.map((r) => r.code));
+      items = items.filter((c) => codes.has(c.location));
+    }
   }
   const total = items.length;
   const start = (args.page - 1) * args.pageSize;

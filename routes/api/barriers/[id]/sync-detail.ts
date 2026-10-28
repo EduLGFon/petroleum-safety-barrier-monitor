@@ -21,6 +21,8 @@ import {
   routeClientKey,
 } from "../../../../lib/server/throttle.ts";
 
+import { getBarrierById } from "../../../../lib/server/sql/barriers.ts";
+
 import { getBarrierSyncDetail } from "../../../../lib/server/sql/sync.ts";
 
 import { loadServerConfig } from "../../../../lib/server/config.ts";
@@ -62,6 +64,17 @@ export const handler = define.handlers({
     const barrierId = parseIdParam(ctx.params.id);
     if (barrierId === undefined) {
       return badRequest("Invalid barrier id", requestId);
+    }
+    // SECURITY: station access scope.
+    if (dataAuth.role !== "admin") {
+      const barrier = await getBarrierById(barrierId);
+      const allowed = dataAuth.user?.allowedLocationIds ?? [];
+      if (
+        barrier && Array.isArray(allowed) &&
+        !allowed.includes(barrier.locationId)
+      ) {
+        return notFound("No sync change found", requestId);
+      }
     }
     const params = new URL(ctx.req.url).searchParams;
     const runRaw = params.get("runId");
