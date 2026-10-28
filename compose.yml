@@ -74,6 +74,7 @@ services:
         condition: service_healthy
     volumes:
       - ./.env:/app/.env:ro
+      - ./secrets:/app/secrets:ro
     ports:
       - "8300:8300"
     restart: unless-stopped

@@ -19,3 +19,6 @@ docs/
 .vscode/
 *.md
 **/*.md
+
+# SSO secrets
+secrets/
