@@ -456,7 +456,7 @@ select option {
   --d-badge-dot: 6px;
   --d-badge-dot-xs: 5px;
   /* Dialog (modal + settings panel) */
-  --d-dialog-w: 580px;
+  --d-dialog-w: 900px;
   --d-dialog-radius: 20px;
   --d-dialog-head: 20px 22px 16px;
   --d-dialog-body: 20px 22px;
@@ -579,7 +579,7 @@ select option {
   --d-badge-md-pad: 3px 9px;
   --d-badge-dot: 5px;
   --d-badge-dot-xs: 4px;
-  --d-dialog-w: 520px;
+  --d-dialog-w: 820px;
   --d-dialog-radius: 16px;
   --d-dialog-head: 15px 18px 12px;
   --d-dialog-body: 15px 18px;
@@ -698,7 +698,7 @@ select option {
   --d-badge-md-pad: 5px 13px;
   --d-badge-dot: 7px;
   --d-badge-dot-xs: 6px;
-  --d-dialog-w: 640px;
+  --d-dialog-w: 980px;
   --d-dialog-radius: 24px;
   --d-dialog-head: 25px 27px 20px;
   --d-dialog-body: 25px 27px;

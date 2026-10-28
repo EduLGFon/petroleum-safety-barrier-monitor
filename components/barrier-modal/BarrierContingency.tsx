@@ -176,7 +176,7 @@ export function BarrierContingency(
           display: "grid",
           gridTemplateColumns: "1fr 1fr",
           gap: "var(--d-details-gap)",
-          marginBottom: "var(--d-details-gap)",
+          marginBottom: "var(--d-block-gap)",
         }}
       >
         <FR
@@ -192,10 +192,12 @@ export function BarrierContingency(
           italic={!b.evidenceCode}
         />
       </div>
-      <Txt
-        value={b.contingencyDesc || "Sem descrição de contingência."}
-        muted={!b.contingencyDesc}
-      />
+      <div style={{ marginBottom: "var(--d-block-gap)" }}>
+        <Txt
+          value={b.contingencyDesc || "Sem descrição de contingência."}
+          muted={!b.contingencyDesc}
+        />
+      </div>
 
       {!connected
         ? (
@@ -219,8 +221,8 @@ export function BarrierContingency(
               <p
                 role="alert"
                 style={{
-                  margin: "var(--d-details-gap) 0",
-                  padding: "12px 14px",
+                  margin: "var(--d-block-gap) 0",
+                  padding: "var(--d-row-pad)",
                   border: "1px solid var(--au-danger-fg)",
                   borderRadius: "var(--d-input-radius)",
                   color: "var(--au-danger-fg)",

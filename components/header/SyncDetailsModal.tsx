@@ -115,7 +115,7 @@ export function SyncDetailsModal(
         <div
           style={{
             width: "100%",
-            maxWidth: 520,
+            maxWidth: 760,
             maxHeight: "86dvh",
             display: "flex",
             flexDirection: "column",

@@ -110,9 +110,11 @@ export function ContingencyCandidates(
     onAdd: (candidateId: number) => void;
   },
 ) {
+  const [selectedId, setSelectedId] = useState<number | null>(null);
+  const selected = candidates.find((c) => c.id === selectedId) ?? null;
   return (
     <>
-      <label style={{ display: "block", marginBottom: 8 }}>
+      <label style={{ display: "block", marginBottom: "var(--d-gap-xs)" }}>
         Buscar por tag na mesma instalação
         <input
           type="search"
@@ -130,23 +132,30 @@ export function ContingencyCandidates(
       </p>
       {candidates.length
         ? (
-          <ul style={{ paddingLeft: 22 }}>
+          <ul style={{ paddingLeft: 22, marginBottom: "var(--d-gap)" }}>
             {candidates.map((candidate) => (
               <li
                 key={candidate.id}
-                style={{ margin: "8px 0", color: "var(--text-primary)" }}
+                style={{
+                  margin: "var(--d-gap-xs) 0",
+                  color: "var(--text-primary)",
+                  cursor: canManage ? "pointer" : "default",
+                }}
+                onClick={() => canManage && setSelectedId(candidate.id)}
               >
-                {candidate.tag}
-                {canManage && (
-                  <button
-                    type="button"
-                    disabled={busy}
-                    onClick={() => onAdd(candidate.id)}
-                    style={buttonStyle}
-                  >
-                    Vincular
-                  </button>
-                )}
+                <span
+                  style={{
+                    display: "inline-block",
+                    padding: "2px 8px",
+                    borderRadius: "var(--d-input-radius)",
+                    background: selectedId === candidate.id
+                      ? "var(--accent)"
+                      : "transparent",
+                    color: selectedId === candidate.id ? "#fff" : "inherit",
+                  }}
+                >
+                  {candidate.tag}
+                </span>
               </li>
             ))}
           </ul>
@@ -161,6 +170,35 @@ export function ContingencyCandidates(
           Há mais resultados. Refine a busca pela tag.
         </p>
       )}
+      {canManage && candidates.length > 0 && (
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            gap: "var(--d-gap)",
+            marginTop: "var(--d-gap)",
+            paddingTop: "var(--d-gap)",
+            borderTop: "1px solid var(--border)",
+          }}
+        >
+          <span
+            style={{ color: "var(--text-muted)", fontSize: "var(--d-small)" }}
+          >
+            {selected
+              ? `Selecionada: ${selected.tag}`
+              : "Selecione uma barreira acima"}
+          </span>
+          <button
+            type="button"
+            disabled={busy || selectedId === null}
+            onClick={() => selectedId !== null && onAdd(selectedId)}
+            style={buttonStyle}
+          >
+            Vincular
+          </button>
+        </div>
+      )}
     </>
   );
 }
@@ -173,7 +211,13 @@ function ReferenceFields(
   },
 ) {
   return (
-    <div style={{ display: "grid", gap: 8, margin: "12px 0" }}>
+    <div
+      style={{
+        display: "grid",
+        gap: "var(--d-gap-xs)",
+        margin: "var(--d-stack-sm) 0",
+      }}
+    >
       <label>
         Gestão de Mudança
         <input
@@ -219,7 +263,7 @@ const inputStyle = {
   width: "100%",
   boxSizing: "border-box" as const,
   padding: "var(--d-sel-pad)",
-  marginTop: 4,
+  marginTop: "var(--d-gap-xs)",
   border: "1px solid var(--border)",
   borderRadius: "var(--d-input-radius)",
   background: "var(--bg-surface)",
@@ -229,13 +273,13 @@ const inputStyle = {
 const cardStyle = {
   border: "1px solid var(--border)",
   borderRadius: "var(--d-input-radius)",
-  padding: 12,
-  margin: "8px 0",
+  padding: "var(--d-row-pad)",
+  margin: "var(--d-gap) 0",
 };
 
 const buttonStyle = {
-  margin: "4px 8px 4px 0",
-  padding: "6px 10px",
+  margin: "var(--d-gap-xs) var(--d-gap-xs) var(--d-gap-xs) 0",
+  padding: "var(--d-mini-pad)",
   border: "1px solid var(--border)",
   borderRadius: "var(--d-input-radius)",
   background: "var(--bg-elevated)",
