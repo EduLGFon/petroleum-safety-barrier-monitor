@@ -1,324 +1,98 @@
 # Architecture - Safety Barrier Monitor
 
-Single source of truth for modules, data flows, runtime lifecycle, island
-bridge topology, persistence, and config. Read this before any architectural
-change (see `agents.md` documentation rules).
-
 Stack: Deno-only Fresh 2 + Vite + Preact islands. No ORM, no `package.json`.
 
 ## Runtime lifecycle
 
-`main.ts` boots one `App<State>` (`utils.ts` `define`) with `staticFiles()`
-plus `fsRoutes()`. `client.ts` only imports `static/styles.css` for HMR.
-`vite.config.ts` enables `@fresh/plugin-vite`.
+`main.ts` boots one `App<State>` (`utils.ts` `define`) with `staticFiles()` + `fsRoutes()`. `client.ts` imports `static/styles.css` for HMR. `vite.config.ts` enables `@fresh/plugin-vite`.
 
-| Task                                                  | Command                                                                                                                                                                                                                              | Env source                                                  |
-| ----------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------- |
-| `check`                                               | `deno fmt --check . && deno lint . && deno check main.ts routes/api/*.ts routes/api/*/*.ts routes/api/*/*/*.ts scripts/*.ts && deno run --allow-read=db/schema.sql scripts/check-migration-order.ts`                                 | none                                                        |
-| `test`                                                | `deno test --allow-read=scripts/fixtures,db/schema.sql --allow-net=127.0.0.1,localhost --allow-env=OPS_SMTP_HOST,OPS_SMTP_PORT,OPS_SMTP_USER,OPS_SMTP_PASS,OPS_EMAIL_TO,OPS_EMAIL_FROM,MAIL_HOST,MAIL_USER,MAIL_PASS,DATABASE_URL .` | shell + `DATABASE_URL` (integration gated)                  |
-| `dev`                                                 | `vite`                                                                                                                                                                                                                               | shell only, no `--env-file`; `export $(cat .env \| xargs)`  |
-| `build`                                               | `vite build`                                                                                                                                                                                                                         | shell at build time; request-time env still needed at serve |
-| `preview`                                             | `deno serve -A _fresh/server.js`                                                                                                                                                                                                     | shell only, no `--env-file`                                 |
-| `start`                                               | `deno serve --env-file=.env -A _fresh/server.js`                                                                                                                                                                                     | `.env`                                                      |
-| `db:migrate`                                          | `deno run -A --env-file=.env scripts/migrate.ts`                                                                                                                                                                                     | `.env` (`DATABASE_URL`)                                     |
-| `db:seed`                                             | `deno run -A --env-file=.env scripts/seed.ts`                                                                                                                                                                                        | `.env` (`DATABASE_URL`)                                     |
-| `fracttal:import`                                     | `deno run -A --env-file=.env scripts/fracttal-import.ts`                                                                                                                                                                             | `.env` (`DATABASE_URL`)                                     |
-| `fracttal:sync`                                       | `deno run -A --env-file=.env scripts/fracttal-sync.ts`                                                                                                                                                                               | `.env` (`DATABASE_URL` + `FRACTTAL_*` live)                 |
-| `fracttal:force-sync`                                 | `deno run -A --env-file=.env scripts/fracttal-force-sync.ts`                                                                                                                                                                         | `.env` (`DATABASE_URL` + `FRACTTAL_*` live)                 |
-| `browser:capture`                                     | `deno run -A scripts/browser-capture.ts [url] [out] [--mode shot\|pdf]`                                                                                                                                                              | none                                                        |
-| `docker:build` / `:up` / `:down` / `:logs`            | `docker compose build` / `up -d --build` / `down` / `logs -f`                                                                                                                                                                        | `.env`                                                      |
-| `docker:migrate` / `:audit` / `:sync` / `:force-sync` | `docker compose run --rm tools ...` wrappers around `migrate` / `audit` / `sync --live` / `force-sync`                                                                                                                               | `.env`                                                      |
-| `docker:dev` / `:dev-down`                            | `docker compose -f compose.yml -f compose.dev.yml up --build` / `down` (bind mounts: vite HMR on :5173, `--watch` loops, no rebuild per edit)                                                                                        | `.env`                                                      |
-| `fracttal:audit`                                      | `deno run -A --env-file=.env scripts/fracttal-audit-stations.ts`                                                                                                                                                                     | `.env` (`DATABASE_URL` + `FRACTTAL_*` live)                 |
-| `fracttal:poll`                                       | `deno run -A --env-file=.env scripts/fracttal-poll.ts`                                                                                                                                                                               | `.env` (`DATABASE_URL` + `FRACTTAL_*` live)                 |
-| `fracttal:capture` / `:extract`                       | read-only live probes                                                                                                                                                                                                                | shell only (`FRACTTAL_*`)                                   |
-| `alerts:check`                                        | `deno run -A --env-file=.env scripts/alerts-check.ts`                                                                                                                                                                                | `.env` (`DATABASE_URL` + `OPS_*`)                           |
-| `alerts:poll`                                         | `deno run -A --env-file=.env scripts/alerts-poll.ts`                                                                                                                                                                                 | `.env` (`DATABASE_URL` + `OPS_*`)                           |
-| `admin:create`                                        | `deno run -A --env-file=.env scripts/create-admin.ts`                                                                                                                                                                                | `.env` (`DATABASE_URL`)                                     |
-
-`build` emits `_fresh/server.js` + `_fresh/server/` + `_fresh/client/`.
-
-Helper scripts (also under `scripts/`, correctly placed per workflow rules):
-`browser-capture.ts` (`--mode shot|pdf`, replaces the old shot/pdf pair) /
-`browser-smoke.ts` (headless Chrome probes), `chaos-scale.ts` (50k-row
-dynamic-data contract check), `test-dom.ts` (linkedom harness for hook
-tests), `import-sort.ts` (agents.md import-order enforcer).
-Removed one-offs: `extract-sheet-options.ts` + `sheet-options.json` and
-`inventory-probe.py` (archived, values already baked into seed).
-`COMPANY_NAME` is read per request, not baked at build time.
-`routes/_app.tsx` renders the HTML shell plus a FOUC guard that restores
-theme/accent/density/motion from `barrier-settings` before hydration.
+Key tasks (`deno task <name>`):
+- `check`: fmt/lint/check + migration-order guard.
+- `test`: Deno tests (net/env gated).
+- `dev`: `vite` (shell exports; `export $(cat .env | xargs)`).
+- `build`: `vite build` -> `_fresh/server.js` + client/server.
+- `preview`: `deno serve -A _fresh/server.js`.
+- `start`: `deno serve --env-file=.env -A _fresh/server.js`.
+- `db:migrate`: `scripts/migrate.ts` (schema + seed lookups).
+- `db:seed`: `scripts/seed.ts` (mock generator, batches of 500; `--force` truncates).
+- `fracttal:import/sync/force-sync/audit/poll/capture/extract`, `alerts:check/poll`, `admin:create`, `browser:capture/smoke`, `chaos-scale`, `docker:*`.
+`COMPANY_NAME` read per request, not baked. `_app.tsx` renders shell + FOUC guard restoring theme/accent/density/motion from `barrier-settings`.
 
 ## Layer boundaries
 
-- `routes/` - SSR + HTTP edge only. `_app.tsx` shell, `index.tsx` mode
-  switch, `api/*` handlers parse via `_params.ts` and call
-  `lib/server/sql/*`. Never render dashboard UI.
-- `lib/` - pure/shared logic. No Preact, no `localStorage`. Barrels
-  (`lib/api.ts`, `lib/data.ts`, `lib/enums.ts`, `lib/constants.ts`,
-  `lib/utils.ts`) re-export split modules underneath.
-- `islands/` - only hydrated JS. `islands/Dashboard.tsx` is the single
-  island root; `islands/dashboard/` holds the mode switch, sections, and
-  server-error UI. May import `components/`, `hooks/`, `context/`, `lib/`
-  (non-server). Must never import `lib/server/*`.
-- `components/` - static presentational UI, bundled as part of the island
-  subtree. Props-driven; vocabularies arrive via props.
-- `hooks/dashboard/` + `hooks/useDashboard.ts` + `hooks/useConnection.ts`
-  - client state (island-only).
-- `context/` - `SettingsContext` + `ThemeContext`, provided inside the
-  island root because server route context does not reach hydrated islands.
-- `lib/server/` - server-only Postgres pool (`db.ts`) + SQL repositories
-  - edge helpers (`errors.ts`, `throttle.ts`, `config.ts`, `page-auth.ts`,
-    `exportRows.ts`, `exportStream.ts`, `exportCsv.ts`, `exportXlsx.ts`,
-    `exportPdf.ts`).
-    Only `routes/index.tsx` and `routes/api/*` may import it.
+- `routes/`: SSR + HTTP edge. `_app.tsx` shell, `index.tsx` mode switch, `api/*` parse via `_params.ts`, call `lib/server/sql/*`. No dashboard UI.
+- `lib/`: pure/shared. No Preact, no localStorage. Barrels re-export split modules.
+- `islands/`: hydrated JS only. `Dashboard.tsx` single root; `dashboard/` mode switch/sections/error UI. May import components/hooks/context/lib (non-server). Never `lib/server/*`.
+- `components/`: static presentational, bundled in island subtree. Props-driven.
+- `hooks/dashboard/` + `useDashboard.ts` + `useConnection.ts`: client state (island-only).
+- `context/`: SettingsContext + ThemeContext, provided inside island root (server context does not reach islands).
+- `lib/server/`: server-only Postgres pool + SQL repos + edge helpers. Only `routes/index.tsx` and `routes/api/*` import.
 
-Server-only boundary is enforced by convention: `lib/server/db.ts` holds a
-lazy `Pool` on `globalThis.__barrierPool` (import never throws; first
-`queryRows` throws when `DATABASE_URL` is missing). All values are bound as
-`$1/$2` via `queryObject`; `ORDER BY` uses the `SORTABLE` whitelist in
-`lib/server/sql/where.ts`.
+Boundary enforced by convention: `lib/server/db.ts` lazy `Pool` on `globalThis.__barrierPool` (import never throws; first `queryRows` throws if `DATABASE_URL` missing). Values bound as `$1/$2` via `queryObject`; `ORDER BY` via `SORTABLE` whitelist in `lib/server/sql/where.ts`.
 
 ## Data flows
 
-### Mock mode (`PUBLIC_API_MODE=mock`, default)
-
+Mock (`PUBLIC_API_MODE=mock`, default):
 ```
-routes/index.tsx --api.getAllBarriers()--> lib/api/mock.ts
-  --> lib/mock/generator.ts --> resolveBarriers --> Barrier[]
-  --> <Dashboard initialBarriers={full list} apiMode="mock" vocabularies={null}>
-  --> DashboardView ClientView --> useDashboard + useDashboardVocabularies
-  --> DashboardSections (Header, KpiSections, FilterBar filter row with Colunas + export icon buttons, result count and reset, BarriersTable with switchable columns and header bulk selection)
+routes/index.tsx -> lib/api/mock.ts -> lib/mock/generator.ts -> Barrier[]
+-> <Dashboard initialBarriers={full} apiMode="mock" vocabularies={null}>
+-> DashboardView ClientView -> useDashboard + useDashboardVocabularies
+-> DashboardSections (header, KPI, filter bar, table)
 ```
+Full list ships as island props. No DB/fetch. Filtering/sort/pagination/KPI/chart client-side from `lib/dashboard/*`. Export full filtered set.
 
-Full list ships as island props. No DB, no `fetch`. Filtering, sorting,
-pagination, KPI, and chart all derive client-side from `lib/dashboard/*`.
-Export covers the full filtered set.
-
-### HTTP mode (`PUBLIC_API_MODE=http`)
-
-SSR in `routes/index.tsx` calls `getVocabularies()` (7 parallel SQL queries)
-and renders `<Dashboard initialBarriers={[]} vocabularies={...}>`. Rows never
-cross the island boundary (50k+ scale).
-
+HTTP (`PUBLIC_API_MODE=http`):
+SSR calls `getVocabularies()` (7 parallel SQL) and renders `<Dashboard initialBarriers={[]} vocabularies={...}>`. Rows never cross island boundary.
 ```
-DashboardView ServerView --> useServerDashboard(baseUrl)
-  --> toWireQuery(domain filters) + httpAdapterFactory(baseUrl)
-  --> Promise.all([GET /api/barriers, GET /api/kpi, GET /api/chart])
-  --> resolveBarriers/resolveKpi/resolveChartData --> render
+DashboardView ServerView -> useServerDashboard(baseUrl)
+-> toWireQuery(filters) + httpAdapterFactory(baseUrl)
+-> Promise.all([GET /api/barriers, /api/kpi, /api/chart])
+-> resolve* -> render
 ```
-
-Table pages use full filters; KPI/chart honor the same filter subset
-(minus paging/sort) (`hooks/dashboard/server.ts`, one shared scope builder
-in `hooks/dashboard/scope.ts`). Requests cancel on supersede; first load
-shows the splash, later refetches keep stale rows. `error + rows == 0`
-renders `ServerErrorCard`, otherwise `ServerErrorBanner` with retry. A
-5-minute cadence (hidden tabs skip) refreshes data plus vocabularies via
-`GET /api/vocabularies`. Every export format goes through
-`GET|POST /api/export` over the whole selection (ids in the body, filters
-in the query), streamed from the database in batches, so a cross-page
-selection of 18k barriers exports completely; only detail resolution is
-page-local.
+Table pages use full filters; KPI/chart same subset minus paging/sort (`hooks/dashboard/server.ts`, scope builder `hooks/dashboard/scope.ts`). Cancel on supersede; first load splash, later refetchs keep stale rows. `error + rows==0` -> ServerErrorCard else ServerErrorBanner + retry. 5-min cadence (hidden tabs skip) refreshes data + vocabularies via `GET /api/vocabularies`. Exports via `GET|POST /api/export` over whole selection (ids in body, filters in query), streamed from DB in batches; cross-page selection exports completely; detail resolution page-local.
 
 ## Export pipeline
 
-`lib/export/` holds one builder per format, all fed the same 30-column
-`rows.ts` mapping and the same `columns.ts` order, so the browser and the
-server emit identical cells. CSV is text: split into head/row/tail pieces
-(`csv.ts`) and driven by `lib/server/exportStream.ts`, which turns paged
-batches into a byte stream.
-The spreadsheet is a real OOXML workbook: `lib/export/xlsx/` builds the
-package - `zip.ts` (streaming ZIP with `deflate-raw` and data descriptors),
-`xml.ts`, `styles.ts` (on-demand style registry), `widths.ts`, `parts.ts`
-(package plumbing), `dataSheet.ts` (the streamed "Barreiras" sheet) and
-`workbook.ts` (the ZIP assembly, shared by `lib/export/xlsx.ts` for the
-browser and `lib/server/exportXlsx.ts` for the route).
-The PDF is real PDF 1.4 bytes: `lib/export/pdf/` holds `metrics.ts` (base-14
-Helvetica advances plus WinAnsi encoding), `columns.ts` (fixed column shares),
-`layout.ts` (page geometry and pagination), `writer.ts` (streaming objects,
-deflated content streams, trailing xref) and `document.ts` (brand block, KPI
-chips, table, footer - shared by `lib/export/pdf.ts` for the browser and
-`lib/server/exportPdf.ts` for the route). No PDF library is used at runtime;
-only base-14 fonts (never embedded) and FlateDecode streams, which every
-reader supports, and no URI or script object is ever emitted, so the file
-cannot carry a page URL.
-Every format downloads
-as one file straight from the database batches - no preview step, so a large
-selection cannot freeze the tab. Ceilings come from the
-formats themselves (`lib/export/limits.ts`): the export ceiling is 200,000
-rows, which sits under Excel's 1,048,576-row worksheet limit, so the workbook
-always fits one sheet. The
-report table uses fixed column shares that sum to the printable width
-(`colGeometry`), so all 30 export columns land on the A4-landscape
-page instead of overflowing and being clipped at the paper edge; text wraps
-inside each column (long tokens break anywhere) and stays vector-crisp at
-any zoom.
+`lib/export/` one builder per format, same 30-column `rows.ts` mapping and `columns.ts` order, so browser/server emit identical cells. CSV text split into head/row/tail (`csv.ts`) driven by `lib/server/exportStream.ts` (paged batches -> byte stream). XLSX real OOXML: `lib/export/xlsx/` (`zip.ts` streaming ZIP deflate-raw + data descriptors, `xml.ts`, `styles.ts`, `widths.ts`, `parts.ts`, `dataSheet.ts`, `workbook.ts` shared by browser + route). PDF real PDF 1.4: `lib/export/pdf/` (`metrics.ts`, `columns.ts`, `layout.ts`, `writer.ts`, `document.ts` shared). No PDF library; base-14 fonts only, FlateDecode streams. Every format downloads as one file straight from DB batches, no preview step. Ceiling `lib/export/limits.ts`: 200,000 rows (under Excel 1,048,576). Report table uses fixed column shares summing printable width (`colGeometry`), text wraps, vector-crisp.
 
 ## Island bridge topology
 
-Islands cannot read `Deno.env` in the browser. Server config crosses the
-boundary as props from `routes/index.tsx`:
-
-- `initialBarriers` (mock mode full list, http mode `[]`)
-- `companyName` (`COMPANY_NAME` via `lib/company.ts`)
-- `apiMode` (`PUBLIC_API_MODE`, default `mock`)
+Islands can't read `Deno.env`. Server config crosses as props from `routes/index.tsx`:
+- `initialBarriers` (mock full list, http `[]`)
+- `companyName` (via `lib/company.ts`)
+- `apiMode` (`PUBLIC_API_MODE`, default mock)
 - `apiBaseUrl` (`PUBLIC_API_BASE_URL`)
-- `vocabularies` (`getVocabularies()` in http mode, `null` in mock mode)
-- `sessionUser` (authenticated user or `null`, from `routes/index.tsx`)
-
-`SettingsProvider` + `ThemeProvider` wrap `DashboardView` inside
-`islands/Dashboard.tsx` for the same reason. Dual-use modules
-(`lib/company.ts`, `lib/api.ts`) read `Deno.env` in `try` with a fallback so
-island import stays safe.
+- `vocabularies` (`getVocabularies()` http, null mock)
+- `sessionUser` (authenticated user or null)
+`SettingsProvider` + `ThemeProvider` wrap `DashboardView` inside `islands/Dashboard.tsx`. Dual-use modules (`lib/company.ts`, `lib/api.ts`) read `Deno.env` in try with fallback.
 
 ## API contract
 
-Full contract lives in `docs/API.md`. Summary:
-
-- Wire (`lib/wireTypes.ts`): numeric ids only (`WireBarrier`,
-  `WireKpiSnapshot`, `WireCategoryCompliance`, `BarriersQuery`,
-  `BarriersResponse`). `complianceId` is intentionally omitted from
-  `WireBarrier`.
-- Domain (`lib/types.ts`): resolved display strings (`Barrier`,
-  `KpiSnapshot`, `CategoryCompliance`, `Vocabularies`, `FilterState`).
-  Open `string & {}` unions keep novel station values compilable.
-- Bridge (`lib/enums/*` + `lib/resolve.ts` + `lib/api/query.ts`):
-  `toXId` returns `undefined` on unknown (caller skips + warns),
-  `fromXId` returns explicit sentinels (`ST-7`), `resolveBarrier` always
-  derives `compliance` via `isCompliant()`, after promoting stored
-  `Degradado`/`Indisponivel` with `has_contingency = 'Sim'` to the
-  `Degradado/Indisponivel Contingenciado` display states
-  (`effectiveAvailabilityId` - manual sheet flag overlay).
-- `BarriersApi` (`lib/api/types.ts`): `getBarriers`, `getAllBarriers`
-  (http forces `pageSize: 100000`), `getBarrierById` (`null` only on 404),
-  `getKpi` / `getChartData` (full filter subset, minus paging/sort).
-- Contingency client (`lib/api/contingencies.ts`) loads and mutates explicit
-  barrier-to-barrier links through authenticated API routes. It is only
-  enabled in HTTP mode; mock mode does not imply persisted relationships.
-- Routes: `GET /api/barriers`, `GET /api/barriers/:id`,
-  `GET /api/barriers/:id/fracttal-raw` (admin + `DEV=true`, bounded
-  read-only raw upstream data, no-store),
-  `GET|POST|PATCH|DELETE /api/barriers/:id/contingencies` (authenticated
-  relationship read and admin-only link management),
-  `PATCH /api/barriers/:id/status` (admin write via `record_status_change()`,
-  author derives from session), `GET /api/barriers/deleted` (admin, legacy
-  alias for `?rowScope=deleted`),
-  `GET /api/kpi`, `GET /api/chart`, `GET|POST /api/export` (csv/xlsx/pdf over
-  the whole selection, streamed in batches),
-  `GET /api/health` (DB-free liveness), `GET /api/vocabularies`
-  (refresh cadence; SSR still seeds the first paint), `GET /api/sync-status`
-  - `GET /api/sync-changes` (header health indicator, 1-minute cadence with
-    a 15s fast lane while a run is in flight), `POST /api/auth/login`,
-    `POST /api/auth/logout`, `GET /api/auth/me`, `POST /api/auth/password`
-    (own change, session-only), `GET/POST /api/users` (admin only; first
-    account via `scripts/create-admin.ts`, never self-registered),
-    `PATCH/DELETE /api/users/:id`, `GET/POST /api/alert-rules`,
-    `PATCH/DELETE /api/alert-rules/:id`, `GET/POST /api/recipients`,
-    `PATCH/DELETE /api/recipients/:id`, `GET /api/lookups` (admin forms),
-    `GET/PUT /api/field-options` (curated sheet options),
-    `PATCH /api/barriers/:id` (admin field update), plus `routes/login.tsx`
-    (only public page) and the `LoginForm`/`BarrierEditor`
-    islands. Admin management (users, recipients, alert rules, field
-    options) lives in the settings sidepanel
-    (`components/settings/AdminSection.tsx`), gated by `sessionUser.role`;
-    there is no separate admin route. Barrier editing lives in the modal
-    Editar tab (`islands/BarrierEditor.tsx`, admin only). Every
-    authenticated user also gets a Conta tab (`AccountSection.tsx`) with a
-    self-service password change (`POST /api/auth/password`, session-only).
-    Admins can reset any other user's password from the Usuários tab
-    (`UsersManager.tsx`, `PATCH /api/users/:id`), which revokes the target's
-    sessions.
-- Access: Login => Dashboard. Data reads need a session or `ADMIN_TOKEN`
-  (anonymous `404`, dead credentials `401`); `/` redirects logged-out
-  visitors to `/login?next=`.
-- Same-origin by design: the dashboard fetches `routes/api/*` from its own
-  origin (`apiBaseUrl` defaults to `url.origin`), so no CORS headers are
-  emitted. Split-origin deploys must proxy `/api/*` through the app origin.
+Full contract in `docs/API.md`. Summary:
+- Wire (`lib/wireTypes.ts`): numeric ids only; `complianceId` omitted from `WireBarrier`.
+- Domain (`lib/types.ts`): resolved display strings; open `string & {}` unions.
+- Bridge (`lib/enums/*`, `lib/resolve.ts`, `lib/api/query.ts`): `toXId` returns undefined on unknown (skip+warn), `fromXId` explicit sentinels, `resolveBarrier` derives `compliance` via `isCompliant()` after promoting stored `Degradado`/`Indisponivel` with `has_contingency='Sim'` to contingency display states (`effectiveAvailabilityId`).
+- `BarriersApi` (`lib/api/types.ts`): getBarriers, getAllBarriers (http forces pageSize 100000), getBarrierById (null only on 404), getKpi/getChartData (full filter subset minus paging/sort).
+- Contingency client (`lib/api/contingencies.ts`) loads/mutates explicit barrier links via authenticated routes; HTTP mode only.
+- Routes list (condensed): GET /api/barriers, /barriers/:id, /barriers/:id/fracttal-raw (admin+DEV), GET|POST|PATCH|DELETE /barriers/:id/contingencies, PATCH /barriers/:id/status, GET /barriers/deleted, /kpi, /chart, GET|POST /export, /health, /vocabularies, /sync-status, /sync-changes, /sync-runs, /barriers/:id/sync-detail, auth (login/logout/me/password), users, alert-rules, recipients, lookups, field-options, PATCH /barriers/:id. Plus `routes/login.tsx` (only public page) and `LoginForm`/`BarrierEditor` islands. Admin management in settings sidepanel (`AdminSection`), gated by role; no separate admin route. Barrier editing in modal Editar tab (admin only). Conta tab for self-service password change.
+- Access: Login => Dashboard. Data reads need session or ADMIN_TOKEN (anonymous 404, dead creds 401); `/` redirects logged-out to `/login?next=`.
+- Same-origin by design: dashboard fetches own origin (apiBaseUrl defaults to url.origin); no CORS. Split-origin must proxy.
 
 ## Persistence
 
-- Fracttal data reference (`docs/FRACTTAL-DATA.md`): field census, join
-  keys, status signal maturity, and the imported catalog, derived from
-  streaming slices of the 480 MB tenant dump.
-- Import pipeline (`scripts/fracttal-import.ts`): streams the dump from
-  disk (char-scan JSON reader, constant memory), rebuilds `locations`,
-  `categories`, and `barriers` from real data, and stamps
-  `lib/server/fracttal/map.ts` import defaults. Dry-runs without `--apply`.
-- Shared mapping rules (`lib/server/fracttal/barrier-rules.ts`): the one
-  converged source for scope keywords, station parse, typology,
-  work-event classification, contingency signals
-  (`isContingencyFlag` for the sheet `Sim`, `isContingencyText` for
-  `contingenc` / `GM-...` / bare `GM` / `CEC` in work free text), and
-  availability used by both the import and the live sync. Base
-  derivation yields the four operational states (0/1/4/5); open
-  corrective work carrying a contingency signal promotes to the
-  `Contingenciado` states (4 to 3, 5 to 2). Precedence: the import owns full catalog
-  rebuilds (creates locations/categories with deterministic ids); the sync
-  creates missing rows between rebuilds (unknown labels converge instead
-  of skipping).
-- Postgres (`docs/DATABASE.md`): lookup tables + `barriers` +
-  `barrier_contingencies` (many-to-many links with optional Management Change
-  and Risk Analysis references) +
-  `barrier_status_history` (including retained Fracttal work-order author,
-  participant names/roles, explanation text, and sync-run link) +
-  `users`/`sessions` (cookie logins, two roles) +
-  `alert_rules` (per-category triggers) + `alert_events`/`alert_recipients`.
-  `compliance_id` is trigger-derived, the only
-  write path is `record_status_change()` (DB-enforced by
-  `trg_guard_availability_write`; same-status writes are a no-op). Reads
-  (KPI, chart, vocabularies, filters) count the effective availability:
-  stored 4/5 with `has_contingency = 'Sim'` read as 3/2, so server
-  numbers match `resolveBarrier` even before the next materializing
-  write. Location and category ids are
-  NOT frontend contracts - the server serves the dynamic id-keyed
-  vocabularies (`{id, code, name, count}` and `{id, label}`) to the island, and
-  `lib/resolve.ts` + `lib/api/query.ts` bind those ids at request time.
-  `barriers.is_active` mirrors the upstream `active` flag and `deleted_at`
-  the soft delete; list/KPI/chart/export honor the admin `rowScope`
-  (`active`/`inactive`/`deleted`/`all`, default `active`) and the dashboard
-  Situacao combo (admin only) switches it with row badges on off-scope rows.
-  Contingency links are local records, independent of upstream sync. Candidate
-  creation is rechecked server-side and requires a live active `Disponível` /
-  `Conforme` barrier at the same location. Existing links remain auditable
-  when eligibility later changes; admins can review off-scope links, while
-  other users only see links between active, non-deleted barriers. The details
-  modal marks visible ineligible links and recommends out-of-operation only
-  for a non-compliant barrier with no eligible outgoing link. The
-  recommendation never writes status.
-  `scripts/migrate.ts` applies `db/schema.sql` + `db/seed_lookups.sql`
-  (idempotent, seed approximates the imported catalog); `scripts/seed.ts`
-  bulk-inserts `getWireBarriers()` output in batches of 500 (`--force`
-  truncates first).
-- Browser `localStorage`: `barrier-dashboard` (location, filters, selection,
-  openId, ordered visible table columns plus hidden pinned filters,
-  `defaultsVersion`; validated per-field on restore, stale page self-heals,
-  and defaults a previous version implied are migrated away instead of
-  replayed - `FILTER_DEFAULTS_VERSION` in `lib/dashboard/filters.ts`) and
-  `barrier-settings` (theme, accent, density, motion, defaults).
+- Fracttal data reference `docs/FRACTTAL-DATA.md`.
+- Import pipeline `scripts/fracttal-import.ts`: streams dump from disk (char-scan JSON, constant memory), rebuilds locations/categories/barriers, stamps `lib/server/fracttal/map.ts` defaults. Dry-run without `--apply`.
+- Shared mapping `lib/server/fracttal/barrier-rules.ts`: scope keywords, station parse, typology, work-event classification, contingency signals (`isContingencyFlag` for sheet `Sim`, `isContingencyText` for `contingenc`/`GM-...`/bare `GM`/`CEC`), availability. Base derivation yields four operational states (0/1/4/5); open corrective work with contingency signal promotes to Contingenciado (4->3, 5->2). Precedence: import owns full rebuilds (creates locations/categories deterministic ids); sync creates missing rows between rebuilds.
+- Postgres (`docs/DATABASE.md`): lookups + barriers + barrier_contingencies (many-to-many links with optional Management Change/Risk Analysis) + barrier_status_history (retained Fracttal work-order author, participant names/roles, explanation, sync-run link) + users/sessions (cookie logins, two roles) + alert_rules (per-category triggers) + alert_events/alert_recipients. `compliance_id` trigger-derived; only write path `record_status_change()` (DB-enforced by `trg_guard_availability_write`; same-status no-op). Reads count effective availability (stored 4/5 with has_contingency='Sim' read as 3/2). Location/category ids are not frontend contracts; server serves dynamic id-keyed vocabularies; `lib/resolve.ts`+`lib/api/query.ts` bind at request time. `barriers.is_active` mirrors upstream `active`; `deleted_at` soft delete; list/KPI/chart/export honor admin `rowScope` (active/inactive/deleted/all, default active) and dashboard Situacao combo (admin only) switches it with row badges on off-scope rows. Contingency links local, independent of sync. Candidate creation rechecked server-side; requires live active Disponível/Conforme at same location. Existing links remain auditable when eligibility changes; admins review off-scope links, others only see links between active non-deleted barriers. Details modal marks visible ineligible links and recommends out-of-operation only for non-compliant barrier with no eligible outgoing link. Recommendation never writes status.
+- migrate applies schema.sql + seed_lookups.sql (idempotent, seed approximates imported catalog); seed bulk-inserts getWireBarriers() in batches of 500 (`--force` truncates).
+- Browser localStorage: `barrier-dashboard` (location, filters, selection, openId, ordered visible table columns + hidden pinned filters, defaultsVersion; validated per-field on restore, stale page self-heals, defaults a previous version implied migrated away - `FILTER_DEFAULTS_VERSION` in `lib/dashboard/filters.ts`) and `barrier-settings` (theme, accent, density, motion, defaults).
 
 ## Config
 
-See `.env.example`. `COMPANY_NAME` brands the top header, login card header,
-splash card, and exports (empty = unbranded). The dashboard footer carries
-the author signature, the settings panel and loading splash have no brand
-copy, and the login footer is an unbranded session marker.
-`PUBLIC_API_MODE` (`mock`/`http`) + `PUBLIC_API_BASE_URL` select the
-adapter. `DATABASE_URL` feeds `lib/server/db.ts` and both `db:*` tasks.
-`DEV=true` enables the admin-only raw Fracttal detail panel and its server
-route; it never replaces authentication. Raw responses are fetched on demand,
-not cached or persisted, and related work rows are capped at 500 per endpoint.
-`dev` needs shell exports; `start`/`db:*`/`fracttal:poll` read `.env`.
+See `.env.example`. `COMPANY_NAME` brands top header, login card header, splash card, exports (empty = unbranded). Dashboard footer carries author signature; settings panel and loading splash have no brand copy; login footer unbranded session marker. `PUBLIC_API_MODE` (mock/http) + `PUBLIC_API_BASE_URL` select adapter. `DATABASE_URL` feeds `lib/server/db.ts` and db:* tasks. `DEV=true` enables admin-only raw Fracttal detail panel and server route; never replaces auth. Raw responses fetched on demand, not cached/persisted; related work rows capped 500 per endpoint. `dev` needs shell exports; `start`/`db:*`/`fracttal:poll` read `.env`.
 
 ## Design principles
 
-- Dynamic data, never fixed catalogs: stations, statuses, categories, and
-  counts change without code changes (open unions, SSR/SQL vocabularies,
-  `distinctBy`). Filter selects and settings default filters use live
-  vocabularies only; no seed fallback is offered.
-- Reconcile everywhere: fixed KPI fields + `other` novel-availability field +
-  `by*` `GROUP BY` buckets, `resolveKpi` translates numeric-id keys, chart
-  derives NC as `total - compliant` fail-closed, so novel values never vanish.
-  Fixed fields + `other` always equal `total`.
-- Layouts survive scale: paginated/server-paged regions, exports streamed in
-  database-sized batches under one row ceiling (`EXPORT_MAX_ROWS`),
-  debounced search, precomputed sort keys.
+- Dynamic data, never fixed catalogs: stations, statuses, categories, counts change without code changes (open unions, SSR/SQL vocabularies, distinctBy). Filter selects and settings default filters use live vocabularies only; no seed fallback.
+- Reconcile everywhere: fixed KPI fields + `other` novel-availability field + `by*` GROUP BY buckets, resolveKpi translates numeric-id keys, chart derives NC as `total - compliant` fail-closed, so novel values never vanish. Fixed fields + `other` always equal `total`.
+- Layouts survive scale: paginated/server-paged regions, exports streamed in DB-sized batches under one row ceiling, debounced search, precomputed sort keys.

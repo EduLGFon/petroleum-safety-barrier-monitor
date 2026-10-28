@@ -1,200 +1,115 @@
 # Deploy on Windows Server 2022 / 2025
 
-> Never touched a Windows Server? Read `docs/WINDOWS-SERVER-START-HERE.md`
-> first - it explains RDP, admin terminals, the three commands, what success
-> looks like, and what to do when red text appears. This page is the
-> reference; that page is the walkthrough.
-
-Supported, tested target: **Windows Server 2022 and 2025, 64-bit, native
-deployment** (no Docker). A Docker path exists but is _not_ recommended on
-Windows Server (see path B).
+Supported target: Windows Server 2022/2025, 64-bit, native (no Docker). Docker path
+exists but is not recommended (path B).
 
 ## Choose a path
+| Path | What | When |
+| --- | --- | --- |
+| A Native (recommended) | Deno + PostgreSQL 16 + NSSM + Caddy TLS | Production |
+| B Docker | Linux containers via Hyper-V | Only if org mandates containers |
 
-| Path                        | What                                                 | When                                               |
-| --------------------------- | ---------------------------------------------------- | -------------------------------------------------- |
-| **A. Native (recommended)** | Deno + PostgreSQL 16 + NSSM services + Caddy for TLS | Production on Windows Server                       |
-| **B. Docker**               | Linux containers via Hyper-V isolation               | Only if the org already runs containers on Windows |
+Native first: Docker Desktop unsupported on Server; Linux image needs Mirantis
+runtime or Hyper-V/WSL2; bind-mounts/volumes differ.
 
-Why native first: Docker Desktop is **not supported on Windows Server**
-(Docker's own docs restrict it to Windows 10/11). Running the provided
-Linux image on Server needs Mirantis Container Runtime or manual
-Hyper-V / WSL2 plumbing, and bind-mounts (`./.env:/app/.env:ro`) plus
-named volumes behave differently there. The compose stack stays the
-Linux/macOS path; on Windows Server use path A.
-
-## Path A - native (step by step)
-
+## Path A - native
 ### 1. Prerequisites
-
-- Windows Server 2022 or 2025, 64-bit, with Administrator access.
-- PostgreSQL 16 (EDB installer: https://www.postgresql.org/download/windows/).
-  Create role `barrier` + database `barreiras`, note the port (default 5432).
-- Outbound 443 (Fracttal API, Deno/JSR downloads, fonts) and 587/465 (SMTP).
-- Inbound 443 (public site). Port 8300 stays **loopback-only** behind the proxy.
+- Windows Server 2022/2025, 64-bit, admin access.
+- PostgreSQL 16 (EDB). Role `barrier`, db `barreiras`, note port (default 5432).
+- Outbound 443, 587/465. Inbound 443. Port 8300 loopback only.
 
 ### 2. Lay down the app
-
 ```powershell
-# From an elevated PowerShell in the repo (or C:\srv\barrier-monitor):
 Copy-Item .env.example .env
-notepad .env   # set at least DATABASE_URL, ADMIN_TOKEN, COMPANY_NAME
+notepad .env
 ```
-
-Minimum `.env` for a first boot (host run, Postgres on the same box):
-
+Minimum `.env`:
 ```ini
 PUBLIC_API_MODE=http
-DATABASE_URL=postgres://barrier:<password>@localhost:5432/barreiras?sslmode=disable
-ADMIN_TOKEN=<openssl rand -hex 32 | 64 hex chars>
+DATABASE_URL=postgres://barrier:<pw>@localhost:5432/barreiras?sslmode=disable
+ADMIN_TOKEN=<64 hex>
 COMPANY_NAME=Seacrest Petróleo
 APP_BASE_URL=https://barreiras.example.com
 ```
+No `export` needed; tasks read `.env` via `--env-file`. For dev/preview/build set
+vars in session. Token: `python -c "import secrets;print(secrets.token_hex(32))"`.
 
-> PowerShell has no `export $(grep -v '^#' .env | xargs)` (a bash-ism used in
-> `readme.md`). Do **not** export anything: `deno task start`, `db:migrate`,
-> `doctor` and the poll loops all read `.env` via `--env-file=.env`
-> themselves. For `dev`/`preview`/`build` (shell-env only), set vars in the
-> current session instead:
->
-> ```powershell
-> Get-Content .env | Where-Object { $_ -match '^\s*[A-Z_]+=' } | ForEach-Object {
->   $k, $v = $_ -split '=', 2; Set-Item "env:$($k.Trim())" $v.Trim().Trim('"')
-> }
-> ```
->
-> Token generation without openssl:
-> `python -c "import secrets;print(secrets.token_hex(32))"` or
-> `[Convert]::ToHexString((1..32 | ForEach-Object { Get-Random -Max 256 }))`.
-
-True one-command path (no git needed on the server - download, unpack, launch):
-
+One-command path (no git):
 ```powershell
-# In an Administrator PowerShell on the server:
 mkdir C:\srv\barrier-monitor; cd C:\srv\barrier-monitor
 Invoke-WebRequest https://github.com/ORG/REPO/archive/refs/heads/master.zip -OutFile repo.zip
 Expand-Archive repo.zip .; Copy-Item repo-master\* . -Recurse -Force
 .\deploy\windows\Setup.cmd -Hostname barreiras.example.com -CompanyName "Seacrest Petróleo" -AdminEmail you@example.com
 ```
+Setup.cmd self-elevates, runs Setup-Production.ps1: Deno, Postgres 16, NSSM,
+Caddy, code, `.env`, services, firewall, backups, smoke tests. Idempotent, fails
+hard. Omit `-Hostname` for loopback host; omitted secrets printed once; re-runs
+pull/rebuild/migrate/restart without rotating `.env`. Replace ORG/REPO.
 
-`Setup.cmd` self-elevates and bypasses the execution policy for that run,
-then `Setup-Production.ps1` does the whole chain: Deno, PostgreSQL 16, NSSM,
-Caddy, code, `.env` with generated secrets, services, firewall, nightly
-backups, smoke tests. Idempotent and fails hard on any gate. Omit
-`-Hostname` for a loopback-only host; any secret you omit is generated and
-printed once at the end; re-runs pull, rebuild, migrate and restart without
-rotating `.env`. (Replace `ORG/REPO` with the real repo path, or ship the
-folder by any other means - only `deno.jsonc` at the target root matters.)
-
-Need the exotic knobs (`-DbUser`, `-SmtpHost`, `-SourceZip`, …)? Call
-`Setup-Production.ps1` directly - same parameters, no wrapper in the way.
-
-Lighter alternative (prerequisites only - Postgres/services/Caddy stay
-manual) when you want step-by-step control:
-
+Exotic knobs: call Setup-Production.ps1 directly. Lighter alt (prereqs only):
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\deploy\windows\Install-BarrierMonitor.ps1 -InstallDir C:\srv\barrier-monitor
 ```
+Pins Deno 2.9.7, locks `.env` ACLs, runs doctor -> build -> db:migrate, opens
+TCP 8300.
 
-It pins Deno **2.9.7** (repo-verified), locks `.env` ACLs to
-Administrators + SYSTEM, then runs `doctor` → `build` → `db:migrate` and
-opens TCP 8300 inbound.
-
-### 3. Validate before serving
-
+### 3. Validate
 ```powershell
-deno run -A --env-file=.env scripts/doctor.ts   # must be all green
-deno task db:migrate                            # idempotent schema + lookups
+deno run -A --env-file=.env scripts/doctor.ts
+deno task db:migrate
 deno task admin:create -- --email you@example.com --password 'at-least-12-chars'
 deno task build
-deno task start                                 # serves :8300 from _fresh/server.js
+deno task start
 Invoke-RestMethod http://localhost:8300/api/health
 ```
+doctor checks Deno 2.x, `.env`, DATABASE_URL parseable, DB reachable, bundle,
+ports 8300/5432.
 
-`doctor` checks: Deno 2.x, `.env` present, `DATABASE_URL` parseable (catches
-the old `postgres://postgres://` typo), DB reachable, bundle built, ports
-8300/5432 state. It exits non-zero on any failure so scripts can gate on it.
-
-### 4. Run as services (NSSM)
-
+### 4. Services (NSSM)
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\deploy\windows\Register-Services.ps1 -InstallDir C:\srv\barrier-monitor
 Get-Service BarrierApp,BarrierPoller,BarrierAlerts | Select Name,Status
 ```
-
-This registers three auto-start services (same trio as `compose.yml`):
-
-| Service         | Command                                | Matches compose |
-| --------------- | -------------------------------------- | --------------- |
-| `BarrierApp`    | `deno task start`                      | `app`           |
-| `BarrierPoller` | `deno run -A scripts/fracttal-poll.ts` | `poller`        |
-| `BarrierAlerts` | `deno run -A scripts/alerts-poll.ts`   | `alerts`        |
-
-Logs: `C:\srv\barrier-monitor\logs\*-out.log` (+ `-err.log`), rotated.
-No NSSM? Fallback is Task Scheduler at startup running the same three
-commands with "Run whether user is logged on or not".
+| Service | Command | compose |
+| --- | --- | --- |
+| BarrierApp | `deno task start` | app |
+| BarrierPoller | `deno run -A scripts/fracttal-poll.ts` | poller |
+| BarrierAlerts | `deno run -A scripts/alerts-poll.ts` | alerts |
+Logs `C:\srv\barrier-monitor\logs\*-out.log` (+ `-err.log`), rotated. No NSSM:
+Task Scheduler at startup.
 
 ### 5. TLS (required)
+App HTTP on `:8300`. Set `APP_BASE_URL` to public https so cookie Secure. Never
+expose `:8300`. Caddy: edit Caddyfile hostname + `APP_BASE_URL`; run Caddy
+service; open 80+443; remove :8300 remote exception. IIS: ARR + URL Rewrite, site
+binding 443 with cert, reverse proxy to `127.0.0.1:8300`, enable
+`X-Forwarded-*`. App ignores `X-Forwarded-For` for rate limiting; proxied
+clients share one throttle bucket.
 
-The app speaks plain HTTP on `:8300`. Set `APP_BASE_URL` to the public https URL
-so the session cookie is marked `Secure` even though the upstream request is
-http. Never expose `:8300` directly. Two options:
-
-**Caddy (recommended, single exe, auto-HTTPS):**
-
-1. Edit `deploy/windows/Caddyfile` hostname + `APP_BASE_URL` in `.env` to match.
-2. Run Caddy as a service (nssm or `caddy run --config …` under Task Scheduler).
-3. Open TCP 80 + 443, remove the :8300 firewall exception for remote hosts.
-
-**IIS (if the shop already runs it):** install ARR + URL Rewrite, create a
-site binding 443 with the cert, add a reverse-proxy rule to
-`127.0.0.1:8300`, enable `X-Forwarded-*` passthrough. The app intentionally
-ignores `X-Forwarded-For` for rate limiting (forgeable header), so all
-proxied clients share one throttle bucket - fine for an internal dashboard.
-
-### 6. Postgres ops on Windows
-
-- Backup (nightly): `deploy/windows/Backup-Database.ps1` via Task Scheduler:
+### 6. Postgres ops
+- Backup nightly: `Backup-Database.ps1` via Task Scheduler:
   `schtasks /create /tn "BarrierBackup" /tr "powershell -File C:\srv\barrier-monitor\deploy\windows\Backup-Database.ps1" /sc daily /st 02:00 /ru SYSTEM`.
-- Verify: restore into an empty DB and compare `barriers` /
-  `barrier_status_history` counts (same drill as `docs/API.md`).
-- Stuck on port 5432? Set `POSTGRES_PORT`-equivalent by changing the port in
-  `DATABASE_URL` (the `5432` default in `lib/server/db.ts` only applies when
-  the DSN omits it).
+- Verify restore into empty DB, compare `barriers` / `barrier_status_history`
+  counts.
+- Port change: adjust port in `DATABASE_URL`.
 
 ### 7. Updates
-
 ```powershell
 Set-Location C:\srv\barrier-monitor
 git pull
-deno task doctor     # catches env drift before anything restarts
+deno task doctor
 deno task build
-deno task db:migrate # idempotent
+deno task db:migrate
 Restart-Service BarrierApp,BarrierPoller,BarrierAlerts
 Invoke-RestMethod http://localhost:8300/api/health
 ```
+Rollback: set `PUBLIC_API_MODE=mock`, restart `BarrierApp` only. DB untouched.
 
-Rollback: set `PUBLIC_API_MODE=mock` in `.env`, restart `BarrierApp` only.
-The DB is untouched.
-
-## Path B - Docker on Windows Server (not recommended)
-
-Only if the org mandates containers: install **Mirantis Container Runtime**
-(or Docker Engine EE) with Hyper-V isolation and run the Linux image as-is -
-no code change needed. Caveats, all verified against this repo:
-
-- No Docker Desktop: unsupported on Server; WSL2-backend tricks from dev
-  laptops do not transfer.
-- Bind-mount `./.env:/app/.env:ro` needs an absolute path or a
-  `COMPOSE_CONVERT_WINDOWS_PATHS=1` env; prefer copying `.env` next to
-  `compose.yml` and running from there.
-- The bundled `db` service uses a **named volume** (`pgdata`) deliberately -
-  keep it, do not switch to a bind mount (NTFS permission + fsync issues).
-- `Dockerfile` is a Linux image; it cannot build or run as a Windows
-  container. Do not attempt `FROM mcr.microsoft.com/windows/...`.
-- Save the file with LF endings if edited in Notepad (CRLF in `compose.yml`
-  is tolerated, CRLF inside `.env` values is not - no trailing spaces).
-
+## Path B - Docker (not recommended)
+Install Mirantis Container Runtime (or Docker Engine EE) Hyper-V isolation; run
+Linux image as-is. Caveats: no Docker Desktop on Server; bind-mount needs
+absolute path or `COMPOSE_CONVERT_WINDOWS_PATHS=1`; keep named volume `pgdata`;
+Dockerfile is Linux image; save `.env` with LF endings.
 ```powershell
 $env:COMPOSE_CONVERT_WINDOWS_PATHS=1
 docker compose build
@@ -203,26 +118,24 @@ docker compose up -d
 curl http://localhost:8300/api/health
 ```
 
-## Troubleshooting (Windows-specific)
-
-| Symptom                              | Cause / fix                                                                                                                                                        |
-| ------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `DATABASE_URL is not set` on `start` | Started outside the app dir or `.env` misnamed (must be exactly `.env`, not `.env.txt` - disable "hide extensions").                                               |
-| `postgres://postgres://…`            | Old typo fixed in this release; value must be single-scheme `postgres://barrier:…@localhost:5432/barreiras?sslmode=disable` on host, `@db` only inside containers. |
-| Login loops / cookie dropped         | Serving over http while `APP_BASE_URL` is https, or proxy not forwarding Host: Secure cookies need real TLS (path A step 5).                                       |
-| `:8300` reachable on LAN             | Firewall rule too wide - restrict to loopback + proxy host.                                                                                                        |
-| `deno` not found in service          | Service PATH lacks `%LOCALAPPDATA%\deno\bin`; reinstall with Install script (sets Machine PATH) or pass `-DenoExe` explicitly.                                     |
-| CRLF weirdness in `.env`             | `doctor`'s parser strips `\r`; but values with trailing spaces fail auth - don't pad `KEY = value`.                                                                |
-| Paths with spaces                    | Quote them (`"C:\srv\barrier monitor\…"`) in NSSM `AppDirectory`, not in `.env` URLs.                                                                              |
-| Poller exits code 2                  | Missing `FRACTTAL_KEY`/`FRACTTAL_SECRET` - by design it exits instead of idling. Set them or stop the `BarrierPoller` service for offline sites.                   |
-| Alerts silent                        | No relay configured = visible dry-run by design; set `OPS_SMTP_*` + recipients, then `deno run -A --env-file=.env scripts/alerts-check.ts --apply`.                |
+## Troubleshooting
+| Symptom | Cause / fix |
+| --- | --- |
+| `DATABASE_URL is not set` | Started outside app dir or `.env` misnamed (must be `.env`, not `.env.txt`). |
+| `postgres://postgres://...` | Old typo; single-scheme DSN, `@db` only in containers. |
+| Login loops / cookie dropped | http serving with https `APP_BASE_URL`, or proxy not forwarding Host. |
+| `:8300` reachable on LAN | Firewall too wide; restrict to loopback + proxy host. |
+| `deno` not found in service | Service PATH lacks `%LOCALAPPDATA%\deno\bin`; reinstall or pass `-DenoExe`. |
+| CRLF weirdness in `.env` | Parser strips `\r`; trailing spaces fail auth. |
+| Paths with spaces | Quote in NSSM `AppDirectory`, not in `.env` URLs. |
+| Poller exits code 2 | Missing `FRACTTAL_KEY`/`FRACTTAL_SECRET`; set or stop service. |
+| Alerts silent | No relay = dry-run; set `OPS_SMTP_*` + recipients, run alerts-check `--apply`. |
 
 ## Pre-handover checklist
-
-- [ ] `doctor` green on the server itself (not just the admin laptop).
-- [ ] Real `ADMIN_TOKEN` (64 hex), real DB password, `.env` ACLs locked.
-- [ ] `BarrierApp/Poller/Alerts` all `Running`, survive a reboot.
-- [ ] Public URL serves https, `:8300` not reachable remotely.
-- [ ] Login → dashboard → export CSV/XLSX/PDF each download a file.
-- [ ] Nightly backup task exists and a restore was drilled once.
-- [ ] `docs/PORT-MAP.md` §10 consulted before changing any port.
+- [ ] `doctor` green on server.
+- [ ] Real `ADMIN_TOKEN`, DB password, `.env` ACLs locked.
+- [ ] Services Running, survive reboot.
+- [ ] Public URL https, `:8300` not remote.
+- [ ] Login -> dashboard -> exports download.
+- [ ] Nightly backup task + restore drilled.
+- [ ] Consult `docs/PORT-MAP.md` section 10 before changing ports.
