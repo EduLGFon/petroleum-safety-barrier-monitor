@@ -6,6 +6,8 @@ import { FieldLabel, SectTitle } from "./SectionPrimitives.tsx";
 
 import { selSt, SORT_OPTS } from "./settings-options.ts";
 
+import { MultiCombo } from "../filter/FilterSelect.tsx";
+
 import type { FilterState } from "../../lib/types.ts";
 
 interface Props {
@@ -59,31 +61,6 @@ export function FiltersSection(
   const critOpts = criticalities ?? [];
   const catOpts = categories ?? [];
   const typoOpts = typologies ?? [];
-  const effAvail = dispOpts.includes(
-      (settings.defaultFilters as Record<string, string>).availability ?? "",
-    )
-    ? (settings.defaultFilters as Record<string, string>).availability as string
-    : "";
-  const effConf = confOpts.includes(
-      (settings.defaultFilters as Record<string, string>).compliance ?? "",
-    )
-    ? (settings.defaultFilters as Record<string, string>).compliance as string
-    : "";
-  const effCat = catOpts.includes(
-      (settings.defaultFilters as Record<string, string>).category ?? "",
-    )
-    ? (settings.defaultFilters as Record<string, string>).category as string
-    : "";
-  const effCrit = critOpts.includes(
-      (settings.defaultFilters as Record<string, string>).criticality ?? "",
-    )
-    ? (settings.defaultFilters as Record<string, string>).criticality as string
-    : "";
-  const effTypo = typoOpts.includes(
-      (settings.defaultFilters as Record<string, string>).typology ?? "",
-    )
-    ? (settings.defaultFilters as Record<string, string>).typology as string
-    : "";
   const effPlan = ["Com plano", "Sem plano"].includes(
       (settings.defaultFilters as Record<string, string>).plan ?? "",
     )
@@ -127,49 +104,47 @@ export function FiltersSection(
         </select>
       </div>
       {[
-        {
-          label: "Disponibilidade",
-          key: "availability",
-          opts: dispOpts,
-          eff: effAvail,
-        },
-        {
-          label: "Conformidade",
-          key: "compliance",
-          opts: confOpts,
-          eff: effConf,
-        },
-        { label: "Categoria", key: "category", opts: catOpts, eff: effCat },
-        { label: "Tipologia", key: "typology", opts: typoOpts, eff: effTypo },
-        {
-          label: "Criticidade",
-          key: "criticality",
-          opts: critOpts,
-          eff: effCrit,
-        },
-        {
-          label: "Plano de ação",
-          key: "plan",
-          opts: ["Com plano", "Sem plano"],
-          eff: effPlan,
-        },
-      ].map(({ label, key, opts, eff }) => (
-        <div key={key}>
-          <FieldLabel>{label}</FieldLabel>
-          <select
-            value={eff}
-            onChange={(e) =>
-              setDefaults({
-                ...settings.defaultFilters,
-                [key]: e.currentTarget.value,
-              })}
-            style={selSt}
-          >
-            <option value="">Todas</option>
-            {opts.map((o) => <option key={o} value={o}>{o}</option>)}
-          </select>
-        </div>
-      ))}
+        { label: "Disponibilidade", key: "availability", opts: dispOpts },
+        { label: "Conformidade", key: "compliance", opts: confOpts },
+        { label: "Categoria", key: "category", opts: catOpts },
+        { label: "Tipologia", key: "typology", opts: typoOpts },
+        { label: "Criticidade", key: "criticality", opts: critOpts },
+      ].map(({ label, key, opts }) => {
+        const cur = (settings.defaultFilters as Record<string, unknown>)[key];
+        const vals = Array.isArray(cur)
+          ? cur.filter((x): x is string => typeof x === "string")
+          : typeof cur === "string" && cur
+          ? [cur]
+          : [];
+        return (
+          <div key={key}>
+            <FieldLabel>{label}</FieldLabel>
+            <MultiCombo
+              values={vals}
+              onChange={(v) => setDefaults({ [key]: v })}
+              placeholder={label}
+              opts={opts}
+            />
+          </div>
+        );
+      })}
+      <div>
+        <FieldLabel>Plano de ação</FieldLabel>
+        <select
+          value={effPlan}
+          onChange={(e) =>
+            setDefaults({
+              ...settings.defaultFilters,
+              plan: e.currentTarget.value,
+            })}
+          style={selSt}
+        >
+          <option value="">Todas</option>
+          {["Com plano", "Sem plano"].map((o) => (
+            <option key={o} value={o}>{o}</option>
+          ))}
+        </select>
+      </div>
       <div>
         <FieldLabel>Ordenação</FieldLabel>
         <div

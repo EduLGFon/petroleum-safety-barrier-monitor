@@ -46,7 +46,7 @@ function MenuPortal({ left, top, width, children }: {
         left: `${left}px`,
         top: `${top}px`,
         width,
-        zIndex: 900,
+        zIndex: 2000,
       }}
     >
       {children}

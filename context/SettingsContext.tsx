@@ -120,8 +120,11 @@ export function SettingsProvider(
     patch({ density: d });
   }, [patch]);
   // Persists defaultFilters via patch (`barrier-settings`); no DOM side effect.
+  // Merges the patch over the current default filters so partial updates
+  // (e.g. changing one facet) never wipe the others: defaults stay
+  // dynamically updateable from the live filter state.
   const setDefaults = useCallback((f: Partial<FilterState>) => {
-    patch({ defaultFilters: f });
+    patch({ defaultFilters: { ...latest.current.defaultFilters, ...f } });
   }, [patch]);
   // Persists defaultLocation via patch (`barrier-settings`); no DOM side effect.
   const setDefaultLoc = useCallback((l: string) => {
