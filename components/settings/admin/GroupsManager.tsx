@@ -241,9 +241,13 @@ export function GroupsManager({ onCount }: { onCount?: (n: number) => void }) {
                         type="button"
                         style={ghostBtn}
                         onClick={() =>
-                          setDraftLocs(locations.map((l) => l.id))}
+                          setDraftLocs(
+                            draftLocs.length === locations.length
+                              ? []
+                              : locations.map((l) => l.id),
+                          )}
                       >
-                        Marcar todas (habilitar todas)
+                        Selecionar todos
                       </button>
                     </div>
                     <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
@@ -291,9 +295,13 @@ export function GroupsManager({ onCount }: { onCount?: (n: number) => void }) {
                         type="button"
                         style={ghostBtn}
                         onClick={() =>
-                          setDraftUsers(users.map((u) => u.id))}
+                          setDraftUsers(
+                            draftUsers.length === users.length
+                              ? []
+                              : users.map((u) => u.id),
+                          )}
                       >
-                        Marcar todas (habilitar todas)
+                        Selecionar todos
                       </button>
                     </div>
                     <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
