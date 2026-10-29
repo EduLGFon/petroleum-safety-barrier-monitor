@@ -13,6 +13,7 @@
     "build": "vite build",
     "preview": "deno serve -A --port 8300 _fresh/server.js",
     "start": "deno serve --env-file=.env -A --port 8300 _fresh/server.js",
+    "start:alt": "deno serve --env-file=.env -A --port 8301 _fresh/server.js",
     "db:migrate": "deno run -A --env-file=.env scripts/migrate.ts",
     "db:seed": "deno run -A --env-file=.env scripts/seed.ts",
     "fracttal:import": "deno run -A --env-file=.env scripts/fracttal-import.ts",
