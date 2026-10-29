@@ -5,6 +5,10 @@
 // `--fix-env` only appends missing commented keys to .env, never secrets.
 import { Pool } from "@db/postgres";
 
+import { loadAuthConfig } from "../lib/server/config.ts";
+
+import { loadCertificateThumbprint, loadPrivateKey } from "../lib/server/auth/entra/keys.ts";
+
 const GREEN = "\x1b[32m";
 const RED = "\x1b[31m";
 const YELLOW = "\x1b[33m";
@@ -234,6 +238,118 @@ function checkPlatform(): void {
   }
 }
 
+async function checkSso(): Promise<void> {
+  let config;
+  try {
+    config = loadAuthConfig((name) => Deno.env.get(name));
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    push("sso-config", "fail", msg);
+    return;
+  }
+  if (!config.ssoEnabled || !config.entra) {
+    push("sso-config", "ok", "SSO disabled; local login only");
+    return;
+  }
+  const entra = config.entra;
+  push("sso-config", "ok", "SSO enabled");
+  push("sso-base-url", "ok", entra.appBaseUrl);
+  push(
+    "sso-redirect-uri",
+    "ok",
+    entra.redirectUri,
+  );
+  if (entra.credential.type === "key") {
+    try {
+      await loadPrivateKey(entra);
+      const thumbprint = await loadCertificateThumbprint(entra);
+      push("sso-key", "ok", "private key imports and certificate thumbprint is available");
+      push("sso-cert-thumbprint", "ok", thumbprint);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      push("sso-key", "fail", msg);
+      return;
+    }
+    push(
+      "sso-cert-expiry",
+      "warn",
+      "certificate expiry check skipped (verify in Entra portal or with openssl)",
+    );
+  } else {
+    if (entra.credential.secret.length < 32) {
+      push("sso-secret", "fail", "client secret is too short");
+    } else {
+      push("sso-secret", "ok", "client secret configured");
+    }
+  }
+  try {
+    const url = `https://login.microsoftonline.com/${entra.tenantId}/v2.0/.well-known/openid-configuration`;
+    const res = await fetch(url, {
+      signal: AbortSignal.timeout(Math.max(1000, entra.httpTimeoutMs)),
+    });
+    if (!res.ok) {
+      push("sso-discovery", "fail", `HTTP ${res.status}`);
+    } else {
+      const json = await res.json() as { token_endpoint?: string };
+      push(
+        "sso-discovery",
+        "ok",
+        `issuer https://login.microsoftonline.com/${entra.tenantId}/v2.0`,
+      );
+      if (typeof json.token_endpoint === "string") {
+        push("sso-token-endpoint", "ok", json.token_endpoint);
+      } else {
+        push("sso-token-endpoint", "fail", "token_endpoint missing");
+      }
+      const date = res.headers.get("date");
+      if (date) {
+        const skew = Math.abs(Date.parse(date) - Date.now());
+        push(
+          "sso-clock-skew",
+          skew <= entra.clockToleranceSeconds * 1000 ? "ok" : "warn",
+          `${Math.round(skew / 1000)}s against IdP`,
+        );
+      }
+    }
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    push("sso-discovery", "fail", msg);
+  }
+  const dbUrl = Deno.env.get("DATABASE_URL");
+  if (dbUrl) {
+    const pool = new Pool(dbUrl, 1, true);
+    try {
+      const client = await pool.connect();
+      try {
+        const result = await client.queryObject<{ n: string }>(
+          "select count(*)::text as n from users where role = 'admin' and active and auth_source = 'local'",
+        );
+        const count = Number(result.rows[0]?.n ?? 0);
+        push(
+          "sso-local-admin",
+          count > 0 ? "ok" : "fail",
+          `${count} active local admin(s)`,
+        );
+        await client.queryArray("select 1 from auth_flows limit 1");
+        push("sso-auth-flows", "ok", "auth_flows table present");
+      } finally {
+        client.release();
+      }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      push("sso-database", "fail", msg);
+    } finally {
+      try {
+        await pool.end();
+      } catch {
+        // Ignore cleanup errors.
+      }
+    }
+  } else {
+    push("sso-database", "warn", "skipped: DATABASE_URL unset");
+  }
+}
+
 async function main(): Promise<void> {
   // --env-file=.env mirrors `deno task start` so the checks see prod values
   // even when the shell has nothing exported (the usual Windows case).
@@ -254,6 +370,7 @@ async function main(): Promise<void> {
   checkDeno();
   await checkEnvFile();
   await checkDatabase();
+  await checkSso();
   await checkBuild();
   await checkPorts();
   let fails = 0;
