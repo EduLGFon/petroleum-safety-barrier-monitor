@@ -174,7 +174,7 @@ export function GroupsManager({ onCount }: { onCount?: (n: number) => void }) {
         </form>
       </AdminCard>
       {groups.length === 0
-        ? <EmptyState message="Nenhum grupo cadastrado." />
+        ? <EmptyState text="Nenhum grupo cadastrado." />
         : (
           groups.map((g) => (
             <AdminCard key={g.id}>
@@ -217,7 +217,35 @@ export function GroupsManager({ onCount }: { onCount?: (n: number) => void }) {
               </div>
               {editing === g.id && (
                 <div style={{ display: "grid", gap: 8 }}>
-                  <Field label="Estações">
+                  <div style={{ display: "grid", gap: 6 }}>
+                    <div
+                      style={{
+                        display: "flex",
+                        justifyContent: "space-between",
+                        alignItems: "center",
+                        gap: 8,
+                      }}
+                    >
+                      <span
+                        style={{
+                          fontSize: "var(--d-caption)",
+                          fontWeight: 700,
+                          color: "var(--text-muted)",
+                          textTransform: "uppercase",
+                          letterSpacing: ".08em",
+                        }}
+                      >
+                        Estações
+                      </span>
+                      <button
+                        type="button"
+                        style={ghostBtn}
+                        onClick={() =>
+                          setDraftLocs(locations.map((l) => l.id))}
+                      >
+                        Marcar todas (habilitar todas)
+                      </button>
+                    </div>
                     <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
                       {locations.map((loc) => (
                         <label
@@ -238,8 +266,36 @@ export function GroupsManager({ onCount }: { onCount?: (n: number) => void }) {
                         </label>
                       ))}
                     </div>
-                  </Field>
-                  <Field label="Usuários">
+                  </div>
+                  <div style={{ display: "grid", gap: 6 }}>
+                    <div
+                      style={{
+                        display: "flex",
+                        justifyContent: "space-between",
+                        alignItems: "center",
+                        gap: 8,
+                      }}
+                    >
+                      <span
+                        style={{
+                          fontSize: "var(--d-caption)",
+                          fontWeight: 700,
+                          color: "var(--text-muted)",
+                          textTransform: "uppercase",
+                          letterSpacing: ".08em",
+                        }}
+                      >
+                        Usuários
+                      </span>
+                      <button
+                        type="button"
+                        style={ghostBtn}
+                        onClick={() =>
+                          setDraftUsers(users.map((u) => u.id))}
+                      >
+                        Marcar todas (habilitar todas)
+                      </button>
+                    </div>
                     <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
                       {users.map((u) => (
                         <label
@@ -260,7 +316,7 @@ export function GroupsManager({ onCount }: { onCount?: (n: number) => void }) {
                         </label>
                       ))}
                     </div>
-                  </Field>
+                  </div>
                   <div style={{ display: "flex", gap: 6 }}>
                     <button
                       type="button"
