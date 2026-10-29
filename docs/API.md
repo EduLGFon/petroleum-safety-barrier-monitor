@@ -14,12 +14,13 @@ routes/index.tsx (SSR)
 ## Wire format (numbers, not text)
 
 Real backend exchanges numeric codes, never display strings. Resolvers in `lib/enums/` (barrel over codes.ts, taxonomy.ts, context.ts):
+
 - Location: 0 ALL, 1 FAL, 2 SML, 3 FSR, 4 IBU, 5 FSL, 6 CNC, 7 JCT, 8 FSJ.
 - Availability: 0 Disponível, 1 Fora de Operação, 2 Indisponível Contingenciado, 3 Degradado Contingenciado, 4 Degradado, 5 Indisponível.
 - Compliance: 0 Conforme, 1 Não Conforme.
 - Criticality: 0 ESO, 1 A, 2 B, 3 C, 4 D (ESO/A critical tiers).
 - Category, grouping, typology, owner, descriptive location, history author follow same pattern.
-Each domain: `toXId(string) -> number | undefined` (undefined = unknown, filter skipped + warn) and `fromXId(number) -> string` (explicit sentinel like `ST-7`).
+  Each domain: `toXId(string) -> number | undefined` (undefined = unknown, filter skipped + warn) and `fromXId(number) -> string` (explicit sentinel like `ST-7`).
 
 ## Wire vs domain types
 
@@ -27,7 +28,7 @@ Each domain: `toXId(string) -> number | undefined` (undefined = unknown, filter 
 - `lib/types.ts`: `Barrier`, `KpiSnapshot`, `CategoryCompliance`, `Vocabularies`, `FilterState`, `SortableColumn`, `StatusHistoryEntry` (resolved strings; open `string & {}` unions).
 - `lib/api/types.ts`: `BarriersApi` (5 methods) + `DomainQuery`.
 - `lib/resolve.ts`: `resolveBarrier`, `resolveHistoryEntry`, `resolveKpi`, `resolveChartData` (wire -> domain).
-`compliance` never travels in `WireBarrier`; derived from `availabilityId` via `isCompliant()` in mock, resolver, and DB trigger. Resolver first applies contingency overlay (`effectiveAvailabilityId`: stored 4/5 with `hasContingency='Sim'` read as 3/2); server KPI/chart/filter/vocabulary queries apply same overlay in SQL.
+  `compliance` never travels in `WireBarrier`; derived from `availabilityId` via `isCompliant()` in mock, resolver, and DB trigger. Resolver first applies contingency overlay (`effectiveAvailabilityId`: stored 4/5 with `hasContingency='Sim'` read as 3/2); server KPI/chart/filter/vocabulary queries apply same overlay in SQL.
 
 `WireKpiSnapshot`: fixed fields + optional dynamic buckets `byAvailability`, `byCompliance`, `byCriticality` (keys = numeric id as string) + `syncedAt` (server ISO). `resolveKpi` translates keys to display strings (already-string keys pass through). Buckets absent -> UI uses fixed fields (known statuses only). Admin snapshots also carry `inactive`/`deleted` counts over same filter subset ignoring `rowScope` (absent reads 0); feed band Situacao segments; never computed for other roles.
 
@@ -43,6 +44,7 @@ DELETE /api/barriers/:id/contingencies, /recipients/:id, /users/:id, /alert-rule
 (`_params.ts` parsers + `validation_test.ts` tests are not routes.)
 
 Key behaviors:
+
 - GET /api/barriers?locationId=1&availabilityId=4&complianceId=1&categoryId=2&typologyId=0&criticalityId=1&criticalOnly=true&hasActionPlan=false&rowScope=active&query=FAL&since=YYYY-MM-DD&until=YYYY-MM-DD&page=1&pageSize=25&sortCol=statusSince&sortDir=desc -> 200 BarriersResponse { items, total, page, pageSize, totalPages } (+ETag, 304). locationId omitted/0 = all; query matches tag ILIKE %q% OR loc.code (%_ escaped, capped 200 chars); typologyId filters Tipologia; criticalOnly restricts ESO/A (absent/false=all); hasActionPlan filters plan presence; since/until over status_since; rowScope active (default live), inactive, deleted, all (admin-only; non-admin 403); availabilityId/complianceId match effective display state; page default 1 (floor min 1); pageSize default 25 (clamped 1..100000); sortCol whitelist (id/tag/location/typology/criticality/category/owner/availability/compliance/statusSince, default id); strict parsers in `_params.ts` (malformed -> undefined, never 400); {error,code,requestId} envelope on DB failure.
 - GET /api/barriers/:id -> 200 WireBarrier (400 invalid id, 404 missing). Admins see soft-deleted (includeDeleted), others live-only.
 - GET /api/barriers/:id/contingencies?q=TAG -> outgoing/incoming links + candidates + candidatesHaveMore. Outgoing/incoming: {barrierId, barrierTag, contingencyBarrierId, contingencyTag, managementChange, riskAnalysis, eligible}. Candidates capped first 50 sorted tags; refine q. Eligibility: active, not soft-deleted, same installation, availability exactly Disponível, compliant. Existing links visible to admins with eligible:false if conditions later fail. Readers need session/token; non-admins only see links between active non-deleted barriers.
@@ -71,6 +73,7 @@ Key behaviors:
 ## Filter query (string -> wire)
 
 `toWireQuery()` in `lib/api/query.ts` (re-exported by `lib/api.ts`) converts UI filters (strings like 'Degradado','FAL') into numeric `BarriersQuery`. Unknown values skipped with console.warn. `cleanDateParam` accepts YYYY-MM-DD (or longer ISO); `buildQueryString` serializes to URL:
+
 ```
 toWireQuery({ location: "FAL", availability: "Degradado", page: 1 });
 // -> { locationId: 1, availabilityId: 4, page: 1 }
@@ -87,6 +90,7 @@ GET /api/vocabularies refreshes same payload on dashboard cadence (SSR still see
 In PUBLIC_API_MODE=http dashboard pages through server (useServerDashboard in hooks/dashboard/server.ts): pages via getBarriers (full filters), KPI via getKpi, chart via getChartData (same filter subset, minus paging/sort), with cancellation, loading, error card/banner, retry, 5-min refresh cadence (hidden tabs skip), vocabulary refetch. getAllBarriers in http forces pageSize:100000. Every export format streams full filtered set from GET /api/export (200k ceiling); detail resolves from current page.
 
 Enable:
+
 1. Start Postgres and run migrations+seed (docs/DATABASE.md).
 2. Set env (.env.example): PUBLIC_API_MODE=http; PUBLIC_API_BASE_URL= (empty = same page origin recommended); DATABASE_URL=postgres://...
    (dev reads shell - export $(cat .env | xargs); start/db:* read .env.) When PUBLIC_API_BASE_URL empty, routes/index.tsx uses request's own origin - browser fetches /api/* same-origin on whatever port app serves. Set explicitly only when API on another origin (that origin needs CORS).
@@ -96,78 +100,79 @@ Entire SQL layer (lib/server/db.ts, lib/server/sql/*) server-only (never importe
 
 ## Files in this layer
 
-| File | Responsibility |
-| --- | --- |
-| lib/api.ts | Barrel: picks mock vs HTTP via PUBLIC_API_MODE, re-exports toWireQuery + mockApi |
-| lib/api/types.ts | BarriersApi (5 methods) + DomainQuery (string filters) |
-| lib/api/query.ts | toWireQuery, cleanDateParam, buildQueryString |
-| lib/api/mock.ts | mockAdapter: numeric matchesQuery + sortWire, resolves only final page |
-| lib/api/http.ts | httpAdapterFactory(baseUrl): fetch over routes/api/*; null only on 404 |
-| lib/enums.ts | Barrel over lib/enums/ |
-| lib/enums/codes.ts | LOCATION/AVAILABILITY/COMPLIANCE/CRITICALITY + to/fromXId |
-| lib/enums/taxonomy.ts | CATEGORY/GROUPING/TYPOLOGY/OWNER (ownerId -1 = empty) |
-| lib/enums/context.ts | LOC_DESC/AUTHOR (from* only) |
-| lib/wireTypes.ts | Wire format (numeric ids; no complianceId in WireBarrier) |
-| lib/types.ts | UI domain (resolved strings, open unions, Vocabularies) |
-| lib/resolve.ts | resolveBarrier(s), resolveHistoryEntry, resolveKpi, resolveChartData |
-| lib/data.ts | Barrel over lib/mock/ (deterministic generator) |
-| lib/mock/generator.ts | getWireBarriers() cached (0xdeadbeef, status/station distributions) |
-| lib/mock/history.ts | generateHistory + comments/plans/notes per status |
-| lib/mock/tags.ts | buildTag + prefixes per category |
-| lib/mock/rng.ts | PRNG with seed (next/int/pick/bool) |
-| lib/constants.ts | Barrel over lib/constants/ |
-| lib/constants/locations.ts | LOCATIONS, LOCATION_DIST_BY_ID, SIM_DATE, PAGE_SIZE(_OPTS) |
-| lib/constants/catalog.ts | Seed lists (categories, groupings, typologies, owners, locs, authors) |
-| lib/constants/helpers.ts | isCompliant() + distinctBy() |
-| lib/constants/colors.ts | Colors per status + DISP_KNOWN_ORDER, shortStatusLabel |
-| lib/server/db.ts | Lazy server-only Postgres pool (globalThis.__barrierPool) |
-| lib/server/sql/barriers.ts | listBarriers, listBarrierWindow (export paging), getBarrierById, getKpi, transitionBarrierStatus |
-| lib/server/sql/chart.ts | getChartData (GROUP BY category_id) |
-| lib/server/sql/vocabularies.ts | getVocabularies() (SSR seed + GET /api/vocabularies refresh) |
-| lib/server/sql/where.ts | buildWhere, resolveOrderBy (whitelist), escapeLike |
-| lib/server/sql/mappers.ts | SELECT_COLUMNS, HISTORY_JOIN (lateral json_agg), toWireBarrier |
-| routes/api/_params.ts | Strict parsers (parseInt/parseDate/parseQueryParam); never a route (_ prefix) |
-| routes/api/barriers.ts | GET /api/barriers (session/token, read throttle) |
-| routes/api/barriers/deleted.ts | GET /api/barriers/deleted (deleted only, admin session or token) |
-| routes/api/barriers/[id].ts | GET/PATCH /api/barriers/:id (GET any reader, PATCH admin field update) |
-| routes/api/barriers/[id]/fracttal-raw.ts | GET /api/barriers/:id/fracttal-raw (admin + DEV=true, capped raw upstream detail) |
-| routes/api/barriers/[id]/status.ts | PATCH /api/barriers/:id/status (requires admin, write throttle; author derives from session) |
-| routes/api/barriers/[id]/contingencies.ts | GET contingency links/candidates (session/token); POST/PATCH/DELETE links (admin, write throttle) |
-| routes/api/barriers/[id]/sync-detail.ts | GET /api/barriers/:id/sync-detail (session/token, read throttle; pinned run or 24h window) |
-| routes/api/export.ts | GET/POST /api/export (csv/xlsx/pdf; session/token, export throttle, streamed, selection via ids) |
-| routes/api/kpi.ts | GET /api/kpi (session/token, read throttle) |
-| routes/api/chart.ts | GET /api/chart (session/token, read throttle) |
-| routes/api/sync-status.ts | GET /api/sync-status (session/token, read throttle; dashboard indicator) |
-| routes/api/sync-runs.ts | GET /api/sync-runs (session/token, read throttle; ?limit= 1..50) |
-| routes/api/sync-changes.ts | GET /api/sync-changes (session/token, read throttle; paged + legacy ?limit= shape) |
-| routes/api/vocabularies.ts | GET /api/vocabularies (session/token, read throttle; refresh cadence) |
-| routes/api/health.ts | GET /api/health (liveness, no DB, no auth, no throttle) |
-| routes/api/recipients.ts | GET/POST /api/recipients (admin, upsert by email) |
-| routes/api/recipients/[id].ts | PATCH/DELETE /api/recipients/:id (admin) |
-| routes/api/auth/login.ts | POST /api/auth/login (credentials -> session cookie) |
-| routes/api/auth/logout.ts | POST /api/auth/logout (revoke + clear cookie) |
-| routes/api/auth/me.ts | GET /api/auth/me (session user for islands) |
-| routes/api/auth/password.ts | POST /api/auth/password (own password change, session-only) |
-| routes/api/users.ts | GET/POST /api/users (admin only; first account via CLI) |
-| routes/api/users/[id].ts | PATCH/DELETE /api/users/:id (admin, last-admin guard) |
-| routes/api/alert-rules.ts | GET/POST /api/alert-rules (admin, scoped triggers + anti-noise windows) |
-| routes/api/alert-rules/[id].ts | PATCH/DELETE /api/alert-rules/:id (admin) |
-| routes/api/alert-rules/preview.ts | GET /api/alert-rules/preview (admin dry-run count + sample tags) |
-| routes/api/lookups.ts | GET /api/lookups (authenticated id lists for admin forms) |
-| routes/api/field-options.ts | GET/PUT /api/field-options (GET any reader, PUT admin only) |
-| lib/server/sql/field-options.ts, lib/field-options.ts, islands/BarrierEditor.tsx | Field options store/registry + admin barrier editor |
-| lib/server/config.ts, errors.ts, auth.ts | Server config, error envelope, auth helpers |
-| lib/server/throttle.ts, lib/server/sql/throttle.ts | Throttle (fixed window, shared budget via Postgres) |
-| lib/server/exportRows.ts, exportStream.ts, exportCsv.ts, exportXlsx.ts, exportPdf.ts | Export streaming (scope, CSV/XLSX/PDF) |
-| lib/server/sql/*, lib/server/auth/*, lib/server/alerts/* | SQL repos, PBKDF2 auth, alert store/rules/detect/run/mailer/provider/templates (see docs/DATABASE.md) |
-| lib/dashboard/urgent.ts, islands/dashboard/vocabularies.ts | Urgency helpers + mock vocabularies hook |
-| db/schema.sql, db/seed_lookups.sql | DDL + static lookup seeds (see docs/DATABASE.md) |
+| File                                                                                 | Responsibility                                                                                        |
+| ------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------- |
+| lib/api.ts                                                                           | Barrel: picks mock vs HTTP via PUBLIC_API_MODE, re-exports toWireQuery + mockApi                      |
+| lib/api/types.ts                                                                     | BarriersApi (5 methods) + DomainQuery (string filters)                                                |
+| lib/api/query.ts                                                                     | toWireQuery, cleanDateParam, buildQueryString                                                         |
+| lib/api/mock.ts                                                                      | mockAdapter: numeric matchesQuery + sortWire, resolves only final page                                |
+| lib/api/http.ts                                                                      | httpAdapterFactory(baseUrl): fetch over routes/api/*; null only on 404                                |
+| lib/enums.ts                                                                         | Barrel over lib/enums/                                                                                |
+| lib/enums/codes.ts                                                                   | LOCATION/AVAILABILITY/COMPLIANCE/CRITICALITY + to/fromXId                                             |
+| lib/enums/taxonomy.ts                                                                | CATEGORY/GROUPING/TYPOLOGY/OWNER (ownerId -1 = empty)                                                 |
+| lib/enums/context.ts                                                                 | LOC_DESC/AUTHOR (from* only)                                                                          |
+| lib/wireTypes.ts                                                                     | Wire format (numeric ids; no complianceId in WireBarrier)                                             |
+| lib/types.ts                                                                         | UI domain (resolved strings, open unions, Vocabularies)                                               |
+| lib/resolve.ts                                                                       | resolveBarrier(s), resolveHistoryEntry, resolveKpi, resolveChartData                                  |
+| lib/data.ts                                                                          | Barrel over lib/mock/ (deterministic generator)                                                       |
+| lib/mock/generator.ts                                                                | getWireBarriers() cached (0xdeadbeef, status/station distributions)                                   |
+| lib/mock/history.ts                                                                  | generateHistory + comments/plans/notes per status                                                     |
+| lib/mock/tags.ts                                                                     | buildTag + prefixes per category                                                                      |
+| lib/mock/rng.ts                                                                      | PRNG with seed (next/int/pick/bool)                                                                   |
+| lib/constants.ts                                                                     | Barrel over lib/constants/                                                                            |
+| lib/constants/locations.ts                                                           | LOCATIONS, LOCATION_DIST_BY_ID, SIM_DATE, PAGE_SIZE(_OPTS)                                            |
+| lib/constants/catalog.ts                                                             | Seed lists (categories, groupings, typologies, owners, locs, authors)                                 |
+| lib/constants/helpers.ts                                                             | isCompliant() + distinctBy()                                                                          |
+| lib/constants/colors.ts                                                              | Colors per status + DISP_KNOWN_ORDER, shortStatusLabel                                                |
+| lib/server/db.ts                                                                     | Lazy server-only Postgres pool (globalThis.__barrierPool)                                             |
+| lib/server/sql/barriers.ts                                                           | listBarriers, listBarrierWindow (export paging), getBarrierById, getKpi, transitionBarrierStatus      |
+| lib/server/sql/chart.ts                                                              | getChartData (GROUP BY category_id)                                                                   |
+| lib/server/sql/vocabularies.ts                                                       | getVocabularies() (SSR seed + GET /api/vocabularies refresh)                                          |
+| lib/server/sql/where.ts                                                              | buildWhere, resolveOrderBy (whitelist), escapeLike                                                    |
+| lib/server/sql/mappers.ts                                                            | SELECT_COLUMNS, HISTORY_JOIN (lateral json_agg), toWireBarrier                                        |
+| routes/api/_params.ts                                                                | Strict parsers (parseInt/parseDate/parseQueryParam); never a route (_ prefix)                         |
+| routes/api/barriers.ts                                                               | GET /api/barriers (session/token, read throttle)                                                      |
+| routes/api/barriers/deleted.ts                                                       | GET /api/barriers/deleted (deleted only, admin session or token)                                      |
+| routes/api/barriers/[id].ts                                                          | GET/PATCH /api/barriers/:id (GET any reader, PATCH admin field update)                                |
+| routes/api/barriers/[id]/fracttal-raw.ts                                             | GET /api/barriers/:id/fracttal-raw (admin + DEV=true, capped raw upstream detail)                     |
+| routes/api/barriers/[id]/status.ts                                                   | PATCH /api/barriers/:id/status (requires admin, write throttle; author derives from session)          |
+| routes/api/barriers/[id]/contingencies.ts                                            | GET contingency links/candidates (session/token); POST/PATCH/DELETE links (admin, write throttle)     |
+| routes/api/barriers/[id]/sync-detail.ts                                              | GET /api/barriers/:id/sync-detail (session/token, read throttle; pinned run or 24h window)            |
+| routes/api/export.ts                                                                 | GET/POST /api/export (csv/xlsx/pdf; session/token, export throttle, streamed, selection via ids)      |
+| routes/api/kpi.ts                                                                    | GET /api/kpi (session/token, read throttle)                                                           |
+| routes/api/chart.ts                                                                  | GET /api/chart (session/token, read throttle)                                                         |
+| routes/api/sync-status.ts                                                            | GET /api/sync-status (session/token, read throttle; dashboard indicator)                              |
+| routes/api/sync-runs.ts                                                              | GET /api/sync-runs (session/token, read throttle; ?limit= 1..50)                                      |
+| routes/api/sync-changes.ts                                                           | GET /api/sync-changes (session/token, read throttle; paged + legacy ?limit= shape)                    |
+| routes/api/vocabularies.ts                                                           | GET /api/vocabularies (session/token, read throttle; refresh cadence)                                 |
+| routes/api/health.ts                                                                 | GET /api/health (liveness, no DB, no auth, no throttle)                                               |
+| routes/api/recipients.ts                                                             | GET/POST /api/recipients (admin, upsert by email)                                                     |
+| routes/api/recipients/[id].ts                                                        | PATCH/DELETE /api/recipients/:id (admin)                                                              |
+| routes/api/auth/login.ts                                                             | POST /api/auth/login (credentials -> session cookie)                                                  |
+| routes/api/auth/logout.ts                                                            | POST /api/auth/logout (revoke + clear cookie)                                                         |
+| routes/api/auth/me.ts                                                                | GET /api/auth/me (session user for islands)                                                           |
+| routes/api/auth/password.ts                                                          | POST /api/auth/password (own password change, session-only)                                           |
+| routes/api/users.ts                                                                  | GET/POST /api/users (admin only; first account via CLI)                                               |
+| routes/api/users/[id].ts                                                             | PATCH/DELETE /api/users/:id (admin, last-admin guard)                                                 |
+| routes/api/alert-rules.ts                                                            | GET/POST /api/alert-rules (admin, scoped triggers + anti-noise windows)                               |
+| routes/api/alert-rules/[id].ts                                                       | PATCH/DELETE /api/alert-rules/:id (admin)                                                             |
+| routes/api/alert-rules/preview.ts                                                    | GET /api/alert-rules/preview (admin dry-run count + sample tags)                                      |
+| routes/api/lookups.ts                                                                | GET /api/lookups (authenticated id lists for admin forms)                                             |
+| routes/api/field-options.ts                                                          | GET/PUT /api/field-options (GET any reader, PUT admin only)                                           |
+| lib/server/sql/field-options.ts, lib/field-options.ts, islands/BarrierEditor.tsx     | Field options store/registry + admin barrier editor                                                   |
+| lib/server/config.ts, errors.ts, auth.ts                                             | Server config, error envelope, auth helpers                                                           |
+| lib/server/throttle.ts, lib/server/sql/throttle.ts                                   | Throttle (fixed window, shared budget via Postgres)                                                   |
+| lib/server/exportRows.ts, exportStream.ts, exportCsv.ts, exportXlsx.ts, exportPdf.ts | Export streaming (scope, CSV/XLSX/PDF)                                                                |
+| lib/server/sql/_, lib/server/auth/_, lib/server/alerts/*                             | SQL repos, PBKDF2 auth, alert store/rules/detect/run/mailer/provider/templates (see docs/DATABASE.md) |
+| lib/dashboard/urgent.ts, islands/dashboard/vocabularies.ts                           | Urgency helpers + mock vocabularies hook                                                              |
+| db/schema.sql, db/seed_lookups.sql                                                   | DDL + static lookup seeds (see docs/DATABASE.md)                                                      |
 
 See docs/DATABASE.md for schema/setup; docs/ARCHITECTURE.md for mock vs http flows and island topology.
 
 ## Operations (P5)
 
 Docker runtime (primary):
+
 ```
 cp .env.example .env  # set DATABASE_URL + FRACTTAL_* + ADMIN_TOKEN (+ OPS_*)
 docker compose build
@@ -176,12 +181,14 @@ docker compose up -d                       # app + poller
 curl -s localhost:8300/api/health          # {"ok":true,...}
 docker compose ps                          # both healthy / running
 ```
+
 Config from host .env (mounted read-only, never baked; see .dockerignore). deno task fracttal:* shortcuts mirror scripts for local runs. Alert digest stays host cron every 15 min: `*/15 * * * * cd /opt/barrier-monitor && docker compose run --rm tools deno run -A --env-file=.env scripts/alerts-check.ts --apply >> /var/log/alerts.log 2>&1` (drop --apply for dry-run). Backup host cron (`pg_dump "$DATABASE_URL" -Fc`), verified by restore into empty DB with identical barriers/barrier_status_history counts.
 
 Drills: kill-poller -> unless-stopped restarts; logs show cadence resuming; missed tick is gap (next tick reconciles). Rollback to mock: set PUBLIC_API_MODE=mock in .env, then `docker compose up -d --force-recreate app` (client returns to deterministic generator; DB untouched).
 
 Systemd runtime (alternative, no Docker; Windows Server: docs/DEPLOY-WINDOWS.md):
 Service (deno task start reads .env):
+
 ```
 # /etc/systemd/system/barrier-monitor.service
 [Unit]
@@ -196,18 +203,43 @@ Restart=on-failure
 [Install]
 WantedBy=multi-user.target
 ```
+
 Scheduling: scripts/fracttal-poll.ts own service (same template, ExecStart=... deno run -A scripts/fracttal-poll.ts with FRACTTAL_SYNC_SCOPES in EnvironmentFile). Digest: `*/15 * * * *` -> `deno run -A scripts/alerts-check.ts --apply >> /var/log/alerts.log 2>&1` (dry-run without --apply; --reprocess manual only after reading log). Relay failure never loses event: tries 3 times, stamps attempts/last_error, parks (dead_letter) after 5 failing runs; log names `event <id> <tag>` for retry via --reprocess.
 
 Post-deploy smoke:
+
 ```
 curl -s -o /dev/null -w "root=%{http_code}\n" "$BASE/"
 curl -s "$BASE/api/health"  # {"ok":true,"time":"..."}
 ```
+
 Backup/restore verified: `pg_dump "$DATABASE_URL" -Fc -f barreiras.dump`; `createdb -O monitor barreiras_restore`; `pg_restore -d "$RESTORE_URL" barreiras.dump`. Rollback to mock without touching DB: PUBLIC_API_MODE=mock (client returns to deterministic generator; /api/* routes still require DATABASE_URL but nothing calls them). Total rollback: previous build + mock mode.
 
 Production cutover (P3, first pass), strict order:
+
 1. Backup: `pg_dump "$DATABASE_URL" -Fc -f barreiras-pre-cutover.dump` (restorable via pg_restore; counts checked in Operations).
 2. Migrate against backup, never directly: start empty DB from dump, run `deno task db:migrate`, verify barriers/lookups/sync_state/alert_events/alert_recipients present; only then migrate prod.
 3. Dual-run mock-vs-http: with DB migrated+seeded, compare dashboard totals in both modes (same filters): mock records KPI total, non-compliant count, grid rows; http same numbers must reconcile with seed (mock deterministic, seed fixed - divergence beyond expected is stop-ship); GET /api/export?format=csv full filters: total data rows == X-Export-Total == total from /api/barriers.
 4. Cutover checklist: clean sync dry-run on fixture (scripts/fracttal-sync.ts without --apply); ADMIN_TOKEN + OPS_SMTP_* configured; active recipient registered; alerts-check.ts dry-run green; smoke / + /api/health on prod build.
 5. Switch on: systemd service + poll + digest cron; first sync --apply in reviewed session (P3: production read-only until this point).
+
+## SSO (Microsoft Entra ID)
+
+When `AUTH_SSO_ENABLED=true`, the app exposes provider-specific routes:
+
+- `GET /auth/entra/login?next=...`
+- `GET /auth/entra/callback?code=...&state=...`
+- `GET /auth/entra/logged-out`
+- `GET /auth/entra/frontchannel-logout` (optional, phase 9)
+
+`POST /api/auth/logout` returns `{ ok, ssoLogoutUrl }`. `ssoLogoutUrl` is null
+for local sessions or when SSO is disabled.
+
+Admin user APIs include `auth_source` and `entra_oid`. `POST /api/users` can
+create an Entra user with `authSource: "entra"` and `entraObjectId`.
+`PATCH /api/users/:id` can convert a local user to Entra or correct an object
+id. `DELETE /api/users/:id/sessions` revokes all sessions for a user.
+
+Entra users cannot use `/api/auth/login`, `/api/auth/password`, or admin
+password reset. Unknown or inactive Entra identities return the same generic
+`no_access` result.

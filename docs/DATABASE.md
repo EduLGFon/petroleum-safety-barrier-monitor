@@ -12,7 +12,9 @@ deno task db:seed      # mock generator, batches of 500
 # set PUBLIC_API_MODE=http, PUBLIC_API_BASE_URL=, DATABASE_URL=...
 deno task dev          # or start (reads .env), preview (shell only)
 ```
+
 Docker:
+
 ```
 cp .env.example .env
 docker compose build
@@ -20,6 +22,7 @@ docker compose run --rm tools deno run -A --env-file=.env scripts/migrate.ts
 docker compose run --rm tools deno run -A --env-file=.env scripts/fracttal-import.ts --dir /dump   # dry; add --apply (mount dump -v /srv/dump:/dump)
 docker compose up -d
 ```
+
 `db:migrate` and `db:seed` idempotent; reseed from scratch: `deno task db:seed -- --force` (TRUNCATE ... RESTART IDENTITY CASCADE).
 
 ## Why pure Postgres
@@ -84,54 +87,72 @@ Changing status should never be direct `UPDATE barriers SET availability_id`. SQ
 
 ## Files in this layer
 
-| File | Responsibility |
-| --- | --- |
-| db/schema.sql | Full DDL: tables, indexes, triggers (`trg_barriers_set_compliance`, `trg_barriers_updated_at`), functions (`barriers_set_compliance()`, `set_updated_at()`, `record_status_change()`) |
-| db/seed_lookups.sql | Populates static lookups from `lib/enums/` (idempotent; locations/categories stay empty for sync) |
-| scripts/migrate.ts | Applies the two files above against `DATABASE_URL` (pool size 1) |
-| scripts/check-migration-order.ts | Static guard on migration order; runs in `deno task check` |
-| scripts/seed.ts | Populates barriers/barrier_status_history with mock data (batches of 500, `--force` truncates) |
-| lib/server/db.ts | Lazy server-only Postgres pool (`globalThis.__barrierPool`, `queryRows<T>`) |
-| lib/server/sql/barriers.ts | `listBarriers` (paginated+count), `getBarrierById`, `getKpi` (fixed + `GROUP BY` buckets), `transitionBarrierStatus`, `updateBarrier` (metadata+sheet fields) |
-| lib/server/sql/field-options.ts | `field_option_sets` store (`list`/`upsert`/`seed` from GERAL extraction) |
-| lib/server/sql/chart.ts | `getChartData` (`GROUP BY category_id`, `compliant` + `total`) |
-| lib/server/sql/vocabularies.ts | `getVocabularies()` (labels+counts, SSR seed via `routes/index.tsx` + `GET /api/vocabularies` refresh) |
-| lib/server/sql/where.ts | `buildWhere` (args `$n`, `escapeLike`), `resolveOrderBy` (whitelist `SORTABLE`) |
-| lib/server/sql/sync.ts | `defaultSyncIo` P3: label->id context, `loadLocal`, `startRun`/`applyPlan`/`finishRun` (upsert via `external_code` UNIQUE, `record_status_change`) + `syncScopeRunning` (poll lock, 10min stale) |
-| lib/server/fracttal/map.ts | Mapper P3: `mapAsset` (exact label->id resolution, skip+reason for unmapped), `availabilityFromAsset`, `IMPORT_DEFAULTS` |
-| lib/server/fracttal/sync.ts | Orchestrator P3: `planReconcile` (pure), `runSync` (dry-run default), `fieldsSignature` |
-| lib/server/fracttal/runner.ts | Poll P3: `pollOnce` (lock->run->notify), `createPollLoop` (cadence per scope, stop-safe) |
-| lib/server/fracttal/notify.ts | Ops P3: `consoleNotifier` (always), `smtpEmailNotifier` + `smtpConfigFromEnv` (`OPS_SMTP_*`, `OPS_EMAIL_*`), `notifyFailureToAll` (best-effort) |
-| lib/server/fracttal/smtp.ts | Deno-native SMTP P3: EHLO, STARTTLS (reader released for `Deno.startTls`), AUTH PLAIN, dot-stuffing |
-| lib/server/sql/mappers.ts | `SELECT_COLUMNS`, `HISTORY_JOIN` (lateral `json_agg`), `toWireBarrier`, `toHistory` |
-| lib/server/config.ts | `loadServerConfig` (http boot), `loadSyncConfig` (Fracttal credentials for scripts) |
-| lib/server/errors.ts | `{error,code,requestId}` envelope + `x-request-id` |
-| lib/server/auth.ts | `checkAdminAuth` (Bearer `ADMIN_TOKEN`, fail-closed, with `role`) |
-| lib/server/throttle.ts | `createThrottle` (fixed window, no deps) + per-route buckets |
-| lib/server/exportRows.ts | `resolveExportScope` (scope KPI) + `exportBatches` (5,000-row paged batches) |
-| lib/server/exportStream.ts | `textStream` (head/batch/tail skeleton shared by CSV format) |
-| lib/server/exportCsv.ts | `streamExportCsv` (BOM + `row()` + `summaryRowsFrom()`) |
-| lib/server/exportXlsx.ts | `streamExportXlsx` (workbook streamed out of ZIP writer, batch by batch) |
-| lib/server/exportPdf.ts | `streamExportPdf` (report streamed page by page, batch by batch) |
-| lib/server/sql/recipients.ts | CRUD `alert_recipients` (pure validation + thin store) |
-| lib/server/sql/users.ts | CRUD `users` (roles, last-admin guard, no hashes in JSON) |
-| lib/server/sql/sessions.ts | Opaque `sessions` (hash lookup, revoke, expiry sweep) |
-| lib/server/sql/authors.ts | `listAuthors` + `getOrCreateAuthor` (session -> author id) |
-| lib/server/sql/alert_rules.ts | CRUD `alert_rules` + `listStaleBarriers` (time trigger) |
-| lib/server/auth/password.ts | PBKDF2-SHA256 hash/verify + 12-char policy (WebCrypto only) |
-| lib/server/auth/session.ts | Opaque token, SHA-256 hash, HttpOnly cookie builders |
-| lib/server/alerts/store.ts | `AlertStore` contract (dedup, `delivered[]` per recipient) |
-| lib/server/alerts/detect.ts | `detectUrgentTransitions` (history -> `isUrgent`, same predicate as dashboard) |
-| lib/server/alerts/run.ts | `runAlertCycle` (detect->enqueue->digest->mark, dry-run default, `--reprocess`) |
-| lib/server/alerts/mailer.ts | `AlertMailer` + SMTP provider (P3 reuse) + `sendWithRetry` |
-| lib/server/alerts/provider.ts | Generic provider payload (`canal: email`/`whatsapp`/`internal`) |
-| lib/server/alerts/templates.ts | Urgent digest pt-BR (subject counts criticals, body lists criticals first) |
-| lib/server/sql/alerts.ts | `sqlAlertStore` (`ON CONFLICT dedup_key DO NOTHING`, dead-letter in payload) |
-| lib/dashboard/urgent.ts | `urgencyOf`/`isUrgent`/`compareUrgency`/`urgentBarriers` (fail-closed baseline = NcAlert) |
-| routes/api/_params.ts | Shared strict parsers (`parseInt`/`parseDate`/`parseQueryParam`) |
-| routes/api/barriers.ts | `GET /api/barriers` |
-| routes/api/barriers/[id].ts | `GET /api/barriers/:id` |
-| routes/api/barriers/[id]/status.ts | `PATCH /api/barriers/:id/status` (admin write + immediate fan-out) |
-| routes/api/kpi.ts | `GET /api/kpi` |
-| routes/api/chart.ts | `GET /api/chart` |
-| routes/api/health.ts | `GET /api/health` (liveness, no DB) |
+| File                               | Responsibility                                                                                                                                                                                   |
+| ---------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| db/schema.sql                      | Full DDL: tables, indexes, triggers (`trg_barriers_set_compliance`, `trg_barriers_updated_at`), functions (`barriers_set_compliance()`, `set_updated_at()`, `record_status_change()`)            |
+| db/seed_lookups.sql                | Populates static lookups from `lib/enums/` (idempotent; locations/categories stay empty for sync)                                                                                                |
+| scripts/migrate.ts                 | Applies the two files above against `DATABASE_URL` (pool size 1)                                                                                                                                 |
+| scripts/check-migration-order.ts   | Static guard on migration order; runs in `deno task check`                                                                                                                                       |
+| scripts/seed.ts                    | Populates barriers/barrier_status_history with mock data (batches of 500, `--force` truncates)                                                                                                   |
+| lib/server/db.ts                   | Lazy server-only Postgres pool (`globalThis.__barrierPool`, `queryRows<T>`)                                                                                                                      |
+| lib/server/sql/barriers.ts         | `listBarriers` (paginated+count), `getBarrierById`, `getKpi` (fixed + `GROUP BY` buckets), `transitionBarrierStatus`, `updateBarrier` (metadata+sheet fields)                                    |
+| lib/server/sql/field-options.ts    | `field_option_sets` store (`list`/`upsert`/`seed` from GERAL extraction)                                                                                                                         |
+| lib/server/sql/chart.ts            | `getChartData` (`GROUP BY category_id`, `compliant` + `total`)                                                                                                                                   |
+| lib/server/sql/vocabularies.ts     | `getVocabularies()` (labels+counts, SSR seed via `routes/index.tsx` + `GET /api/vocabularies` refresh)                                                                                           |
+| lib/server/sql/where.ts            | `buildWhere` (args `$n`, `escapeLike`), `resolveOrderBy` (whitelist `SORTABLE`)                                                                                                                  |
+| lib/server/sql/sync.ts             | `defaultSyncIo` P3: label->id context, `loadLocal`, `startRun`/`applyPlan`/`finishRun` (upsert via `external_code` UNIQUE, `record_status_change`) + `syncScopeRunning` (poll lock, 10min stale) |
+| lib/server/fracttal/map.ts         | Mapper P3: `mapAsset` (exact label->id resolution, skip+reason for unmapped), `availabilityFromAsset`, `IMPORT_DEFAULTS`                                                                         |
+| lib/server/fracttal/sync.ts        | Orchestrator P3: `planReconcile` (pure), `runSync` (dry-run default), `fieldsSignature`                                                                                                          |
+| lib/server/fracttal/runner.ts      | Poll P3: `pollOnce` (lock->run->notify), `createPollLoop` (cadence per scope, stop-safe)                                                                                                         |
+| lib/server/fracttal/notify.ts      | Ops P3: `consoleNotifier` (always), `smtpEmailNotifier` + `smtpConfigFromEnv` (`OPS_SMTP_*`, `OPS_EMAIL_*`), `notifyFailureToAll` (best-effort)                                                  |
+| lib/server/fracttal/smtp.ts        | Deno-native SMTP P3: EHLO, STARTTLS (reader released for `Deno.startTls`), AUTH PLAIN, dot-stuffing                                                                                              |
+| lib/server/sql/mappers.ts          | `SELECT_COLUMNS`, `HISTORY_JOIN` (lateral `json_agg`), `toWireBarrier`, `toHistory`                                                                                                              |
+| lib/server/config.ts               | `loadServerConfig` (http boot), `loadSyncConfig` (Fracttal credentials for scripts)                                                                                                              |
+| lib/server/errors.ts               | `{error,code,requestId}` envelope + `x-request-id`                                                                                                                                               |
+| lib/server/auth.ts                 | `checkAdminAuth` (Bearer `ADMIN_TOKEN`, fail-closed, with `role`)                                                                                                                                |
+| lib/server/throttle.ts             | `createThrottle` (fixed window, no deps) + per-route buckets                                                                                                                                     |
+| lib/server/exportRows.ts           | `resolveExportScope` (scope KPI) + `exportBatches` (5,000-row paged batches)                                                                                                                     |
+| lib/server/exportStream.ts         | `textStream` (head/batch/tail skeleton shared by CSV format)                                                                                                                                     |
+| lib/server/exportCsv.ts            | `streamExportCsv` (BOM + `row()` + `summaryRowsFrom()`)                                                                                                                                          |
+| lib/server/exportXlsx.ts           | `streamExportXlsx` (workbook streamed out of ZIP writer, batch by batch)                                                                                                                         |
+| lib/server/exportPdf.ts            | `streamExportPdf` (report streamed page by page, batch by batch)                                                                                                                                 |
+| lib/server/sql/recipients.ts       | CRUD `alert_recipients` (pure validation + thin store)                                                                                                                                           |
+| lib/server/sql/users.ts            | CRUD `users` (roles, last-admin guard, no hashes in JSON)                                                                                                                                        |
+| lib/server/sql/sessions.ts         | Opaque `sessions` (hash lookup, revoke, expiry sweep)                                                                                                                                            |
+| lib/server/sql/authors.ts          | `listAuthors` + `getOrCreateAuthor` (session -> author id)                                                                                                                                       |
+| lib/server/sql/alert_rules.ts      | CRUD `alert_rules` + `listStaleBarriers` (time trigger)                                                                                                                                          |
+| lib/server/auth/password.ts        | PBKDF2-SHA256 hash/verify + 12-char policy (WebCrypto only)                                                                                                                                      |
+| lib/server/auth/session.ts         | Opaque token, SHA-256 hash, HttpOnly cookie builders                                                                                                                                             |
+| lib/server/alerts/store.ts         | `AlertStore` contract (dedup, `delivered[]` per recipient)                                                                                                                                       |
+| lib/server/alerts/detect.ts        | `detectUrgentTransitions` (history -> `isUrgent`, same predicate as dashboard)                                                                                                                   |
+| lib/server/alerts/run.ts           | `runAlertCycle` (detect->enqueue->digest->mark, dry-run default, `--reprocess`)                                                                                                                  |
+| lib/server/alerts/mailer.ts        | `AlertMailer` + SMTP provider (P3 reuse) + `sendWithRetry`                                                                                                                                       |
+| lib/server/alerts/provider.ts      | Generic provider payload (`canal: email`/`whatsapp`/`internal`)                                                                                                                                  |
+| lib/server/alerts/templates.ts     | Urgent digest pt-BR (subject counts criticals, body lists criticals first)                                                                                                                       |
+| lib/server/sql/alerts.ts           | `sqlAlertStore` (`ON CONFLICT dedup_key DO NOTHING`, dead-letter in payload)                                                                                                                     |
+| lib/dashboard/urgent.ts            | `urgencyOf`/`isUrgent`/`compareUrgency`/`urgentBarriers` (fail-closed baseline = NcAlert)                                                                                                        |
+| routes/api/_params.ts              | Shared strict parsers (`parseInt`/`parseDate`/`parseQueryParam`)                                                                                                                                 |
+| routes/api/barriers.ts             | `GET /api/barriers`                                                                                                                                                                              |
+| routes/api/barriers/[id].ts        | `GET /api/barriers/:id`                                                                                                                                                                          |
+| routes/api/barriers/[id]/status.ts | `PATCH /api/barriers/:id/status` (admin write + immediate fan-out)                                                                                                                               |
+| routes/api/kpi.ts                  | `GET /api/kpi`                                                                                                                                                                                   |
+| routes/api/chart.ts                | `GET /api/chart`                                                                                                                                                                                 |
+| routes/api/health.ts               | `GET /api/health` (liveness, no DB)                                                                                                                                                              |
+
+## SSO (Microsoft Entra ID)
+
+SSO adds these columns and tables without removing the existing password model:
+
+- `users.auth_source` (`local` or `entra`), `entra_tid`, `entra_oid`.
+- `users.password_hash` is nullable for Entra users.
+- `users_auth_source_valid` and `users_auth_source_shape` enforce local versus
+  Entra rows.
+- `idx_users_entra_identity` uniquely maps `(entra_tid, entra_oid)` for Entra
+  users.
+- `sessions.auth_method` (`password` or `entra`) and `idp_sid_hash`.
+- `auth_flows` stores short-lived OIDC state, browser binding, nonce, and PKCE
+  verifier hashes. Rows expire after the configured flow TTL.
+
+Entra identity is `(tid, oid)`. Email, UPN, and `preferred_username` are never
+used as identity. Entra users have no local password. Admin conversion preserves
+`users.id` and authored history.

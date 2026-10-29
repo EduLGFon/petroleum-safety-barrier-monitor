@@ -7,6 +7,7 @@ Stack: Deno-only Fresh 2 + Vite + Preact islands. No ORM, no `package.json`.
 `main.ts` boots one `App<State>` (`utils.ts` `define`) with `staticFiles()` + `fsRoutes()`. `client.ts` imports `static/styles.css` for HMR. `vite.config.ts` enables `@fresh/plugin-vite`.
 
 Key tasks (`deno task <name>`):
+
 - `check`: fmt/lint/check + migration-order guard.
 - `test`: Deno tests (net/env gated).
 - `dev`: `vite` (shell exports; `export $(cat .env | xargs)`).
@@ -16,7 +17,7 @@ Key tasks (`deno task <name>`):
 - `db:migrate`: `scripts/migrate.ts` (schema + seed lookups).
 - `db:seed`: `scripts/seed.ts` (mock generator, batches of 500; `--force` truncates).
 - `fracttal:import/sync/force-sync/audit/poll/capture/extract`, `alerts:check/poll`, `admin:create`, `browser:capture/smoke`, `chaos-scale`, `docker:*`.
-`COMPANY_NAME` read per request, not baked. `_app.tsx` renders shell + FOUC guard restoring theme/accent/density/motion from `barrier-settings`.
+  `COMPANY_NAME` read per request, not baked. `_app.tsx` renders shell + FOUC guard restoring theme/accent/density/motion from `barrier-settings`.
 
 ## Layer boundaries
 
@@ -33,22 +34,26 @@ Boundary enforced by convention: `lib/server/db.ts` lazy `Pool` on `globalThis._
 ## Data flows
 
 Mock (`PUBLIC_API_MODE=mock`, default):
+
 ```
 routes/index.tsx -> lib/api/mock.ts -> lib/mock/generator.ts -> Barrier[]
 -> <Dashboard initialBarriers={full} apiMode="mock" vocabularies={null}>
 -> DashboardView ClientView -> useDashboard + useDashboardVocabularies
 -> DashboardSections (header, KPI, filter bar, table)
 ```
+
 Full list ships as island props. No DB/fetch. Filtering/sort/pagination/KPI/chart client-side from `lib/dashboard/*`. Export full filtered set.
 
 HTTP (`PUBLIC_API_MODE=http`):
 SSR calls `getVocabularies()` (7 parallel SQL) and renders `<Dashboard initialBarriers={[]} vocabularies={...}>`. Rows never cross island boundary.
+
 ```
 DashboardView ServerView -> useServerDashboard(baseUrl)
 -> toWireQuery(filters) + httpAdapterFactory(baseUrl)
 -> Promise.all([GET /api/barriers, /api/kpi, /api/chart])
 -> resolve* -> render
 ```
+
 Table pages use full filters; KPI/chart same subset minus paging/sort (`hooks/dashboard/server.ts`, scope builder `hooks/dashboard/scope.ts`). Cancel on supersede; first load splash, later refetchs keep stale rows. `error + rows==0` -> ServerErrorCard else ServerErrorBanner + retry. 5-min cadence (hidden tabs skip) refreshes data + vocabularies via `GET /api/vocabularies`. Exports via `GET|POST /api/export` over whole selection (ids in body, filters in query), streamed from DB in batches; cross-page selection exports completely; detail resolution page-local.
 
 ## Export pipeline
@@ -58,17 +63,19 @@ Table pages use full filters; KPI/chart same subset minus paging/sort (`hooks/da
 ## Island bridge topology
 
 Islands can't read `Deno.env`. Server config crosses as props from `routes/index.tsx`:
+
 - `initialBarriers` (mock full list, http `[]`)
 - `companyName` (via `lib/company.ts`)
 - `apiMode` (`PUBLIC_API_MODE`, default mock)
 - `apiBaseUrl` (`PUBLIC_API_BASE_URL`)
 - `vocabularies` (`getVocabularies()` http, null mock)
 - `sessionUser` (authenticated user or null)
-`SettingsProvider` + `ThemeProvider` wrap `DashboardView` inside `islands/Dashboard.tsx`. Dual-use modules (`lib/company.ts`, `lib/api.ts`) read `Deno.env` in try with fallback.
+  `SettingsProvider` + `ThemeProvider` wrap `DashboardView` inside `islands/Dashboard.tsx`. Dual-use modules (`lib/company.ts`, `lib/api.ts`) read `Deno.env` in try with fallback.
 
 ## API contract
 
 Full contract in `docs/API.md`. Summary:
+
 - Wire (`lib/wireTypes.ts`): numeric ids only; `complianceId` omitted from `WireBarrier`.
 - Domain (`lib/types.ts`): resolved display strings; open `string & {}` unions.
 - Bridge (`lib/enums/*`, `lib/resolve.ts`, `lib/api/query.ts`): `toXId` returns undefined on unknown (skip+warn), `fromXId` explicit sentinels, `resolveBarrier` derives `compliance` via `isCompliant()` after promoting stored `Degradado`/`Indisponivel` with `has_contingency='Sim'` to contingency display states (`effectiveAvailabilityId`).
@@ -96,3 +103,12 @@ See `.env.example`. `COMPANY_NAME` brands top header, login card header, splash 
 - Dynamic data, never fixed catalogs: stations, statuses, categories, counts change without code changes (open unions, SSR/SQL vocabularies, distinctBy). Filter selects and settings default filters use live vocabularies only; no seed fallback.
 - Reconcile everywhere: fixed KPI fields + `other` novel-availability field + `by*` GROUP BY buckets, resolveKpi translates numeric-id keys, chart derives NC as `total - compliant` fail-closed, so novel values never vanish. Fixed fields + `other` always equal `total`.
 - Layouts survive scale: paginated/server-paged regions, exports streamed in DB-sized batches under one row ceiling, debounced search, precomputed sort keys.
+
+## SSO (Microsoft Entra ID)
+
+The dashboard can use Microsoft Entra ID as a second sign-in method. The
+authorization code flow with PKCE runs in `lib/server/auth/entra/*`. Entra tokens
+are discarded after ID token validation. The app keeps the existing opaque
+Postgres session and cookie. Stable identity is `(tid, oid)`. Local roles remain
+authoritative. Short-lived flows are stored in `auth_flows`. See
+`docs/SSO-ENTRA-PLAN.md`.
