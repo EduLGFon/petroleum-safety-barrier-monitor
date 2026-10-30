@@ -16,9 +16,12 @@ Perfis: `admin` e `user`.
 
 - Única rota pública: `/login`; não autenticados redirecionados para `/login?next=...`.
 - Sem cadastro público; primeira conta via `deno task admin:create`.
-- Sessão válida 12 horas; logout revoga imediatamente.
-- Alteração de senha (aba Conta): revoga todas as sessões; senha 12 a 256 caracteres.
-- Redefinição por admin (aba Usuários): revoga sessões apenas do usuário afetado.
+- Login local por e-mail e senha (quando habilitado) e, se configurado pelo administrador, login com Microsoft Entra ID ("Entrar com Microsoft") na mesma tela.
+- Contas podem ser locais ou Entra. A conversão de uma conta local para Entra preserva o identificador e o histórico; contas Entra não alteram senha no monitor (gerenciada pela organização).
+- Sessão válida 12 horas; logout revoga imediatamente. Para sessões Entra, o logout também oferece encerramento da sessão no provedor (quando habilitado).
+- Alteração de senha (aba Conta): apenas contas locais; revoga todas as sessões; senha 12 a 256 caracteres.
+- Edição de perfil (aba Conta): nome, e-mail e telefone do próprio usuário.
+- Redefinição por admin (aba Usuários): revoga sessões apenas do usuário afetado; admin pode revogar todas as sessões de qualquer usuário ("Revogar sessões").
 
 ## 3. Visão geral do painel
 
@@ -45,6 +48,7 @@ Busca textual (tag e código da instalação); Tipologia; Categoria; Criticidade
 - Contagem de resultados atualizada conforme filtros.
 - Estado inicial: sem filtros, 25 linhas por página, ordenação crescente por ID.
 - Padrões personalizáveis no painel de configurações.
+- Usuários vinculados a grupos de acesso visualizam apenas barreiras das estações dos seus grupos; sem vínculo, acesso irrestrito.
 
 ## 5. Tabela de barreiras
 
@@ -124,17 +128,23 @@ Painel via botão de engrenagem.
 
 ### 10.1 Preferências do usuário
 
-Tema (claro, escuro, preto puro); cor de destaque (8 paletas); densidade (3 predefinições); redução de movimento; filtros padrão; ordenação padrão; alteração de senha (aba Conta).
+Tema (claro, escuro, preto puro); cor de destaque (8 paletas); densidade (3 predefinições); redução de movimento; desativar desfoque (desempenho); filtros padrão; ordenação padrão; alteração de senha (aba Conta).
 
 ### 10.2 Configurações administrativas
 
-Usuários: listar, criar, editar, remover contas; proteção da última conta de admin ativa.
+Usuários: listar, criar, editar, remover contas; proteção da última conta de admin ativa. Criação e edição incluem nome, e-mail, telefone e tipo de conta (senha local ou Microsoft Entra com Object ID); contas locais podem ser convertidas para Entra. Admin pode revogar todas as sessões de um usuário.
+
+Grupos de acesso: criar, editar e remover grupos que restringem usuários a um conjunto de estações. Cada grupo vincula usuários e estações; um usuário pode pertencer a vários grupos e visualiza a união das estações. Usuário sem vínculo a grupo tem acesso irrestrito; administradores têm acesso irrestrito. Nas telas de seleção de estações e usuários há botão "Selecionar todos" para marcar/desmarcar em lote.
 
 Destinatários de alertas: listar, cadastrar, ativar, remover.
 
 Regras de alerta: categoria da barreira, status de chegada, criticidade, recuperação do estado operacional, dias de atraso, envio imediato ou agrupado.
 
 Opções de campo: listas controladas para perguntas da ficha de inventário.
+
+Importação em lote de usuários: `deno task import:users` lê `users.txt` (ou arquivo informado), cria ou atualiza contas (nome, e-mail, telefone e perfil) com senha padrão `123456789012` para novas contas.
+
+Verificação de ambiente: `deno task doctor` (preflight de host, `.env`, banco e SSO) antes de build/start.
 
 ### 10.3 Persistência
 
@@ -173,6 +183,8 @@ Sincronizando; Ocioso; Atrasado; Desconhecido.
 | Gerenciar usuários | Não | Sim |
 | Gerenciar destinatários e regras | Não | Sim |
 | Gerenciar opções de campo | Não | Sim |
+| Gerenciar grupos de acesso | Não | Sim |
+| Visualizar estações conforme grupos de acesso | Conforme grupos | Sim |
 
 Alterações são recusadas quando nenhuma credencial está configurada.
 
@@ -189,17 +201,21 @@ Seis estados:
 | Status | Significado |
 | --- | --- |
 | Disponível | Ativo protegido livre de falhas ou defeitos. |
-| Degradado | Intervenção corretiva planejada em aberto no ativo. |
+| Degradado | Intervenção corretiva planejada e urgente em aberto no ativo. |
 | Indisponível | Intervenção corretiva emergencial em aberto no ativo. |
 | Degradado Contingenciado | Condição degradada com contingência em vigor. |
 | Indisponível Contingenciado | Indisponível com contingência em vigor. |
 | Fora de Operação | Ativo fora de serviço, isolado positivamente. |
+
+Observação: Degradado exige gatilho urgente (atributo de urgência do trabalho planejado); trabalho planejado sem urgência não altera a disponibilidade e a barreira permanece Disponível.
 
 ### 14.2 Regras de contingência
 
 Estados contingenciados são derivados dos estados-base. Com intervenção corretiva em aberto e evidência de contingência, o estado-base pode ser promovido: Degradado para Degradado Contingenciado; Indisponível para Indisponível Contingenciado.
 
 Evidências: GM/CEC; nota explícita de contingência no texto da intervenção; campo Há Contingência? = Sim.
+
+A degradação exige intervenção corretiva planejada urgente; intervenção planejada não urgente não gera Degradado.
 
 ### 14.3 Regras de conformidade
 
