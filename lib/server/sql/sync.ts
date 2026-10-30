@@ -32,7 +32,6 @@ import type {
   SyncChangeItem,
   SyncChangeSummary,
   SyncRun,
-  SyncStatus,
 } from "../../types.ts";
 
 import type { CatalogNeeds, MapContext } from "../fracttal/map.ts";
@@ -43,13 +42,17 @@ import { getResolverLabels } from "./vocabularies.ts";
 
 import { log } from "../log.ts";
 
+import {
+  SYNC_FRESH_MINUTES,
+  SYNC_STALE_MINUTES,
+  type SyncStatusRow,
+} from "./sync-status.ts";
+
 export const SYNC_AUTHOR_ID = 10; // authors.id, see db/seed_lookups.sql
 
 // Freshness windows for the status indicator, in minutes. A `running` row
 // newer than SYNC_FRESH_MINUTES means a sync is in flight; one older than
 // SYNC_STALE_MINUTES means the poller likely crashed mid-run.
-export const SYNC_FRESH_MINUTES = 10;
-export const SYNC_STALE_MINUTES = 15;
 
 // Apply chunk: barriers committed per transaction. Bounds tx length and
 // the audit batch (8 params per row) well under protocol limits.
@@ -768,142 +771,6 @@ async function insertAuditBatch(
   }
 }
 
-// SyncStatusRow: the raw sync_state shape the status indicator reads.
-export interface SyncStatusRow {
-  id: number;
-  scope: string;
-  status: string;
-  inserts: number;
-  updates: number;
-  deletes: number;
-  skips: number;
-  note: string;
-  started_at: string;
-  finished_at: string;
-}
-
-// isStaleActive: pure guard so superseded orphans never latch `stale`.
-// A stale `running` candidate only counts when it is newer than the
-// latest finished run (id is monotonic; timestamp is the cross-scope
-// fallback). An older orphan means healthy runs kept landing after the
-// crash - the indicator must report idle, not stuck.
-export function isStaleActive(
-  staleRow: { id: number; started_at: string } | null | undefined,
-  latest: Pick<SyncStatusRow, "id" | "finished_at"> | null,
-): boolean {
-  if (staleRow === null || staleRow === undefined) return false;
-  if (latest === null) return true;
-  if (staleRow.id !== latest.id) return staleRow.id > latest.id;
-  return new Date(staleRow.started_at).getTime() >
-    new Date(latest.finished_at).getTime();
-}
-
-// toSyncStatus: pure state decision over the three reads below. A fresh
-// `running` row means in flight; a stale one (no fresh row) means the
-// poller likely died mid-run; otherwise the latest finished row decides,
-// and an empty table reports unknown. Unexpected statuses fail closed.
-export function toSyncStatus(args: {
-  latest: SyncStatusRow | null;
-  running: { scope: string; started_at: string } | null;
-  staleRunning: boolean;
-  barriers: number;
-}): SyncStatus {
-  const totals = { barriers: args.barriers };
-  const lastRun = args.latest === null ? null : {
-    scope: args.latest.scope,
-    status: (args.latest.status === "ok" ? "ok" : "failed") as
-      | "ok"
-      | "failed",
-    startedAt: args.latest.started_at,
-    finishedAt: args.latest.finished_at,
-    inserts: args.latest.inserts,
-    updates: args.latest.updates,
-    deletes: args.latest.deletes,
-    skips: args.latest.skips,
-    note: args.latest.note,
-  };
-  if (args.running !== null) {
-    return {
-      state: "syncing",
-      runningSince: args.running.started_at,
-      lastRun,
-      totals,
-    };
-  }
-  if (args.staleRunning) {
-    return { state: "stale", runningSince: null, lastRun, totals };
-  }
-  if (lastRun === null) {
-    return { state: "unknown", runningSince: null, lastRun, totals };
-  }
-  return { state: "idle", runningSince: null, lastRun, totals };
-}
-
-// getSyncStatus: dashboard indicator data - latest finished run, fresh
-// running row, stale-run flag, and the tracked barrier total. Read-only;
-// the route serves it to any authenticated dashboard user.
-//
-// Stale defense in depth: a `running` row whose heartbeat lapsed past
-// SYNC_STALE_MINUTES only counts when it is NEWER than the latest finished
-// run. An orphan left by a killed process (superseded by later `ok` rows)
-// is ignored here and reaped on the next startRun, instead of latching
-// `stale` forever while healthy runs keep landing.
-export async function getSyncStatus(): Promise<SyncStatus> {
-  const [finished, running, stale, counted] = await Promise.all([
-    queryRows<SyncStatusRow>(
-      `select id, scope, status, inserts, updates, deletes, skips, note,
-        started_at, finished_at
-       from sync_state where status != 'running'
-       order by id desc limit 1`,
-    ),
-    queryRows<{ scope: string; started_at: string }>(
-      `select scope, started_at from sync_state
-       where status = 'running'
-         and finished_at >= now() - make_interval(mins => $1)
-       order by id desc limit 1`,
-      [SYNC_FRESH_MINUTES],
-    ),
-    queryRows<{ id: number; started_at: string }>(
-      `select id, started_at from sync_state
-       where status = 'running'
-         and finished_at < now() - make_interval(mins => $1)
-       order by id desc limit 1`,
-      [SYNC_STALE_MINUTES],
-    ),
-    queryRows<{ n: number }>(
-      `select count(*)::int as n from barriers where deleted_at is null`,
-    ),
-  ]);
-  const latest = finished[0] ?? null;
-  const staleRow = stale[0] ?? null;
-  // A stale candidate superseded by a newer finished run is an orphan,
-  // not an in-flight stuck sync (see isStaleActive).
-  const staleRunning = isStaleActive(staleRow, latest);
-  // The driver returns timestamptz as Date; the SyncStatus contract is ISO
-  // strings (wire JSON serializes Dates identically, so this changes only
-  // the in-process shape, never the bytes).
-  const run = running[0] ?? null;
-  return toSyncStatus({
-    latest: latest === null ? null : {
-      ...latest,
-      started_at: asIsoString(latest.started_at),
-      finished_at: asIsoString(latest.finished_at),
-    },
-    running: run === null ? null : {
-      scope: run.scope,
-      started_at: asIsoString(run.started_at),
-    },
-    staleRunning,
-    barriers: counted[0]?.n ?? 0,
-  });
-}
-
-// asIsoString: normalizes a driver timestamp (Date) or string to the ISO
-// form the SyncStatus/SyncRun contracts declare.
-function asIsoString(v: string | Date): string {
-  return v instanceof Date ? v.toISOString() : String(v);
-}
-
 // HistoryTouch: raw join shape for the recent-changes list below.
 interface HistoryTouch {
   barrier_id: number;
@@ -1584,3 +1451,12 @@ export async function recordSyncFailure(
     note: note.slice(0, 200),
   });
 }
+
+export {
+  getSyncStatus,
+  isStaleActive,
+  SYNC_FRESH_MINUTES,
+  SYNC_STALE_MINUTES,
+  toSyncStatus,
+} from "./sync-status.ts";
+export type { SyncStatusRow } from "./sync-status.ts";
