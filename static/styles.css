@@ -1188,6 +1188,19 @@ tbody.table-refreshing {
   color: var(--text-primary);
 }
 
+/* ── Responsive adjustments for small screens ───────────────────────────────── */
+@media (max-width: 768px) {
+  .glass-card {
+    padding: 10px;
+  }
+  .table-card {
+    overflow-x: auto;
+  }
+  .goto-input {
+    max-width: 100%;
+  }
+}
+
 /* ── Disable all animations ─────────────────────────────────────────────────── */
 html.no-anim *,
 html.no-anim *::before,
