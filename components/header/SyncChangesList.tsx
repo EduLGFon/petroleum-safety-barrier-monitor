@@ -9,7 +9,7 @@ import type { SyncChangeItem } from "../../lib/types.ts";
 
 import { SyncChangeRow } from "./SyncChangeRow.tsx";
 
-import { useState } from "preact/hooks";
+import { useRef, useState } from "preact/hooks";
 
 export function SyncChangesList(
   { baseUrl, scope, runId, onOpenBarrier }: {
@@ -32,14 +32,16 @@ export function SyncChangesList(
     pageSize: 25,
   }, true);
 
+  const searchTimer = useRef<number | undefined>(undefined);
   const onSearch = (v: string) => {
     setQuery(v);
     setPage(1);
-    globalThis.clearTimeout((onSearch as unknown as { t?: number }).t);
-    (onSearch as unknown as { t?: number }).t = globalThis.setTimeout(
-      () => setDebounced(v.trim()),
-      300,
-    );
+    if (searchTimer.current !== undefined) {
+      globalThis.clearTimeout(searchTimer.current);
+    }
+    searchTimer.current = globalThis.setTimeout(() => {
+      setDebounced(v.trim());
+    }, 300) as unknown as number;
   };
 
   return (
