@@ -3,18 +3,7 @@
 // ids (not display labels) for availabilities, categories, and authors. The
 // public vocabularies endpoint only carries labels, so this authenticated
 // endpoint serves the exact rows those writes reference.
-import {
-  authStoreUnavailable,
-  denyByCredentials,
-  requireAuthenticated,
-} from "../../lib/server/auth.ts";
-
-import {
-  internal,
-  newRequestId,
-  okWithEtag,
-  rateLimited,
-} from "../../lib/server/errors.ts";
+import { internal, okWithEtag } from "../../lib/server/errors.ts";
 
 import { listAuthors } from "../../lib/server/sql/authors.ts";
 

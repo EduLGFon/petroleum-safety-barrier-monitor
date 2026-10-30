@@ -4,55 +4,31 @@
 // category, criticality, action-plan presence, text, dates) so the header
 // never disagrees with the grid.
 // Authenticated GET (session or ADMIN_TOKEN); anonymous gets 404.
-import {
-  forbidden,
-  internal,
-  newRequestId,
-  okWithEtag,
-  rateLimited,
-} from "../../lib/server/errors.ts";
-
-import {
-  authStoreUnavailable,
-  denyDataAuth,
-  requireDataAuth,
-} from "../../lib/server/auth.ts";
-
-import { readThrottle, routeClientKey } from "../../lib/server/throttle.ts";
-
-import { loadServerConfig } from "../../lib/server/config.ts";
+import { forbidden, internal, okWithEtag } from "../../lib/server/errors.ts";
 
 import { getKpi } from "../../lib/server/sql/barriers.ts";
 
 import { parseFilterQuery } from "./_params.ts";
+
+import { guardRequest } from "../../lib/server/api-guard.ts";
 
 import { define } from "../../utils.ts";
 
 export const handler = define.handlers({
   // GET KPI snapshot for the given filters (all omitted = everything).
   async GET(ctx) {
-    const requestId = newRequestId();
-    const limit = readThrottle.check(routeClientKey(ctx));
-    if (!limit.allowed) {
-      return rateLimited(
-        "too many requests",
-        requestId,
-        limit.retryAfterMs,
-      );
-    }
-    try {
-      loadServerConfig();
-    } catch (err) {
-      return internal("GET /api/kpi", err, requestId, "Server misconfigured");
-    }
-    let dataAuth;
-    try {
-      dataAuth = await requireDataAuth(ctx.req);
-    } catch (err) {
-      return authStoreUnavailable("GET /api/kpi", err, requestId);
-    }
-    if (!dataAuth.ok) return denyDataAuth(dataAuth, requestId);
-
+    const g = await guardRequest(ctx, {
+      kind: "read",
+      auth: "data",
+      label: "GET /api/kpi",
+    });
+    if (g.response) return g.response;
+    const requestId = g.requestId;
+    const dataAuth = g.dataAuth as {
+      ok: true;
+      role: string;
+      user?: { allowedLocationIds?: number[] };
+    };
     const filter = {
       ...parseFilterQuery(ctx.url.searchParams),
       allowedLocationIds: dataAuth.role === "admin"
@@ -67,8 +43,6 @@ export const handler = define.handlers({
     }
 
     try {
-      // Admin snapshots carry inactive/deleted scope counts for the band
-      // segments; other roles get scope-local numbers only.
       const snapshot = await getKpi(filter, {
         scopeCounts: dataAuth.role === "admin",
       });

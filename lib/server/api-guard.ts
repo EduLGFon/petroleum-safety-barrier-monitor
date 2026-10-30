@@ -5,8 +5,11 @@
 import {
   authStoreUnavailable,
   denyByCredentials,
+  denyDataAuth,
   requireAdminAuth,
   requireAuthenticated,
+  requireDataAuth,
+  type DataAuth,
 } from "./auth.ts";
 
 import {
@@ -19,7 +22,7 @@ import { readThrottle, routeClientKey, writeThrottle } from "./throttle.ts";
 
 import { loadServerConfig } from "./config.ts";
 
-export type AuthLevel = "none" | "user" | "admin";
+export type AuthLevel = "none" | "user" | "admin" | "data";
 export type ThrottleKind = "read" | "write";
 
 export interface GuardOptions {
@@ -31,6 +34,7 @@ export interface GuardOptions {
 export interface GuardResult {
   requestId: string;
   response?: Response;
+  dataAuth?: DataAuth;
 }
 
 // guardRequest: runs throttle + config + auth and returns either a ready
@@ -58,6 +62,24 @@ export async function guardRequest(
     };
   }
   if (opts.auth === "none") return { requestId };
+  if (opts.auth === "data") {
+    let dataAuth;
+    try {
+      dataAuth = await requireDataAuth(req);
+    } catch (err) {
+      return {
+        requestId,
+        response: authStoreUnavailable(opts.label, err, requestId),
+      };
+    }
+    if (!dataAuth.ok) {
+      return {
+        requestId,
+        response: denyDataAuth(dataAuth, requestId),
+      };
+    }
+    return { requestId, dataAuth };
+  }
   let auth;
   try {
     auth = opts.auth === "admin"
@@ -77,5 +99,3 @@ export async function guardRequest(
   }
   return { requestId };
 }
-EOF
-echo done
