@@ -52,7 +52,7 @@ Live row carries 62 fields. Captured by `FracttalWorkRequest` (14 fields): join 
 Not captured (48 fields). Important candidates:
 
 | Field | Value to us | Recommendation |
-| `is_urgent` | 29% of WRs are urgent. Today dropped; could prioritize alerts/queue. | Add to `FracttalWorkRequest` and surface in UI/alerts. |
+| `is_urgent` | Urgent flag gating Degradada: planned corrective only degrades when `is_urgent=true` (see `resolveAvailability`). Parsed in `work.ts` + `fracttal-import.ts`. | Captured; next step is surfacing in UI/alerts. |
 | `date`, `date_incident`, `date_solution`, `date_status` | Timeline; `date_incident` is when the failure started (better than `date_maintenance`). | Use `date_incident`/`date` as event date fallback. |
 | `id_work_order` | Direct WR to WO link (today only matched by code/text). | Use for correlation when present. |
 | `types_1_description` | Request category (e.g. "Patrimonio"). | Reporting/grouping. |
@@ -72,7 +72,7 @@ Not captured (48 fields). Important candidates:
 1. Contingency is the one signal we deliberately read from the raw row (labels + `work_orders_status_custom_description`) via `contingencyFromRaw`, because the typed structs drop those fields. That coverage is already correct; the gap is only typing, not data.
 2. Dates are the highest-value missing WO/WR fields: today's status timeline uses 3 of ~7 available dates, so event ordering can be off when `initial_date`/`date_maintenance` are null (they are null on ~93% of rows). `cal_date_maintenance`/`first_date_task`/`date_incident` are populated more often and would improve `status_since` accuracy.
 3. Failure context (`causes_description`, `severiry_description`, `damages_types_description`) is entirely dropped; only `description`/`task_note` survive into `degradationDesc`/`actionPlan`. Adding these would make the barrier dialog's degradation text materially better.
-4. Urgency (`is_urgent` on WRs, `priorities_description` on WOs) is dropped, so the monitor cannot distinguish an urgent corrective from a routine one beyond the planned/emergency classification.
+4. Urgency: WR `is_urgent` now gates Degradada (planned + urgent → degraded; planned without urgent → available) and rides `StatusEvent.isUrgent`. WO `priorities_description` remains available for alert prioritization.
 5. Custom fields on items are the one asset-side unknown: we capture `field_1..field_6` but not `custom_fields_values`. A tenant probe of those values is the next step before deciding whether they warrant a column.
 
 ## 5. Custom-field probe result (2026-10-27)
@@ -83,7 +83,7 @@ Scanned all equipment rows: `custom_fields_values` carries a single empty-label 
 
 1. WO/WR additional dates -> `status_since` accuracy (medium effort, high value).
 2. WO failure context -> better `degradationDesc`/`actionPlan` (low effort).
-3. `is_urgent` + WO priority -> alert prioritization (low effort).
+3. Urgent-flag surfacing in UI/alerts (low effort; derivation gate already done).
 4. `id_status_work_order` -> replace `done` heuristic (low effort).
 5. `custom_fields_values` probe -> decide if a new column is warranted.
 6. Everything else (costs, accounting, signatures, geolocation) -> keep out of the sync payload; reachable via raw detail when an operator needs it.

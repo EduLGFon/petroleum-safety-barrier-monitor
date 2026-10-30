@@ -246,11 +246,23 @@ Deno.test("resolveAvailability follows urgent, planned, stopped, flag, open", ()
   );
   assertStrictEquals(planned.availabilityId, AVAILABILITY_UNAVAILABLE);
   const degraded = resolveAvailability(
-    { ...idle, planned: { date: "2026-09-12", source: "p" } },
+    {
+      ...idle,
+      planned: { date: "2026-09-12", source: "p", isUrgent: true },
+    },
     "2026-09-15",
   );
   assertStrictEquals(degraded.availabilityId, AVAILABILITY_DEGRADED);
   assertStrictEquals(degraded.statusSince, "2026-09-12");
+  const nonUrgentPlanned = resolveAvailability(
+    { ...idle, planned: { date: "2026-09-12", source: "p" } },
+    "2026-09-15",
+  );
+  assertStrictEquals(
+    nonUrgentPlanned.availabilityId,
+    AVAILABILITY_AVAILABLE,
+    "planned without the urgent flag must not degrade",
+  );
   const stopped = resolveAvailability(
     { ...idle, stopAssets: true },
     "2026-09-15",
@@ -374,12 +386,25 @@ Deno.test("resolveAvailability promotes corrective work with contingency", () =>
   const planned = resolveAvailability(
     {
       ...idle,
-      planned: { date: "2026-09-12", source: "p" },
+      planned: { date: "2026-09-12", source: "p", isUrgent: true },
       hasContingency: true,
     },
     "2026-09-15",
   );
   assertStrictEquals(planned.availabilityId, AVAILABILITY_DEGRADED_CONTINGENCY);
+  const nonUrgentContingency = resolveAvailability(
+    {
+      ...idle,
+      planned: { date: "2026-09-12", source: "p" },
+      hasContingency: true,
+    },
+    "2026-09-15",
+  );
+  assertStrictEquals(
+    nonUrgentContingency.availabilityId,
+    AVAILABILITY_AVAILABLE,
+    "contingency text without an urgent planned trigger must not degrade",
+  );
   const urgent = resolveAvailability(
     {
       ...idle,

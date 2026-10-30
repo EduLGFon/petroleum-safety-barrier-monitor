@@ -53,7 +53,7 @@ App models barriers with `availability`, `compliance`, `criticality`. Fracttal a
 
 | App concept | Fracttal source (both paths) | Notes |
 | `externalCode` (new wire field) | `code` | Upsert match key |
-| `availability` | `resolveAvailability`: urgent WO/WR event -> 5; planned -> 4; `stop_assets`/`initial_date_out_of_service` -> 1; `available:false` -> 5; else 0 | Work events from open-status WO sweep + windowed WR pass (merged per code by `buildWorkEvents`); import merges dump events the same way |
+| `availability` | `resolveAvailability`: urgent WO/WR event -> 5; planned with urgent flag (`is_urgent`) -> 4; `stop_assets`/`initial_date_out_of_service` -> 1; `available:false` -> 5; else 0 | Work events from open-status WO sweep + windowed WR pass (merged per code by `buildWorkEvents`; planned `isUrgent` comes from WR `is_urgent`, WO rows stay non-urgent); import merges dump events the same way |
 | `compliance` | derived: open/corrective work order on the asset - endpoint TBD | Unmapped: needs work-order contract + fixture review |
 | `criticality` | `criticalityLabelFor`: `groups_2 = 'ESO'` flag wins, else TAG suffix letter (`... { code } A/B/C/D`), else `priorities_description`, else rank D + warning | ESO > A > B > C > D ranks; ESO/A are critical tiers; listed in run report (`mappingWarnings`), never a silent guess |
 | `category` | `groups_description` taxonomy label (both paths; `groups_1_description` is the polo, never consulted) | sync creates missing rows between rebuilds (ids past max(id)) |

@@ -87,10 +87,31 @@ Deno.test("workRequestSlot gates on closed status and type", () => {
     parseWorkRequest(request({ types_2_description: "Corretiva Emergencial" })),
   );
   assertStrictEquals(full?.urgent?.date, "2026-09-08");
+  assertStrictEquals(full?.urgent?.isUrgent, false);
+  const urgentPlanned = workRequestSlot(
+    parseWorkRequest(
+      request({
+        types_2_description: "Corretiva Planejada",
+        is_urgent: true,
+      }),
+    ),
+  );
+  assertStrictEquals(urgentPlanned?.planned?.isUrgent, true);
+  const nonUrgentPlanned = workRequestSlot(
+    parseWorkRequest(
+      request({ types_2_description: "Corretiva Planejada" }),
+    ),
+  );
+  assertStrictEquals(nonUrgentPlanned?.planned?.isUrgent, false);
   assertStrictEquals(
     workRequestSlot(parseWorkRequest(request({ id_status: 4 }))),
     null,
   );
+});
+
+Deno.test("workOrderSlot never marks planned as urgent", () => {
+  const planned = workOrderSlot(parseWorkOrder(order()));
+  assertStrictEquals(planned?.planned?.isUrgent, false);
 });
 
 Deno.test("buildWorkEvents merges per code keeping the first event", () => {

@@ -56,11 +56,13 @@ Date fields available (per work order task): `creation_date`, `date_maintenance`
 
 People retained in sync-generated status history: `created_by` (primary author), `requested_by` (author fallback and requester participant), `personnel_description` (personnel), `user_assigned` (assigned user), `resources_human_resources` (one or more semicolon-separated human resources), `validated_by_description` (validator). The sync snapshots names and roles only when it writes a new status-history row. Employee codes, personnel ids, signatures, and image paths are not stored. Work-request actor-field parity is not verified; the parser uses these fields only if the endpoint includes them.
 
-Summary status derivation rule: Open corrective WO on an asset:
-- `tasks_log_types_description` contains `Corretiva Planejada` or `types_description = Falha Potencial` -> Degradada
-- `tasks_log_types_description` contains `Corretiva Emergencial` -> Indisponivel
+Summary status derivation rule: Open corrective work on an asset:
+- `tasks_log_types_description` contains `Corretiva Emergencial` -> Indisponivel (urgent slot, regardless of `is_urgent`)
+- planned corrective (`Corretiva Planejada` / `Falha Potencial`, WO or WR) WITH urgent flag (`StatusEvent.isUrgent`, from WR `is_urgent=true`) -> Degradada; planned work without the urgent flag carries no status signal -> Disponivel
 - `stop_assets = true` or `initial_date_out_of_service` set -> Fora de Operacao
-- No open corrective WO, not out of service -> Disponivel
+- No open urgent/planned-urgent corrective work, not out of service -> Disponivel
+
+Sample attribute: WR `is_urgent` (boolean, 29% true in the dump slice) is parsed in `lib/server/fracttal/work.ts` (`parseWorkRequest` → `workRequestEvent.isUrgent`) and merged per code; the dump import reads the same field in `scripts/fracttal-import.ts` (`extractEvent`). WO rows carry no `is_urgent`, so WO planned events stay non-urgent and no longer degrade.
 
 ## 5. Work requests (supplementary signal)
 
@@ -101,7 +103,7 @@ Always null in work orders (30k sampled). The field exists but carries no signal
 ## 10. Maturity summary for status derivation
 
 | Signal | Source | Ready? |
-| Degradada | `tasks_log_types_description` = `CORR - Corretiva Planejada` | yes |
+| Degradada | planned corrective (`CORR - Corretiva Planejada` / `Falha Potencial`) WITH urgent flag (WR `is_urgent=true` → `StatusEvent.isUrgent`) | yes - urgent gate |
 | Indisponivel | `tasks_log_types_description` = `CORR - Corretiva Emergencial` | yes |
 | Fora de Operacao | `stop_assets = true` or `initial_date_out_of_service` on item | yes |
 | Disponivel | default (no open corrective WO, not out of service) | yes |

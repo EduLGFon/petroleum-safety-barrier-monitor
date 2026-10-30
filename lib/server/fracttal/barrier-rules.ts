@@ -490,8 +490,10 @@ export interface AvailabilityOut {
 // resolveAvailability derives status by precedence (docs/FRACTTAL-DATA.md
 // section 4, docs/STATUSES.md for the contingency overlay): open emergency
 // corrective -> Indisponivel (5, or 2 when contingency is in place); open
-// planned corrective -> Degradada (4, or 3 when contingency is in place);
-// stopped asset or out-of-service date -> Fora de Operacao (1); asset
+// planned corrective WITH urgent flag (StatusEvent.isUrgent, from WR
+// is_urgent) -> Degradada (4, or 3 when contingency is in place);
+// planned work without the urgent flag carries no status signal; stopped
+// asset or out-of-service date -> Fora de Operacao (1); asset
 // flagged unavailable -> Indisponivel (5, the documented P3 draft for the
 // bare flag); otherwise Disponivel (0).
 export function resolveAvailability(
@@ -508,7 +510,7 @@ export function resolveAvailability(
       note: signals.urgent.source,
     };
   }
-  if (signals.planned) {
+  if (signals.planned && signals.planned.isUrgent === true) {
     return {
       availabilityId: conting
         ? AVAILABILITY_DEGRADED_CONTINGENCY

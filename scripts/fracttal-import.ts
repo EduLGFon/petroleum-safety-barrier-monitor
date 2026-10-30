@@ -238,6 +238,9 @@ function contingencyTexts(row: Record<string, unknown>): string[] {
 
 // extractEvent distills a dump work order/request row to a shared status
 // event: earliest of the candidate date fields plus folio + description.
+// The urgent flag rides along from the WR is_urgent boolean (WO rows have
+// no such field, so they stay non-urgent); only planned events with
+// isUrgent=true can drive Degradada in resolveAvailability.
 function extractEvent(row: Record<string, unknown>): StatusEvent {
   const folio = str(row.wo_folio);
   const desc = str(row.description);
@@ -253,6 +256,7 @@ function extractEvent(row: Record<string, unknown>): StatusEvent {
     trade: (str(row.tasks_log_types_2_description) ||
       str(row.tasks_log_task_type_main) || str(row.types_description))
       .slice(0, 120),
+    isUrgent: row.is_urgent === true,
   };
 }
 
@@ -510,9 +514,11 @@ async function main() {
   // ── Derived status per barrier ────────────────────────────────────────────
   // Shared precedence (lib/server/fracttal/barrier-rules.ts): open emergency
   // corrective -> Indisponível (5, or 2 when contingency text is present);
-  // open planned corrective -> Degradada (4, or 3 when contingency text is
-  // present); stopped asset or out-of-service date -> Fora de Operação (1);
-  // asset flagged unavailable -> Indisponível (5); otherwise Disponível (0).
+  // open planned corrective WITH urgent flag (WR is_urgent) -> Degradada
+  // (4, or 3 when contingency text is present); planned work without the
+  // urgent flag carries no status signal; stopped asset or out-of-service
+  // date -> Fora de Operação (1); asset flagged unavailable ->
+  // Indisponível (5); otherwise Disponível (0).
   // The asset flag is passed as available: the dump semantics for that
   // column are unverified, so the import derives status from work events
   // only. Contingency auto-detection scans the open corrective work text

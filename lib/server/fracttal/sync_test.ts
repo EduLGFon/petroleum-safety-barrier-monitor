@@ -313,7 +313,7 @@ Deno.test("runSync applies work events to availability and comments", async () =
       code === "FAL-EQ-001"
         ? {
           urgent: null,
-          planned: { date: "2026-09-11", source: "OS - 7" },
+          planned: { date: "2026-09-11", source: "OS - 7", isUrgent: true },
           preventive: null,
           stopAssets: false,
         }
@@ -326,6 +326,27 @@ Deno.test("runSync applies work events to availability and comments", async () =
   assertStrictEquals(entry.input.availabilityId, 4);
   assertStrictEquals(entry.input.comments, "OS - 7");
   assertStrictEquals(entry.input.sourceUpdatedAt, "2026-09-11");
+});
+
+Deno.test("runSync keeps non-urgent planned work available", async () => {
+  const { io, state } = makeFakeIo();
+  await runSync(() => Promise.resolve([rawRow()]), {
+    io,
+    dryRun: false,
+    workEvents: (code) =>
+      code === "FAL-EQ-001"
+        ? {
+          urgent: null,
+          planned: { date: "2026-09-11", source: "OS - 7" },
+          preventive: null,
+          stopAssets: false,
+        }
+        : null,
+  });
+  const entry = state.calls.applyPlan[0]!.entries[0]!;
+  assertStrictEquals(entry.kind, "insert");
+  if (entry.kind !== "insert") throw new Error("unreachable");
+  assertStrictEquals(entry.input.availabilityId, 0);
 });
 
 Deno.test("runSync fails closed when work events throw", async () => {

@@ -213,13 +213,28 @@ Deno.test("mapAsset maps work events to status plus comments", () => {
     asset(),
     ctx,
     {
-      work: { planned: { date: "2026-09-11", source: "OS - 1: fix" } },
+      work: {
+        planned: { date: "2026-09-11", source: "OS - 1: fix", isUrgent: true },
+      },
       today: "2026-09-15",
     },
   );
   if (!mapped.ok) throw new Error("expected ok");
   assertStrictEquals(mapped.input.availabilityId, 4);
   assertStrictEquals(mapped.input.comments, "OS - 1: fix");
+});
+
+Deno.test("mapAsset keeps non-urgent planned work available", () => {
+  const mapped = mapAsset(
+    asset(),
+    ctx,
+    {
+      work: { planned: { date: "2026-09-11", source: "OS - 1: fix" } },
+      today: "2026-09-15",
+    },
+  );
+  if (!mapped.ok) throw new Error("expected ok");
+  assertStrictEquals(mapped.input.availabilityId, 0);
 });
 
 Deno.test("mapAsset maps out-of-service dates to outOfService id", () => {
@@ -243,7 +258,9 @@ Deno.test("mapAsset applies work stop flags to outOfService id", () => {
 
 Deno.test("mapAsset stamps sourceUpdatedAt from the winning event", () => {
   const mapped = mapAsset(asset(), ctx, {
-    work: { planned: { date: "2026-09-11", source: "OS - 1" } },
+    work: {
+      planned: { date: "2026-09-11", source: "OS - 1", isUrgent: true },
+    },
     today: "2026-09-15",
   });
   if (!mapped.ok) throw new Error("expected ok");
@@ -253,7 +270,7 @@ Deno.test("mapAsset stamps sourceUpdatedAt from the winning event", () => {
 Deno.test("mapAsset promotes corrective work with contingency to 2/3", () => {
   const degr = mapAsset(asset(), ctx, {
     work: {
-      planned: { date: "2026-09-11", source: "OS - 1" },
+      planned: { date: "2026-09-11", source: "OS - 1", isUrgent: true },
       hasContingency: true,
       contingencySource: "OS - 1: contingência GM-1",
     },
@@ -286,6 +303,7 @@ Deno.test("mapAsset builds explanatory history from the winning work event", () 
         operationState: "Em aberto",
         sourceAuthor: "Pessoa autora",
         participants: [{ name: "Pessoa executora", role: "Pessoal" }],
+        isUrgent: true,
       },
       hasContingency: true,
       contingencySource: "OS sintética: contingência",
