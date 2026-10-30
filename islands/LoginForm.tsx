@@ -10,6 +10,7 @@ import { BrandHeader } from "../components/login/BrandHeader.tsx";
 import { TrustFooter } from "../components/login/TrustFooter.tsx";
 
 import { toPtError } from "../lib/api/error-pt.ts";
+import { apiFetch } from "../lib/api/http.ts";
 
 import { AURORA } from "../lib/aurora.ts";
 
@@ -17,7 +18,7 @@ import { useState } from "preact/hooks";
 
 // postJson: fetch helper that sends cookies and parses error envelopes.
 async function postJson(url: string, body: unknown): Promise<unknown> {
-  const res = await fetch(url, {
+  const res = await apiFetch(url, {
     method: "POST",
     credentials: "same-origin",
     headers: { "Content-Type": "application/json" },

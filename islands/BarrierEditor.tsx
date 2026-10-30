@@ -10,6 +10,7 @@ import { useEffect, useState } from "preact/hooks";
 import type { Barrier } from "../lib/types.ts";
 
 import { AURORA } from "../lib/aurora.ts";
+import { apiFetch } from "../lib/api/http.ts";
 
 interface Lookups {
   availabilities?: { id: number; label: string }[];
@@ -149,13 +150,13 @@ export function BarrierEditor(
   useEffect(() => {
     // Fetch lookups with ids + custom field options
     Promise.all([
-      fetch("/api/lookups", { credentials: "same-origin" })
+      apiFetch("/api/lookups", { credentials: "same-origin" })
         .then((r) => (r.ok ? r.json() : null))
         .catch((err) => {
           console.warn("BarrierEditor: lookups fetch failed", err);
           return null;
         }),
-      fetch("/api/field-options", { credentials: "same-origin" })
+      apiFetch("/api/field-options", { credentials: "same-origin" })
         .then((r) => (r.ok ? r.json() : null))
         .catch((err) => {
           console.warn("BarrierEditor: field-options fetch failed", err);
@@ -251,7 +252,7 @@ export function BarrierEditor(
         extraComments,
       };
 
-      const res = await fetch(`/api/barriers/${barrier.id}`, {
+      const res = await apiFetch(`/api/barriers/${barrier.id}`, {
         method: "PATCH",
         credentials: "same-origin",
         headers: { "Content-Type": "application/json" },

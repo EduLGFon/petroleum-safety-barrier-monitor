@@ -7,6 +7,8 @@ import { useEffect, useState } from "preact/hooks";
 
 import { toLoginWithReturn } from "./server.ts";
 
+import { apiFetch } from "../../lib/api/http.ts";
+
 const cache = new Map<string, SyncBarrierDetail>();
 
 export function useBarrierSyncDetail(
@@ -40,7 +42,7 @@ export function useBarrierSyncDetail(
     setError(null);
     const params = new URLSearchParams({ scope });
     if (runId !== null) params.set("runId", String(runId));
-    fetch(`${baseUrl}/api/barriers/${barrierId}/sync-detail?${params}`, {
+    apiFetch(`${baseUrl}/api/barriers/${barrierId}/sync-detail?${params}`, {
       headers: { "Accept": "application/json" },
       credentials: "same-origin",
       signal: ctrl.signal,

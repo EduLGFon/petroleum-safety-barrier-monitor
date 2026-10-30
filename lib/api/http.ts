@@ -44,7 +44,7 @@ const MAX_CACHED_URLS = 50;
 
 // fetchOrFail: network failures are user-facing; translate them once instead
 // of letting the browser's English "Failed to fetch" reach the error card.
-async function fetchOrFail(
+export async function fetchOrFail(
   input: string,
   init: RequestInit,
 ): Promise<Response> {
@@ -54,6 +54,11 @@ async function fetchOrFail(
     throw new Error("Falha de conexão, tente novamente");
   }
 }
+
+// apiFetch: shared client-side fetch with connection-error translation, so
+// components and hooks outside the HTTP adapter still handle dead networks
+// the same way.
+export const apiFetch = fetchOrFail;
 
 // Creates an HTTP BarriersApi bound to the given backend baseUrl. labels
 // carries dynamic station/category id->label maps so imported values beyond

@@ -12,6 +12,8 @@ import { useEffect, useState } from "preact/hooks";
 
 import { toLoginWithReturn } from "./server.ts";
 
+import { apiFetch } from "../../lib/api/http.ts";
+
 export function useSyncStatus(
   baseUrl: string,
   idleMs: number,
@@ -28,7 +30,7 @@ export function useSyncStatus(
     if (!cadence || cadence <= 0) return;
     let cancelled = false;
     const load = (): void => {
-      fetch(`${baseUrl}/api/sync-status`, {
+      apiFetch(`${baseUrl}/api/sync-status`, {
         headers: { "Accept": "application/json" },
         credentials: "same-origin",
       }).then((res) => {

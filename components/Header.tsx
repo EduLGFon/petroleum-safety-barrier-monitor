@@ -20,6 +20,7 @@ import { SyncHoverCard } from "./header/SyncHoverCard.tsx";
 import { useEffect, useRef, useState } from "preact/hooks";
 
 import { AURORA, AURORA_TYPE } from "../lib/aurora.ts";
+import { apiFetch } from "../lib/api/http.ts";
 
 import { HealthDot } from "./header/HealthDot.tsx";
 
@@ -73,7 +74,7 @@ function GearIcon() {
 // Failures still navigate (a dead session must never trap the user).
 async function logoutToLogin(): Promise<void> {
   try {
-    await fetch("/api/auth/logout", {
+    await apiFetch("/api/auth/logout", {
       method: "POST",
       credentials: "same-origin",
     });

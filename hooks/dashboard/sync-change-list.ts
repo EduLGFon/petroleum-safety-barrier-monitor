@@ -14,6 +14,8 @@ import { toPtError } from "../../lib/api/error-pt.ts";
 
 import { toLoginWithReturn } from "./server.ts";
 
+import { apiFetch } from "../../lib/api/http.ts";
+
 export interface ChangeListQuery {
   scope: "last-run" | "last-day";
   runId?: number | null;
@@ -74,7 +76,7 @@ export function useSyncChangeList(
       pageSize: String(pageSize),
     });
     if (runId !== null) params.set("runId", String(runId));
-    fetch(`${baseUrl}/api/sync-changes?${params}`, {
+    apiFetch(`${baseUrl}/api/sync-changes?${params}`, {
       headers: { "Accept": "application/json" },
       credentials: "same-origin",
       signal: ctrl.signal,

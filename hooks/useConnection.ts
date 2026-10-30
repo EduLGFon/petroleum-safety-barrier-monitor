@@ -3,6 +3,8 @@
 // the hook keeps the component presentational and reusable elsewhere.
 import { useEffect, useRef, useState } from "preact/hooks";
 
+import { apiFetch } from "../lib/api/http.ts";
+
 import type { Conn } from "../lib/types.ts";
 
 export type { Conn };
@@ -70,7 +72,7 @@ export function useConnection(
       const ctrl = new AbortController();
       const timeout = globalThis.setTimeout(() => ctrl.abort(), 4000);
       try {
-        const res = await fetch(healthUrl, {
+        const res = await apiFetch(healthUrl, {
           method: "GET",
           cache: "no-store",
           headers: { "Accept": "application/json" },

@@ -13,6 +13,8 @@ import type { Fmt } from "../../lib/export/format.ts";
 
 import { FMT_EXT } from "../../lib/export/format.ts";
 
+import { apiFetch } from "../../lib/api/http.ts";
+
 export interface ServerExportRequest {
   baseUrl: string;
   kind: Fmt;
@@ -45,7 +47,7 @@ async function requestFile(
   req: ServerExportRequest,
 ): Promise<{ res: Response }> {
   const qs = exportQueryString(req.query);
-  const res = await fetch(
+  const res = await apiFetch(
     `${req.baseUrl}/api/export?${qs}`,
     {
       method: "POST",

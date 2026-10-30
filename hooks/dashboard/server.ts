@@ -26,7 +26,7 @@ import { exportFromServer } from "./export-server.ts";
 
 import type { Fmt } from "../../lib/export/format.ts";
 
-import { isAuthExpired } from "../../lib/api/http.ts";
+import { apiFetch, isAuthExpired } from "../../lib/api/http.ts";
 
 import { loadDash, saveDash } from "./persistence.ts";
 
@@ -339,7 +339,7 @@ export function useServerDashboard(
   // stale after a run while the table already reloaded.
   const refreshVocab = useCallback(() => {
     // Empty baseUrl means same origin (relative /api/*), not disabled.
-    fetch(`${baseUrl}/api/vocabularies`, {
+    apiFetch(`${baseUrl}/api/vocabularies`, {
       headers: { "Accept": "application/json" },
       credentials: "same-origin",
     }).then((res) => {
