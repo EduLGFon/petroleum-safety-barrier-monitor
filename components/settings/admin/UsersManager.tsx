@@ -19,7 +19,9 @@ import {
 
 import { adminApi } from "../../../lib/api/admin-client.ts";
 
-import { useEffect, useState } from "preact/hooks";
+import { useState } from "preact/hooks";
+
+import { useAdminResource } from "../../../hooks/useAdminResource.ts";
 
 interface PublicUser {
   id: number;
@@ -226,9 +228,13 @@ export function UsersManager(
     currentUserId?: number;
   },
 ) {
-  const [users, setUsers] = useState<PublicUser[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
+  const resource = useAdminResource<PublicUser>(async () => {
+    const list = await adminApi("/api/users") as PublicUser[];
+    onCount?.(list.length);
+    return list;
+  });
+  const { items: users, setItems: setUsers, loading, error, setError, reload: reloadUsers } =
+    resource;
   const [email, setEmail] = useState("");
   const [name, setName] = useState("");
   const [password, setPassword] = useState("");
@@ -241,17 +247,7 @@ export function UsersManager(
   const [notice, setNotice] = useState("");
 
   async function refresh() {
-    try {
-      setError("");
-      setLoading(true);
-      const list = await adminApi("/api/users") as PublicUser[];
-      setUsers(list);
-      onCount?.(list.length);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
-    } finally {
-      setLoading(false);
-    }
+    await reloadUsers();
   }
 
   async function revokeSessions(id: number) {
@@ -281,10 +277,7 @@ export function UsersManager(
     }
   }
 
-  useEffect(() => {
-    void refresh();
-    // Refresh once per mount; the count reporter is stable for the session.
-  }, []);
+  // Initial load handled by useAdminResource.
 
   async function create(e: Event) {
     e.preventDefault();

@@ -21,6 +21,8 @@ import { adminApi } from "../../../lib/api/admin-client.ts";
 
 import { useEffect, useState } from "preact/hooks";
 
+import { useAdminResource } from "../../../hooks/useAdminResource.ts";
+
 interface Recipient {
   id: number;
   email: string;
@@ -40,9 +42,6 @@ interface UserOption {
 export function RecipientsManager(
   { onCount }: { onCount?: (n: number) => void },
 ) {
-  const [items, setItems] = useState<Recipient[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
   const [email, setEmail] = useState("");
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
@@ -52,29 +51,32 @@ export function RecipientsManager(
   const [busy, setBusy] = useState(false);
   const [confirmId, setConfirmId] = useState<number | null>(null);
 
+  const resource = useAdminResource<Recipient>(async () => {
+    const list = await adminApi("/api/recipients") as Recipient[];
+    onCount?.(list.filter((r) => r.active).length);
+    return list;
+  });
+  const { items, loading, error, setError, reload: reloadItems } = resource;
+
   async function refresh() {
+    await reloadItems();
     try {
-      setError("");
-      setLoading(true);
-      const list = await adminApi("/api/recipients") as Recipient[];
-      setItems(list);
-      onCount?.(list.filter((r) => r.active).length);
-      try {
-        const userList = await adminApi("/api/users") as UserOption[];
-        setUsers(userList);
-      } catch {
-        // ignore user list errors; manual entry still works
-      }
-    } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
-    } finally {
-      setLoading(false);
+      const userList = await adminApi("/api/users") as UserOption[];
+      setUsers(userList);
+    } catch {
+      // ignore user list errors; manual entry still works
     }
   }
 
   useEffect(() => {
-    void refresh();
-    // Refresh once per mount; the count reporter is stable for the session.
+    void (async () => {
+      try {
+        const userList = await adminApi("/api/users") as UserOption[];
+        setUsers(userList);
+      } catch {
+        // ignore
+      }
+    })();
   }, []);
 
   async function create(e: Event) {
