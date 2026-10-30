@@ -4,19 +4,15 @@
 // keeps the envelopes and request ids consistent and shrinks handler bodies.
 import {
   authStoreUnavailable,
+  type DataAuth,
   denyByCredentials,
   denyDataAuth,
   requireAdminAuth,
   requireAuthenticated,
   requireDataAuth,
-  type DataAuth,
 } from "./auth.ts";
 
-import {
-  internal,
-  newRequestId,
-  rateLimited,
-} from "./errors.ts";
+import { internal, newRequestId, rateLimited } from "./errors.ts";
 
 import { readThrottle, routeClientKey, writeThrottle } from "./throttle.ts";
 
