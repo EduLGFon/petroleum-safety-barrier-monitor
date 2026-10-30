@@ -142,10 +142,6 @@ Regras de alerta: categoria da barreira, status de chegada, criticidade, recuper
 
 Opções de campo: listas controladas para perguntas da ficha de inventário.
 
-Importação em lote de usuários: `deno task import:users` lê `users.txt` (ou arquivo informado), cria ou atualiza contas (nome, e-mail, telefone e perfil) com senha padrão `123456789012` para novas contas.
-
-Verificação de ambiente: `deno task doctor` (preflight de host, `.env`, banco e SSO) antes de build/start.
-
 ### 10.3 Persistência
 
 Preferências armazenadas localmente no navegador e restauradas ao abrir o site. Chaves detalhadas na seção 13.
