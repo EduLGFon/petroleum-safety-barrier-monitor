@@ -50,6 +50,7 @@ const RED = "#ef4444";
 function useAnimatedValue(target: number, duration = 600) {
   const [cur, setCur] = useState(target);
   const prev = useRef(target);
+  const displayed = useRef(target);
   const raf = useRef<number>(0);
   useEffect(() => {
     if (prev.current === target) return;
@@ -59,7 +60,12 @@ function useAnimatedValue(target: number, duration = 600) {
       const p = Math.min((now - t0) / duration, 1);
       // Ease out cubic
       const e = 1 - Math.pow(1 - p, 3);
-      setCur(start + (end - start) * e);
+      const next = start + (end - start) * e;
+      // Skip no-op state updates to reduce render churn.
+      if (next !== displayed.current) {
+        displayed.current = next;
+        setCur(next);
+      }
       if (p < 1) raf.current = requestAnimationFrame(tick);
     };
     raf.current = requestAnimationFrame(tick);

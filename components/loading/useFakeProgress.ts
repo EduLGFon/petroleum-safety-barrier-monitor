@@ -1,5 +1,5 @@
 // Fake progress hook - eased splash progress with staged status messages.
-// This is why it exists: simulates load pacing and exit timing so the splash
+// Why it exists: simulates load pacing and exit timing so the splash
 // covers hydration with smooth easing before signalling onDone.
 import { useCallback, useEffect, useState } from "preact/hooks";
 
@@ -12,23 +12,28 @@ export function useFakeProgress(onDone: () => void) {
   const done = useCallback(onDone, [onDone]);
 
   useEffect(() => {
-    const steps = 55, dur = 1500;
-    let step = 0;
-    const id = setInterval(() => {
-      step++;
+    const steps = 40, dur = 1200;
+    let raf = 0;
+    let started = 0;
+    const tick = (now: number) => {
+      if (!started) started = now;
+      const elapsed = now - started;
+      const step = Math.min(steps, Math.floor((elapsed / dur) * steps));
       const t = step / steps;
       const e = t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
       setProgress(Math.round(e * 100));
       if (step >= steps) {
-        clearInterval(id);
         setReady(true);
         setTimeout(() => {
           setExit(true);
           setTimeout(done, 550);
         }, 300);
+        return;
       }
-    }, dur / steps);
-    return () => clearInterval(id);
+      raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
   }, [done]);
 
   const msg = progress < 35

@@ -53,8 +53,8 @@ export const AVAILABILITY_CODES: Record<number, Availability> = {
 };
 export const AVAILABILITY_IDS = buildReverse(AVAILABILITY_CODES);
 
-export function toAvailabilityId(v: Availability): number | undefined {
-  return AVAILABILITY_IDS[v];
+export function toAvailabilityId(v: string): number | undefined {
+  return AVAILABILITY_IDS[v as Availability];
 }
 export function fromAvailabilityId(id: number): Availability {
   return AVAILABILITY_CODES[id] ?? `Disponibilidade (${id})`;
@@ -68,8 +68,8 @@ export const COMPLIANCE_CODES: Record<number, Compliance> = {
 };
 export const COMPLIANCE_IDS = buildReverse(COMPLIANCE_CODES);
 
-export function toComplianceId(v: Compliance): number | undefined {
-  return COMPLIANCE_IDS[v];
+export function toComplianceId(v: string): number | undefined {
+  return COMPLIANCE_IDS[v as Compliance];
 }
 export function fromComplianceId(id: number): Compliance {
   return COMPLIANCE_CODES[id] ?? `Conformidade (${id})`;
@@ -101,8 +101,8 @@ export function isCriticalRankLabel(label: string): boolean {
   return label === "ESO" || label === "A";
 }
 
-export function toCriticalityId(v: Criticality): number | undefined {
-  return CRITICALITY_IDS[v];
+export function toCriticalityId(v: string): number | undefined {
+  return CRITICALITY_IDS[v as Criticality];
 }
 export function fromCriticalityId(id: number): Criticality {
   return CRITICALITY_CODES[id] ?? `Criticidade (${id})`;

@@ -34,5 +34,3 @@ export function useFocusTrap(
     return () => document.removeEventListener("keydown", handler);
   }, [open, root]);
 }
-EOF
-echo done

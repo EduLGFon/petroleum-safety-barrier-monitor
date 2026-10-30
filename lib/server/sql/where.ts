@@ -81,8 +81,9 @@ export function buildWhere(
     // Compliance derives from the effective availability (2/3 count as
     // compliant, like isCompliant), not from the stored compliance_id which
     // still reflects the base id until the next materializing write.
-    const hasCompliant = compIds.includes(0);
-    const hasNonCompliant = compIds.includes(1);
+    const compSet = new Set(compIds);
+    const hasCompliant = compSet.has(0);
+    const hasNonCompliant = compSet.has(1);
     const otherIds = compIds.filter((x) => x !== 0 && x !== 1);
     const effAvail =
       `(case when b.availability_id in (4, 5) and lower(trim(coalesce(b.has_contingency, ''))) = 'sim' then case when b.availability_id = 4 then 3 else 2 end else b.availability_id end)`;

@@ -61,7 +61,7 @@ export function toWireQuery(
   };
   const availIds = toIdList(
     f.availability as string | string[] | undefined,
-    (s) => toAvailabilityId(s as never),
+    (s) => toAvailabilityId(s),
     "availability",
   );
   if (availIds) {
@@ -69,7 +69,7 @@ export function toWireQuery(
   }
   const confIds = toIdList(
     f.compliance as string | string[] | undefined,
-    (s) => toComplianceId(s as never),
+    (s) => toComplianceId(s),
     "compliance",
   );
   if (confIds) q.complianceId = confIds.length === 1 ? confIds[0] : confIds;
@@ -92,7 +92,7 @@ export function toWireQuery(
       : [f.criticality];
     const critIds = critVals
       .map((s) => {
-        const id = toCriticalityId(s as never);
+        const id = toCriticalityId(s);
         if (id === undefined) {
           console.warn(`[toWireQuery] unknown criticality: ${s}`);
         }

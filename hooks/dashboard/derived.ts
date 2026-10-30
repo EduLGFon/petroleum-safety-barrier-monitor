@@ -58,9 +58,16 @@ export function useDashboardDerived(
     Math.ceil(sorted.length / filters.pageSize),
   );
 
+  // Index barriers by id once per list so opening a row is O(1) instead of
+  // scanning the whole list on every open.
+  const barrierById = useMemo(() => {
+    const m = new Map<number, Barrier>();
+    for (const b of allBarriers) m.set(b.id, b);
+    return m;
+  }, [allBarriers]);
   const openBarrier = useMemo(
-    () => openId ? allBarriers.find((b) => b.id === openId) ?? null : null,
-    [openId, allBarriers],
+    () => (openId ? barrierById.get(openId) ?? null : null),
+    [openId, barrierById],
   );
   // Station metadata comes from the seed list when known; stations added
   // later fall back to their own code so details never render undefined.

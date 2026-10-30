@@ -355,7 +355,9 @@ export function useServerDashboard(
       // memo (and its data effect) does not refetch a second time on top of
       // the reloadKey bump above. Compare structurally without allocating
       // two full JSON strings on every vocab refresh.
-      setLiveVocab((prev) => (prev !== null && sameVocabularies(prev, v) ? prev : v));
+      setLiveVocab((
+        prev,
+      ) => (prev !== null && sameVocabularies(prev, v) ? prev : v));
     }).catch(() => {
       // Vocabulary refresh is best-effort; the data reload above stands.
     });
@@ -446,12 +448,17 @@ export function useServerDashboard(
 
 // sameVocabularies: structural equality for Vocabularies without JSON.stringify.
 function sameVocabularies(a: Vocabularies, b: Vocabularies): boolean {
-  if (a.locations.length !== b.locations.length ||
+  if (
+    a.locations.length !== b.locations.length ||
     a.categories.length !== b.categories.length ||
-    a.typologies.length !== b.typologies.length) return false;
+    a.typologies.length !== b.typologies.length
+  ) return false;
   for (let i = 0; i < a.locations.length; i++) {
     const x = a.locations[i], y = b.locations[i];
-    if (x.id !== y.id || x.code !== y.code || x.name !== y.name || x.count !== y.count) return false;
+    if (
+      x.id !== y.id || x.code !== y.code || x.name !== y.name ||
+      x.count !== y.count
+    ) return false;
   }
   for (let i = 0; i < a.categories.length; i++) {
     const x = a.categories[i], y = b.categories[i];
@@ -461,12 +468,20 @@ function sameVocabularies(a: Vocabularies, b: Vocabularies): boolean {
     const x = a.typologies[i], y = b.typologies[i];
     if (x.id !== y.id || x.label !== y.label) return false;
   }
-  if (a.availabilities.length !== b.availabilities.length ||
+  if (
+    a.availabilities.length !== b.availabilities.length ||
     a.compliances.length !== b.compliances.length ||
-    a.criticalities.length !== b.criticalities.length) return false;
-  for (let i = 0; i < a.availabilities.length; i++) if (a.availabilities[i] !== b.availabilities[i]) return false;
-  for (let i = 0; i < a.compliances.length; i++) if (a.compliances[i] !== b.compliances[i]) return false;
-  for (let i = 0; i < a.criticalities.length; i++) if (a.criticalities[i] !== b.criticalities[i]) return false;
+    a.criticalities.length !== b.criticalities.length
+  ) return false;
+  for (let i = 0; i < a.availabilities.length; i++) {
+    if (a.availabilities[i] !== b.availabilities[i]) return false;
+  }
+  for (let i = 0; i < a.compliances.length; i++) {
+    if (a.compliances[i] !== b.compliances[i]) return false;
+  }
+  for (let i = 0; i < a.criticalities.length; i++) {
+    if (a.criticalities[i] !== b.criticalities[i]) return false;
+  }
   const aa = a.authors ?? [], bb = b.authors ?? [];
   if (aa.length !== bb.length) return false;
   for (let i = 0; i < aa.length; i++) {

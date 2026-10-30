@@ -11,5 +11,6 @@ _fresh/
 .env*
 test/
 _*.md
+scripts/fixtures/*
 # SSO secrets
 secrets/

@@ -15,6 +15,8 @@ import {
 
 import { useCallback, useEffect, useRef, useState } from "preact/hooks";
 
+import { useFocusTrap } from "../../hooks/useFocusTrap.ts";
+
 import { lockBody, unlockBody } from "../../lib/body-lock.ts";
 
 import type { Conn } from "../../hooks/useConnection.ts";
@@ -61,24 +63,7 @@ export function SyncDetailsModal(
   useEffect(() => {
     panelRef.current?.focus();
   }, []);
-  const trapTab = (e: KeyboardEvent) => {
-    if (e.key !== "Tab") return;
-    const root = panelRef.current;
-    if (!root) return;
-    const focusables = root.querySelectorAll<HTMLElement>(
-      'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])',
-    );
-    if (focusables.length === 0) return;
-    const first = focusables[0];
-    const last = focusables[focusables.length - 1];
-    if (e.shiftKey && document.activeElement === first) {
-      e.preventDefault();
-      last.focus();
-    } else if (!e.shiftKey && document.activeElement === last) {
-      e.preventDefault();
-      first.focus();
-    }
-  };
+  useFocusTrap(panelRef, true);
   return (
     <>
       <div
@@ -98,7 +83,6 @@ export function SyncDetailsModal(
         aria-label="Detalhes da sincronização"
         tabIndex={-1}
         ref={panelRef}
-        onKeyDown={trapTab}
         style={{
           position: "fixed",
           inset: 0,

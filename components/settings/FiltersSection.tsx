@@ -9,6 +9,7 @@ import { selSt, SORT_OPTS } from "./settings-options.ts";
 import { MultiCombo } from "../filter/FilterSelect.tsx";
 
 import type { FilterState } from "../../lib/types.ts";
+import type { SortableColumn } from "../../lib/types.ts";
 
 interface Props {
   settings: SettingsState;
@@ -160,7 +161,7 @@ export function FiltersSection(
             onChange={(e) =>
               setDefaults({
                 ...settings.defaultFilters,
-                sortCol: e.currentTarget.value as never,
+                sortCol: e.currentTarget.value as SortableColumn,
               })}
             style={selSt}
           >
@@ -174,7 +175,7 @@ export function FiltersSection(
             onChange={(e) =>
               setDefaults({
                 ...settings.defaultFilters,
-                sortDir: e.currentTarget.value as never,
+                sortDir: e.currentTarget.value as "asc" | "desc",
               })}
             style={selSt}
           >

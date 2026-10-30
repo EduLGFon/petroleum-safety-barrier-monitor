@@ -207,7 +207,10 @@ export function SettingsPanel(
             <button
               type="button"
               key={key}
-              onClick={() => setSection(key as never)}
+              onClick={() =>
+                setSection(
+                  key as "appearance" | "filters" | "account" | "admin",
+                )}
               style={{
                 flex: 1,
                 display: "flex",
