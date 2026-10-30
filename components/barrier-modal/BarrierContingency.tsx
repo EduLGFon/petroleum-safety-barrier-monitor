@@ -191,6 +191,18 @@ export function BarrierContingency(
           value={b.evidenceCode || "Não informado"}
           italic={!b.evidenceCode}
         />
+        <FR
+          Icon={BuildingIcon}
+          label="Gestão de Mudança"
+          value={data?.outgoing?.[0]?.managementChange || "Não informado"}
+          italic={!data?.outgoing?.[0]?.managementChange}
+        />
+        <FR
+          Icon={BuildingIcon}
+          label="Análise de Risco"
+          value={data?.outgoing?.[0]?.riskAnalysis || "Não informado"}
+          italic={!data?.outgoing?.[0]?.riskAnalysis}
+        />
       </div>
       <div style={{ marginBottom: "var(--d-block-gap)" }}>
         <Txt
