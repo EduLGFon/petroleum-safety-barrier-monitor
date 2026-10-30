@@ -1,89 +1,19 @@
-# Fracttal field survey (per barrier / WO / WR)
+# Fracttal field survey
 
-Source of truth: live read of Fracttal One tenant (`GET /items`, `/work_orders`, `/work_requests`) taken 2026-10-27, compared with the narrow slices the app parses (`lib/server/fracttal/types.ts` + `parseAsset`/`parseWorkOrder`/`parseWorkRequest`) and the barrier schema (`db/schema.sql`).
+Live read of the Fracttal tenant compared with the narrow slices the app parses (`lib/server/fracttal/types.ts`, `parseAsset`, `parseWorkOrder`, `parseWorkRequest`) and `db/schema.sql`. The app consumes a validated subset; everything else stays behind the admin raw-detail endpoint.
 
-The app deliberately consumes a narrow, validated slice of each upstream row and keeps everything else behind the raw-detail endpoint (`routes/api/barriers/[id]/fracttal-raw.ts` + `lib/server/fracttal/raw-detail.ts`), so "missing" means "not part of the normal sync/derivation pipeline", not "unreadable". Each section lists what is captured, what is missing, and whether the gap is worth closing.
+## Barrier (item_type 2)
 
-## 1. Barrier (equipment item, `item_type = 2`)
+Captured: identity, flags, taxonomy, hierarchy, out-of-service dates, maintenance plan, free-text fields `field_1..field_6`, notes, description, units. Not captured: custom fields, commissioning dates, running hours, cost center, geolocation, inventory/accounting fields. Criticality is derived from the TAG suffix plus ESO flag; `priorities_description` is effectively null upstream.
 
-Live row carries 50 fields. Captured by `FracttalAsset` (28 fields): identity `id`, `code`; flags `active`, `available`, `is_serial_control`; taxonomy `items_types_description`, `groups_description`, `groups_1_description` (polo/area), `groups_2_description` (ESO flag), `priorities_description` (almost always null upstream); hierarchy `parent_description`, `location_code`, `id_parent`; out-of-service `initial_date_out_of_service`, `last_final_date_available`; maintenance plan `id_group_task`, `groups_tasks_description`; free-text inventory columns `field_1..field_6`, `notes`, `description`, `units_description`.
+## Work order
 
-Not captured (22 fields), grouped by likely value:
+Captured: join code, classification, status, text, dates, people. Not captured: most of the 87 upstream fields. Important candidates include priority, cost, and timestamps.
 
-| Field | Value to us | Recommendation |
-| `custom_fields_values` (+ `custom_fields_groups_description`) | Per-asset custom attributes (labels/values). Could hold barrier-specific data (test dates, certifications, set-points). | Inspect tenant values before deciding; if they carry barrier evidence, add a JSONB column + sync. |
-| `startup_date`, `purchase_date` | Commissioning / age context. | Nice-to-have for lifecycle/KPI; low priority. |
-| `hours_average_daily_use` | Running hours per day (e.g. `86400`). Useful for maintenance-interval reasoning. | Could feed plan-followed heuristics later. |
-| `costs_center_description`, `budgets_description` | Cost center / budget. | Reporting only; not needed for status. |
-| `units_code` | Unit code (vs `units_description`). | Cosmetic; skip unless exports need it. |
-| `id_company`, `visible_to_all`, `id_parent` (captured), `item_url` | Access/company/link metadata. | Skip (`item_url` could be a convenience link). |
-| `barcode`, `weight`, `lead_time`, `min_stock_warning`, `salvage_value`, `anual_depreciation`, `total_cost`, `total_replacement_cost` | Inventory/accounting. | Skip for a safety-barrier monitor. |
-| `latitude`, `longitud` | Geolocation. | Skip unless a map view is added. |
+## Work request
 
-Already-dead/ignored upstream signals (documented in `docs/FRACTTAL-DATA.md`): `priorities_description` is null on ~18k/18k rows; criticality is derived from the TAG suffix + ESO flag instead. `id_items_availability` is always null in WOs. `groups_1_description` is the polo, never a category.
+Captured: join code, status, text, dates, people. Not captured: the remaining upstream fields.
 
-## 2. Work order (`/work_orders`)
+## Conclusion
 
-Live row carries 87 fields. Captured by `FracttalWorkOrder` (19 fields): join `code`; classification `tasks_log_types_description`, `tasks_log_types_2_description`, `tasks_log_task_type_main`, `types_description`; status `done`, `stop_assets`; text `wo_folio`, `description`, `task_note`, `note`; dates `initial_date`, `date_maintenance`, `creation_date`; people `created_by`, `requested_by`, `personnel_description`, `user_assigned`, `resources_human_resources`, `validated_by_description`.
-
-Not captured (68 fields). Important candidates:
-
-| Field | Value to us | Recommendation |
-| `id_status_work_order` | Open (1) vs closed (4). Today we infer from `done !== false`, which is coarser. | Add to `FracttalWorkOrder`; use in `workOrderSlot` gate instead of `done`. |
-| `event_date`, `final_date`, `wo_final_date`, `cal_date_maintenance`, `first_date_task` | Richer dates for the status-event timeline; today only `initial_date`/`date_maintenance`/`creation_date` are used. | Add to `earliestDate` candidate set in `workOrderEvent`. |
-| `causes_description`, `severiry_description`, `damages_types_description`, `detection_method_description` | Failure analysis behind a degraded/unavailable barrier. | Append to `degradationDesc`/action text or store for reports. |
-| `priorities_description` | WO priority (VERY_HIGH/HIGH/...). | Could drive alert urgency; today ignored. |
-| `trigger_description` | Scheduled (`DATE$EVERY$...`) vs ad-hoc (`NO_SCHEDULE_TASK`). | Maintenance-compliance/KPI signal (planned vs reactive). |
-| `work_orders_status_custom_description`, `labels` | Contingency signal (GM/CEC). Already scanned via `contingencyFromRaw` on the raw row, so no derivation gap; only the typed struct lacks them. | Keep raw scan (already done); optionally type them for clarity. |
-| `stop_assets_sec`, `real_stop_assets_sec`, `time_disruption` | Downtime duration while stopped. | KPI/reporting (MTTR-ish); not status. |
-| `resources_inventory`, `resources_services`, `resources_hours` | Parts/services/hours consumed. | Reporting/cost; skip for status. |
-| `completed_percentage`, `duration`, `tasks_duration`, `real_duration` | Progress. | Reporting. |
-| `annotations`, `rating`, `review_date` | Audit/quality. | Nice-to-have. |
-| `code_create_by`, `code_responsible`, `id_item`, `id_request`, `id_personnel`, `id_personnel_log` | Traceability and WR-to-WO linkage (`id_request` already links WR to WO). | `id_request`/`id_item` useful for joins; others audit. |
-| `parent_description`, `groups_*` | Asset context (already on barrier). | Skip (duplicate). |
-| `is_offline` | Data-quality flag. | Skip unless auditing. |
-| `personnel_path_image`, `signature`, `*_path_signature`, `details_signature`, `validator_path_signature` | Signatures/images. | Skip (binary-ish paths). |
-| `id_items_availability` | Dead field (always null). | Intentionally ignored. |
-
-## 3. Work request (`/work_requests`)
-
-Live row carries 62 fields. Captured by `FracttalWorkRequest` (14 fields): join `code_item`; status `id_status`; classification `types_2_description`, `types_description`; text `wo_folio`, `description`, `observation`; date `date_maintenance`; people `created_by`, `requested_by`, `personnel_description`, `user_assigned`, `resources_human_resources`, `validated_by_description`.
-
-Not captured (48 fields). Important candidates:
-
-| Field | Value to us | Recommendation |
-| `is_urgent` | Urgent flag gating Degradada: planned corrective only degrades when `is_urgent=true` (see `resolveAvailability`). Parsed in `work.ts` + `fracttal-import.ts`. | Captured; next step is surfacing in UI/alerts. |
-| `date`, `date_incident`, `date_solution`, `date_status` | Timeline; `date_incident` is when the failure started (better than `date_maintenance`). | Use `date_incident`/`date` as event date fallback. |
-| `id_work_order` | Direct WR to WO link (today only matched by code/text). | Use for correlation when present. |
-| `types_1_description` | Request category (e.g. "Patrimonio"). | Reporting/grouping. |
-| `priorities_description` | Request priority (null in dump, but live may populate). | Check live; probably skip if always null. |
-| `rating`, `rating_notes` | Quality feedback. | Reporting. |
-| `requests_x_status_notes`, `requests_x_status_description`, `requests_x_status_accounts_name`, `requests_x_status_third_parties_name` | Status-transition detail/owner. | Could enrich history participants. |
-| `requests_x_key_words_descriptions` | Tags. | Could feed contingency/keyword search. |
-| `accounts_name`, `accounts_email`, `code_creator`, `email_requested_by`, `requested_by` (captured) | Requester identity. | Already have `requested_by`; email/account add contactability. |
-| `costs_center_description` | Cost center. | Reporting. |
-| `items_description`, `parent_description`, `parent_path_node` | Asset context (duplicate of barrier). | Skip. |
-| `geolocation` | Location of request. | Skip unless map view. |
-| `visible_to_all`, `id_company`, `id_*` (cost center, group, account, user, personnel log, contact log) | Access/audit metadata. | Skip except `id_work_order`. |
-| `from_guest_portal`, `identifier`, `annotations`, `status_path_image`, `types_color` | UI/portal metadata. | Skip. |
-
-## 4. Cross-cutting observations
-
-1. Contingency is the one signal we deliberately read from the raw row (labels + `work_orders_status_custom_description`) via `contingencyFromRaw`, because the typed structs drop those fields. That coverage is already correct; the gap is only typing, not data.
-2. Dates are the highest-value missing WO/WR fields: today's status timeline uses 3 of ~7 available dates, so event ordering can be off when `initial_date`/`date_maintenance` are null (they are null on ~93% of rows). `cal_date_maintenance`/`first_date_task`/`date_incident` are populated more often and would improve `status_since` accuracy.
-3. Failure context (`causes_description`, `severiry_description`, `damages_types_description`) is entirely dropped; only `description`/`task_note` survive into `degradationDesc`/`actionPlan`. Adding these would make the barrier dialog's degradation text materially better.
-4. Urgency: WR `is_urgent` now gates Degradada (planned + urgent → degraded; planned without urgent → available) and rides `StatusEvent.isUrgent`. WO `priorities_description` remains available for alert prioritization.
-5. Custom fields on items are the one asset-side unknown: we capture `field_1..field_6` but not `custom_fields_values`. A tenant probe of those values is the next step before deciding whether they warrant a column.
-
-## 5. Custom-field probe result (2026-10-27)
-
-Scanned all equipment rows: `custom_fields_values` carries a single empty-label entry with empty values on every row, and `field_5` is just the criticality letter (A/B/C/D) already derived from the TAG suffix. No barrier-relevant data is hidden in custom fields, so no new column is warranted. `field_5` remains redundant with the derived criticality rank.
-
-## 6. Suggested priority order
-
-1. WO/WR additional dates -> `status_since` accuracy (medium effort, high value).
-2. WO failure context -> better `degradationDesc`/`actionPlan` (low effort).
-3. Urgent-flag surfacing in UI/alerts (low effort; derivation gate already done).
-4. `id_status_work_order` -> replace `done` heuristic (low effort).
-5. `custom_fields_values` probe -> decide if a new column is warranted.
-6. Everything else (costs, accounting, signatures, geolocation) -> keep out of the sync payload; reachable via raw detail when an operator needs it.
+Only fields needed for status derivation and display are synced. Raw upstream rows remain available through the admin-only raw detail panel when `DEV=true`.
