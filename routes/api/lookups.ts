@@ -16,11 +16,9 @@ import {
   rateLimited,
 } from "../../lib/server/errors.ts";
 
-import { readThrottle, routeClientKey } from "../../lib/server/throttle.ts";
-
 import { listAuthors } from "../../lib/server/sql/authors.ts";
 
-import { loadServerConfig } from "../../lib/server/config.ts";
+import { guardRequest } from "../../lib/server/api-guard.ts";
 
 import { queryRows } from "../../lib/server/db.ts";
 
@@ -29,28 +27,13 @@ import { define } from "../../utils.ts";
 export const handler = define.handlers({
   // GET - returns availabilities, categories, and authors with ids.
   async GET(ctx) {
-    const requestId = newRequestId();
-    const limit = readThrottle.check(routeClientKey(ctx));
-    if (!limit.allowed) {
-      return rateLimited("too many requests", requestId, limit.retryAfterMs);
-    }
-    try {
-      loadServerConfig();
-    } catch (err) {
-      return internal(
-        "GET /api/lookups",
-        err,
-        requestId,
-        "Server misconfigured",
-      );
-    }
-    let auth;
-    try {
-      auth = await requireAuthenticated(ctx.req);
-    } catch (err) {
-      return authStoreUnavailable("GET /api/lookups", err, requestId);
-    }
-    if (!auth.ok) return denyByCredentials(ctx.req, auth.message, requestId);
+    const g = await guardRequest(ctx, {
+      kind: "read",
+      auth: "user",
+      label: "GET /api/lookups",
+    });
+    if (g.response) return g.response;
+    const requestId = g.requestId;
     try {
       const [
         availabilities,
