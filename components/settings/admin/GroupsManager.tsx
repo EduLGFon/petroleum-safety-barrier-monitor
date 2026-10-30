@@ -173,190 +173,188 @@ export function GroupsManager({ onCount }: { onCount?: (n: number) => void }) {
           </button>
         </form>
       </AdminCard>
-      {groups.length === 0
-        ? <EmptyState text="Nenhum grupo cadastrado." />
-        : (
-          groups.map((g) => (
-            <AdminCard key={g.id}>
-              <div
-                style={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  gap: 8,
-                }}
-              >
-                <div>
-                  <strong>{g.name}</strong>
-                  {g.description && (
-                    <div
+      {groups.length === 0 ? <EmptyState text="Nenhum grupo cadastrado." /> : (
+        groups.map((g) => (
+          <AdminCard key={g.id}>
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                gap: 8,
+              }}
+            >
+              <div>
+                <strong>{g.name}</strong>
+                {g.description && (
+                  <div
+                    style={{
+                      fontSize: "var(--d-small)",
+                      color: "var(--text-muted)",
+                    }}
+                  >
+                    {g.description}
+                  </div>
+                )}
+              </div>
+              <div style={{ display: "flex", gap: 6 }}>
+                <button
+                  type="button"
+                  style={ghostBtn}
+                  onClick={() => startEdit(g)}
+                >
+                  Editar
+                </button>
+                <button
+                  type="button"
+                  style={ghostBtn}
+                  onClick={() => void remove(g)}
+                >
+                  Excluir
+                </button>
+              </div>
+            </div>
+            {editing === g.id && (
+              <div style={{ display: "grid", gap: 8 }}>
+                <div style={{ display: "grid", gap: 6 }}>
+                  <div
+                    style={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "center",
+                      gap: 8,
+                    }}
+                  >
+                    <span
                       style={{
-                        fontSize: "var(--d-small)",
+                        fontSize: "var(--d-caption)",
+                        fontWeight: 700,
                         color: "var(--text-muted)",
+                        textTransform: "uppercase",
+                        letterSpacing: ".08em",
                       }}
                     >
-                      {g.description}
-                    </div>
-                  )}
+                      Estações
+                    </span>
+                    <button
+                      type="button"
+                      style={ghostBtn}
+                      onClick={() =>
+                        setDraftLocs(
+                          draftLocs.length === locations.length
+                            ? []
+                            : locations.map((l) => l.id),
+                        )}
+                    >
+                      Selecionar todos
+                    </button>
+                  </div>
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                    {locations.map((loc) => (
+                      <label
+                        key={loc.id}
+                        style={{
+                          display: "flex",
+                          gap: 4,
+                          alignItems: "center",
+                        }}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={draftLocs.includes(loc.id)}
+                          onChange={() =>
+                            toggle(draftLocs, loc.id, setDraftLocs)}
+                        />
+                        {loc.code}
+                      </label>
+                    ))}
+                  </div>
+                </div>
+                <div style={{ display: "grid", gap: 6 }}>
+                  <div
+                    style={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "center",
+                      gap: 8,
+                    }}
+                  >
+                    <span
+                      style={{
+                        fontSize: "var(--d-caption)",
+                        fontWeight: 700,
+                        color: "var(--text-muted)",
+                        textTransform: "uppercase",
+                        letterSpacing: ".08em",
+                      }}
+                    >
+                      Usuários
+                    </span>
+                    <button
+                      type="button"
+                      style={ghostBtn}
+                      onClick={() =>
+                        setDraftUsers(
+                          draftUsers.length === users.length
+                            ? []
+                            : users.map((u) => u.id),
+                        )}
+                    >
+                      Selecionar todos
+                    </button>
+                  </div>
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                    {users.map((u) => (
+                      <label
+                        key={u.id}
+                        style={{
+                          display: "flex",
+                          gap: 4,
+                          alignItems: "center",
+                        }}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={draftUsers.includes(u.id)}
+                          onChange={() =>
+                            toggle(draftUsers, u.id, setDraftUsers)}
+                        />
+                        {u.name || u.email}
+                      </label>
+                    ))}
+                  </div>
                 </div>
                 <div style={{ display: "flex", gap: 6 }}>
                   <button
                     type="button"
-                    style={ghostBtn}
-                    onClick={() => startEdit(g)}
+                    style={primaryBtn}
+                    disabled={busy}
+                    onClick={() => void saveEdit(g)}
                   >
-                    Editar
+                    Salvar
                   </button>
                   <button
                     type="button"
                     style={ghostBtn}
-                    onClick={() => void remove(g)}
+                    onClick={() => setEditing(null)}
                   >
-                    Excluir
+                    Cancelar
                   </button>
                 </div>
               </div>
-              {editing === g.id && (
-                <div style={{ display: "grid", gap: 8 }}>
-                  <div style={{ display: "grid", gap: 6 }}>
-                    <div
-                      style={{
-                        display: "flex",
-                        justifyContent: "space-between",
-                        alignItems: "center",
-                        gap: 8,
-                      }}
-                    >
-                      <span
-                        style={{
-                          fontSize: "var(--d-caption)",
-                          fontWeight: 700,
-                          color: "var(--text-muted)",
-                          textTransform: "uppercase",
-                          letterSpacing: ".08em",
-                        }}
-                      >
-                        Estações
-                      </span>
-                      <button
-                        type="button"
-                        style={ghostBtn}
-                        onClick={() =>
-                          setDraftLocs(
-                            draftLocs.length === locations.length
-                              ? []
-                              : locations.map((l) => l.id),
-                          )}
-                      >
-                        Selecionar todos
-                      </button>
-                    </div>
-                    <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-                      {locations.map((loc) => (
-                        <label
-                          key={loc.id}
-                          style={{
-                            display: "flex",
-                            gap: 4,
-                            alignItems: "center",
-                          }}
-                        >
-                          <input
-                            type="checkbox"
-                            checked={draftLocs.includes(loc.id)}
-                            onChange={() =>
-                              toggle(draftLocs, loc.id, setDraftLocs)}
-                          />
-                          {loc.code}
-                        </label>
-                      ))}
-                    </div>
-                  </div>
-                  <div style={{ display: "grid", gap: 6 }}>
-                    <div
-                      style={{
-                        display: "flex",
-                        justifyContent: "space-between",
-                        alignItems: "center",
-                        gap: 8,
-                      }}
-                    >
-                      <span
-                        style={{
-                          fontSize: "var(--d-caption)",
-                          fontWeight: 700,
-                          color: "var(--text-muted)",
-                          textTransform: "uppercase",
-                          letterSpacing: ".08em",
-                        }}
-                      >
-                        Usuários
-                      </span>
-                      <button
-                        type="button"
-                        style={ghostBtn}
-                        onClick={() =>
-                          setDraftUsers(
-                            draftUsers.length === users.length
-                              ? []
-                              : users.map((u) => u.id),
-                          )}
-                      >
-                        Selecionar todos
-                      </button>
-                    </div>
-                    <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-                      {users.map((u) => (
-                        <label
-                          key={u.id}
-                          style={{
-                            display: "flex",
-                            gap: 4,
-                            alignItems: "center",
-                          }}
-                        >
-                          <input
-                            type="checkbox"
-                            checked={draftUsers.includes(u.id)}
-                            onChange={() =>
-                              toggle(draftUsers, u.id, setDraftUsers)}
-                          />
-                          {u.name || u.email}
-                        </label>
-                      ))}
-                    </div>
-                  </div>
-                  <div style={{ display: "flex", gap: 6 }}>
-                    <button
-                      type="button"
-                      style={primaryBtn}
-                      disabled={busy}
-                      onClick={() => void saveEdit(g)}
-                    >
-                      Salvar
-                    </button>
-                    <button
-                      type="button"
-                      style={ghostBtn}
-                      onClick={() => setEditing(null)}
-                    >
-                      Cancelar
-                    </button>
-                  </div>
-                </div>
-              )}
-              {editing !== g.id && (
-                <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-                  <StatusBadge tone="neutral">
-                    {g.locationIds.length} estações
-                  </StatusBadge>
-                  <StatusBadge tone="neutral">
-                    {g.userIds.length} usuários
-                  </StatusBadge>
-                </div>
-              )}
-            </AdminCard>
-          ))
-        )}
+            )}
+            {editing !== g.id && (
+              <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                <StatusBadge tone="neutral">
+                  {g.locationIds.length} estações
+                </StatusBadge>
+                <StatusBadge tone="neutral">
+                  {g.userIds.length} usuários
+                </StatusBadge>
+              </div>
+            )}
+          </AdminCard>
+        ))
+      )}
     </div>
   );
 }

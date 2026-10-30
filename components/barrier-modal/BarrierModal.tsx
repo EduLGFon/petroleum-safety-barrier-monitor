@@ -10,6 +10,8 @@ import {
 
 import { useCallback, useEffect, useRef, useState } from "preact/hooks";
 
+import { useFocusTrap } from "../../hooks/useFocusTrap.ts";
+
 import { UnsavedChangesDialog } from "./UnsavedChangesDialog.tsx";
 
 import { BarrierEditor } from "../../islands/BarrierEditor.tsx";
@@ -117,24 +119,7 @@ export function BarrierModal(
       restoreFocusRef.current = null;
     }
   }, [barrier]);
-  const trapTab = (e: KeyboardEvent) => {
-    if (e.key !== "Tab" || !isOpen) return;
-    const root = dialogRef.current;
-    if (!root) return;
-    const focusables = root.querySelectorAll<HTMLElement>(
-      'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])',
-    );
-    if (focusables.length === 0) return;
-    const first = focusables[0];
-    const last = focusables[focusables.length - 1];
-    if (e.shiftKey && activeEl() === first) {
-      e.preventDefault();
-      last.focus();
-    } else if (!e.shiftKey && activeEl() === last) {
-      e.preventDefault();
-      first.focus();
-    }
-  };
+  useFocusTrap(dialogRef, isOpen);
   return (
     <>
       <div
@@ -162,7 +147,6 @@ export function BarrierModal(
         aria-label={`Detalhes da barreira${barrier ? ` ${barrier.tag}` : ""}`}
         tabIndex={-1}
         ref={dialogRef}
-        onKeyDown={trapTab}
         style={{
           position: "fixed",
           inset: 0,

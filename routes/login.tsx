@@ -10,11 +10,11 @@ import {
 
 import { LoginShell } from "../components/login/LoginShell.tsx";
 
+import { loadAuthConfig } from "../lib/server/config.ts";
+
 import { LoginForm } from "../islands/LoginForm.tsx";
 
 import { getCompanyName } from "../lib/company.ts";
-
-import { loadAuthConfig } from "../lib/server/config.ts";
 
 import { define } from "../utils.ts";
 

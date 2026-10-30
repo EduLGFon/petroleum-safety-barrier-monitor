@@ -16,18 +16,18 @@ import {
   requireAdminAuth,
 } from "../../../../lib/server/auth.ts";
 
-import { getUserById } from "../../../../lib/server/sql/users.ts";
-
-import { deleteSessionsForUser } from "../../../../lib/server/sql/sessions.ts";
-
 import {
   routeClientKey,
   writeThrottle,
 } from "../../../../lib/server/throttle.ts";
 
+import { deleteSessionsForUser } from "../../../../lib/server/sql/sessions.ts";
+
 import { parseIdParam } from "../../../../lib/server/validation.ts";
 
 import { loadServerConfig } from "../../../../lib/server/config.ts";
+
+import { getUserById } from "../../../../lib/server/sql/users.ts";
 
 import { define } from "../../../../utils.ts";
 

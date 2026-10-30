@@ -174,7 +174,9 @@ class SmtpLineIO {
       try {
         // cancel() may throw synchronously on a dead resource and may
         // reject async after a peer FIN - neither may fail the send.
-        this.#reader.cancel().catch(() => {});
+        this.#reader.cancel().catch((err) => {
+          console.warn("[smtp] reader cancel failed", err);
+        });
       } catch {
         // fall through to unlock + close below
       }

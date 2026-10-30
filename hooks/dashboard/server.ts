@@ -353,10 +353,9 @@ export function useServerDashboard(
       if (!v) return;
       // Keep object identity when the payload is unchanged so the adapter
       // memo (and its data effect) does not refetch a second time on top of
-      // the reloadKey bump above.
-      setLiveVocab((prev) =>
-        prev !== null && JSON.stringify(prev) === JSON.stringify(v) ? prev : v
-      );
+      // the reloadKey bump above. Compare structurally without allocating
+      // two full JSON strings on every vocab refresh.
+      setLiveVocab((prev) => (prev !== null && sameVocabularies(prev, v) ? prev : v));
     }).catch(() => {
       // Vocabulary refresh is best-effort; the data reload above stands.
     });
@@ -443,4 +442,35 @@ export function useServerDashboard(
     // Live vocabulary (SSR seed, refreshed on cadence) for tabs and counts.
     liveVocabularies: liveVocab,
   };
+}
+
+// sameVocabularies: structural equality for Vocabularies without JSON.stringify.
+function sameVocabularies(a: Vocabularies, b: Vocabularies): boolean {
+  if (a.locations.length !== b.locations.length ||
+    a.categories.length !== b.categories.length ||
+    a.typologies.length !== b.typologies.length) return false;
+  for (let i = 0; i < a.locations.length; i++) {
+    const x = a.locations[i], y = b.locations[i];
+    if (x.id !== y.id || x.code !== y.code || x.name !== y.name || x.count !== y.count) return false;
+  }
+  for (let i = 0; i < a.categories.length; i++) {
+    const x = a.categories[i], y = b.categories[i];
+    if (x.id !== y.id || x.label !== y.label) return false;
+  }
+  for (let i = 0; i < a.typologies.length; i++) {
+    const x = a.typologies[i], y = b.typologies[i];
+    if (x.id !== y.id || x.label !== y.label) return false;
+  }
+  if (a.availabilities.length !== b.availabilities.length ||
+    a.compliances.length !== b.compliances.length ||
+    a.criticalities.length !== b.criticalities.length) return false;
+  for (let i = 0; i < a.availabilities.length; i++) if (a.availabilities[i] !== b.availabilities[i]) return false;
+  for (let i = 0; i < a.compliances.length; i++) if (a.compliances[i] !== b.compliances[i]) return false;
+  for (let i = 0; i < a.criticalities.length; i++) if (a.criticalities[i] !== b.criticalities[i]) return false;
+  const aa = a.authors ?? [], bb = b.authors ?? [];
+  if (aa.length !== bb.length) return false;
+  for (let i = 0; i < aa.length; i++) {
+    if (aa[i].id !== bb[i].id || aa[i].name !== bb[i].name) return false;
+  }
+  return true;
 }

@@ -395,7 +395,9 @@ export async function runSync(
     const beat = io.heartbeat.bind(io);
     const every = Math.max(10_000, options.heartbeatMs ?? 60_000);
     heartbeatTimer = setInterval(() => {
-      void beat(runId).catch(() => {});
+      void beat(runId).catch((err) => {
+        console.warn("[fracttal-sync] heartbeat failed", err);
+      });
     }, every);
     try {
       Deno.unrefTimer?.(heartbeatTimer);

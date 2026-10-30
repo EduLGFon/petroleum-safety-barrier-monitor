@@ -2,19 +2,6 @@
 // This is why it exists: the browser is redirected to Entra with PKCE, state,
 // and nonce, while the server keeps the one-time flow in Postgres.
 import {
-  internal,
-  newRequestId,
-  rateLimited,
-} from "../../../lib/server/errors.ts";
-
-import { loadAuthConfig } from "../../../lib/server/config.ts";
-
-import {
-  buildAuthorizationRequestUrl,
-  getOidcConfiguration,
-} from "../../../lib/server/auth/entra/client.ts";
-
-import {
   buildBindingCookie,
   codeChallenge,
   createFlow,
@@ -25,15 +12,28 @@ import {
   isSecureForConfig,
 } from "../../../lib/server/auth/entra/flows.ts";
 
-import { safeAuthNext } from "../../../lib/server/page-auth.ts";
+import {
+  buildAuthorizationRequestUrl,
+  getOidcConfiguration,
+} from "../../../lib/server/auth/entra/client.ts";
+
+import {
+  internal,
+  newRequestId,
+  rateLimited,
+} from "../../../lib/server/errors.ts";
 
 import { getSessionTokenFromRequest } from "../../../lib/server/auth/session.ts";
+
+import { routeClientKey, writeThrottle } from "../../../lib/server/throttle.ts";
 
 import { hashSessionToken } from "../../../lib/server/auth/session.ts";
 
 import { getSessionUser } from "../../../lib/server/sql/sessions.ts";
 
-import { routeClientKey, writeThrottle } from "../../../lib/server/throttle.ts";
+import { safeAuthNext } from "../../../lib/server/page-auth.ts";
+
+import { loadAuthConfig } from "../../../lib/server/config.ts";
 
 import { define } from "../../../utils.ts";
 

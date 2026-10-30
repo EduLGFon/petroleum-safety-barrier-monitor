@@ -21,9 +21,9 @@ import {
   routeClientKey,
 } from "../../../../lib/server/throttle.ts";
 
-import { getBarrierById } from "../../../../lib/server/sql/barriers.ts";
-
 import { getBarrierSyncDetail } from "../../../../lib/server/sql/sync.ts";
+
+import { getBarrierById } from "../../../../lib/server/sql/barriers.ts";
 
 import { loadServerConfig } from "../../../../lib/server/config.ts";
 

@@ -2,7 +2,7 @@
 // This is why it exists: Header needs one merged connection + sync state
 // without embedding date math or precedence rules in JSX. No Preact here,
 // so the mapper stays unit-testable and reusable from any component.
-import type { Conn } from "../hooks/useConnection.ts";
+import type { Conn } from "./types.ts";
 
 import type { SyncStatus } from "./types.ts";
 

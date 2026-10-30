@@ -13,9 +13,9 @@ import {
   PrivateKeyJwt,
 } from "openid-client";
 
-import { type AuthConfig } from "../../config.ts";
-
 import { loadCertificateThumbprint, loadPrivateKey } from "./keys.ts";
+
+import { type AuthConfig } from "../../config.ts";
 
 const discoveryCache = new Map<
   string,

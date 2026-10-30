@@ -169,7 +169,9 @@ async function main(): Promise<void> {
       labels,
       statusInfo,
       onRuleFired: (ruleId) => {
-        void touchRuleTriggered(ruleId).catch(() => {});
+        void touchRuleTriggered(ruleId).catch((err) => {
+          console.warn("[alerts-check] touchRuleTriggered failed", err);
+        });
       },
     });
     if (flags.json) console.log(JSON.stringify(result));

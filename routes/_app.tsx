@@ -28,7 +28,7 @@ const INIT = `(function(){try{
   var dn=s.density;
   dn=(dn==='compact'||dn==='spacious')?dn:'comfortable';
   document.documentElement.dataset.density=dn;
-}catch(e){}})();`;
+}catch(e){console.error("[settings-restore]",e);} })();`;
 
 // Font loader: same raw-script rule as INIT. Preact escapes text children
 // inside <script>, which turns quotes into &quot; and breaks the JS parser.

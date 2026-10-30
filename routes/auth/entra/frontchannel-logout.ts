@@ -2,15 +2,15 @@
 // This is why it exists: Entra can ask the app to end sessions in a hidden
 // iframe. The endpoint validates the issuer and unguessable sid, then returns
 // 200 without revealing whether any session matched.
-import { newRequestId, rateLimited } from "../../../lib/server/errors.ts";
-
-import { loadAuthConfig } from "../../../lib/server/config.ts";
-
-import { sha256Hex } from "../../../lib/server/auth/entra/flows.ts";
+import { routeClientKey, writeThrottle } from "../../../lib/server/throttle.ts";
 
 import { deleteSessionsBySidHash } from "../../../lib/server/sql/sessions.ts";
 
-import { routeClientKey, writeThrottle } from "../../../lib/server/throttle.ts";
+import { newRequestId, rateLimited } from "../../../lib/server/errors.ts";
+
+import { sha256Hex } from "../../../lib/server/auth/entra/flows.ts";
+
+import { loadAuthConfig } from "../../../lib/server/config.ts";
 
 import { define } from "../../../utils.ts";
 

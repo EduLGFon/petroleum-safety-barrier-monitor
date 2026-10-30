@@ -24,11 +24,17 @@ function flag(name: string): string | undefined {
   return Deno.args[idx + 1];
 }
 
-function parseUsers(text: string): Array<{ name: string; email: string; phone: string; admin: boolean }> {
+function parseUsers(
+  text: string,
+): Array<{ name: string; email: string; phone: string; admin: boolean }> {
   const lines = text.split(/\r?\n/);
-  const users: Array<{ name: string; email: string; phone: string; admin: boolean }> = [];
+  const users: Array<
+    { name: string; email: string; phone: string; admin: boolean }
+  > = [];
   let currentName = "";
-  let lastUser: { name: string; email: string; phone: string; admin: boolean } | null = null;
+  let lastUser:
+    | { name: string; email: string; phone: string; admin: boolean }
+    | null = null;
   for (const raw of lines) {
     const line = raw.trim();
     if (line === "") continue;
@@ -40,7 +46,12 @@ function parseUsers(text: string): Array<{ name: string; email: string; phone: s
     if (/@/.test(line)) {
       const [emailPart, suffix] = line.split("|");
       const admin = (suffix ?? "").trim().toLowerCase() === "admin";
-      const u = { name: currentName.trim(), email: emailPart.trim(), phone: "", admin };
+      const u = {
+        name: currentName.trim(),
+        email: emailPart.trim(),
+        phone: "",
+        admin,
+      };
       users.push(u);
       lastUser = u;
       currentName = "";
@@ -58,7 +69,9 @@ if (import.meta.main) {
   const file = flag("--file") ?? "users.txt";
   const text = await Deno.readTextFile(file);
   const users = parseUsers(text);
-  const passwordHash = await hashPassword(validateNewPassword(DEFAULT_PASSWORD));
+  const passwordHash = await hashPassword(
+    validateNewPassword(DEFAULT_PASSWORD),
+  );
   let ok = 0;
   for (const u of users) {
     try {
@@ -69,7 +82,9 @@ if (import.meta.main) {
           phone: u.phone,
           role: u.admin ? "admin" : "user",
         });
-        console.log(`updated ${updated?.email ?? u.email} (${updated?.role ?? ""})`);
+        console.log(
+          `updated ${updated?.email ?? u.email} (${updated?.role ?? ""})`,
+        );
       } else {
         const created = await createUser({
           email: normalizeEmail(u.email),

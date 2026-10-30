@@ -24,23 +24,23 @@ import {
 } from "../../../lib/server/auth.ts";
 
 import {
-  deleteUser,
-  getUserById,
-  updateUser,
-} from "../../../lib/server/sql/users.ts";
-
-import { routeClientKey, writeThrottle } from "../../../lib/server/throttle.ts";
-
-import {
   normalizeEntraObjectId,
   parseIdParam,
   readJsonBody,
 } from "../../../lib/server/validation.ts";
 
 import {
+  deleteUser,
+  getUserById,
+  updateUser,
+} from "../../../lib/server/sql/users.ts";
+
+import {
   loadAuthConfig,
   loadServerConfig,
 } from "../../../lib/server/config.ts";
+
+import { routeClientKey, writeThrottle } from "../../../lib/server/throttle.ts";
 
 import { define } from "../../../utils.ts";
 

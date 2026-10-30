@@ -3,11 +3,14 @@
 // on env/DB/port issues instead. Run `deno task doctor` on the target host
 // (PowerShell, cmd, or bash) before `build`/`start`. Read-only by default;
 // `--fix-env` only appends missing commented keys to .env, never secrets.
-import { Pool } from "@db/postgres";
+import {
+  loadCertificateThumbprint,
+  loadPrivateKey,
+} from "../lib/server/auth/entra/keys.ts";
 
 import { loadAuthConfig } from "../lib/server/config.ts";
 
-import { loadCertificateThumbprint, loadPrivateKey } from "../lib/server/auth/entra/keys.ts";
+import { Pool } from "@db/postgres";
 
 const GREEN = "\x1b[32m";
 const RED = "\x1b[31m";
@@ -263,7 +266,11 @@ async function checkSso(): Promise<void> {
     try {
       await loadPrivateKey(entra);
       const thumbprint = await loadCertificateThumbprint(entra);
-      push("sso-key", "ok", "private key imports and certificate thumbprint is available");
+      push(
+        "sso-key",
+        "ok",
+        "private key imports and certificate thumbprint is available",
+      );
       push("sso-cert-thumbprint", "ok", thumbprint);
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
@@ -283,7 +290,8 @@ async function checkSso(): Promise<void> {
     }
   }
   try {
-    const url = `https://login.microsoftonline.com/${entra.tenantId}/v2.0/.well-known/openid-configuration`;
+    const url =
+      `https://login.microsoftonline.com/${entra.tenantId}/v2.0/.well-known/openid-configuration`;
     const res = await fetch(url, {
       signal: AbortSignal.timeout(Math.max(1000, entra.httpTimeoutMs)),
     });

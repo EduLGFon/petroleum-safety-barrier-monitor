@@ -137,7 +137,9 @@ async function cycle(
       labels,
       statusInfo,
       onRuleFired: (ruleId) => {
-        void touchRuleTriggered(ruleId).catch(() => {});
+        void touchRuleTriggered(ruleId).catch((err) => {
+          console.warn("[alerts-poll] touchRuleTriggered failed", err);
+        });
       },
     });
     console.log(

@@ -13,20 +13,20 @@ import {
   rateLimited,
 } from "../../../lib/server/errors.ts";
 
-import { routeClientKey, writeThrottle } from "../../../lib/server/throttle.ts";
-
-import { hashSessionToken } from "../../../lib/server/auth/session.ts";
-
 import {
   deleteSession,
   getSessionUser,
 } from "../../../lib/server/sql/sessions.ts";
 
+import { routeClientKey, writeThrottle } from "../../../lib/server/throttle.ts";
+
+import { buildEntraLogoutUrl } from "../../../lib/server/auth/entra/logout.ts";
+
+import { hashSessionToken } from "../../../lib/server/auth/session.ts";
+
 import { loadServerConfig } from "../../../lib/server/config.ts";
 
 import { loadAuthConfig } from "../../../lib/server/config.ts";
-
-import { buildEntraLogoutUrl } from "../../../lib/server/auth/entra/logout.ts";
 
 import { define } from "../../../utils.ts";
 

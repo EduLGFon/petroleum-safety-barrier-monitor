@@ -299,3 +299,6 @@ export interface AuthUser {
   allowedLocationIds: number[] | null;
   authSource: "local" | "entra";
 }
+
+// Connection health state shared by the header indicator and sync model.
+export type Conn = "connected" | "reconnecting" | "disconnected";

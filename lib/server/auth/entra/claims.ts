@@ -1,13 +1,13 @@
 // Entra claim policy - extracts the stable identity from a validated ID token.
 // This is why it exists: openid-client validates protocol mechanics, but the
 // application still must pin the tenant, client, and required claims.
-import type { IDToken } from "openid-client";
-
-import { type EntraConfig } from "../../config.ts";
-
 import { normalizeEntraObjectId } from "../../validation.ts";
 
 import { constantTimeEqual } from "../constant-time.ts";
+
+import { type EntraConfig } from "../../config.ts";
+
+import type { IDToken } from "openid-client";
 
 const GUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;

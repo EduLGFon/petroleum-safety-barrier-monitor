@@ -3,7 +3,7 @@
 // the hook keeps the component presentational and reusable elsewhere.
 import { useEffect, useRef, useState } from "preact/hooks";
 
-export type Conn = "connected" | "reconnecting" | "disconnected";
+export type { Conn } from "../lib/types.ts";
 
 // Live server connectivity: browser online/offline events drive the dot,
 // plus a lightweight heartbeat against /api/health so a stopped backend

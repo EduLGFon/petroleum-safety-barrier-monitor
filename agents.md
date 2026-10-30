@@ -154,21 +154,21 @@ lockfiles via package manager; no manual edits.
 - Dynamic Data/Scalability: Do not hard-code catalogs/categories/statuses/entities/counts/domain values unless explicitly
   immutable. Stations/categories mirror live upstream catalogue; vocabularies from `getVocabularies()` in http mode; filter
   options live vocabularies no seed fallback; branding per request from `COMPANY_NAME`; tunables in `.env.example` + `lib/enums/`
-  + `lib/constants.ts`, not scattered. Assume valid data may grow/shrink/rename/gain values; no fixed counts of
-  stations/categories/typologies/owners/statuses/criticality ranks/alert rules/recipients/export rows. Handle unseen valid values
-  gracefully (unknown upstream labels converge or skip with listed reason; open `string & {}` unions; unknown ids -> deterministic
-  fallback colors/labels; undecided sync rows wait next run). No fixed record counts/dataset sizes or layouts that only fit
-  current data. Performance limits (paging 25/50/100, seed batches 500, export batches 5,000, export ceiling 200,000, Fracttal 100
-  rows/page with caps, adaptive rate bucket, capped row stagger, debounced search, 5s probe, 5min vocab refresh) must degrade
-  gracefully with explicit refusal/banner/retry/shed line, never drop data silently or crash. Avoid unnecessary O(N^2) (filtering,
-  tally building, vocab derivation, reconcile planning). Use pagination/batching/caching when scale requires (server-paged table,
-  streamed exports from DB batches, parallel vocab queries, request cancel on supersede with stale-rows-kept dim, sync overlap
-  lock with orphan reap). Aggregations/derived values reconcile with source; no silent omission of new values (KPI fields +
-  `other` = `total`; dynamic `by*` GROUP BY buckets mirror every real value; chart NC fail-closed `total - compliant`;
-  `scripts/chaos-scale.ts` asserts 50,000-row contract with new values). Env values tunable source of truth at boot
-  (`dev`/`preview`/`build` read shell env; `start`/`db:*`/poll loops read `.env`); in-memory and `localStorage` caches fallbacks
-  only, validated per field on restore with stale-page self-heal (`barrier-dashboard`, `barrier-chart`, `barrier-settings`,
-  `FILTER_DEFAULTS_VERSION` migration).
+  - `lib/constants.ts`, not scattered. Assume valid data may grow/shrink/rename/gain values; no fixed counts of
+    stations/categories/typologies/owners/statuses/criticality ranks/alert rules/recipients/export rows. Handle unseen valid values
+    gracefully (unknown upstream labels converge or skip with listed reason; open `string & {}` unions; unknown ids -> deterministic
+    fallback colors/labels; undecided sync rows wait next run). No fixed record counts/dataset sizes or layouts that only fit
+    current data. Performance limits (paging 25/50/100, seed batches 500, export batches 5,000, export ceiling 200,000, Fracttal 100
+    rows/page with caps, adaptive rate bucket, capped row stagger, debounced search, 5s probe, 5min vocab refresh) must degrade
+    gracefully with explicit refusal/banner/retry/shed line, never drop data silently or crash. Avoid unnecessary O(N^2) (filtering,
+    tally building, vocab derivation, reconcile planning). Use pagination/batching/caching when scale requires (server-paged table,
+    streamed exports from DB batches, parallel vocab queries, request cancel on supersede with stale-rows-kept dim, sync overlap
+    lock with orphan reap). Aggregations/derived values reconcile with source; no silent omission of new values (KPI fields +
+    `other` = `total`; dynamic `by*` GROUP BY buckets mirror every real value; chart NC fail-closed `total - compliant`;
+    `scripts/chaos-scale.ts` asserts 50,000-row contract with new values). Env values tunable source of truth at boot
+    (`dev`/`preview`/`build` read shell env; `start`/`db:*`/poll loops read `.env`); in-memory and `localStorage` caches fallbacks
+    only, validated per field on restore with stale-page self-heal (`barrier-dashboard`, `barrier-chart`, `barrier-settings`,
+    `FILTER_DEFAULTS_VERSION` migration).
 
 ## 8. Security, Privacy, and Legal Compliance
 
@@ -270,11 +270,12 @@ Secrets/Crypto: Never commit passwords/creds/private keys/tokens/certs/cookies/a
 passwords/tenant dumps/secrets. Env/secret files (`.env`, `test/` captures, keystores, SSH keys) outside repo history/samples. Do
 not open/print/summarize; ask owner if needed. Never expose secrets in logs/errors/responses/URLs/client
 bundles/tests/docs/artifacts. Do not pass secrets/personal data to sub-agents. Approved secret management: local untracked `.env`
-+ `.env.example` shape; `dev`/`preview`/`build` read shell exports; `start`/`db:*`/poll loops read `--env-file=.env`; image
-carries no secrets; host `.env` mounts read-only. Use established crypto libs/algorithms; never invent (PBKDF2-SHA256 via
-WebCrypto + SHA-256 token hashes; auth via Postgres sessions). Protect keys separately; encoding/hashing/obfuscation/Base64 are
-not encryption. Encryption in transit (TLS-only platform APIs; SMTP implicit TLS 465 else STARTTLS; no cleartext creds). Never
-disable TLS verification/auth/authz/cert validation/security controls for dev convenience.
+
+- `.env.example` shape; `dev`/`preview`/`build` read shell exports; `start`/`db:*`/poll loops read `--env-file=.env`; image
+  carries no secrets; host `.env` mounts read-only. Use established crypto libs/algorithms; never invent (PBKDF2-SHA256 via
+  WebCrypto + SHA-256 token hashes; auth via Postgres sessions). Protect keys separately; encoding/hashing/obfuscation/Base64 are
+  not encryption. Encryption in transit (TLS-only platform APIs; SMTP implicit TLS 465 else STARTTLS; no cleartext creds). Never
+  disable TLS verification/auth/authz/cert validation/security controls for dev convenience.
 
 Logging/Auditing: Log security-relevant events without personal data (request id on every API log line matching response body +
 `x-request-id`; `sync_state` one row per run status+counts+compact note; alert payloads attempts+last error+dead-letter flag).

@@ -29,17 +29,17 @@ import {
 } from "../../lib/server/auth/password.ts";
 
 import {
+  normalizeEntraObjectId,
+  readJsonBody,
+} from "../../lib/server/validation.ts";
+
+import {
   createUser,
   listUsers,
   normalizeRole,
 } from "../../lib/server/sql/users.ts";
 
 import { loadAuthConfig, loadServerConfig } from "../../lib/server/config.ts";
-
-import {
-  normalizeEntraObjectId,
-  readJsonBody,
-} from "../../lib/server/validation.ts";
 
 import { define } from "../../utils.ts";
 

@@ -2,28 +2,6 @@
 // This is why it exists: the authorization code is exchanged server-side,
 // the ID token is validated, and an opaque local session is created.
 import {
-  internal,
-  newRequestId,
-  rateLimited,
-  unavailable,
-} from "../../../lib/server/errors.ts";
-
-import { loadAuthConfig } from "../../../lib/server/config.ts";
-
-import {
-  exchangeAuthorizationCode,
-  getOidcConfiguration,
-} from "../../../lib/server/auth/entra/client.ts";
-
-import {
-  clearBindingCookie,
-  consumeFlow,
-  isSecureForConfig,
-} from "../../../lib/server/auth/entra/flows.ts";
-
-import { validateEntraClaims } from "../../../lib/server/auth/entra/claims.ts";
-
-import {
   buildSessionCookie,
   createSessionToken,
   hashSessionToken,
@@ -31,13 +9,35 @@ import {
   sessionExpiry,
 } from "../../../lib/server/auth/session.ts";
 
+import {
+  clearBindingCookie,
+  consumeFlow,
+  isSecureForConfig,
+} from "../../../lib/server/auth/entra/flows.ts";
+
+import {
+  exchangeAuthorizationCode,
+  getOidcConfiguration,
+} from "../../../lib/server/auth/entra/client.ts";
+
+import {
+  internal,
+  newRequestId,
+  rateLimited,
+  unavailable,
+} from "../../../lib/server/errors.ts";
+
+import { routeClientKey, writeThrottle } from "../../../lib/server/throttle.ts";
+
+import { validateEntraClaims } from "../../../lib/server/auth/entra/claims.ts";
+
+import { deleteExpiredSessions } from "../../../lib/server/sql/sessions.ts";
+
 import { getUserByEntraIdentity } from "../../../lib/server/sql/users.ts";
 
 import { createSession } from "../../../lib/server/sql/sessions.ts";
 
-import { deleteExpiredSessions } from "../../../lib/server/sql/sessions.ts";
-
-import { routeClientKey, writeThrottle } from "../../../lib/server/throttle.ts";
+import { loadAuthConfig } from "../../../lib/server/config.ts";
 
 import { define } from "../../../utils.ts";
 

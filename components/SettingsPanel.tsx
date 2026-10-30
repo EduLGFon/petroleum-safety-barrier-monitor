@@ -23,6 +23,8 @@ import { lockBody, unlockBody } from "../lib/body-lock.ts";
 
 import { useEffect, useRef, useState } from "preact/hooks";
 
+import { useFocusTrap } from "../hooks/useFocusTrap.ts";
+
 import { PanelHeader } from "./settings/PanelChrome.tsx";
 
 import type { AuthUser, Theme } from "../lib/types.ts";
@@ -125,24 +127,7 @@ export function SettingsPanel(
       restoreFocusRef.current = null;
     }
   }, [open]);
-  const trapTab = (e: KeyboardEvent) => {
-    if (e.key !== "Tab" || !open) return;
-    const root = panelRef.current;
-    if (!root) return;
-    const focusables = root.querySelectorAll<HTMLElement>(
-      'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])',
-    );
-    if (focusables.length === 0) return;
-    const first = focusables[0];
-    const last = focusables[focusables.length - 1];
-    if (e.shiftKey && activeEl() === first) {
-      e.preventDefault();
-      last.focus();
-    } else if (!e.shiftKey && activeEl() === last) {
-      e.preventDefault();
-      first.focus();
-    }
-  };
+  useFocusTrap(panelRef, open);
 
   return (
     <>
@@ -171,7 +156,6 @@ export function SettingsPanel(
         aria-hidden={!open}
         tabIndex={-1}
         ref={panelRef}
-        onKeyDown={trapTab}
         style={{
           position: "fixed",
           top: 0,
