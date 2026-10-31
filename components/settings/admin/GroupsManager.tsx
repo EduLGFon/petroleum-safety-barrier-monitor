@@ -52,7 +52,8 @@ export function GroupsManager({ onCount }: { onCount?: (n: number) => void }) {
     onCount?.(g.length);
     return g;
   });
-  const { items: groups, loading, error, setError, reload: reloadGroups } = resource;
+  const { items: groups, loading, error, setError, reload: reloadGroups } =
+    resource;
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [busy, setBusy] = useState(false);

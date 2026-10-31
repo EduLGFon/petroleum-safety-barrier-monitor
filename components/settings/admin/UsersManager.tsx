@@ -233,7 +233,8 @@ export function UsersManager(
     onCount?.(list.length);
     return list;
   });
-  const { items: users, loading, error, setError, reload: reloadUsers } = resource;
+  const { items: users, loading, error, setError, reload: reloadUsers } =
+    resource;
   const [email, setEmail] = useState("");
   const [name, setName] = useState("");
   const [password, setPassword] = useState("");
