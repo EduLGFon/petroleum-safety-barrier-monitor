@@ -14,7 +14,9 @@ import {
 
 import { adminApi } from "../../../lib/api/admin-client.ts";
 
-import { useEffect, useState } from "preact/hooks";
+import { useState } from "preact/hooks";
+
+import { useAdminResource } from "../../../hooks/useAdminResource.ts";
 
 interface Group {
   id: number;
@@ -37,11 +39,20 @@ interface UserOpt {
 }
 
 export function GroupsManager({ onCount }: { onCount?: (n: number) => void }) {
-  const [groups, setGroups] = useState<Group[]>([]);
   const [locations, setLocations] = useState<LocationOpt[]>([]);
   const [users, setUsers] = useState<UserOpt[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
+  const resource = useAdminResource<Group>(async () => {
+    const [g, lookups, userList] = await Promise.all([
+      adminApi("/api/access-groups") as Promise<Group[]>,
+      adminApi("/api/lookups") as Promise<{ locations: LocationOpt[] }>,
+      adminApi("/api/users") as Promise<UserOpt[]>,
+    ]);
+    setLocations(lookups.locations ?? []);
+    setUsers(userList ?? []);
+    onCount?.(g.length);
+    return g;
+  });
+  const { items: groups, loading, error, setError, reload: reloadGroups } = resource;
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [busy, setBusy] = useState(false);
@@ -50,28 +61,10 @@ export function GroupsManager({ onCount }: { onCount?: (n: number) => void }) {
   const [draftUsers, setDraftUsers] = useState<number[]>([]);
 
   async function refresh() {
-    try {
-      setError("");
-      setLoading(true);
-      const [g, lookups, userList] = await Promise.all([
-        adminApi("/api/access-groups") as Promise<Group[]>,
-        adminApi("/api/lookups") as Promise<{ locations: LocationOpt[] }>,
-        adminApi("/api/users") as Promise<UserOpt[]>,
-      ]);
-      setGroups(g);
-      setLocations(lookups.locations ?? []);
-      setUsers(userList ?? []);
-      onCount?.(g.length);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
-    } finally {
-      setLoading(false);
-    }
+    await reloadGroups();
   }
 
-  useEffect(() => {
-    void refresh();
-  }, []);
+  // Initial load handled by useAdminResource.
 
   async function create(e: Event) {
     e.preventDefault();
