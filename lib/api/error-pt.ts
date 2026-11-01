@@ -261,8 +261,12 @@ const PT_PREFIX =
 
 // toPtError: maps a known English API error to pt-BR. Unknown English text
 // gets a safe Portuguese fallback rather than leaking implementation details;
-// strings already localized by the client pass through unchanged.
+// strings already localized by the client pass through unchanged. Non-string
+// input (missing envelope field) maps to the generic failure, never throws.
 export function toPtError(message: string): string {
+  if (typeof message !== "string" || message === "") {
+    return "Ocorreu um erro inesperado. Tente novamente.";
+  }
   if (PT_BY_EN[message]) return PT_BY_EN[message];
   const dynamic = translateDynamic(message);
   if (dynamic) return dynamic;

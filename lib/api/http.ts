@@ -70,8 +70,11 @@ export function httpAdapterFactory(
   // Per-adapter URL cache (never shared: different baseUrls must never
   // serve each other's bytes).
   const etagCache = new Map<string, { etag: string; body: unknown }>();
-  // GETs JSON path from baseUrl; throws on non-OK status.
-  async function fetchJson<T>(path: string): Promise<T> {
+  // GETs JSON path from baseUrl; throws on non-OK status. Aborts via opts.
+  async function fetchJson<T>(
+    path: string,
+    opts?: { signal?: AbortSignal },
+  ): Promise<T> {
     const cached = etagCache.get(path);
     const res = await fetchOrFail(`${baseUrl}${path}`, {
       headers: {
@@ -79,6 +82,7 @@ export function httpAdapterFactory(
         ...(cached ? { "If-None-Match": cached.etag } : {}),
       },
       credentials: "same-origin",
+      ...(opts?.signal ? { signal: opts.signal } : {}),
     });
     // 304 confirms the cached bytes are current - return them without
     // re-parsing. Untagged 304s (no cache entry) are an error: the server
@@ -113,31 +117,55 @@ export function httpAdapterFactory(
 
   return {
     // HTTP getBarriers: fetches one wire page and resolves items to domain.
-    async getBarriers(query) {
+    async getBarriers(query, opts) {
       const qs = buildQueryString(query);
-      const data = await fetchJson<BarriersResponse>(`/api/barriers?${qs}`);
+      const data = await fetchJson<BarriersResponse>(
+        `/api/barriers?${qs}`,
+        opts,
+      );
       return {
         items: resolveBarriers(data.items, labels),
         total: data.total,
         totalPages: data.totalPages,
       };
     },
-    // HTTP getAllBarriers: fetches up to 100k wire rows, resolves to domain.
-    async getAllBarriers(query) {
-      const qs = buildQueryString({ ...query, page: 1, pageSize: 100000 });
-      const data = await fetchJson<BarriersResponse>(`/api/barriers?${qs}`);
-      return resolveBarriers(data.items, labels);
+    // HTTP getAllBarriers: pages through the whole scope, resolving to domain.
+    // Loops to the first page's ceiling so scopes past one pageSize still
+    // return every row instead of silently truncating at 100k.
+    async getAllBarriers(query, opts) {
+      const pageSize = 100000;
+      const firstQs = buildQueryString({ ...query, page: 1, pageSize });
+      const first = await fetchJson<BarriersResponse>(
+        `/api/barriers?${firstQs}`,
+        opts,
+      );
+      const items = [...first.items];
+      const totalPages = Math.max(
+        1,
+        first.totalPages ?? Math.ceil(first.total / pageSize),
+      );
+      for (let page = 2; page <= totalPages; page++) {
+        opts?.signal?.throwIfAborted();
+        const qs = buildQueryString({ ...query, page, pageSize });
+        const data = await fetchJson<BarriersResponse>(
+          `/api/barriers?${qs}`,
+          opts,
+        );
+        items.push(...data.items);
+      }
+      return resolveBarriers(items, labels);
     },
     // HTTP getBarrierById: fetches wire row by id; null only on a genuine
     // row-level 404 ("Barrier not found"), other failures throw so callers
     // can tell "missing" from "broken". Anonymous camouflage (envelope error
     // exactly "not found") throws AuthExpiredError like the collections so
     // logged-out callers redirect to login instead of seeing a null row.
-    async getBarrierById(id) {
+    async getBarrierById(id, opts) {
       const path = `/api/barriers/${id}`;
       const res = await fetchOrFail(`${baseUrl}${path}`, {
         headers: { "Accept": "application/json" },
         credentials: "same-origin",
+        ...(opts?.signal ? { signal: opts.signal } : {}),
       });
       if (res.status === 404) {
         let camouflaged = false;
@@ -156,16 +184,17 @@ export function httpAdapterFactory(
       return resolveBarriers([w], labels)[0];
     },
     // HTTP getKpi: fetches wire KPI snapshot and resolves to domain.
-    async getKpi(query) {
+    async getKpi(query, opts) {
       const qs = buildQueryString(query);
-      const w = await fetchJson<WireKpiSnapshot>(`/api/kpi?${qs}`);
+      const w = await fetchJson<WireKpiSnapshot>(`/api/kpi?${qs}`, opts);
       return resolveKpi(w);
     },
     // HTTP getChartData: fetches wire per-category totals and resolves rows.
-    async getChartData(query) {
+    async getChartData(query, opts) {
       const qs = buildQueryString(query);
       const items = await fetchJson<WireCategoryCompliance[]>(
         `/api/chart?${qs}`,
+        opts,
       );
       return resolveChartData(items, labels);
     },

@@ -30,9 +30,11 @@ export function computeChartData(b: Barrier[]): CategoryCompliance[] {
 }
 
 // truncateLabel: presentation-only shortening for SVG row labels; the full
-// name stays in data (tooltip <title>, search, table filter).
+// name stays in data (tooltip <title>, search, table filter). Array.from
+// keeps surrogate pairs (emoji) whole instead of splitting them.
 export function truncateLabel(name: string, max = 26): string {
-  return name.length > max ? name.slice(0, max) + "…" : name;
+  const chars = Array.from(name);
+  return chars.length > max ? chars.slice(0, max).join("") + "…" : name;
 }
 
 // ChartSort: volume = biggest total first; ncRate = highest % Não Conforme
@@ -89,8 +91,9 @@ export function summarizeCompliance(
     compliant,
     nonCompliant,
     total,
+    // Empty scope is 0%, matching computeKpi: no rows means no compliance.
     pctCompliant: total === 0
-      ? 100
+      ? 0
       : Math.round((compliant / total) * 1000) / 10,
     topNC,
   };

@@ -83,8 +83,10 @@ export const AURORA_CONN = {
 } as const;
 
 // Widths of the KPI progress fills: every metric bar runs the signature
-// gradient, scaled by its share of the total.
+// gradient, scaled by its share of the total. Non-finite input renders 0%
+// instead of "NaN%".
 export function progressWidth(sharePct: number): string {
+  if (!Number.isFinite(sharePct)) return "0%";
   const p = Math.max(0, Math.min(100, Math.round(sharePct)));
   return `${p}%`;
 }

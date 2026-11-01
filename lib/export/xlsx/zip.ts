@@ -94,11 +94,22 @@ async function* deflate(
   const cs = new CompressionStream("deflate-raw");
   const writer = cs.writable.getWriter();
   const feed = (async () => {
-    for await (const chunk of source) {
-      onRaw(chunk);
-      await writer.write(chunk);
+    try {
+      for await (const chunk of source) {
+        onRaw(chunk);
+        await writer.write(chunk);
+      }
+      await writer.close();
+    } catch (e) {
+      // A throwing source would otherwise leave the reader hanging forever:
+      // abort the writable so the read side errors and the failure surfaces.
+      try {
+        await writer.abort(e);
+      } catch {
+        // Ignore abort failures; the source error is what matters.
+      }
+      throw e;
     }
-    await writer.close();
   })();
   const reader = cs.readable.getReader();
   try {

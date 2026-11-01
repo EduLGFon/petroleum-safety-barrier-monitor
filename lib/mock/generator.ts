@@ -6,7 +6,7 @@ import {
   OWNER_CODES,
   TYPOLOGY_CODES,
 } from "../enums.ts";
-import { ACTION_PLANS, COMMENTS, generateHistory } from "./history.ts";
+import { ACTION_PLANS, COMMENTS, generateHistory, STATUS_DIST } from "./history.ts";
 import { LOCATION_DIST_BY_ID, LOCATIONS } from "../constants.ts";
 import type { WireBarrier } from "../wireTypes.ts";
 import { genSheetFields } from "./sheet-fields.ts";
@@ -15,15 +15,7 @@ import { buildTag } from "./tags.ts";
 
 // ─── Status distribution (id-keyed) ──────────────────────────────────────
 // 0=available 1=out-of-service 2=contingency-outage 3=degraded-contingency 4=degraded 5=unavailable
-
-const STATUS_DIST: [number, number][] = [
-  [0, 0.52],
-  [1, 0.14],
-  [2, 0.08],
-  [3, 0.07],
-  [4, 0.12],
-  [5, 0.07],
-];
+// Shared with history.ts (single source; re-exported for existing importers).
 export { STATUS_DIST };
 
 // Picks a status id from STATUS_DIST cumulative probabilities.
@@ -61,8 +53,12 @@ export function pickRankId(r: number): number {
 let _cache: WireBarrier[] | null = null;
 
 // Generates (once, cached) the deterministic mock WireBarrier[] dataset.
+// Returns a defensive copy each call so callers can sort/filter without
+// mutating the cached seed (a mutated cache would leak across tests).
 export function getWireBarriers(): WireBarrier[] {
-  if (_cache) return _cache;
+  if (_cache) {
+    return _cache.map((b) => ({ ...b, statusHistory: [...b.statusHistory] }));
+  }
 
   const rng = createRng(0xdeadbeef);
   const barriers: WireBarrier[] = [];
@@ -126,5 +122,5 @@ export function getWireBarriers(): WireBarrier[] {
   }
 
   _cache = barriers;
-  return barriers;
+  return _cache.map((b) => ({ ...b, statusHistory: [...b.statusHistory] }));
 }

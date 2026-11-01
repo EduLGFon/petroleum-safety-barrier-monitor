@@ -44,6 +44,7 @@ export function rowHeight(lines: number, line = LINE): number {
 // and slices them by the returned counts.
 export class PagePlanner {
   private pending: number[] = [];
+  private sum = 0;
   private first = true;
 
   constructor(
@@ -57,19 +58,24 @@ export class PagePlanner {
   }
 
   private total(): number {
-    return this.pending.reduce((a, b) => a + b, 0);
+    return this.sum;
   }
 
   // push: one row height in, completed pages (lists of heights) out.
   push(height: number): number[][] {
     this.pending.push(height);
+    this.sum += height;
     const out: number[][] = [];
     for (;;) {
       if (this.total() <= this.cap()) break;
       // Only the giant row itself is pending: hold it for flush (or for a
       // follower, which will push it out onto its own overflowing page).
       if (this.pending.length === 1) break;
-      out.push(this.pending.splice(0, this.pending.length - 1));
+      const page = this.pending.splice(0, this.pending.length - 1);
+      let pageSum = 0;
+      for (const h of page) pageSum += h;
+      this.sum -= pageSum;
+      out.push(page);
       this.first = false;
     }
     return out;
@@ -78,6 +84,7 @@ export class PagePlanner {
   // flush: whatever is left becomes the last page (or nothing when empty).
   flush(): number[][] {
     const rest = this.pending.splice(0);
+    this.sum = 0;
     this.first = false;
     return rest.length > 0 ? [rest] : [];
   }

@@ -128,10 +128,19 @@ export function toWireQuery(
 }
 
 // Serializes wire query to URL search string, skipping empty values.
+// Array values append once per element (?a=1&a=2) so the server's
+// comma-or-repeat parser sees every id instead of a single "1,2" blob.
 export function buildQueryString(q: BarriersQuery): string {
   const params = new URLSearchParams();
   for (const [k, v] of Object.entries(q)) {
-    if (v !== undefined && v !== "") params.set(k, String(v));
+    if (v === undefined || v === "") continue;
+    if (Array.isArray(v)) {
+      for (const item of v) {
+        if (item !== undefined && item !== "") params.append(k, String(item));
+      }
+    } else {
+      params.set(k, String(v));
+    }
   }
   return params.toString();
 }

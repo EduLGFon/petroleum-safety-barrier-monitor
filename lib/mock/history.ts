@@ -4,10 +4,11 @@ import { AUTHOR_CODES } from "../enums.ts";
 import { SIM_DATE } from "../constants.ts";
 import type { Rng } from "./rng.ts";
 
-// Returns a copy of date shifted by d days.
+// Returns a copy of date shifted by d days, using UTC math so the mock
+// timeline never shifts across local DST boundaries.
 function addDays(b: Date, d: number): Date {
   const x = new Date(b);
-  x.setDate(x.getDate() + d);
+  x.setUTCDate(x.getUTCDate() + d);
   return x;
 }
 // Formats a date as YYYY-MM-DD (date part of ISO string).
@@ -18,7 +19,7 @@ function fmtISO(d: Date): string {
 // ─── Status distribution (id-keyed) ──────────────────────────────────────
 // 0=available 1=out-of-service 2=contingency-outage 3=degraded-contingency 4=degraded 5=unavailable
 
-const STATUS_DIST: [number, number][] = [
+export const STATUS_DIST: [number, number][] = [
   [0, 0.52],
   [1, 0.14],
   [2, 0.08],

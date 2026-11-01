@@ -42,12 +42,22 @@ function num(n: number): string {
   return String(Math.round(n * 100) / 100);
 }
 
-// pdfText: one literal string, WinAnsi-encoded with ( ) \ escaped.
+// pdfText: one literal string, WinAnsi-encoded with ( ) \ escaped. Newlines
+// and carriage returns are escaped as \n \r so a multi-line comment never
+// breaks the content stream with a raw line break inside (...) .
 export function pdfText(text: string): number[] {
   const out: number[] = [0x28];
   for (const b of encodeWinAnsi(text)) {
-    if (b === 0x28 || b === 0x29 || b === 0x5c) out.push(0x5c);
-    out.push(b);
+    if (b === 0x28 || b === 0x29 || b === 0x5c) {
+      out.push(0x5c);
+      out.push(b);
+    } else if (b === 0x0a) {
+      out.push(0x5c, 0x6e);
+    } else if (b === 0x0d) {
+      out.push(0x5c, 0x72);
+    } else {
+      out.push(b);
+    }
   }
   out.push(0x29);
   return out;

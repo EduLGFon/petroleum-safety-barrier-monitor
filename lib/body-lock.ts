@@ -4,11 +4,13 @@
 // first close re-enabling scroll under a still-open dialog.
 let locks = 0;
 
-// Locks body scroll; safe to call during SSR (no document there).
-export function lockBody(): void {
-  if (typeof document === "undefined") return;
+// Locks body scroll; safe to call during SSR (no document there). Returns a
+// cleanup that releases the lock, so effects can `return lockBody()`.
+export function lockBody(): () => void {
+  if (typeof document === "undefined") return () => {};
   locks++;
   document.body.style.overflow = "hidden";
+  return unlockBody;
 }
 
 // Releases one body scroll lock; scroll resumes at zero locks only.

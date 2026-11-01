@@ -91,14 +91,15 @@ export function escHtml(v: string): string {
     .replace(/"/g, "&quot;");
 }
 
-// Triggers a browser download via object URL + temp anchor; revokes URL immediately to avoid leaks.
+// Triggers a browser download via object URL + temp anchor; revokes the URL on
+// a timer (immediate revoke aborts the download in some browsers) to avoid leaks.
 export function download(blob: Blob, filename: string): void {
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
   a.download = filename;
   a.click();
-  URL.revokeObjectURL(url);
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
 // Throws when document is undefined; guards all exports which need DOM/Blob URLs (browser-only).

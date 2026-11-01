@@ -170,15 +170,21 @@ export function fallbackColors(key: string): ColorSet {
 
 /** Lookup with graceful fallback - never returns undefined for new values. */
 export function dispColorFor(key: string): ColorSet {
-  return { ...fallbackColors(key), ...DISP_COLORS[key] };
+  const known = DISP_COLORS[key];
+  if (known) return { ...known };
+  return fallbackColors(key);
 }
 // Compliance colors with deterministic fallback for new values.
 export function confColorFor(key: string): ColorSet {
-  return { ...fallbackColors(key), ...CONF_COLORS[key] };
+  const known = CONF_COLORS[key];
+  if (known) return { ...known };
+  return fallbackColors(key);
 }
 // Criticality colors with deterministic fallback for new values.
 export function critColorFor(key: string): ColorSet {
-  return { ...fallbackColors(key), ...CRIT_COLORS[key] };
+  const known = CRIT_COLORS[key];
+  if (known) return { ...known };
+  return fallbackColors(key);
 }
 
 /** Short label for status band segments - known values use curated shorts,

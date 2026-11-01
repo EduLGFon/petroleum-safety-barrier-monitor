@@ -218,12 +218,19 @@ export function sheetStyles(book: StyleBook): SheetStyles {
 // every column exactly, so the KPI strip stays aligned when the column list
 // grows or a column is added.
 export function kpiSpans(total: number, blocks: number): number[] {
-  const base = Math.floor(total / blocks);
-  const extra = total % blocks;
-  return Array.from(
-    { length: blocks },
-    (_, i) => base + (i < extra ? 1 : 0),
+  const safeTotal = Math.max(1, Math.floor(total));
+  const safeBlocks = Math.max(1, Math.floor(blocks));
+  const n = Math.min(safeBlocks, safeTotal);
+  const base = Math.floor(safeTotal / n);
+  const extra = safeTotal % n;
+  const spans = Array.from(
+    { length: n },
+    (_, i) => Math.max(1, base + (i < extra ? 1 : 0)),
   );
+  // Pad with width-1 spans when the caller asked for more blocks than columns
+  // so the strip still returns `blocks` ranges instead of a short row.
+  while (spans.length < safeBlocks) spans.push(1);
+  return spans;
 }
 
 // band: one row of merged cells - the value in the first cell of each span,

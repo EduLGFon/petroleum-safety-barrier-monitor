@@ -104,16 +104,18 @@ export function styleBook(): StyleBook {
     return fontKeys.set(key, fonts.length - 1).get(key)!;
   };
   const fillId = (color: string): number => {
-    const at = fillKeys.get(color);
+    const key = color.toUpperCase();
+    const at = fillKeys.get(key);
     if (at !== undefined) return at;
-    fills.push(color);
-    return fillKeys.set(color, fills.length - 1).get(color)!;
+    fills.push(key);
+    return fillKeys.set(key, fills.length - 1).get(key)!;
   };
   const borderId = (color: string): number => {
-    const at = borderKeys.get(color);
+    const key = color.toUpperCase();
+    const at = borderKeys.get(key);
     if (at !== undefined) return at;
-    borders.push(color);
-    return borderKeys.set(color, borders.length - 1).get(color)!;
+    borders.push(key);
+    return borderKeys.set(key, borders.length - 1).get(key)!;
   };
 
   const style = (spec: StyleSpec): number => {

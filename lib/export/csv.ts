@@ -11,8 +11,13 @@ import { row } from "./rows.ts";
 
 // ;-quote-escapes one CSV cell (double quotes double); shared by export so tests
 // can cover the escaping that otherwise only runs inside a browser download.
+// OWASP formula guard: a leading = + - @ (or tab/CR) would execute as a
+// spreadsheet formula on import, so prefix it with a single quote (inside the
+// quoted field Excel renders the value literally).
 export function csvCell(v: unknown): string {
-  return `"${String(v ?? "").replace(/"/g, '""')}"`;
+  let cell = String(v ?? "").replace(/"/g, '""');
+  if (/^[=+\-@\t\r]/.test(cell)) cell = "'" + cell;
+  return `"${cell}"`;
 }
 
 // The 30 export columns, single-sourced: the browser CSV and the server

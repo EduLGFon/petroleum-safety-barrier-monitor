@@ -58,11 +58,14 @@ export function inlineStr(
 }
 
 // numberCell: a numeric cell, so Excel sorts and filters it as a number.
+// Non-finite values (NaN/Infinity from bad data) are not valid in <v> and
+// would corrupt the sheet, so they fall back to an inline string cell.
 export function numberCell(
   ref: string,
   value: number,
   style?: number,
 ): string {
+  if (!Number.isFinite(value)) return inlineStr(ref, String(value), style);
   return `<c r="${ref}"${styleAttr(style)}><v>${value}</v></c>`;
 }
 

@@ -61,5 +61,14 @@ export async function adminApi(
     }
     throw new AdminApiError(message, res.status, code, requestId);
   }
-  return await res.json();
+  try {
+    return await res.json();
+  } catch {
+    // The status was OK but the body is not JSON (empty/proxied): surface a
+    // structured failure instead of leaking a SyntaxError to the UI.
+    throw new AdminApiError(
+      "Ocorreu um erro inesperado. Tente novamente.",
+      res.status,
+    );
+  }
 }

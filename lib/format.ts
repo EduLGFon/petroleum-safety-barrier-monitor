@@ -15,9 +15,10 @@ export function daysSince(d: string, nowMs: number = Date.now()): number {
 }
 
 // Formats day count as pt-BR duration (dia/semana/mês/ano); days < 2 collapses to "1 dia".
-// Non-finite input renders "-" instead of "NaN anos".
+// Non-finite or negative input renders "-" instead of "NaN anos" or "1 dia".
 export function humanDuration(days: number): string {
   if (!Number.isFinite(days)) return "-";
+  if (days < 0) return "-";
   if (days < 2) return "1 dia";
   if (days < 7) return `${days} dias`;
   if (days < 14) return "1 semana";
@@ -29,10 +30,27 @@ export function humanDuration(days: number): string {
 }
 
 // Converts YYYY-MM-DD to DD/MM/YYYY; malformed input passes through visibly
-// instead of rendering "undefined/undefined/...".
+// instead of rendering "undefined/undefined/...". Only the date prefix is
+// parsed (longer ISO stamps still format from their day), and the day is
+// round-trip validated through the UTC calendar so 2026-13-40 never renders
+// as "40/13/2026".
 export function fmtDate(iso: string): string {
   if (!/^\d{4}-\d{2}-\d{2}/.test(iso)) return iso;
-  const [y, m, d] = iso.split("-");
+  const date = iso.slice(0, 10);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return iso;
+  const [y, m, d] = date.split("-");
+  const year = Number(y);
+  const month = Number(m);
+  const day = Number(d);
+  if (!Number.isInteger(year) || !Number.isInteger(month) || !Number.isInteger(day)) {
+    return iso;
+  }
+  if (month < 1 || month > 12 || day < 1 || day > 31) return iso;
+  const dt = new Date(Date.UTC(year, month - 1, day));
+  if (
+    dt.getUTCFullYear() !== year || dt.getUTCMonth() !== month - 1 ||
+    dt.getUTCDate() !== day
+  ) return iso;
   return `${d}/${m}/${y}`;
 }
 
