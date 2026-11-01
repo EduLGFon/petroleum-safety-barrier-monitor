@@ -20,6 +20,10 @@ export interface LocalBarrier {
   availabilityId: number;
   deletedAt: string | null;
   signature: string;
+  // Admin-owned fields (barriers.manual_fields): excluded from the signature
+  // and the sync UPDATE so manual edits survive sweeps. Optional so old
+  // fixtures/tests keep compiling; absent reads as sync-owned.
+  manualFields?: string[];
   // Full signature fields for per-field diffing (which columns changed).
   // Optional so old fixtures/tests keep compiling; present in production
   // rows built by loadLocal in lib/server/sql/sync.ts.
@@ -144,37 +148,26 @@ export type SignatureSource = Pick<
 // and never rewritten. ORDER IS PART OF THE CONTRACT - keep in step with the
 // stored signature built by lib/server/sql/sync.ts. Contingency rides the
 // signature (M1/M2) so an auto Sim -> Não clearing lands as an update with
-// changed_fields instead of a silent stranded Sim.
-export function fieldsSignature(input: SignatureSource): string {
-  return JSON.stringify([
-    input.tag,
-    input.locationId,
-    input.typologyId,
-    input.locDescId,
-    input.criticalityId,
-    input.categoryId,
-    input.groupingId,
-    input.ownerId,
-    input.comments,
-    input.actionPlan,
-    input.isActive,
-    input.scopeSource,
-    input.origin,
-    input.installLocal,
-    input.equipTypology,
-    input.fieldInstalled,
-    input.fieldOperational,
-    input.opStatus,
-    input.hasMaintPlan,
-    input.planFollowed,
-    input.failureFree,
-    input.maintStatus,
-    input.hasContingency ?? "Não",
-    input.contingencyDesc ?? "",
-    input.evidenceCode,
-    input.degradationDesc,
-    input.extraComments,
-  ]);
+// changed_fields instead of a silent stranded Sim. `exclude` carries the
+// admin-owned field keys (barriers.manual_fields): owned fields never enter
+// the signature on either side, so a manual edit alone never marks the row
+// dirty and the sync never reverts it.
+export function fieldsSignature(
+  input: SignatureSource,
+  exclude: readonly string[] = [],
+): string {
+  const skip = exclude.length === 0 ? null : new Set(exclude);
+  const values: unknown[] = [];
+  for (const key of SIGNATURE_FIELD_KEYS) {
+    if (skip?.has(key)) continue;
+    const v = key === "hasContingency"
+      ? (input[key] ?? "Não")
+      : key === "contingencyDesc"
+      ? (input[key] ?? "")
+      : input[key];
+    values.push(v);
+  }
+  return JSON.stringify(values);
 }
 
 // diffSignatureFields: names the SignatureSource keys that differ between
@@ -214,10 +207,13 @@ export function diffSignatureFields(
   oldFields: SignatureSource | undefined,
   input: SignatureSource,
   statusChanged: boolean,
+  exclude: readonly string[] = [],
 ): string[] {
   const changed: string[] = [];
   if (oldFields !== undefined) {
+    const skip = exclude.length === 0 ? null : new Set(exclude);
     for (const key of SIGNATURE_FIELD_KEYS) {
+      if (skip?.has(key)) continue;
       const oldVal = key === "hasContingency"
         ? (oldFields[key] ?? "Não")
         : key === "contingencyDesc"
@@ -271,7 +267,11 @@ export function planReconcile(
       entries.push({ kind: "insert", input });
       continue;
     }
-    const signature = fieldsSignature(input);
+    // Owned fields are excluded on both sides (the stored signature was
+    // built the same way in loadLocal), so manual edits never flip the row
+    // to update and the sync never reverts them.
+    const owned = existing.manualFields ?? [];
+    const signature = fieldsSignature(input, owned);
     const statusChanged = existing.availabilityId !== input.availabilityId;
     if (existing.deletedAt !== null) {
       entries.push({ kind: "restore", local: existing, input, statusChanged });

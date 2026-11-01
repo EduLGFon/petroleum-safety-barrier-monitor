@@ -91,3 +91,53 @@ Deno.test("snapshotOf strips non-signature extras for symmetry", () => {
     ["hasContingency"],
   );
 });
+
+Deno.test("owned fields are excluded from signature and diff", () => {
+  const base = {
+    tag: "A",
+    locationId: 1,
+    typologyId: 1,
+    locDescId: 0,
+    criticalityId: 1,
+    categoryId: 7,
+    groupingId: 0,
+    ownerId: null,
+    comments: "",
+    actionPlan: "",
+    isActive: true,
+    scopeSource: "all",
+    origin: "",
+    installLocal: "",
+    equipTypology: "",
+    fieldInstalled: "",
+    fieldOperational: "",
+    opStatus: "",
+    hasMaintPlan: "",
+    planFollowed: "",
+    failureFree: "",
+    maintStatus: "",
+    hasContingency: "Não",
+    contingencyDesc: "",
+    evidenceCode: "",
+    degradationDesc: "",
+    extraComments: "",
+  };
+  const edited = { ...base, origin: "Manual", tag: "B" };
+  // No exclusion: the manual edit changes the signature.
+  assertEquals(fieldsSignature(base) === fieldsSignature(edited), false);
+  // With exclusion: owned keys never enter on either side.
+  assertEquals(
+    fieldsSignature(base, ["origin", "tag"]),
+    fieldsSignature(edited, ["origin", "tag"]),
+  );
+  // Diff skips owned keys but still reports the rest (and availability).
+  assertEquals(diffSignatureFields(base, edited, false, ["origin"]), ["tag"]);
+  assertEquals(
+    diffSignatureFields(base, edited, true, ["origin", "tag"]),
+    ["availabilityId"],
+  );
+  assertEquals(diffSignatureFields(base, edited, false, []), [
+    "tag",
+    "origin",
+  ]);
+});

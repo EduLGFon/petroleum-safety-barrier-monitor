@@ -113,6 +113,32 @@ Deno.test("planReconcile updates on signature change", () => {
   assertStrictEquals(entry.statusChanged, false);
 });
 
+Deno.test("planReconcile skips when only owned fields differ", () => {
+  const base = baseInput();
+  const owned = ["tag"];
+  const local = [localRow({
+    manualFields: owned,
+    signature: fieldsSignature(base, owned),
+  })];
+  const plan = planReconcile([baseInput({ tag: "MANUAL-EDIT" })], local);
+  assertStrictEquals(plan.counts.skips, 1);
+  assertStrictEquals(kinds(plan).join(","), "skip");
+});
+
+Deno.test("planReconcile updates when a non-owned field differs", () => {
+  const base = baseInput();
+  const owned = ["tag"];
+  const local = [localRow({
+    manualFields: owned,
+    signature: fieldsSignature(base, owned),
+  })];
+  const plan = planReconcile(
+    [baseInput({ tag: "MANUAL-EDIT", comments: "sync note" })],
+    local,
+  );
+  assertStrictEquals(plan.counts.updates, 1);
+});
+
 Deno.test("planReconcile flags statusChanged when availability flips", () => {
   const local = [localRow()];
   const plan = planReconcile([baseInput({ availabilityId: 5 })], local);
