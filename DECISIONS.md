@@ -12,5 +12,15 @@ Append-only architecture decision records. Newest last.
 - D08: conditional GETs with ETags.
 - D09: duplication-guard hardening.
 - D10-D18: sync history attribution, contingency links, sync lease contention, Fracttal detail derivations, raw detail panel, sync status timestamp contract, and related implementation decisions.
+- D19: performance pass without visual change. Blur is never removed, only
+  contained/promoted/resized (contain: paint/strict, translateZ, smaller
+  kernels over opaque surfaces, orb pause behind overlays). Server: list
+  queries skip the history lateral (detail fetches it), /api/barriers caps
+  at 1000 with an id-only listing for select-all, KPI/chart/vocab/sync
+  responses memoize in short TTLs so ETags 304, gzip middleware for
+  JSON/CSV, single-trip sync-status CTE, collapsed vocabulary scans,
+  batched alert cooldown counts, guarded pg_trgm + rule-expression indexes.
+  Client: export builders + editor + admin managers load lazily, memoized
+  rows/chart, debounced searches/persistence, 30s health heartbeat.
 
 See git history for full context.
