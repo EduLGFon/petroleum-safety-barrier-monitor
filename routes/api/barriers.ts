@@ -4,6 +4,7 @@
 // Authenticated GET (session or ADMIN_TOKEN); anonymous gets 404
 // camouflage, invalid credentials get 401. Throttled, envelope errors.
 import {
+  badRequest,
   forbidden,
   internal,
   newRequestId,
@@ -15,13 +16,18 @@ import {
   authStoreUnavailable,
   denyDataAuth,
   requireDataAuth,
+  resolveAllowedLocationIds,
 } from "../../lib/server/auth.ts";
 
 import { readThrottle, routeClientKey } from "../../lib/server/throttle.ts";
 
 import { listBarriers } from "../../lib/server/sql/barriers.ts";
 
-import { parseFilterQuery, parseIntParam } from "./_params.ts";
+import {
+  hasDateParamError,
+  parseFilterQuery,
+  parseIntParam,
+} from "./_params.ts";
 
 import { loadServerConfig } from "../../lib/server/config.ts";
 
@@ -60,15 +66,16 @@ export const handler = define.handlers({
     if (!dataAuth.ok) return denyDataAuth(dataAuth, requestId);
 
     const sp = ctx.url.searchParams;
+    if (hasDateParamError(sp)) {
+      return badRequest("Invalid date param", requestId);
+    }
     const query: BarriersQuery = {
       ...parseFilterQuery(sp),
       page: parseIntParam(sp.get("page")),
       pageSize: parseIntParam(sp.get("pageSize")),
       sortCol: sp.get("sortCol") ?? undefined,
       sortDir: sp.get("sortDir") === "desc" ? "desc" : "asc",
-      allowedLocationIds: dataAuth.role === "admin"
-        ? null
-        : (dataAuth.user?.allowedLocationIds ?? []),
+      allowedLocationIds: resolveAllowedLocationIds(dataAuth),
     };
     // Deleted/audit scopes are admin-only; authenticated non-admins get a
     // 403 instead of the rows.

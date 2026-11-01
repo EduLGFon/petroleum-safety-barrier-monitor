@@ -14,6 +14,7 @@ import {
   authStoreUnavailable,
   denyDataAuth,
   requireDataAuth,
+  resolveAllowedLocationIds,
 } from "../../../../lib/server/auth.ts";
 
 import {
@@ -65,13 +66,14 @@ export const handler = define.handlers({
     if (barrierId === undefined) {
       return badRequest("Invalid barrier id", requestId);
     }
-    // SECURITY: station access scope.
+    // SECURITY: station access scope. Load with deleted rows so a deleted
+    // or inactive barrier still 404s uniformly (no existence oracle).
     if (dataAuth.role !== "admin") {
-      const barrier = await getBarrierById(barrierId);
-      const allowed = dataAuth.user?.allowedLocationIds ?? [];
+      const barrier = await getBarrierById(barrierId, { includeDeleted: true });
+      const allowed = resolveAllowedLocationIds(dataAuth);
       if (
-        barrier && Array.isArray(allowed) &&
-        !allowed.includes(barrier.locationId)
+        !barrier || barrier.deletedAt !== null || barrier.isActive === false ||
+        (allowed !== null && !allowed.includes(barrier.locationId))
       ) {
         return notFound("No sync change found", requestId);
       }

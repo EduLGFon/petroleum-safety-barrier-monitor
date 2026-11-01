@@ -18,6 +18,7 @@ import {
   authStoreUnavailable,
   denyDataAuth,
   requireDataAuth,
+  resolveAllowedLocationIds,
 } from "../../lib/server/auth.ts";
 
 import {
@@ -51,9 +52,11 @@ import { getCompanyName } from "../../lib/company.ts";
 
 import type { Fmt } from "../../lib/export/format.ts";
 
-import { parseFilterQuery } from "./_params.ts";
+import { hasDateParamError, parseFilterQuery } from "./_params.ts";
 
 import { define } from "../../utils.ts";
+
+import { denyIfCrossSite } from "../../lib/server/csrf.ts";
 
 // Request payload: the filters always come from the query string (one parser
 // for GET and POST alike); the selection and the browser time zone come from
@@ -110,6 +113,8 @@ async function stream(
   sp: URLSearchParams,
 ): Promise<Response> {
   const requestId = newRequestId();
+  const csrf = denyIfCrossSite(ctx.req, requestId);
+  if (csrf) return csrf;
   // Errors name the verb that actually arrived (GET or POST).
   const where = `${ctx.req.method} /api/export`;
   // Shared DB budget first so multi-isolate deploys enforce one limit;
@@ -159,10 +164,11 @@ async function stream(
     page: 1,
     sortCol: sp.get("sortCol") ?? undefined,
     sortDir: sp.get("sortDir") === "desc" ? "desc" : "asc",
-    allowedLocationIds: dataAuth.role === "admin"
-      ? null
-      : (dataAuth.user?.allowedLocationIds ?? []),
+    allowedLocationIds: resolveAllowedLocationIds(dataAuth),
   };
+  if (hasDateParamError(sp)) {
+    return badRequest("Invalid date param", requestId);
+  }
   if (
     (query.rowScope === "deleted" || query.rowScope === "all") &&
     dataAuth.role !== "admin"

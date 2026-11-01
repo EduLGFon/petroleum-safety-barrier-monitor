@@ -7,6 +7,7 @@ import {
   denyDataAuth,
   requireAdminAuth,
   requireDataAuth,
+  resolveAllowedLocationIds,
 } from "../../../lib/server/auth.ts";
 
 import {
@@ -56,6 +57,8 @@ import { forRequest } from "../../../lib/server/log.ts";
 
 import { define } from "../../../utils.ts";
 
+import { denyIfCrossSite } from "../../../lib/server/csrf.ts";
+
 function optStr(raw: unknown, max = 2000): string | undefined {
   if (raw === undefined) return undefined;
   if (typeof raw !== "string") throw new Error("must be a string");
@@ -74,6 +77,8 @@ export const handler = define.handlers({
   // GET single barrier by numeric id; 400 invalid, 404 when missing.
   async GET(ctx) {
     const requestId = newRequestId();
+    const csrf = denyIfCrossSite(ctx.req, requestId);
+    if (csrf) return csrf;
     const limit = readThrottle.check(routeClientKey(ctx));
     if (!limit.allowed) {
       return rateLimited("too many requests", requestId, limit.retryAfterMs);
@@ -114,7 +119,7 @@ export const handler = define.handlers({
       if (!barrier) return notFound("Barrier not found", requestId);
       // SECURITY: station access scope.
       if (dataAuth.role !== "admin") {
-        const allowed = dataAuth.user?.allowedLocationIds ?? [];
+        const allowed = resolveAllowedLocationIds(dataAuth);
         if (allowed !== null && !allowed.includes(barrier.locationId)) {
           return notFound("Barrier not found", requestId);
         }
@@ -133,6 +138,8 @@ export const handler = define.handlers({
   // PATCH - updates editable barrier fields; admin only.
   async PATCH(ctx) {
     const requestId = newRequestId();
+    const csrf = denyIfCrossSite(ctx.req, requestId);
+    if (csrf) return csrf;
     const reqLog = forRequest(requestId, "barrier");
     const limit = writeThrottle.check(routeClientKey(ctx));
     if (!limit.allowed) {

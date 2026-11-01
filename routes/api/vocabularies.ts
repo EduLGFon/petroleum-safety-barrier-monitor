@@ -6,6 +6,11 @@
 
 import { internal, okWithEtag } from "../../lib/server/errors.ts";
 
+import {
+  type DataAuth,
+  resolveAllowedLocationIds,
+} from "../../lib/server/auth.ts";
+
 import { getVocabularies } from "../../lib/server/sql/vocabularies.ts";
 
 import { guardRequest } from "../../lib/server/api-guard.ts";
@@ -22,16 +27,14 @@ export const handler = define.handlers({
     });
     if (g.response) return g.response;
     const requestId = g.requestId;
-    const dataAuth = g.dataAuth as {
-      ok: true;
-      role: string;
-      user?: { allowedLocationIds?: number[] };
-    };
+    const dataAuth = g.dataAuth as Extract<DataAuth, { ok: true }>;
     try {
-      const allowed = dataAuth.role === "admin"
-        ? null
-        : (dataAuth.user?.allowedLocationIds ?? []);
-      return okWithEtag(ctx.req, await getVocabularies(allowed), requestId);
+      const allowed = resolveAllowedLocationIds(dataAuth);
+      return await okWithEtag(
+        ctx.req,
+        await getVocabularies(allowed),
+        requestId,
+      );
     } catch (err) {
       return internal(
         "GET /api/vocabularies",

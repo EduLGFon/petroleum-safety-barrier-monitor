@@ -3,6 +3,7 @@
 // chart honors the same filter subset as the table so it never disagrees
 // with the grid. Authenticated GET (session or ADMIN_TOKEN); throttled.
 import {
+  badRequest,
   forbidden,
   internal,
   newRequestId,
@@ -14,6 +15,7 @@ import {
   authStoreUnavailable,
   denyDataAuth,
   requireDataAuth,
+  resolveAllowedLocationIds,
 } from "../../lib/server/auth.ts";
 
 import { readThrottle, routeClientKey } from "../../lib/server/throttle.ts";
@@ -22,7 +24,7 @@ import { loadServerConfig } from "../../lib/server/config.ts";
 
 import { getChartData } from "../../lib/server/sql/chart.ts";
 
-import { parseFilterQuery } from "./_params.ts";
+import { hasDateParamError, parseFilterQuery } from "./_params.ts";
 
 import { define } from "../../utils.ts";
 
@@ -58,10 +60,11 @@ export const handler = define.handlers({
 
     const filter = {
       ...parseFilterQuery(ctx.url.searchParams),
-      allowedLocationIds: dataAuth.role === "admin"
-        ? null
-        : (dataAuth.user?.allowedLocationIds ?? []),
+      allowedLocationIds: resolveAllowedLocationIds(dataAuth),
     };
+    if (hasDateParamError(ctx.url.searchParams)) {
+      return badRequest("Invalid date param", requestId);
+    }
     if (
       (filter.rowScope === "deleted" || filter.rowScope === "all") &&
       dataAuth.role !== "admin"

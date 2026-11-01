@@ -6,9 +6,11 @@ import {
   authStoreUnavailable,
   denyDataAuth,
   requireDataAuth,
+  resolveAllowedLocationIds,
 } from "../../lib/server/auth.ts";
 
 import {
+  badRequest,
   internal,
   newRequestId,
   okWithEtag,
@@ -84,6 +86,25 @@ export const handler = define.handlers({
       ? clampInt(legacyLimit, 8, 1, 100)
       : clampInt(params.get("pageSize"), 25, 1, 100);
 
+    const allowedLocationIds = resolveAllowedLocationIds(dataAuth);
+    // Strict param validation: unknown kinds/scopes must 400, not fall back.
+    const validKinds = new Set([
+      "new",
+      "updated",
+      "removed",
+      "restored",
+      "all",
+    ]);
+    if (!validKinds.has(kind)) {
+      return badRequest("Invalid kind param", requestId);
+    }
+    if (scope !== null && scope !== "last-run" && scope !== "last-day") {
+      return badRequest("Invalid scope param", requestId);
+    }
+    if (query.length > 200) {
+      return badRequest("Search query is too long", requestId);
+    }
+
     try {
       // Legacy hover-card shape: ?limit= without paging params returns
       // { changes } so the old card keeps working during rollout.
@@ -94,9 +115,7 @@ export const handler = define.handlers({
         const result = await listSyncChanges({
           page: 1,
           pageSize,
-          allowedLocationIds: dataAuth.role === "admin"
-            ? null
-            : (dataAuth.user?.allowedLocationIds ?? []),
+          allowedLocationIds,
         });
         const changes = result.items.map((c) => ({
           barrierId: c.barrierId,
@@ -121,9 +140,7 @@ export const handler = define.handlers({
         query,
         page,
         pageSize,
-        allowedLocationIds: dataAuth.role === "admin"
-          ? null
-          : (dataAuth.user?.allowedLocationIds ?? []),
+        allowedLocationIds,
       });
       // When runId is absent and scope is last-run, listSyncChanges resolves
       // the latest finished run internally.

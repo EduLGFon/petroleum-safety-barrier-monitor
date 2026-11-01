@@ -174,3 +174,17 @@ export async function requireDataAuth(req: Request): Promise<DataAuth> {
   if (auth.ok) return { ok: true, role: auth.role, user: auth.user };
   return { ok: false, anonymous, message: auth.message };
 }
+
+// resolveAllowedLocationIds: fail-closed station scope for data reads.
+// Admin => null (unrestricted). Legacy ungrouped users carry null (also
+// unrestricted). An explicit array (possibly empty) is honored as-is.
+// Missing/undefined => [] (no access) so a malformed session cannot widen.
+export function resolveAllowedLocationIds(
+  auth: { role: string; user?: { allowedLocationIds?: number[] | null } | null },
+): number[] | null {
+  if (auth.role === "admin") return null;
+  const v = auth.user?.allowedLocationIds;
+  if (v === null) return null;
+  if (Array.isArray(v)) return v;
+  return [];
+}

@@ -4,6 +4,8 @@
 // for a post-login return. No data ever ships to strangers.
 import { requirePageSession, toLogin } from "../lib/server/page-auth.ts";
 
+import { resolveAllowedLocationIds } from "../lib/server/auth.ts";
+
 import { getVocabularies } from "../lib/server/sql/vocabularies.ts";
 
 import { isDevFracttalRawEnabled } from "../lib/server/config.ts";
@@ -68,9 +70,12 @@ export default define.page(async function Home(
       }
     })();
     const vocabularies: Vocabularies = await getVocabularies(
-      sessionUser?.role === "admin"
-        ? null
-        : (sessionUser?.allowedLocationIds ?? []),
+      resolveAllowedLocationIds({
+        role: sessionUser?.role ?? "user",
+        user: sessionUser as unknown as {
+          allowedLocationIds?: number[] | null;
+        } | null,
+      }),
     );
     return (
       <main style={PAGE_STYLE}>

@@ -4,11 +4,21 @@
 // category, criticality, action-plan presence, text, dates) so the header
 // never disagrees with the grid.
 // Authenticated GET (session or ADMIN_TOKEN); anonymous gets 404.
-import { forbidden, internal, okWithEtag } from "../../lib/server/errors.ts";
+import {
+  badRequest,
+  forbidden,
+  internal,
+  okWithEtag,
+} from "../../lib/server/errors.ts";
+
+import {
+  type DataAuth,
+  resolveAllowedLocationIds,
+} from "../../lib/server/auth.ts";
 
 import { getKpi } from "../../lib/server/sql/barriers.ts";
 
-import { parseFilterQuery } from "./_params.ts";
+import { hasDateParamError, parseFilterQuery } from "./_params.ts";
 
 import { guardRequest } from "../../lib/server/api-guard.ts";
 
@@ -24,16 +34,13 @@ export const handler = define.handlers({
     });
     if (g.response) return g.response;
     const requestId = g.requestId;
-    const dataAuth = g.dataAuth as {
-      ok: true;
-      role: string;
-      user?: { allowedLocationIds?: number[] };
-    };
+    const dataAuth = g.dataAuth as Extract<DataAuth, { ok: true }>;
+    if (hasDateParamError(ctx.url.searchParams)) {
+      return badRequest("Invalid date param", requestId);
+    }
     const filter = {
       ...parseFilterQuery(ctx.url.searchParams),
-      allowedLocationIds: dataAuth.role === "admin"
-        ? null
-        : (dataAuth.user?.allowedLocationIds ?? []),
+      allowedLocationIds: resolveAllowedLocationIds(dataAuth),
     };
     if (
       (filter.rowScope === "deleted" || filter.rowScope === "all") &&
@@ -46,7 +53,7 @@ export const handler = define.handlers({
       const snapshot = await getKpi(filter, {
         scopeCounts: dataAuth.role === "admin",
       });
-      return okWithEtag(ctx.req, snapshot, requestId);
+      return await okWithEtag(ctx.req, snapshot, requestId);
     } catch (err) {
       return internal(
         "GET /api/kpi",
