@@ -43,6 +43,8 @@ import { loadAuthConfig, loadServerConfig } from "../../lib/server/config.ts";
 
 import { define } from "../../utils.ts";
 
+import { denyIfCrossSite } from "../../lib/server/csrf.ts";
+
 // guardAdmin: shared admin gate with the caller's requestId (never a fresh
 // one, so denied responses correlate with the handler's log line). Returns
 // null when authorized, otherwise the denial response.
@@ -65,6 +67,8 @@ export const handler = define.handlers({
   // GET - lists users without password hashes.
   async GET(ctx) {
     const requestId = newRequestId();
+    const csrf = denyIfCrossSite(ctx.req, requestId);
+    if (csrf) return csrf;
     const limit = readThrottle.check(routeClientKey(ctx));
     if (!limit.allowed) {
       return rateLimited("too many requests", requestId, limit.retryAfterMs);
@@ -92,6 +96,8 @@ export const handler = define.handlers({
   // required. First accounts come from scripts/create-admin.ts, never here.
   async POST(ctx) {
     const requestId = newRequestId();
+    const csrf = denyIfCrossSite(ctx.req, requestId);
+    if (csrf) return csrf;
     const limit = writeThrottle.check(routeClientKey(ctx));
     if (!limit.allowed) {
       return rateLimited("too many requests", requestId, limit.retryAfterMs);
@@ -170,7 +176,8 @@ export const handler = define.handlers({
       }
       if (
         message.includes("email") || message.includes("name") ||
-        message.includes("password") || message.includes("role")
+        message.includes("password") || message.includes("role") ||
+        message.includes("phone") || message.includes("invalid phone")
       ) {
         return badRequest(message, requestId);
       }

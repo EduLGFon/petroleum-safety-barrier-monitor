@@ -12,14 +12,42 @@ import {
   requireDataAuth,
 } from "./auth.ts";
 
-import { internal, newRequestId, rateLimited } from "./errors.ts";
+import { badRequest, internal, newRequestId, rateLimited } from "./errors.ts";
 
-import { readThrottle, routeClientKey, writeThrottle } from "./throttle.ts";
+import {
+  exportThrottle,
+  fracttalRawThrottle,
+  passwordThrottle,
+  readThrottle,
+  routeClientKey,
+  writeThrottle,
+} from "./throttle.ts";
 
 import { loadServerConfig } from "./config.ts";
 
 export type AuthLevel = "none" | "user" | "admin" | "data";
-export type ThrottleKind = "read" | "write";
+export type ThrottleKind =
+  | "read"
+  | "write"
+  | "password"
+  | "export"
+  | "fracttalRaw";
+
+function throttleFor(kind: ThrottleKind) {
+  switch (kind) {
+    case "write":
+      return writeThrottle;
+    case "password":
+      return passwordThrottle;
+    case "export":
+      return exportThrottle;
+    case "fracttalRaw":
+      return fracttalRawThrottle;
+    case "read":
+    default:
+      return readThrottle;
+  }
+}
 
 export interface GuardOptions {
   kind: ThrottleKind;
@@ -40,8 +68,14 @@ export async function guardRequest(
   opts: GuardOptions,
 ): Promise<GuardResult> {
   const requestId = newRequestId();
-  const req = (ctx as { req: Request }).req;
-  const throttle = opts.kind === "read" ? readThrottle : writeThrottle;
+  const req = (ctx as { req?: unknown }).req;
+  if (!(req instanceof Request)) {
+    return {
+      requestId,
+      response: badRequest("Invalid request", requestId),
+    };
+  }
+  const throttle = throttleFor(opts.kind);
   const limit = throttle.check(routeClientKey(ctx));
   if (!limit.allowed) {
     return {

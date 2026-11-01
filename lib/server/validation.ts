@@ -27,7 +27,8 @@ export function normalizePhone(raw: unknown): string {
   if (typeof raw !== "string") throw new Error("phone must be a string");
   const trimmed = raw.trim();
   if (trimmed === "") return "";
-  const digits = trimmed.replace(/\D/g, "").slice(0, 13);
+  const digits = trimmed.replace(/\D/g, "");
+  if (digits.length > 13) throw new Error("invalid phone number");
   if (/^55\d{10,11}$/.test(digits)) return digits;
   if (/^\d{10,11}$/.test(digits)) return `55${digits}`;
   throw new Error("invalid phone number");

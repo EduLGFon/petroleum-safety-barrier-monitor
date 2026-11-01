@@ -31,11 +31,35 @@ export function parseIntArrayParam(
   return nums.length === 1 ? nums[0] : nums;
 }
 
-// Parses optional ISO-date param (YYYY-MM-DD); undefined when malformed.
+// Parses optional ISO-date param (YYYY-MM-DD); undefined when missing.
+// Strict: month 1-12 and day valid for the month (UTC check). Malformed
+// values return undefined so callers can answer 400 via hasDateParamError.
 export function parseDateParam(v: string | null): string | undefined {
   if (v === null || v === "") return undefined;
   const date = v.trim().slice(0, 10);
-  return /^\d{4}-\d{2}-\d{2}$/.test(date) ? date : undefined;
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return undefined;
+  const year = Number(date.slice(0, 4));
+  const month = Number(date.slice(5, 7));
+  const day = Number(date.slice(8, 10));
+  if (month < 1 || month > 12 || day < 1 || day > 31) return undefined;
+  const d = new Date(Date.UTC(year, month - 1, day));
+  if (
+    d.getUTCFullYear() !== year || d.getUTCMonth() !== month - 1 ||
+    d.getUTCDate() !== day
+  ) return undefined;
+  return date;
+}
+
+// hasDateParamError: true when a since/until param was present but failed
+// strict validation, so routes can answer 400 instead of silently ignoring.
+export function hasDateParamError(sp: URLSearchParams): boolean {
+  for (const key of ["since", "until"]) {
+    const raw = sp.get(key);
+    if (raw !== null && raw !== "" && parseDateParam(raw) === undefined) {
+      return true;
+    }
+  }
+  return false;
 }
 
 // Trims free text and caps length so a pasted blob cannot become a huge LIKE.

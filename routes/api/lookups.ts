@@ -3,6 +3,7 @@
 // ids (not display labels) for availabilities, categories, and authors. The
 // public vocabularies endpoint only carries labels, so this authenticated
 // endpoint serves the exact rows those writes reference.
+// Admin only: the full location list must not leak to scoped users.
 import { internal, okWithEtag } from "../../lib/server/errors.ts";
 
 import { listAuthors } from "../../lib/server/sql/authors.ts";
@@ -18,7 +19,7 @@ export const handler = define.handlers({
   async GET(ctx) {
     const g = await guardRequest(ctx, {
       kind: "read",
-      auth: "user",
+      auth: "admin",
       label: "GET /api/lookups",
     });
     if (g.response) return g.response;
@@ -57,7 +58,7 @@ export const handler = define.handlers({
         ),
         listAuthors(),
       ]);
-      return okWithEtag(ctx.req, {
+      return await okWithEtag(ctx.req, {
         availabilities,
         categories,
         locations,

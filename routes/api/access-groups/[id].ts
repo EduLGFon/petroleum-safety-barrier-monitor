@@ -20,18 +20,29 @@ import {
   requireAdminAuth,
 } from "../../../lib/server/auth.ts";
 
-import { routeClientKey, writeThrottle } from "../../../lib/server/throttle.ts";
+import {
+  readThrottle,
+  routeClientKey,
+  writeThrottle,
+} from "../../../lib/server/throttle.ts";
 
-import { parseIdParam, readJsonBody } from "../../../lib/server/validation.ts";
+import {
+  parseIdParam,
+  readJsonBodyCapped,
+} from "../../../lib/server/validation.ts";
 
 import { loadServerConfig } from "../../../lib/server/config.ts";
 
 import { define } from "../../../utils.ts";
 
+import { denyIfCrossSite } from "../../../lib/server/csrf.ts";
+
 export const handler = define.handlers({
   async GET(ctx) {
     const requestId = newRequestId();
-    const limit = writeThrottle.check(routeClientKey(ctx));
+    const csrf = denyIfCrossSite(ctx.req, requestId);
+    if (csrf) return csrf;
+    const limit = readThrottle.check(routeClientKey(ctx));
     if (!limit.allowed) {
       return rateLimited("too many requests", requestId, limit.retryAfterMs);
     }
@@ -70,6 +81,8 @@ export const handler = define.handlers({
 
   async PATCH(ctx) {
     const requestId = newRequestId();
+    const csrf = denyIfCrossSite(ctx.req, requestId);
+    if (csrf) return csrf;
     const limit = writeThrottle.check(routeClientKey(ctx));
     if (!limit.allowed) {
       return rateLimited("too many requests", requestId, limit.retryAfterMs);
@@ -97,8 +110,15 @@ export const handler = define.handlers({
     if (!auth.ok) return denyByCredentials(ctx.req, auth.message, requestId);
     const id = parseIdParam(ctx.params.id);
     if (id === undefined) return badRequest("Invalid group id", requestId);
-    const parsed = await readJsonBody(ctx.req);
-    if (!parsed.ok) return badRequest("Invalid JSON body", requestId);
+    const parsed = await readJsonBodyCapped(ctx.req, 10_000);
+    if (!parsed.ok) {
+      return badRequest(
+        parsed.reason === "too-large"
+          ? "Request body is too large"
+          : "Invalid JSON body",
+        requestId,
+      );
+    }
     const body = parsed.body as {
       name?: unknown;
       description?: unknown;
@@ -111,26 +131,46 @@ export const handler = define.handlers({
       locationIds?: number[];
       userIds?: number[];
     } = {};
-    if (body.name !== undefined) {
-      if (typeof body.name !== "string" || !body.name.trim()) {
-        return badRequest("name is required", requestId);
+    try {
+      if (body.name !== undefined) {
+        if (typeof body.name !== "string" || !body.name.trim()) {
+          return badRequest("name is required", requestId);
+        }
+        patch.name = body.name;
       }
-      patch.name = body.name;
-    }
-    if (body.description !== undefined) {
-      patch.description = typeof body.description === "string"
-        ? body.description
-        : "";
-    }
-    if (body.locationIds !== undefined) {
-      patch.locationIds = Array.isArray(body.locationIds)
-        ? body.locationIds.filter((n): n is number => typeof n === "number")
-        : [];
-    }
-    if (body.userIds !== undefined) {
-      patch.userIds = Array.isArray(body.userIds)
-        ? body.userIds.filter((n): n is number => typeof n === "number")
-        : [];
+      if (body.description !== undefined) {
+        patch.description = typeof body.description === "string"
+          ? body.description
+          : "";
+      }
+      if (body.locationIds !== undefined) {
+        if (!Array.isArray(body.locationIds)) {
+          return badRequest("locationIds must be an array", requestId);
+        }
+        for (const n of body.locationIds) {
+          if (typeof n !== "number" || !Number.isSafeInteger(n) || n <= 0) {
+            return badRequest(
+              "locationIds must be positive integers",
+              requestId,
+            );
+          }
+        }
+        patch.locationIds = body.locationIds as number[];
+      }
+      if (body.userIds !== undefined) {
+        if (!Array.isArray(body.userIds)) {
+          return badRequest("userIds must be an array", requestId);
+        }
+        for (const n of body.userIds) {
+          if (typeof n !== "number" || !Number.isSafeInteger(n) || n <= 0) {
+            return badRequest("userIds must be positive integers", requestId);
+          }
+        }
+        patch.userIds = body.userIds as number[];
+      }
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      return badRequest(message, requestId);
     }
     try {
       const updated = await updateAccessGroup(id, patch);
@@ -152,6 +192,8 @@ export const handler = define.handlers({
 
   async DELETE(ctx) {
     const requestId = newRequestId();
+    const csrf = denyIfCrossSite(ctx.req, requestId);
+    if (csrf) return csrf;
     const limit = writeThrottle.check(routeClientKey(ctx));
     if (!limit.allowed) {
       return rateLimited("too many requests", requestId, limit.retryAfterMs);
