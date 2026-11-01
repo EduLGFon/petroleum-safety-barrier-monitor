@@ -9,8 +9,8 @@
 // in-memory list. The dropdown portals to document.body (like FilterSelect
 // and ColumnsMenu) because the animated section and the table card both trap
 // stacking contexts, so a nested menu would paint under the rows.
-import { exportToCSV, exportToPDF, exportToXlsx } from "../../lib/export.ts";
-
+// Format builders load lazily on first export click: the xlsx + pdf builders
+// (~2.5k lines) never parse on dashboard load.
 import { useEffect, useMemo, useRef, useState } from "preact/hooks";
 
 import { toPtError } from "../../lib/api/error-pt.ts";
@@ -140,8 +140,9 @@ export function ExportMenu(
   }, [open]);
 
   // doExport: every format exports the whole selection, either from the
-  // server (streamed) or from the in-memory list. Returns success so the menu
-  // closes on completion while staying open to surface failures inline.
+  // server (streamed) or from the in-memory list. Format builders import
+  // lazily here so dashboard load never parses them. Returns success so the
+  // menu closes on completion while staying open to surface failures inline.
   async function doExport(kind: Fmt): Promise<boolean> {
     if (empty || loading) return false;
     const name = `barreiras-${new Date().toISOString().slice(0, 10)}`;
@@ -152,12 +153,17 @@ export function ExportMenu(
         await onServerExport(kind, ids, name);
       } else {
         if (kind === "xlsx") {
+          const { exportToXlsx } = await import("../../lib/export/xlsx.ts");
           await exportToXlsx(exportable, name, companyName);
         }
         if (kind === "pdf") {
+          const { exportToPDF } = await import("../../lib/export/pdf.ts");
           await exportToPDF(exportable, name, companyName);
         }
-        if (kind === "csv") exportToCSV(exportable, name);
+        if (kind === "csv") {
+          const { exportToCSV } = await import("../../lib/export/csv.ts");
+          exportToCSV(exportable, name);
+        }
       }
       return true;
     } catch (err) {
@@ -223,11 +229,13 @@ export function ExportMenu(
                 minWidth: 190,
                 padding: 4,
                 background: AURORA.dialog,
-                backdropFilter: "blur(16px) saturate(1.25)",
-                WebkitBackdropFilter: "blur(16px) saturate(1.25)",
+                backdropFilter: "blur(10px) saturate(1.1)",
+                WebkitBackdropFilter: "blur(10px) saturate(1.1)",
                 border: `1px solid ${AURORA.segBorder}`,
                 borderRadius: 10,
                 boxShadow: "0 12px 32px rgba(0,0,0,.35)",
+                contain: "paint",
+                transform: "translateZ(0)",
               }}
             >
               <div
