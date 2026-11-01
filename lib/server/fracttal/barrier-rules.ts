@@ -464,6 +464,18 @@ export function effectiveAvailabilityId(
   return baseId;
 }
 
+// hasUrgentCorrective reports whether open work carries an urgent status
+// signal: an emergency (urgent-slot) event, or a planned event whose
+// isUrgent flag is true (WR is_urgent, WO high priority). A planned event
+// without the flag carries no status signal and must not flip failure-free,
+// degradation, or action text to corrective.
+export function hasUrgentCorrective(work: {
+  urgent?: StatusEvent | null;
+  planned?: StatusEvent | null;
+}): boolean {
+  return work.urgent != null || work.planned?.isUrgent === true;
+}
+
 // AvailabilitySignals is every input the derivation reads. hasContingency
 // is the auto-detected work-text signal (GM/CEC/contingência in the open
 // corrective WO/WR); the manual sheet flag overlays later via

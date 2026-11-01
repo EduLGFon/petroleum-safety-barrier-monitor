@@ -5,7 +5,7 @@
 // plan, notes, open work) plus a deterministic fallback where the upstream
 // contract has no exact column. Both the dump import and the live sync call
 // this module so a rebuild and a poller agree cell by cell.
-import { foldText, type StatusEvent } from "./barrier-rules.ts";
+import { foldText, hasUrgentCorrective, type StatusEvent } from "./barrier-rules.ts";
 
 // Generic program reference used when an asset note carries no HAZOP/APR
 // document. It is the manual's own origin column default and the procedure
@@ -224,10 +224,12 @@ export function planFollowedOf(
   return "Sim";
 }
 
-// failureFreeOf is the inverse of an open corrective signal: any planned or
-// emergency work order means the barrier has a failure/defect.
+// failureFreeOf is the inverse of an urgent open-corrective signal: only an
+// emergency event or a planned event with the urgent flag (isUrgent) means
+// the barrier has a failure/defect. Planned work without the flag carries no
+// status signal and leaves the barrier failure-free.
 export function failureFreeOf(work: SheetWork): string {
-  return work.urgent || work.planned ? "Não" : "Sim";
+  return hasUrgentCorrective(work) ? "Não" : "Sim";
 }
 
 // evidenceCodeFromText extracts the GM/CEC evidence code used by the
@@ -245,11 +247,14 @@ export function evidenceCodeFromText(
   return "";
 }
 
-// openEvent picks the winning open corrective event (urgent first, matching
-// the availability precedence). Only corrective work describes a degradation
-// or an action; preventive work never does.
+// openEvent picks the winning urgent open-corrective event (urgent first,
+// then planned only when it carries the urgent flag, matching the
+// availability precedence). Non-urgent planned work describes no degradation
+// and no action; preventive work never does.
 function openEvent(work: SheetWork): StatusEvent | null {
-  return work.urgent ?? work.planned ?? null;
+  if (work.urgent != null) return work.urgent;
+  if (work.planned?.isUrgent === true) return work.planned;
+  return null;
 }
 
 // degradationText describes what is wrong: the folio+description source
@@ -312,7 +317,7 @@ export function deriveSheetFields(
 ): SheetFields {
   const contingency = work.hasContingency === true;
   const source = fieldValue(work.contingencySource);
-  const hasCorrective = (work.urgent ?? work.planned) != null;
+  const hasCorrective = hasUrgentCorrective(work);
   return {
     origin: originOf(asset),
     installLocal: installLocalOf(asset),

@@ -243,6 +243,8 @@ export const defaultSyncIo: SyncIo = {
       plan_followed: string | null;
       failure_free: string | null;
       maint_status: string | null;
+      has_contingency: string | null;
+      contingency_desc: string | null;
       evidence_code: string | null;
       degradation_desc: string | null;
       extra_comments: string | null;
@@ -254,7 +256,8 @@ export const defaultSyncIo: SyncIo = {
          coalesce(scope_source, '') as scope_source,
          origin, install_local, equip_typology, field_installed,
          field_operational, op_status, has_maint_plan, plan_followed,
-         failure_free, maint_status, evidence_code, degradation_desc,
+         failure_free, maint_status, has_contingency, contingency_desc,
+         evidence_code, degradation_desc,
          extra_comments
         from barriers
         where external_code is not null
@@ -287,6 +290,8 @@ export const defaultSyncIo: SyncIo = {
         planFollowed: r.plan_followed ?? "",
         failureFree: r.failure_free ?? "",
         maintStatus: r.maint_status ?? "",
+        hasContingency: r.has_contingency ?? "Não",
+        contingencyDesc: r.contingency_desc ?? "",
         evidenceCode: r.evidence_code ?? "",
         degradationDesc: r.degradation_desc ?? "",
         extraComments: r.extra_comments ?? "",
@@ -437,9 +442,9 @@ export const defaultSyncIo: SyncIo = {
           }
           // update / restore: same field write (location included, so
           // station moves persist); restore clears deleted_at. Contingency
-          // sheet columns are sync-owned only when auto-detected: coalesce
-          // preserves manual Há Contingência?/descrição on rows without a
-          // work-text signal instead of clearing them to null.
+          // is sync-owned (M1/M2): an explicit Sim/ Não always lands so a
+          // closed work order clears a stale auto Sim; a null desc becomes
+          // null, a Sim keeps its source and a Não clears to null.
           await tx(
             `update barriers set
                tag = $2, location_id = $3, typology_id = $4, loc_desc_id = $5,
@@ -447,9 +452,9 @@ export const defaultSyncIo: SyncIo = {
                owner_id = $9, comments = $10, action_plan = $11,
                source_updated_at = $12, scope_source = $13, is_active = $14,
                deleted_at = case when $15 then null else deleted_at end,
-               has_contingency = coalesce($16, has_contingency, 'Não'),
-               contingency_desc = case when $16 is not null
-                 then $17 else contingency_desc end,
+               has_contingency = coalesce($16, 'Não'),
+               contingency_desc = case when coalesce($16, 'Não') = 'Sim'
+                 then nullif($17, '') else null end,
                origin = $18, install_local = $19, equip_typology = $20,
                field_installed = $21, field_operational = $22, op_status = $23,
                has_maint_plan = $24, plan_followed = $25, failure_free = $26,
@@ -644,8 +649,8 @@ async function insertBarrier(input: {
       input.sourceUpdatedAt,
       input.scopeSource,
       input.isActive,
-      input.hasContingency ?? null,
-      input.contingencyDesc ?? null,
+      input.hasContingency ?? "Não",
+      input.contingencyDesc || null,
       input.origin,
       input.installLocal,
       input.equipTypology,

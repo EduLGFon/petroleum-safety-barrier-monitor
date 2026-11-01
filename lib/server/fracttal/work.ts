@@ -10,6 +10,7 @@ import {
   classifyCorrective,
   classifyRequest,
   earliestDate,
+  foldText,
   hasContingencySignal,
   isClosedRequestStatus,
   isoDate,
@@ -155,6 +156,36 @@ export function parseWorkRequest(raw: unknown): FracttalWorkRequest {
   };
 }
 
+// urgentFromPriority maps a WO priorities_description to the urgent flag.
+// VERY_HIGH/HIGH (and emergência/urgência text) count as urgent; anything
+// else (MEDIUM/LOW/blank/null) does not. WR rows keep their is_urgent
+// boolean; this helper is WO-only.
+export function urgentFromPriority(
+  value: string | null | undefined,
+): boolean {
+  const folded = foldText(value ?? null);
+  if (folded === "") return false;
+  if (folded.includes("very_high") || folded.includes("very high")) {
+    return true;
+  }
+  if (folded.includes("muito alta")) return true;
+  if (/\bhigh\b/.test(folded) || /\balta\b/.test(folded)) return true;
+  if (folded.includes("emergenc") || folded.includes("urgent")) return true;
+  return false;
+}
+
+// isOpenWorkOrderRow is the shared live/import open predicate (duplicated in
+// scripts/fracttal-import.ts with the same comment): closed wins
+// (done===true or id_status===4 closes), otherwise open when done===false
+// or id_status is in (1, 2).
+export function isOpenWorkOrderRow(
+  done: boolean | null,
+  statusId: number | null,
+): boolean {
+  if (done === true || statusId === 4) return false;
+  return done === false || statusId === 1 || statusId === 2;
+}
+
 // workOrderEvent distills a row to a shared status event: earliest of the
 // candidate date fields plus folio + description (capped like the import).
 // detail is the action note the technician sees (task_note wins over note);
@@ -216,7 +247,7 @@ function workOrderEvent(wo: FracttalWorkOrder): StatusEvent {
     sourceAuthor: preferredAuthor(wo.created_by, wo.requested_by),
     participants: peopleFromFields(wo),
     priority: wo.priorities_description,
-    isUrgent: false,
+    isUrgent: urgentFromPriority(wo.priorities_description),
     failureContext,
   };
 }
@@ -301,19 +332,18 @@ function peopleFromFields(
   return people;
 }
 
-// workOrderSlot sorts one order: closed rows (done !== false) carry no
-// signal; open rows classify into a slot and always report the stop flag.
+// workOrderSlot sorts one order: closed rows carry no signal; open rows
+// classify into a slot and always report the stop flag. Open/closed follows
+// isOpenWorkOrderRow (done===false or id_status in (1,2) opens;
+// done===true or id_status===4 closes, closed wins), shared with the dump
+// import so a live run and a rebuild agree.
 // Contingency rides along when the row text carries it (GM/CEC/contingência
 // in description or folio); promotion to 2/3 happens in resolveAvailability
 // only when a corrective slot exists, so preventive contingency notes stay
 // inert by design.
 export function workOrderSlot(wo: FracttalWorkOrder): WorkSlot | null {
-  // Open when the row is explicitly open (done === false) or carries an open
-  // status id; a closed status id (4) or done === true closes it.
-  const closed = wo.done === true || wo.id_status_work_order === 4;
-  const open = wo.done === false || wo.id_status_work_order === 1 ||
-    wo.id_status_work_order === 2;
-  if (closed || !open) return null;
+  // Shared open predicate: done===false or open status id; closed wins.
+  if (!isOpenWorkOrderRow(wo.done, wo.id_status_work_order)) return null;
   const slot = classifyCorrective(
     wo.tasks_log_types_description,
     wo.types_description,
@@ -357,6 +387,12 @@ export function workRequestSlot(wr: FracttalWorkRequest): WorkSlot | null {
 // structs only carry description/folio; live rows may carry GM/CEC in
 // labels or the custom status field (both empty in the dump samples but
 // present in the schema), so the merge ORs this with the parsed check.
+// Key set is shared with scripts/fracttal-import.ts contingencyTexts:
+// description, task_note, note, notes, task_description,
+// custom_description, work_orders_status_custom_description,
+// types_description, types_1_description, types_2_description,
+// tasks_log_types_description, observation, wo_folio, plus labels as
+// string or {description,name} objects.
 export function contingencyFromRaw(raw: unknown): boolean {
   if (typeof raw !== "object" || raw === null) return false;
   const row = raw as Record<string, unknown>;
@@ -368,10 +404,14 @@ export function contingencyFromRaw(raw: unknown): boolean {
       "note",
       "notes",
       "task_description",
+      "custom_description",
       "work_orders_status_custom_description",
       "types_description",
-      "tasks_log_types_description",
+      "types_1_description",
       "types_2_description",
+      "tasks_log_types_description",
+      "observation",
+      "wo_folio",
     ] as const
   ) {
     const v = row[key];

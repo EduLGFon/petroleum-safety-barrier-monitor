@@ -133,6 +133,8 @@ export type SignatureSource = Pick<
   | "planFollowed"
   | "failureFree"
   | "maintStatus"
+  | "hasContingency"
+  | "contingencyDesc"
   | "evidenceCode"
   | "degradationDesc"
   | "extraComments"
@@ -140,7 +142,9 @@ export type SignatureSource = Pick<
 
 // fieldsSignature: two rows with the same signature and status are identical
 // and never rewritten. ORDER IS PART OF THE CONTRACT - keep in step with the
-// stored signature built by lib/server/sql/sync.ts.
+// stored signature built by lib/server/sql/sync.ts. Contingency rides the
+// signature (M1/M2) so an auto Sim -> Não clearing lands as an update with
+// changed_fields instead of a silent stranded Sim.
 export function fieldsSignature(input: SignatureSource): string {
   return JSON.stringify([
     input.tag,
@@ -165,6 +169,8 @@ export function fieldsSignature(input: SignatureSource): string {
     input.planFollowed,
     input.failureFree,
     input.maintStatus,
+    input.hasContingency ?? "Não",
+    input.contingencyDesc ?? "",
     input.evidenceCode,
     input.degradationDesc,
     input.extraComments,
@@ -198,6 +204,8 @@ export const SIGNATURE_FIELD_KEYS = [
   "planFollowed",
   "failureFree",
   "maintStatus",
+  "hasContingency",
+  "contingencyDesc",
   "evidenceCode",
   "degradationDesc",
   "extraComments",
@@ -210,7 +218,17 @@ export function diffSignatureFields(
   const changed: string[] = [];
   if (oldFields !== undefined) {
     for (const key of SIGNATURE_FIELD_KEYS) {
-      if (oldFields[key] !== input[key]) changed.push(key);
+      const oldVal = key === "hasContingency"
+        ? (oldFields[key] ?? "Não")
+        : key === "contingencyDesc"
+        ? (oldFields[key] ?? "")
+        : oldFields[key];
+      const newVal = key === "hasContingency"
+        ? (input[key] ?? "Não")
+        : key === "contingencyDesc"
+        ? (input[key] ?? "")
+        : input[key];
+      if (oldVal !== newVal) changed.push(key);
     }
   }
   if (statusChanged) changed.push("availabilityId");
@@ -219,11 +237,21 @@ export function diffSignatureFields(
 
 // snapshotOf: compact JSON snapshot stored per change row (same keys as the
 // signature plus availabilityId), so detail renders before/after directly.
+// Only signature keys plus availabilityId are kept: SyncBarrierInput extras
+// (externalCode, history, sourceUpdatedAt) are stripped so old/new snapshots
+// stay symmetric.
 export function snapshotOf(
   fields: SignatureSource,
   availabilityId: number,
 ): Record<string, unknown> {
-  return { ...fields, availabilityId };
+  const pick = (k: typeof SIGNATURE_FIELD_KEYS[number]): unknown => {
+    if (k === "hasContingency") return fields[k] ?? "Não";
+    if (k === "contingencyDesc") return fields[k] ?? "";
+    return fields[k];
+  };
+  const out: Record<string, unknown> = { availabilityId };
+  for (const k of SIGNATURE_FIELD_KEYS) out[k] = pick(k);
+  return out;
 }
 // planReconcile: pure diff of remote inputs vs local rows -> executable plan.
 // Deleted local rows reappearing upstream are restored, never duplicated.

@@ -42,7 +42,7 @@ async function main(): Promise<void> {
     }>(
       `select b.id, b.external_code, b.availability_id,
         (select h.author_id from barrier_status_history h
-          where h.barrier_id = b.id order by h.id desc limit 1) as latest_author
+          where h.barrier_id = b.id order by h.created_at desc, h.id desc limit 1) as latest_author
        from barriers b
        where b.availability_id in (3, 4) and b.deleted_at is null
        order by b.id`,
@@ -82,10 +82,24 @@ async function main(): Promise<void> {
 
     let demoted = 0;
     for (const r of syncOwned) {
-      await client.queryArray(
-        "select record_status_change($1, $2, $3, $4)",
-        [r.id, 0, SYNC_AUTHOR_ID, NOTE],
-      );
+      // Same tx demotes the status (sanctioned path) and clears the
+      // urgent-gated sheet fields so a demoted row does not keep a stale
+      // Degradada description/action/failure flag.
+      await client.queryArray('BEGIN', []);
+      try {
+        await client.queryArray(
+          "select record_status_change($1, $2, $3, $4)",
+          [r.id, 0, SYNC_AUTHOR_ID, NOTE],
+        );
+        await client.queryArray(
+          `update barriers set degradation_desc = '', action_plan = '', failure_free = 'Sim', op_status = 'Disponível', maint_status = 'Disponível', field_operational = 'Sim', has_contingency = 'Não', contingency_desc = null, evidence_code = null where id = $1`,
+          [r.id],
+        );
+        await client.queryArray('COMMIT', []);
+      } catch (err) {
+        try { await client.queryArray('ROLLBACK', []); } catch { /* already closed */ }
+        throw err;
+      }
       demoted++;
       if (demoted % 500 === 0) console.log(`  demoted ${demoted}...`);
     }

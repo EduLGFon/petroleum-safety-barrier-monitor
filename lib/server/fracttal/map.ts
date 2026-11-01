@@ -69,8 +69,9 @@ export interface MapContext {
 
 // SyncBarrierInput: one fully-resolved row ready for the upsert planner.
 // The sheet inventory fields (GERAL) ride along so the sync is their single
-// writer; hasContingency/contingencyDesc stay optional because the sync only
-// auto-writes Sim and must never clear a manual value (D11).
+// writer; hasContingency/contingencyDesc always ride explicitly ("Sim" with
+// an auto-detected source, otherwise "Não"/"") so a closed work order
+// clears a stale auto Sim instead of leaving it stranded (M1/M2).
 export interface SyncBarrierInput
   extends Omit<SheetFields, "hasContingency" | "contingencyDesc"> {
   externalCode: string;
@@ -230,23 +231,11 @@ export function mapAsset(
     : status.availabilityId === AVAILABILITY_OUT_OF_SERVICE
     ? work?.stopEvent ?? null
     : null;
-  const historyNote = historyExplanation({
-    statusId: status.availabilityId,
-    event: historyEvent ?? null,
-    outOfServiceDate,
-    assetAvailable: asset.available ?? null,
-    stopAssets: work?.stopAssets ?? false,
-    hasContingency: autoCont,
-    contingencySource: work?.contingencySource ?? "",
-  });
   // Sheet derivation reads the same signals as availability. Only a promoted
-  // corrective contingency drives hasContingency; preventive text stays inert
-  // (D11) and the SQL update preserves any manual Sim.
-  const {
-    hasContingency: _sheetContingency,
-    contingencyDesc: _sheetContingencyDesc,
-    ...sheetFields
-  } = deriveSheetFields(
+  // corrective contingency drives hasContingency Sim; otherwise the sheet
+  // carries an explicit Não so a closed work order clears a stale auto Sim
+  // (M1/M2). Preventive text stays inert.
+  const sheet = deriveSheetFields(
     asset,
     {
       urgent: work?.urgent ?? null,
@@ -257,12 +246,24 @@ export function mapAsset(
     },
     { availabilityId: status.availabilityId, today },
   );
+  const historyNote = historyExplanation({
+    statusId: status.availabilityId,
+    event: historyEvent ?? null,
+    outOfServiceDate,
+    assetAvailable: asset.available ?? null,
+    stopAssets: work?.stopAssets ?? false,
+    hasContingency: autoCont,
+    contingencySource: work?.contingencySource ?? "",
+    nonUrgentPlanned: (work?.planned != null &&
+      work.planned.isUrgent !== true) ||
+      false,
+  });
 
   return {
     ok: true,
     warnings,
     input: {
-      ...sheetFields,
+      ...sheet,
       externalCode: code,
       tag: tagFor(asset.description, code),
       locationId,
@@ -289,12 +290,6 @@ export function mapAsset(
       // visible, the pre-flag behavior for old fixtures and dumps).
       isActive: asset.active ?? true,
       scopeSource,
-      ...(autoCont
-        ? {
-          hasContingency: "Sim",
-          contingencyDesc: (work?.contingencySource ?? "").slice(0, 800),
-        }
-        : {}),
     },
   };
 }
@@ -307,6 +302,7 @@ function historyExplanation(args: {
   stopAssets: boolean;
   hasContingency: boolean;
   contingencySource: string;
+  nonUrgentPlanned?: boolean;
 }): string {
   const parts: string[] = [];
   if (args.event) {
@@ -334,6 +330,13 @@ function historyExplanation(args: {
       args.assetAvailable === false
         ? "Fracttal indica o ativo como indisponível"
         : "Foi identificada uma condição de indisponibilidade",
+    );
+  } else if (args.nonUrgentPlanned) {
+    // A planned corrective exists but carries no urgent flag: it is not a
+    // status signal, so the barrier stays Disponível. Say so explicitly
+    // instead of claiming no corrective signal was seen.
+    parts.push(
+      "Há corretiva planejada aberta sem marcador de urgência; sem gatilho urgente o status permanece Disponível",
     );
   } else {
     parts.push(
