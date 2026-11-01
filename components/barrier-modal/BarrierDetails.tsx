@@ -276,7 +276,6 @@ const summaryStyle = {
   cursor: "pointer",
   display: "flex",
   alignItems: "center",
-  justifyContent: "space-between",
   gap: "var(--d-mini-gap)",
   fontSize: "var(--d-caption)",
   fontWeight: 800,
