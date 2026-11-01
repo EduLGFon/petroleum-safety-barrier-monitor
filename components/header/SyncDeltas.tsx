@@ -16,14 +16,14 @@ function Chip(
         display: "inline-flex",
         alignItems: "center",
         fontFamily: "var(--font-mono)",
-        fontSize: 11,
+        fontSize: "var(--d-small)",
         fontWeight: 700,
         color,
         background: `color-mix(in srgb, ${color} 13%, transparent)`,
         border: `1px solid color-mix(in srgb, ${color} 32%, transparent)`,
         borderRadius: 5,
         padding: "0 5px",
-        lineHeight: "16px",
+        lineHeight: 4 / 3,
         whiteSpace: "nowrap",
       }}
     >
@@ -38,7 +38,7 @@ export function SyncDeltas({ deltas }: { deltas: Deltas | null }) {
   if (deltas === null) return null;
   if (deltas.changed === 0) {
     return (
-      <span style={{ fontSize: 11, color: "var(--au-sub)" }}>
+      <span style={{ fontSize: "var(--d-small)", color: "var(--au-sub)" }}>
         sem alterações
       </span>
     );

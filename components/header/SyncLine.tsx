@@ -42,10 +42,10 @@ export function SyncLine({ sync, conn }: Props) {
         alignItems: "center",
         gap: 6,
         flexWrap: "wrap",
-        fontSize: 11.5,
+        fontSize: "var(--d-small)",
         fontWeight: 600,
         color: "var(--au-sub)",
-        lineHeight: "16px",
+        lineHeight: 4 / 3,
         opacity: conn === "disconnected" ? 0.75 : 1,
       }}
     >
