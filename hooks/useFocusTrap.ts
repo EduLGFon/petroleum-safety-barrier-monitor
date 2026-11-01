@@ -13,15 +13,29 @@ export function useFocusTrap(
 ): void {
   useEffect(() => {
     if (!open) return;
+    const node = root.current;
+    // If focus landed outside the dialog (e.g. no autofocus on open),
+    // move it to the first focusable so keyboard users start inside.
+    if (node && !node.contains(document.activeElement)) {
+      const first = node.querySelector<HTMLElement>(FOCUSABLE);
+      first?.focus();
+    }
     const handler = (e: KeyboardEvent) => {
       if (e.key !== "Tab") return;
-      const node = root.current;
-      if (!node) return;
-      const focusables = node.querySelectorAll<HTMLElement>(FOCUSABLE);
+      const el = root.current;
+      if (!el) return;
+      const focusables = el.querySelectorAll<HTMLElement>(FOCUSABLE);
       if (focusables.length === 0) return;
       const first = focusables[0];
       const last = focusables[focusables.length - 1];
       const active = document.activeElement as HTMLElement | null;
+      // Focus escaped the dialog (programmatic blur, portal timing):
+      // pull it back instead of letting Tab leave the modal.
+      if (!el.contains(active)) {
+        e.preventDefault();
+        first.focus();
+        return;
+      }
       if (e.shiftKey && active === first) {
         e.preventDefault();
         last.focus();

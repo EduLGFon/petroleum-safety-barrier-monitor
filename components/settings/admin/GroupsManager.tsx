@@ -56,7 +56,10 @@ export function GroupsManager({ onCount }: { onCount?: (n: number) => void }) {
     resource;
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
+  // busy guards the top-level create form only; row save/remove use rowBusy
+  // below so a background reload or a slow row never blocks the other rows.
   const [busy, setBusy] = useState(false);
+  const [rowBusy, setRowBusy] = useState<number | null>(null);
   const [editing, setEditing] = useState<number | null>(null);
   const [draftLocs, setDraftLocs] = useState<number[]>([]);
   const [draftUsers, setDraftUsers] = useState<number[]>([]);
@@ -99,7 +102,8 @@ export function GroupsManager({ onCount }: { onCount?: (n: number) => void }) {
   }
 
   async function saveEdit(g: Group) {
-    setBusy(true);
+    if (rowBusy !== null) return;
+    setRowBusy(g.id);
     try {
       await adminApi(`/api/access-groups/${g.id}`, {
         method: "PATCH",
@@ -114,25 +118,36 @@ export function GroupsManager({ onCount }: { onCount?: (n: number) => void }) {
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     } finally {
-      setBusy(false);
+      setRowBusy(null);
     }
   }
 
   async function remove(g: Group) {
     if (!confirm(`Excluir grupo ${g.name}?`)) return;
+    if (rowBusy !== null) return;
+    setRowBusy(g.id);
     try {
       await adminApi(`/api/access-groups/${g.id}`, { method: "DELETE" });
       await refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setRowBusy(null);
     }
   }
 
-  function toggle(list: number[], id: number, set: (v: number[]) => void) {
-    set(list.includes(id) ? list.filter((x) => x !== id) : [...list, id]);
+  // Functional toggle: updater form avoids stale draftLocs/draftUsers
+  // closures when checkboxes fire in quick succession.
+  function toggle(
+    id: number,
+    set: (updater: (prev: number[]) => number[]) => void,
+  ) {
+    set((prev) => prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]);
   }
 
-  if (loading) return <SkeletonRows />;
+  // Background reloads keep hero + form on screen; skeleton only on first
+  // paint when there is nothing stale to show.
+  if (loading && groups.length === 0) return <SkeletonRows />;
 
   return (
     <div style={{ display: "grid", gap: "var(--d-panel-gap)" }}>
@@ -201,9 +216,10 @@ export function GroupsManager({ onCount }: { onCount?: (n: number) => void }) {
                 <button
                   type="button"
                   style={ghostBtn}
+                  disabled={rowBusy === g.id}
                   onClick={() => void remove(g)}
                 >
-                  Excluir
+                  {rowBusy === g.id ? "Excluindo…" : "Excluir"}
                 </button>
               </div>
             </div>
@@ -233,11 +249,10 @@ export function GroupsManager({ onCount }: { onCount?: (n: number) => void }) {
                       type="button"
                       style={ghostBtn}
                       onClick={() =>
-                        setDraftLocs(
-                          draftLocs.length === locations.length
+                        setDraftLocs((prev) =>
+                          locations.every((l) => prev.includes(l.id))
                             ? []
-                            : locations.map((l) => l.id),
-                        )}
+                            : locations.map((l) => l.id))}
                     >
                       Selecionar todos
                     </button>
@@ -255,8 +270,7 @@ export function GroupsManager({ onCount }: { onCount?: (n: number) => void }) {
                         <input
                           type="checkbox"
                           checked={draftLocs.includes(loc.id)}
-                          onChange={() =>
-                            toggle(draftLocs, loc.id, setDraftLocs)}
+                          onChange={() => toggle(loc.id, setDraftLocs)}
                         />
                         {loc.code}
                       </label>
@@ -287,11 +301,10 @@ export function GroupsManager({ onCount }: { onCount?: (n: number) => void }) {
                       type="button"
                       style={ghostBtn}
                       onClick={() =>
-                        setDraftUsers(
-                          draftUsers.length === users.length
+                        setDraftUsers((prev) =>
+                          users.every((u) => prev.includes(u.id))
                             ? []
-                            : users.map((u) => u.id),
-                        )}
+                            : users.map((u) => u.id))}
                     >
                       Selecionar todos
                     </button>
@@ -309,8 +322,7 @@ export function GroupsManager({ onCount }: { onCount?: (n: number) => void }) {
                         <input
                           type="checkbox"
                           checked={draftUsers.includes(u.id)}
-                          onChange={() =>
-                            toggle(draftUsers, u.id, setDraftUsers)}
+                          onChange={() => toggle(u.id, setDraftUsers)}
                         />
                         {u.name || u.email}
                       </label>
@@ -321,10 +333,10 @@ export function GroupsManager({ onCount }: { onCount?: (n: number) => void }) {
                   <button
                     type="button"
                     style={primaryBtn}
-                    disabled={busy}
+                    disabled={rowBusy === g.id}
                     onClick={() => void saveEdit(g)}
                   >
-                    Salvar
+                    {rowBusy === g.id ? "Salvando…" : "Salvar"}
                   </button>
                   <button
                     type="button"

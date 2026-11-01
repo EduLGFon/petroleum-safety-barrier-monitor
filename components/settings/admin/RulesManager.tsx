@@ -27,14 +27,19 @@ import {
   draftToPayload,
   EMPTY_DRAFT,
   Lookups,
+  numCoercionError,
   ruleToDraft,
   toggleId,
   WEEKDAYS,
 } from "./rules-helpers.tsx";
 
-import { useEffect, useState } from "preact/hooks";
+import { useEffect, useRef, useState } from "preact/hooks";
 
 import { createPortal } from "preact/compat";
+
+import { useAdminResource } from "../../../hooks/useAdminResource.ts";
+
+import { useFocusTrap } from "../../../hooks/useFocusTrap.ts";
 
 function scopeSummary(r: AlertRule): string {
   const parts: string[] = [];
@@ -83,12 +88,12 @@ const TABS: { key: TabKey; label: string }[] = [
 ];
 
 export function RulesManager({ onCount }: { onCount?: (n: number) => void }) {
-  const [rules, setRules] = useState<AlertRule[]>([]);
   const [lookups, setLookups] = useState<Lookups | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
   const [form, setForm] = useState<Draft>(EMPTY_DRAFT);
+  // busy guards the modal save form only; row toggle/duplicate/remove use
+  // rowBusy below so one slow row never blocks the other rows.
   const [busy, setBusy] = useState(false);
+  const [rowBusy, setRowBusy] = useState<number | null>(null);
   const [confirmId, setConfirmId] = useState<number | null>(null);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
@@ -97,29 +102,33 @@ export function RulesManager({ onCount }: { onCount?: (n: number) => void }) {
     { count: number; tags: string[] } | null
   >(null);
   const [previewBusy, setPreviewBusy] = useState(false);
+  // Modal-scoped failure: save/preview problems render inside the dialog,
+  // never as a global banner that implies the rules list failed to load.
+  const [modalError, setModalError] = useState("");
+  const modalRef = useRef<HTMLDivElement | null>(null);
+  const previewTimer = useRef<number | undefined>(undefined);
+  const previewAbort = useRef<AbortController | null>(null);
+  const lastFocus = useRef<HTMLElement | null>(null);
+  useFocusTrap(modalRef, modalOpen);
 
-  async function refresh() {
-    try {
-      setError("");
-      setLoading(true);
+  const resource = useAdminResource<AlertRule>(
+    async (signal?: AbortSignal) => {
       const [r, l] = await Promise.all([
-        adminApi("/api/alert-rules") as Promise<AlertRule[]>,
-        adminApi("/api/lookups") as Promise<Lookups>,
+        adminApi("/api/alert-rules", { signal }) as Promise<AlertRule[]>,
+        adminApi("/api/lookups", { signal }) as Promise<Lookups>,
       ]);
-      setRules(r);
       setLookups(l);
       onCount?.(r.filter((x) => x.active).length);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
-    } finally {
-      setLoading(false);
-    }
+      return r;
+    },
+  );
+  const { items: rules, loading, error, setError, reload } = resource;
+
+  async function refresh() {
+    await reload();
   }
 
-  useEffect(() => {
-    void refresh();
-  }, []);
-
+  // Escape closes the modal (backdrop click handled on the overlay).
   useEffect(() => {
     if (!modalOpen) return;
     const onKey = (e: KeyboardEvent) => {
@@ -129,6 +138,41 @@ export function RulesManager({ onCount }: { onCount?: (n: number) => void }) {
     return () => document.removeEventListener("keydown", onKey);
   }, [modalOpen]);
 
+  // Modal open: remember the trigger, lock body scroll, focus the first
+  // field. Close/unmount: unlock scroll, abort preview, restore focus.
+  useEffect(() => {
+    if (!modalOpen) return;
+    lastFocus.current = document.activeElement as HTMLElement | null;
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    const t = globalThis.setTimeout(() => {
+      const node = modalRef.current;
+      const first = node?.querySelector<HTMLElement>(
+        "input, select, textarea, button",
+      );
+      first?.focus();
+    }, 0);
+    return () => {
+      globalThis.clearTimeout(t);
+      document.body.style.overflow = prevOverflow;
+      previewAbort.current?.abort();
+      if (previewTimer.current !== undefined) {
+        globalThis.clearTimeout(previewTimer.current);
+      }
+      lastFocus.current?.focus?.();
+    };
+  }, [modalOpen]);
+
+  // Unmount safety for the debounced preview timer.
+  useEffect(() => {
+    return () => {
+      if (previewTimer.current !== undefined) {
+        globalThis.clearTimeout(previewTimer.current);
+      }
+      previewAbort.current?.abort();
+    };
+  }, []);
+
   function update(patch: Partial<Draft>) {
     setForm((prev) => ({ ...prev, ...patch }));
   }
@@ -137,6 +181,7 @@ export function RulesManager({ onCount }: { onCount?: (n: number) => void }) {
     setEditingId(null);
     setForm(EMPTY_DRAFT);
     setPreview(null);
+    setModalError("");
     setTab("basic");
     setModalOpen(true);
   }
@@ -145,13 +190,32 @@ export function RulesManager({ onCount }: { onCount?: (n: number) => void }) {
     setEditingId(r.id);
     setForm(ruleToDraft(r));
     setPreview(null);
+    setModalError("");
     setTab("basic");
     setModalOpen(true);
   }
 
   async function save(e: Event) {
     e.preventDefault();
+    // Field-level numeric feedback beats a silent null in the payload.
+    const bad = [
+      ["staleDays", form.staleDays],
+      ["staleRepeatDays", form.staleRepeatDays],
+      ["cooldownMinutes", form.cooldownMinutes],
+      ["maxPerDay", form.maxPerDay],
+      ["priority", form.priority],
+      ["quietStart", form.quietStart],
+      ["quietEnd", form.quietEnd],
+    ] as const;
+    for (const [, raw] of bad) {
+      const err = numCoercionError(raw);
+      if (err) {
+        setModalError(`Corrija os campos numéricos: ${err}`);
+        return;
+      }
+    }
     setBusy(true);
+    setModalError("");
     try {
       if (editingId !== null) {
         await adminApi(`/api/alert-rules/${editingId}`, {
@@ -169,14 +233,18 @@ export function RulesManager({ onCount }: { onCount?: (n: number) => void }) {
       setModalOpen(false);
       await refresh();
     } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
+      setModalError(err instanceof Error ? err.message : String(err));
     } finally {
       setBusy(false);
     }
   }
 
-  async function runPreview() {
+  async function runPreviewImmediate() {
+    previewAbort.current?.abort();
+    const ctrl = new AbortController();
+    previewAbort.current = ctrl;
     setPreviewBusy(true);
+    setModalError("");
     try {
       const q = new URLSearchParams();
       const put = (k: string, ids: number[]) => {
@@ -194,16 +262,35 @@ export function RulesManager({ onCount }: { onCount?: (n: number) => void }) {
       if (form.onlyNoActionPlan) q.set("onlyNoActionPlan", "1");
       const res = await adminApi(
         `/api/alert-rules/preview?${q.toString()}`,
+        { signal: ctrl.signal },
       ) as { count: number; tags: string[] };
+      if (ctrl.signal.aborted) return;
       setPreview(res);
     } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
+      if (
+        (err instanceof DOMException && err.name === "AbortError") ||
+        ctrl.signal.aborted
+      ) return;
+      setModalError(err instanceof Error ? err.message : String(err));
     } finally {
-      setPreviewBusy(false);
+      if (!ctrl.signal.aborted) setPreviewBusy(false);
     }
   }
 
+  // Debounced preview: rapid "Testar escopo" clicks or scope edits reuse one
+  // in-flight request; the previous fetch aborts instead of racing.
+  function runPreview() {
+    if (previewTimer.current !== undefined) {
+      globalThis.clearTimeout(previewTimer.current);
+    }
+    previewTimer.current = globalThis.setTimeout(() => {
+      void runPreviewImmediate();
+    }, 350) as unknown as number;
+  }
+
   async function toggle(rule: AlertRule) {
+    if (rowBusy !== null) return;
+    setRowBusy(rule.id);
     try {
       await adminApi(`/api/alert-rules/${rule.id}`, {
         method: "PATCH",
@@ -213,10 +300,14 @@ export function RulesManager({ onCount }: { onCount?: (n: number) => void }) {
       await refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setRowBusy(null);
     }
   }
 
   async function duplicate(rule: AlertRule) {
+    if (rowBusy !== null) return;
+    setRowBusy(rule.id);
     try {
       const d = ruleToDraft(rule);
       d.name = `${rule.name} (cópia)`.slice(0, 200);
@@ -228,6 +319,8 @@ export function RulesManager({ onCount }: { onCount?: (n: number) => void }) {
       await refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setRowBusy(null);
     }
   }
 
@@ -237,11 +330,15 @@ export function RulesManager({ onCount }: { onCount?: (n: number) => void }) {
       return;
     }
     setConfirmId(null);
+    if (rowBusy !== null) return;
+    setRowBusy(rule.id);
     try {
       await adminApi(`/api/alert-rules/${rule.id}`, { method: "DELETE" });
       await refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setRowBusy(null);
     }
   }
 
@@ -403,6 +500,13 @@ export function RulesManager({ onCount }: { onCount?: (n: number) => void }) {
   }
 
   function renderTimingFields() {
+    // Field-level numeric feedback: "12a" no longer vanishes to null.
+    const fieldErr = (raw: string): string | null => numCoercionError(raw);
+    const errStyle = {
+      fontSize: "var(--d-small)",
+      color: "var(--au-danger-fg)",
+      marginTop: 4,
+    } as const;
     return (
       <div style={{ display: "grid", gap: 12 }}>
         <div
@@ -420,7 +524,11 @@ export function RulesManager({ onCount }: { onCount?: (n: number) => void }) {
               value={form.staleDays}
               onInput={(e) => update({ staleDays: e.currentTarget.value })}
               style={inputSt}
+              aria-invalid={fieldErr(form.staleDays) !== null}
             />
+            {fieldErr(form.staleDays) && (
+              <div role="alert" style={errStyle}>{fieldErr(form.staleDays)}</div>
+            )}
           </Field>
           <Field label="Repetir lembrete a cada N dias">
             <input
@@ -431,7 +539,13 @@ export function RulesManager({ onCount }: { onCount?: (n: number) => void }) {
               onInput={(e) =>
                 update({ staleRepeatDays: e.currentTarget.value })}
               style={inputSt}
+              aria-invalid={fieldErr(form.staleRepeatDays) !== null}
             />
+            {fieldErr(form.staleRepeatDays) && (
+              <div role="alert" style={errStyle}>
+                {fieldErr(form.staleRepeatDays)}
+              </div>
+            )}
           </Field>
           <Field label="Pausa por barreira (min)">
             <input
@@ -442,7 +556,13 @@ export function RulesManager({ onCount }: { onCount?: (n: number) => void }) {
               onInput={(e) =>
                 update({ cooldownMinutes: e.currentTarget.value })}
               style={inputSt}
+              aria-invalid={fieldErr(form.cooldownMinutes) !== null}
             />
+            {fieldErr(form.cooldownMinutes) && (
+              <div role="alert" style={errStyle}>
+                {fieldErr(form.cooldownMinutes)}
+              </div>
+            )}
           </Field>
           <Field label="Máx por dia/barreira">
             <input
@@ -452,7 +572,13 @@ export function RulesManager({ onCount }: { onCount?: (n: number) => void }) {
               value={form.maxPerDay}
               onInput={(e) => update({ maxPerDay: e.currentTarget.value })}
               style={inputSt}
+              aria-invalid={fieldErr(form.maxPerDay) !== null}
             />
+            {fieldErr(form.maxPerDay) && (
+              <div role="alert" style={errStyle}>
+                {fieldErr(form.maxPerDay)}
+              </div>
+            )}
           </Field>
           <Field label="Prioridade (maior vence)">
             <input
@@ -460,7 +586,13 @@ export function RulesManager({ onCount }: { onCount?: (n: number) => void }) {
               value={form.priority}
               onInput={(e) => update({ priority: e.currentTarget.value })}
               style={inputSt}
+              aria-invalid={fieldErr(form.priority) !== null}
             />
+            {fieldErr(form.priority) && (
+              <div role="alert" style={errStyle}>
+                {fieldErr(form.priority)}
+              </div>
+            )}
           </Field>
         </div>
         <div
@@ -479,7 +611,13 @@ export function RulesManager({ onCount }: { onCount?: (n: number) => void }) {
               value={form.quietStart}
               onInput={(e) => update({ quietStart: e.currentTarget.value })}
               style={inputSt}
+              aria-invalid={fieldErr(form.quietStart) !== null}
             />
+            {fieldErr(form.quietStart) && (
+              <div role="alert" style={errStyle}>
+                {fieldErr(form.quietStart)}
+              </div>
+            )}
           </Field>
           <Field label="Silêncio até (h UTC)">
             <input
@@ -490,7 +628,13 @@ export function RulesManager({ onCount }: { onCount?: (n: number) => void }) {
               value={form.quietEnd}
               onInput={(e) => update({ quietEnd: e.currentTarget.value })}
               style={inputSt}
+              aria-invalid={fieldErr(form.quietEnd) !== null}
             />
+            {fieldErr(form.quietEnd) && (
+              <div role="alert" style={errStyle}>
+                {fieldErr(form.quietEnd)}
+              </div>
+            )}
           </Field>
           <Field label="Válida de">
             <input
@@ -517,6 +661,7 @@ export function RulesManager({ onCount }: { onCount?: (n: number) => void }) {
                 <button
                   key={day}
                   type="button"
+                  aria-pressed={on}
                   onClick={() =>
                     update({ activeDays: toggleId(form.activeDays, day) })}
                   style={{
@@ -562,7 +707,7 @@ export function RulesManager({ onCount }: { onCount?: (n: number) => void }) {
           + Nova regra
         </button>
       </div>
-      {loading
+      {loading && rules.length === 0
         ? <SkeletonRows />
         : rules.length === 0
         ? (
@@ -570,6 +715,17 @@ export function RulesManager({ onCount }: { onCount?: (n: number) => void }) {
         )
         : (
           <div style={{ display: "grid", gap: 8 }}>
+            {loading && (
+              <div
+                role="status"
+                style={{
+                  fontSize: "var(--d-small)",
+                  color: "var(--text-muted)",
+                }}
+              >
+                Atualizando regras…
+              </div>
+            )}
             {rules.map((r) => (
               <AdminRow key={r.id}>
                 <Avatar name={r.name} />
@@ -633,24 +789,35 @@ export function RulesManager({ onCount }: { onCount?: (n: number) => void }) {
                   </button>
                   <button
                     type="button"
+                    disabled={rowBusy === r.id}
                     onClick={() => void toggle(r)}
                     style={ghostBtn}
                   >
-                    {r.active ? "Desativar" : "Ativar"}
+                    {rowBusy === r.id
+                      ? "Aguarde…"
+                      : r.active
+                      ? "Desativar"
+                      : "Ativar"}
                   </button>
                   <button
                     type="button"
+                    disabled={rowBusy === r.id}
                     onClick={() => void duplicate(r)}
                     style={ghostBtn}
                   >
-                    Duplicar
+                    {rowBusy === r.id ? "Aguarde…" : "Duplicar"}
                   </button>
                   <button
                     type="button"
+                    disabled={rowBusy === r.id}
                     onClick={() => void remove(r)}
                     style={dangerBtn}
                   >
-                    {confirmId === r.id ? "Confirmar remoção?" : "Remover"}
+                    {rowBusy === r.id
+                      ? "Aguarde…"
+                      : confirmId === r.id
+                      ? "Confirmar remoção?"
+                      : "Remover"}
                   </button>
                 </span>
               </AdminRow>
@@ -663,6 +830,7 @@ export function RulesManager({ onCount }: { onCount?: (n: number) => void }) {
           <div
             role="dialog"
             aria-modal="true"
+            aria-labelledby="rules-modal-title"
             onClick={(e) => {
               if (e.target === e.currentTarget) setModalOpen(false);
             }}
@@ -680,6 +848,7 @@ export function RulesManager({ onCount }: { onCount?: (n: number) => void }) {
             }}
           >
             <div
+              ref={modalRef}
               style={{
                 width: "min(920px, 100%)",
                 maxHeight: "calc(100vh - 32px)",
@@ -702,6 +871,7 @@ export function RulesManager({ onCount }: { onCount?: (n: number) => void }) {
                 }}
               >
                 <span
+                  id="rules-modal-title"
                   style={{
                     fontSize: "var(--d-lead)",
                     fontWeight: 800,
@@ -744,7 +914,26 @@ export function RulesManager({ onCount }: { onCount?: (n: number) => void }) {
                   );
                 })}
               </div>
-              <form onSubmit={save} style={{ display: "grid", gap: 12 }}>
+              <form
+                onSubmit={(e) => void save(e)}
+                style={{ display: "grid", gap: 12 }}
+              >
+                {modalError && (
+                  <div
+                    role="alert"
+                    style={{
+                      background: "var(--au-danger-bg)",
+                      border: "1px solid var(--alert-nc-border)",
+                      color: "var(--au-danger-fg)",
+                      borderRadius: "var(--d-input-radius)",
+                      padding: "8px 12px",
+                      fontSize: "var(--d-small)",
+                      lineHeight: 1.5,
+                    }}
+                  >
+                    {modalError}
+                  </div>
+                )}
                 {tab === "basic" && (
                   <div style={{ display: "grid", gap: 10 }}>
                     <div
@@ -772,6 +961,8 @@ export function RulesManager({ onCount }: { onCount?: (n: number) => void }) {
                             type="number"
                             title="Prioridade"
                             value={form.priority}
+                            aria-invalid={numCoercionError(form.priority) !==
+                              null}
                             onInput={(e) =>
                               update({ priority: e.currentTarget.value })}
                             style={{ ...inputSt, maxWidth: 90 }}
@@ -802,6 +993,18 @@ export function RulesManager({ onCount }: { onCount?: (n: number) => void }) {
                             <option value="critical">Só crítica</option>
                           </select>
                         </div>
+                        {numCoercionError(form.priority) && (
+                          <div
+                            role="alert"
+                            style={{
+                              fontSize: "var(--d-small)",
+                              color: "var(--au-danger-fg)",
+                              marginTop: 4,
+                            }}
+                          >
+                            Prioridade: {numCoercionError(form.priority)}
+                          </div>
+                        )}
                       </Field>
                     </div>
                     <Field label="Descrição (opcional)">

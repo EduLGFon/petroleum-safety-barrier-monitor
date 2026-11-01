@@ -19,7 +19,7 @@ import {
 
 import { adminApi } from "../../../lib/api/admin-client.ts";
 
-import { useEffect, useState } from "preact/hooks";
+import { useState } from "preact/hooks";
 
 import { useAdminResource } from "../../../hooks/useAdminResource.ts";
 
@@ -46,38 +46,37 @@ export function RecipientsManager(
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
   const [users, setUsers] = useState<UserOption[]>([]);
+  const [usersError, setUsersError] = useState("");
   const [selectedUserId, setSelectedUserId] = useState("");
   const [assignBusy, setAssignBusy] = useState(false);
   const [busy, setBusy] = useState(false);
   const [confirmId, setConfirmId] = useState<number | null>(null);
 
-  const resource = useAdminResource<Recipient>(async () => {
-    const list = await adminApi("/api/recipients") as Recipient[];
+  // Single loader owns both recipients and the user-picker options, so one
+  // reload refreshes everything and users-list failures surface instead of
+  // being swallowed (manual entry still works when the lookup fails).
+  const resource = useAdminResource<Recipient>(async (signal?: AbortSignal) => {
+    const list = await adminApi("/api/recipients", { signal }) as Recipient[];
     onCount?.(list.filter((r) => r.active).length);
+    try {
+      const userList = await adminApi("/api/users", { signal }) as UserOption[];
+      setUsers(userList);
+      setUsersError("");
+    } catch (err) {
+      if (
+        (err instanceof DOMException && err.name === "AbortError") ||
+        signal?.aborted
+      ) throw err;
+      setUsers([]);
+      setUsersError(err instanceof Error ? err.message : String(err));
+    }
     return list;
   });
   const { items, loading, error, setError, reload: reloadItems } = resource;
 
   async function refresh() {
     await reloadItems();
-    try {
-      const userList = await adminApi("/api/users") as UserOption[];
-      setUsers(userList);
-    } catch {
-      // ignore user list errors; manual entry still works
-    }
   }
-
-  useEffect(() => {
-    void (async () => {
-      try {
-        const userList = await adminApi("/api/users") as UserOption[];
-        setUsers(userList);
-      } catch {
-        // ignore
-      }
-    })();
-  }, []);
 
   async function create(e: Event) {
     e.preventDefault();
@@ -176,6 +175,18 @@ export function RecipientsManager(
               ))}
             </select>
           </Field>
+          {usersError && (
+            <div
+              role="alert"
+              style={{
+                fontSize: "var(--d-small)",
+                color: "var(--au-danger-fg)",
+                flex: "1 1 100%",
+              }}
+            >
+              Não foi possível carregar usuários: {usersError}
+            </div>
+          )}
           <div style={{ display: "flex", alignItems: "end", flex: "1 1 100%" }}>
             <button
               type="button"
@@ -195,7 +206,7 @@ export function RecipientsManager(
       </AdminCard>
       <AdminCard>
         <form
-          onSubmit={create}
+          onSubmit={(e) => void create(e)}
           style={{ display: "flex", gap: 10, flexWrap: "wrap" }}
         >
           <Field label="E-mail">

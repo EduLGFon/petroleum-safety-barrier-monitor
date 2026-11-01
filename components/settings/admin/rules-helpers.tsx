@@ -117,6 +117,38 @@ export function numOrNull(s: string): number | null {
   return Number.isInteger(n) ? n : null;
 }
 
+// numCoercionError: field-level feedback for numeric rule inputs. numOrNull
+// silently maps "abc" to null (payload drops the value); callers use this to
+// show "não é um número inteiro" next to the offending field instead.
+export function numCoercionError(raw: string): string | null {
+  const t = raw.trim();
+  if (t === "") return null;
+  const n = Number(t);
+  if (!Number.isInteger(n)) return `"${raw}" não é um número inteiro válido`;
+  return null;
+}
+
+// validateNumericDraft: maps Draft key -> field-level error for every numeric
+// timing/priority input. Empty means null (unset), which is valid.
+export function validateNumericDraft(d: Draft): Record<string, string> {
+  const errors: Record<string, string> = {};
+  const fields: [keyof Draft, string][] = [
+    ["staleDays", "Parado há N dias"],
+    ["staleRepeatDays", "Repetir lembrete"],
+    ["cooldownMinutes", "Pausa por barreira"],
+    ["maxPerDay", "Máx por dia"],
+    ["priority", "Prioridade"],
+    ["quietStart", "Silêncio das"],
+    ["quietEnd", "Silêncio até"],
+  ];
+  for (const [key, label] of fields) {
+    const raw = String(d[key] ?? "");
+    const err = numCoercionError(raw);
+    if (err) errors[key as string] = `${label}: ${err}`;
+  }
+  return errors;
+}
+
 export function draftToPayload(d: Draft): Record<string, unknown> {
   return {
     name: d.name,
@@ -219,6 +251,7 @@ export function CheckGrid(
           <button
             key={o.id}
             type="button"
+            aria-pressed={on}
             onClick={() => onToggle(o.id)}
             title={o.label}
             style={{

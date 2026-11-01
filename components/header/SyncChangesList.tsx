@@ -9,7 +9,7 @@ import type { SyncChangeItem } from "../../lib/types.ts";
 
 import { SyncChangeRow } from "./SyncChangeRow.tsx";
 
-import { useRef, useState } from "preact/hooks";
+import { useEffect, useRef, useState } from "preact/hooks";
 
 export function SyncChangesList(
   { baseUrl, scope, runId, onOpenBarrier }: {
@@ -33,6 +33,15 @@ export function SyncChangesList(
   }, true);
 
   const searchTimer = useRef<number | undefined>(undefined);
+  // Clear the debounced search timer on unmount so a late setDebounced
+  // never fires after the list is gone.
+  useEffect(() => {
+    return () => {
+      if (searchTimer.current !== undefined) {
+        globalThis.clearTimeout(searchTimer.current);
+      }
+    };
+  }, []);
   const onSearch = (v: string) => {
     setQuery(v);
     setPage(1);

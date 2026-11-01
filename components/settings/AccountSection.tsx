@@ -15,7 +15,7 @@ import { adminApi } from "../../lib/api/admin-client.ts";
 
 import type { AuthUser } from "../../lib/types.ts";
 
-import { useState } from "preact/hooks";
+import { useEffect, useState } from "preact/hooks";
 
 // AccountSection: read-only profile card plus password form for the owner.
 export function AccountSection(
@@ -31,6 +31,14 @@ export function AccountSection(
   const [name, setName] = useState(sessionUser?.name ?? "");
   const [email, setEmail] = useState(sessionUser?.email ?? "");
   const [phone, setPhone] = useState(sessionUser?.phone ?? "");
+  // Props arrive async (session fetch) and can change after a profile save
+  // elsewhere: mirror them into the editable draft instead of freezing the
+  // first render's values.
+  useEffect(() => {
+    setName(sessionUser?.name ?? "");
+    setEmail(sessionUser?.email ?? "");
+    setPhone(sessionUser?.phone ?? "");
+  }, [sessionUser?.name, sessionUser?.email, sessionUser?.phone]);
   const [profileBusy, setProfileBusy] = useState(false);
   const [profileError, setProfileError] = useState("");
   const [profileDone, setProfileDone] = useState(false);

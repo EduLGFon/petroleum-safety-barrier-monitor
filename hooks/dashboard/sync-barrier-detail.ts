@@ -9,7 +9,38 @@ import { toLoginWithReturn } from "./server.ts";
 
 import { apiFetch } from "../../lib/api/http.ts";
 
-const cache = new Map<string, SyncBarrierDetail>();
+const cache = new Map<string, { detail: SyncBarrierDetail; at: number }>();
+const CACHE_MAX = 50;
+const CACHE_TTL_MS = 5 * 60 * 1000;
+
+function cacheGet(key: string): SyncBarrierDetail | null {
+  const hit = cache.get(key);
+  if (!hit) return null;
+  if (Date.now() - hit.at > CACHE_TTL_MS) {
+    cache.delete(key);
+    return null;
+  }
+  // LRU touch: re-insert so eviction drops the oldest entry.
+  cache.delete(key);
+  cache.set(key, hit);
+  return hit.detail;
+}
+
+function cacheSet(key: string, detail: SyncBarrierDetail): void {
+  cache.delete(key);
+  cache.set(key, { detail, at: Date.now() });
+  while (cache.size > CACHE_MAX) {
+    const oldest = cache.keys().next().value;
+    if (oldest === undefined) break;
+    cache.delete(oldest);
+  }
+}
+
+// clearBarrierDetailCache: called when a new sync run starts so rows never
+// render a stale barrier snapshot from the previous run.
+export function clearBarrierDetailCache(): void {
+  cache.clear();
+}
 
 export function useBarrierSyncDetail(
   baseUrl: string,
@@ -29,13 +60,22 @@ export function useBarrierSyncDetail(
 
   useEffect(() => {
     // Empty baseUrl means same origin (relative /api/*), not disabled.
-    if (!enabled || barrierId === null) return;
-    const key = `${barrierId}:${runId ?? scope}`;
-    const hit = cache.get(key);
-    if (hit) {
-      setDetail(hit);
+    if (!enabled || barrierId === null) {
+      setDetail(null);
+      setLoading(false);
       return;
     }
+    const key = `${barrierId}:${runId ?? scope}`;
+    const hit = cacheGet(key);
+    if (hit) {
+      setDetail(hit);
+      setLoading(false);
+      setError(null);
+      return;
+    }
+    // New key: drop the previous barrier snapshot so the modal never shows
+    // stale before/after while the next detail loads.
+    setDetail(null);
     let cancelled = false;
     const ctrl = new AbortController();
     setLoading(true);
@@ -47,15 +87,29 @@ export function useBarrierSyncDetail(
       credentials: "same-origin",
       signal: ctrl.signal,
     }).then((res) => {
-      if (res.status === 401 || res.status === 404) {
-        if (res.status === 401) toLoginWithReturn();
+      if (cancelled) return null;
+      if (res.status === 401) {
+        setError("Sessão expirada. Redirecionando para o acesso…");
+        setLoading(false);
+        toLoginWithReturn();
+        return null;
+      }
+      if (res.status === 404) {
+        setDetail(null);
+        setError("Detalhe não encontrado para esta sincronização.");
+        setLoading(false);
         return null;
       }
       if (!res.ok) throw new Error(`sync-detail ${res.status}`);
       return res.json() as Promise<{ detail: SyncBarrierDetail }>;
     }).then((next) => {
-      if (!next || cancelled) return;
-      cache.set(key, next.detail);
+      if (cancelled) return;
+      if (!next) {
+        // 401/404 already settled loading/error above.
+        setLoading(false);
+        return;
+      }
+      cacheSet(key, next.detail);
       setDetail(next.detail);
       setLoading(false);
     }).catch((err) => {

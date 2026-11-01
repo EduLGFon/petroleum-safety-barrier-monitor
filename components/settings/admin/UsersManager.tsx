@@ -245,6 +245,9 @@ export function UsersManager(
   const [busy, setBusy] = useState(false);
   const [editFor, setEditFor] = useState<number | null>(null);
   const [notice, setNotice] = useState("");
+  // Per-row guard so rapid Promover/Ativar clicks on the same row never
+  // fire concurrent PATCHes; different rows stay independent.
+  const [patchBusy, setPatchBusy] = useState<number | null>(null);
 
   async function refresh() {
     await reloadUsers();
@@ -310,6 +313,8 @@ export function UsersManager(
   }
 
   async function patch(id: number, body: unknown) {
+    if (patchBusy !== null) return;
+    setPatchBusy(id);
     try {
       await adminApi(`/api/users/${id}`, {
         method: "PATCH",
@@ -319,6 +324,8 @@ export function UsersManager(
       await refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setPatchBusy(null);
     }
   }
 
@@ -507,21 +514,31 @@ export function UsersManager(
                   >
                     <button
                       type="button"
+                      disabled={patchBusy === u.id}
                       onClick={() =>
                         void patch(u.id, {
                           role: u.role === "admin" ? "user" : "admin",
                         })}
                       style={ghostBtn}
                     >
-                      {u.role === "admin" ? "Rebaixar" : "Promover"}
+                      {patchBusy === u.id
+                        ? "Aguarde…"
+                        : u.role === "admin"
+                        ? "Rebaixar"
+                        : "Promover"}
                     </button>
                     <button
                       type="button"
+                      disabled={patchBusy === u.id}
                       onClick={() =>
                         void patch(u.id, { active: !u.active })}
                       style={u.active ? dangerBtn : ghostBtn}
                     >
-                      {u.active ? "Desativar" : "Ativar"}
+                      {patchBusy === u.id
+                        ? "Aguarde…"
+                        : u.active
+                        ? "Desativar"
+                        : "Ativar"}
                     </button>
                     {u.auth_source !== "entra" && (
                       <button
@@ -573,6 +590,9 @@ export function UsersManager(
                       setNotice(
                         `Usuário ${email} atualizado.`,
                       );
+                      // Re-fetch so the row shows the edited name/email/phone
+                      // instead of the stale pre-edit snapshot.
+                      void refresh();
                     }}
                   />
                 )}

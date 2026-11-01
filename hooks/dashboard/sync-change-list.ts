@@ -81,14 +81,35 @@ export function useSyncChangeList(
       credentials: "same-origin",
       signal: ctrl.signal,
     }).then((res) => {
-      if (res.status === 401 || res.status === 404) {
+      if (cancelled) return null;
+      if (res.status === 401) {
+        setError("Sessão expirada. Redirecionando para o acesso…");
+        setLoading(false);
         toLoginWithReturn();
+        return null;
+      }
+      if (res.status === 404) {
+        // Unknown run / no sync yet: empty list, no spinner, no redirect.
+        setData({
+          run: null,
+          items: [],
+          total: 0,
+          totalPages: 1,
+          summary: { total: 0, byKind: {}, byStatus: {}, critical: 0 },
+        });
+        setError("Sincronização não encontrada.");
+        setLoading(false);
         return null;
       }
       if (!res.ok) throw new Error(`Erro ${res.status} ao carregar alterações`);
       return res.json() as Promise<ChangeListResult>;
     }).then((next) => {
-      if (!next || cancelled) return;
+      if (cancelled) return;
+      if (!next) {
+        // 401/404 already settled loading/error above; ensure no stuck spinner.
+        setLoading(false);
+        return;
+      }
       setData({
         run: next.run,
         items: Array.isArray(next.items) ? next.items : [],
