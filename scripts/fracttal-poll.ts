@@ -74,7 +74,7 @@ import { createCycleLoop } from "../lib/server/fracttal/cycle.ts";
 
 import { runSync } from "../lib/server/fracttal/sync.ts";
 
-import { loadSyncConfig } from "../lib/server/config.ts";
+import { assertFracttalBaseUrl, loadSyncConfig } from "../lib/server/config.ts";
 
 const DEFAULT_BASE_URL = "https://app.fracttal.com/api";
 
@@ -96,6 +96,11 @@ interface PollFlags {
 }
 
 function parseFlags(): PollFlags {
+  // FRACTTAL_BASE_URL is allow-listed (app.fracttal.com only); a staging or
+  // typo host fails closed here instead of leaking prod creds elsewhere.
+  // No --fixture flag by design: the poller always sweeps live (fixtures are
+  // for one-shot sync/capture CLIs, validated via assertFixturePath there).
+  const rawBaseUrl = Deno.env.get("FRACTTAL_BASE_URL") ?? DEFAULT_BASE_URL;
   return {
     seconds: Math.max(5, Number(Deno.env.get("FRACTTAL_POLL_SECONDS")) || 300),
     itemType: (Number(Deno.env.get("FRACTTAL_SYNC_ITEM_TYPE")) ||
@@ -141,7 +146,7 @@ function parseFlags(): PollFlags {
       1,
       Math.floor(Number(Deno.env.get("FRACTTAL_FETCH_CONCURRENCY")) || 4),
     ),
-    baseUrl: Deno.env.get("FRACTTAL_BASE_URL") ?? DEFAULT_BASE_URL,
+    baseUrl: assertFracttalBaseUrl(rawBaseUrl),
   };
 }
 

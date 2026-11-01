@@ -17,6 +17,40 @@ import { ITEM_TYPE_LABELS } from "../lib/server/fracttal/itemType.ts";
 
 import { anonymizeAsset } from "../lib/server/fracttal/anonymize.ts";
 
+import { fromFileUrl } from "@std/path";
+
+import {
+  assertFixturePath,
+  assertFracttalBaseUrl,
+} from "../lib/server/config.ts";
+
+// Fixture anchor: fromFileUrl(new URL("./fixtures/", import.meta.url)) is
+// the only directory --output may land in (*.json direct children). Any
+// traversal or absolute path outside it fails closed in assertOutputPath.
+const FIXTURE_ROOT = fromFileUrl(new URL("./fixtures/", import.meta.url));
+
+function assertOutputPath(raw: string): string {
+  assertFixturePath(raw, "--output");
+  // Resolve repo-relative outputs against the repo root and require the
+  // fromFileUrl-anchored fixture dir as prefix (blocks ../ escapes that
+  // pass a naive prefix string check on ".." variants).
+  const repoRoot = new URL("../", import.meta.url);
+  let resolved: string;
+  try {
+    resolved = fromFileUrl(new URL(raw, repoRoot));
+  } catch {
+    throw new Error(`--output is not a resolvable path (got ${raw})`);
+  }
+  const normResolved = resolved.replace(/\\/g, "/");
+  const normRoot = FIXTURE_ROOT.replace(/\\/g, "/");
+  if (!normResolved.startsWith(normRoot)) {
+    throw new Error(
+      `--output must be inside ${normRoot} (got ${raw})`,
+    );
+  }
+  return raw;
+}
+
 const DEFAULT_BASE_URL = "https://app.fracttal.com/api";
 
 interface CaptureFlags {
@@ -41,9 +75,19 @@ function parseFlags(argv: string[]): CaptureFlags {
       base.pages = Math.min(10, Math.max(1, Number(argv[++i]) || 1));
     } else if (arg === "--item-type") {
       base.itemType = Number(argv[++i]) as ItemTypeValue;
-    } else if (arg === "--output") base.output = argv[++i];
-    else if (arg === "--base-url") base.baseUrl = argv[++i];
+    } else if (arg === "--output") {
+      // Allow-list: fixture outputs stay inside scripts/fixtures/*.json so a
+      // flag can never overwrite arbitrary repo files (fromFileUrl-resolved
+      // dir is the anchor; see assertFixturePath).
+      base.output = assertOutputPath(argv[++i]);
+    } else if (arg === "--base-url") {
+      // Hostname allow-list: only the prod Fracttal API host is ever dialed.
+      base.baseUrl = assertFracttalBaseUrl(argv[++i]);
+    }
   }
+  // Validate defaults/env too (FRACTTAL_BASE_URL could point elsewhere).
+  base.output = assertOutputPath(base.output);
+  base.baseUrl = assertFracttalBaseUrl(base.baseUrl);
   return base;
 }
 

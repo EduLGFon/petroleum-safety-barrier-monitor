@@ -37,7 +37,7 @@ import type { ItemTypeValue } from "../lib/server/fracttal/itemType.ts";
 
 import type { OpsNotifier } from "../lib/server/fracttal/notify.ts";
 
-import { loadSyncConfig } from "../lib/server/config.ts";
+import { assertFracttalBaseUrl, loadSyncConfig } from "../lib/server/config.ts";
 
 const DEFAULT_BASE_URL = "https://app.fracttal.com/api";
 const SWEEP_SCOPE = "fracttal-live:all";
@@ -80,12 +80,15 @@ function parseFlags(argv: string[]): ForceFlags {
       f.concurrency = Math.max(1, Number(argv[++i]) || 4);
     } else if (a === "--item-type") {
       f.itemType = Number(argv[++i]) as ItemTypeValue;
-    } else if (a === "--base-url") f.baseUrl = argv[++i];
-    else if (a === "--scope") f.scope = argv[++i];
+    } else if (a === "--base-url") {
+      f.baseUrl = assertFracttalBaseUrl(argv[++i]);
+    } else if (a === "--scope") f.scope = argv[++i];
     else if (a === "--force") f.force = true;
     else if (a === "--apply") f.apply = true;
     else if (a === "--json") f.json = true;
   }
+  // Env default must also stay on the allow-listed host.
+  f.baseUrl = assertFracttalBaseUrl(f.baseUrl);
   return f;
 }
 

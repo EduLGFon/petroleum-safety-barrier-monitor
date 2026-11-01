@@ -44,7 +44,34 @@ import type { ItemTypeValue } from "../lib/server/fracttal/itemType.ts";
 
 import type { OpsNotifier } from "../lib/server/fracttal/notify.ts";
 
-import { loadSyncConfig } from "../lib/server/config.ts";
+import {
+  assertFixturePath,
+  assertFracttalBaseUrl,
+  loadSyncConfig,
+} from "../lib/server/config.ts";
+
+import { fromFileUrl } from "@std/path";
+
+// Fixture anchor (fromFileUrl): --fixture/--work-fixture must resolve under
+// scripts/fixtures/*.json; anything else fails closed before any read.
+const FIXTURE_ROOT = fromFileUrl(new URL("./fixtures/", import.meta.url));
+
+function assertFixtureFlag(raw: string, flag: string): string {
+  assertFixturePath(raw, flag);
+  const repoRoot = new URL("../", import.meta.url);
+  let resolved: string;
+  try {
+    resolved = fromFileUrl(new URL(raw, repoRoot));
+  } catch {
+    throw new Error(`${flag} is not a resolvable path (got ${raw})`);
+  }
+  const norm = resolved.replace(/\\/g, "/");
+  const root = FIXTURE_ROOT.replace(/\\/g, "/");
+  if (!norm.startsWith(root)) {
+    throw new Error(`${flag} must be inside ${root} (got ${raw})`);
+  }
+  return raw;
+}
 
 const DEFAULT_BASE_URL = "https://app.fracttal.com/api";
 const DEFAULT_FIXTURE = "scripts/fixtures/fracttal-assets-sample.json";
@@ -82,9 +109,11 @@ function parseFlags(argv: string[]): SyncFlags {
   };
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i];
-    if (arg === "--fixture") base.fixturePath = argv[++i];
-    else if (arg === "--work-fixture") base.workFixturePath = argv[++i];
-    else if (arg === "--live") base.live = true;
+    if (arg === "--fixture") {
+      base.fixturePath = assertFixtureFlag(argv[++i], "--fixture");
+    } else if (arg === "--work-fixture") {
+      base.workFixturePath = assertFixtureFlag(argv[++i], "--work-fixture");
+    } else if (arg === "--live") base.live = true;
     else if (arg === "--scope") base.scope = argv[++i];
     else if (arg === "--item-type") {
       base.itemType = Number(argv[++i]) as ItemTypeValue;
@@ -98,9 +127,20 @@ function parseFlags(argv: string[]): SyncFlags {
       base.ratePerMin = Math.max(1, Number(argv[++i]) || 180);
     } else if (arg === "--fetch-concurrency") {
       base.fetchConcurrency = Math.max(1, Number(argv[++i]) || 4);
-    } else if (arg === "--base-url") base.baseUrl = argv[++i];
-    else if (arg === "--apply") base.apply = true;
+    } else if (arg === "--base-url") {
+      base.baseUrl = assertFracttalBaseUrl(argv[++i]);
+    } else if (arg === "--apply") base.apply = true;
     else if (arg === "--json") base.json = true;
+  }
+  // Validate defaults/env too: FRACTTAL_BASE_URL must stay on the
+  // allow-listed host, fixtures under scripts/fixtures/*.json.
+  base.baseUrl = assertFracttalBaseUrl(base.baseUrl);
+  base.fixturePath = assertFixtureFlag(base.fixturePath, "--fixture");
+  if (base.workFixturePath !== undefined) {
+    base.workFixturePath = assertFixtureFlag(
+      base.workFixturePath,
+      "--work-fixture",
+    );
   }
   return base;
 }

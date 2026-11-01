@@ -205,9 +205,27 @@ interface BarrierAcc extends EquipmentRow {
   contingencySource: string;
 }
 
+// isOpenWorkOrder is the shared live/import open predicate (duplicated in
+// lib/server/fracttal/work.ts isOpenWorkOrderRow with the same comment):
+// closed wins (done===true or id_status===4 closes), otherwise open when
+// done===false or id_status is in (1, 2). Reads id_status_work_order first
+// (live field name) with an id_status fallback for dump rows.
+function isOpenWorkOrder(row: Record<string, unknown>): boolean {
+  const done = typeof row.done === "boolean" ? row.done : null;
+  const statusRaw = row.id_status_work_order ?? row.id_status;
+  const statusId = typeof statusRaw === "number" ? statusRaw : null;
+  if (done === true || statusId === 4) return false;
+  return done === false || statusId === 1 || statusId === 2;
+}
+
 // contingencyTexts pulls every free-text field a dump work row may carry a
-// GM/CEC/contingência signal in (description plus notes, labels, custom
-// status). The dump samples left labels/custom empty, but the schema
+// GM/CEC/contingência signal in. Key set is shared with
+// lib/server/fracttal/work.ts contingencyFromRaw: description, task_note,
+// note, notes, task_description, custom_description,
+// work_orders_status_custom_description, types_description,
+// types_1_description, types_2_description, tasks_log_types_description,
+// observation, wo_folio, plus labels as string or {description,name}
+// objects. The dump samples left labels/custom empty, but the schema
 // carries them and live rows may populate them.
 function contingencyTexts(row: Record<string, unknown>): string[] {
   const out: string[] = [];
@@ -215,12 +233,16 @@ function contingencyTexts(row: Record<string, unknown>): string[] {
     const key of [
       "description",
       "task_note",
+      "note",
       "notes",
       "task_description",
+      "custom_description",
       "work_orders_status_custom_description",
       "types_description",
-      "tasks_log_types_description",
+      "types_1_description",
       "types_2_description",
+      "tasks_log_types_description",
+      "observation",
       "wo_folio",
     ] as const
   ) {
@@ -230,7 +252,16 @@ function contingencyTexts(row: Record<string, unknown>): string[] {
   const labels = row["labels"];
   if (Array.isArray(labels)) {
     for (const l of labels) {
-      if (typeof l === "string") out.push(l);
+      if (typeof l === "string" && l !== "") out.push(l);
+      else if (typeof l === "object" && l !== null) {
+        const o = l as Record<string, unknown>;
+        if (typeof o["description"] === "string" && o["description"] !== "") {
+          out.push(o["description"] as string);
+        }
+        if (typeof o["name"] === "string" && o["name"] !== "") {
+          out.push(o["name"] as string);
+        }
+      }
     }
   }
   return out;
@@ -238,14 +269,24 @@ function contingencyTexts(row: Record<string, unknown>): string[] {
 
 // extractEvent distills a dump work order/request row to a shared status
 // event: earliest of the candidate date fields plus folio + description.
-// The urgent flag rides along from the WR is_urgent boolean (WO rows have
-// no such field, so they stay non-urgent); only planned events with
+// The urgent flag rides along from the WR is_urgent boolean; WO rows derive
+// it from priorities_description (VERY_HIGH/HIGH/emergência), matching the
+// live workOrderEvent urgentFromPriority; only planned events with
 // isUrgent=true can drive Degradada in resolveAvailability.
 function extractEvent(row: Record<string, unknown>): StatusEvent {
   const folio = str(row.wo_folio);
   const desc = str(row.description);
   const detail = str(row.task_note) || str(row.note) ||
     str(row.observation) || desc;
+  const rawPriority = typeof row.priorities_description === "string"
+    ? row.priorities_description
+    : null;
+  const foldedPriority = (rawPriority ?? "").toLowerCase();
+  const woUrgent = foldedPriority.includes("very_high") ||
+    foldedPriority.includes("very high") ||
+    /\bhigh\b/.test(foldedPriority) || /\balta\b/.test(foldedPriority) ||
+    foldedPriority.includes("muito alta") ||
+    foldedPriority.includes("emergenc") || foldedPriority.includes("urgent");
   return {
     date: earliestDate(
       isoDate(row.initial_date),
@@ -256,18 +297,21 @@ function extractEvent(row: Record<string, unknown>): StatusEvent {
     trade: (str(row.tasks_log_types_2_description) ||
       str(row.tasks_log_task_type_main) || str(row.types_description))
       .slice(0, 120),
-    isUrgent: row.is_urgent === true,
+    isUrgent: row.is_urgent === true || woUrgent,
   };
 }
 
 // Applies one work order to the barrier map; returns the match kind for the report.
+// Open/closed follows isOpenWorkOrder (done===false or id_status in (1,2)
+// opens; done===true or id_status===4 closes, closed wins), shared with the
+// live workOrderSlot so a live run and a rebuild agree.
 function applyWorkOrder(
   barriers: Map<string, BarrierAcc>,
   wo: Record<string, unknown>,
 ): "matched" | "unmatched" | "not-corrective" {
   const acc = barriers.get(str(wo.code));
   if (!acc) return "unmatched";
-  if (wo.done !== false) return "not-corrective";
+  if (!isOpenWorkOrder(wo)) return "not-corrective";
   const event = extractEvent(wo);
   const slot = classifyCorrective(
     str(wo.tasks_log_types_description),
