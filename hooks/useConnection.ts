@@ -15,9 +15,11 @@ export type { Conn };
 // navigator.onLine alone never notices the server going away). A fresh
 // offline-to-online flip shows amber "reconnecting" briefly before settling
 // on emerald, so all three states are reachable in production.
+// 30s cadence (visibilitychange + online/offline fire immediate checks):
+// the dot does not need a 5s wakeup to report outages within seconds.
 export function useConnection(
   healthUrl = "/api/health",
-  intervalMs = 5000,
+  intervalMs = 30000,
 ): Conn {
   const [conn, setConn] = useState<Conn>("connected");
   const connRef = useRef<Conn>("connected");

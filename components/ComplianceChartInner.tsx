@@ -24,7 +24,13 @@ import type { CategoryCompliance } from "../lib/types.ts";
 
 import { ChartTooltip } from "./chart/ChartTooltip.tsx";
 
-import { useEffect, useState } from "preact/hooks";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "preact/hooks";
 
 import { ChartRow } from "./chart/ChartRow.tsx";
 
@@ -88,8 +94,23 @@ export default function ComplianceChartInner(
   const height = chartHeight(data.length, ROW_H);
   const { plotW, width } = layoutChart(available, LABEL_W);
   const ticks = buildTicks(max);
-  // w: linear value→pixels scale against the max row total.
-  const w = makeW(max, plotW);
+  // w: linear value→pixels scale against the max row total. Memoized on
+  // inputs so memoized ChartRows see a stable closure across hover ticks.
+  const w = useMemo(() => makeW(max, plotW), [max, plotW]);
+  // Stable hover callbacks so memoized ChartRows skip re-render on parent
+  // ticks (selection, poll): only the hovered row's `dimmed` prop changes.
+  // rAF-throttled: mousemove fires faster than frames; the latest position
+  // wins and whole-SVG re-renders collapse to one per frame.
+  const hoverRaf = useRef(0);
+  const onHover = useCallback((i: number, x: number, y: number) => {
+    cancelAnimationFrame(hoverRaf.current);
+    hoverRaf.current = requestAnimationFrame(() => setHover({ i, x, y }));
+  }, []);
+  const onLeave = useCallback(() => {
+    cancelAnimationFrame(hoverRaf.current);
+    setHover(null);
+  }, []);
+  useEffect(() => () => cancelAnimationFrame(hoverRaf.current), []);
   const hovered = hover !== null ? data[hover.i] : null;
   // Geometry lives in attributes (SSR/fallback) AND in style: only the
   // CSS values go through the transition engine, which is what morphs
@@ -153,8 +174,8 @@ export default function ComplianceChartInner(
             rowH={ROW_H}
             plotW={plotW}
             w={w}
-            onHover={(ii, x, y) => setHover({ i: ii, x, y })}
-            onLeave={() => setHover(null)}
+            onHover={onHover}
+            onLeave={onLeave}
             onSelect={(isOutrosRow?.(i) ?? false)
               ? (() => onExpandOutros?.())
               : onSelectCategory}

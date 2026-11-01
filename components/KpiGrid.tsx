@@ -11,7 +11,7 @@
 import { AURORA, AURORA_TYPE, progressWidth } from "../lib/aurora.ts";
 import { splitRankGroups } from "../lib/dashboard/criticality.ts";
 import { critColorFor, dispColorFor } from "../lib/constants.ts";
-import { useEffect, useRef, useState } from "preact/hooks";
+import { useEffect, useMemo, useRef, useState } from "preact/hooks";
 import type { KpiSnapshot } from "../lib/types.ts";
 import { fmt, pct1 } from "../lib/utils.ts";
 
@@ -195,133 +195,138 @@ function CardRows({ rows }: { rows: CardRow[] }) {
 // KpiGrid: glass cards from KpiSnapshot; shares divide by total||1 with one
 // decimal. Criticality renders as two group cards (critical ESO+A vs the
 // rest) with per-rank graphs inside.
+// Card model is memoized on the snapshot: parent re-renders (poll ticks,
+// selection, hover) reuse it instead of rebuilding groups per render.
 export function KpiGrid({ kpi }: Props) {
-  const t = kpi.total || 1;
-  // One-decimal share of the scope total (bar widths + sub labels).
-  const share1 = (v: number) => Math.round(v / t * 1000) / 10;
-  // One-decimal rate within a group (NC concentration per group or rank).
-  const rate1 = (nc: number, total: number) =>
-    total > 0 ? Math.round(nc / total * 1000) / 10 : 0;
-  const byCrit = kpi.byCriticality ?? {};
-  const ncByCrit = kpi.ncByCriticality ?? {};
-  // Folds one rank group into a card: group total as value, group NC rate
-  // as sub, per-rank rows with graphs inside (bars share the group total).
-  const groupOf = (entries: Array<[string, number]>) => {
-    const total = entries.reduce((a, [, n]) => a + n, 0);
-    const nc = entries.reduce((a, [label]) => a + (ncByCrit[label] ?? 0), 0);
-    const rows: CardRow[] = entries.map(([label, n]) => {
-      const c = ncByCrit[label] ?? 0;
-      return {
-        label,
-        color: critColorFor(label).solid,
-        value: fmt(n),
-        hint: `${fmt(c)} NC · ${pct1(rate1(c, n))}`,
-        hintAlert: c > 0,
-        frac: total > 0 ? Math.round(n / total * 1000) / 10 : 0,
-        bar: c > 0 ? RED : AURORA.track,
-      };
-    });
-    return { total, nc, rows };
-  };
-  const { critical: critEntries, other: otherEntries } = splitRankGroups(
-    Object.entries(byCrit).filter(([, n]) => n > 0),
-  );
-  const crit = groupOf(critEntries);
-  const rest = groupOf(otherEntries);
-  const ncShare = share1(kpi.nonCompliant);
-  const confShare = share1(kpi.compliant);
-  const otherShare = share1(kpi.other ?? 0);
-  // Composition of the NC card: degraded vs unavailable shares of the NC.
-  const degColor = dispColorFor("Degradado").solid;
-  const indColor = dispColorFor("Indisponível").solid;
-  const ncRows: CardRow[] = [
-    {
-      label: "Degradadas",
-      color: degColor,
-      value: fmt(kpi.degraded),
-      hint: `${pct1(rate1(kpi.degraded, kpi.nonCompliant))} das NC`,
-      frac: rate1(kpi.degraded, kpi.nonCompliant),
-      bar: degColor,
-    },
-    {
-      label: "Indisponíveis",
-      color: indColor,
-      value: fmt(kpi.unavailable),
-      hint: `${pct1(rate1(kpi.unavailable, kpi.nonCompliant))} das NC`,
-      frac: rate1(kpi.unavailable, kpi.nonCompliant),
-      bar: indColor,
-    },
-  ];
-  const cards: C[] = [
-    {
-      label: "% Conformidade",
-      rawNum: kpi.pctCompliant,
-      decimals: 1,
-      isPercent: true,
-      sub: `${fmt(kpi.compliant)} conformes de ${fmt(kpi.total)}`,
-      rows: [
-        {
-          label: "Conformes",
-          color: GREEN,
-          value: fmt(kpi.compliant),
-          hint: pct1(confShare),
-          frac: confShare,
-          bar: GREEN,
-        },
-        {
-          label: "Não conformes",
-          color: RED,
-          value: fmt(kpi.nonCompliant),
-          hint: pct1(ncShare),
-          hintAlert: kpi.nonCompliant > 0,
-          frac: ncShare,
-          bar: RED,
-        },
-      ],
-      delay: 0,
-    },
-    {
-      label: "Não Conformes",
-      rawNum: kpi.nonCompliant,
-      sub: `${pct1(ncShare)} do inventário`,
-      rows: ncRows,
-      alert: true,
-      delay: 50,
-    },
-    ...(crit.total > 0
-      ? [{
-        label: "Críticas ESO+A",
-        rawNum: crit.total,
-        sub: `${fmt(crit.nc)} NC · ${
-          pct1(rate1(crit.nc, crit.total))
-        } do grupo`,
-        rows: crit.rows,
-        alert: crit.nc > 0,
-        delay: 100,
-      } as C]
-      : []),
-    ...(rest.total > 0
-      ? [{
-        label: "Não Críticas",
-        rawNum: rest.total,
-        sub: `${fmt(rest.nc)} NC · ${
-          pct1(rate1(rest.nc, rest.total))
-        } do grupo`,
-        rows: rest.rows,
-        delay: 150,
-      } as C]
-      : []),
-    ...((kpi.other ?? 0) > 0
-      ? [{
-        label: "Outros Status",
-        rawNum: kpi.other ?? 0,
-        sub: pct1(otherShare) + " do inv.",
-        share: otherShare,
+  const cards: C[] = useMemo(() => {
+    const t = kpi.total || 1;
+    // One-decimal share of the scope total (bar widths + sub labels).
+    const share1 = (v: number) => Math.round(v / t * 1000) / 10;
+    // One-decimal rate within a group (NC concentration per group or rank).
+    const rate1 = (nc: number, total: number) =>
+      total > 0 ? Math.round(nc / total * 1000) / 10 : 0;
+    const byCrit = kpi.byCriticality ?? {};
+    const ncByCrit = kpi.ncByCriticality ?? {};
+    // Folds one rank group into a card: group total as value, group NC rate
+    // as sub, per-rank rows with graphs inside (bars share the group total).
+    const groupOf = (entries: Array<[string, number]>) => {
+      const total = entries.reduce((a, [, n]) => a + n, 0);
+      const nc = entries.reduce((a, [label]) => a + (ncByCrit[label] ?? 0), 0);
+      const rows: CardRow[] = entries.map(([label, n]) => {
+        const c = ncByCrit[label] ?? 0;
+        return {
+          label,
+          color: critColorFor(label).solid,
+          value: fmt(n),
+          hint: `${fmt(c)} NC · ${pct1(rate1(c, n))}`,
+          hintAlert: c > 0,
+          frac: total > 0 ? Math.round(n / total * 1000) / 10 : 0,
+          bar: c > 0 ? RED : AURORA.track,
+        };
+      });
+      return { total, nc, rows };
+    };
+    const { critical: critEntries, other: otherEntries } = splitRankGroups(
+      Object.entries(byCrit).filter(([, n]) => n > 0),
+    );
+    const crit = groupOf(critEntries);
+    const rest = groupOf(otherEntries);
+    const ncShare = share1(kpi.nonCompliant);
+    const confShare = share1(kpi.compliant);
+    const otherShare = share1(kpi.other ?? 0);
+    // Composition of the NC card: degraded vs unavailable shares of the NC.
+    const degColor = dispColorFor("Degradado").solid;
+    const indColor = dispColorFor("Indisponível").solid;
+    const ncRows: CardRow[] = [
+      {
+        label: "Degradadas",
+        color: degColor,
+        value: fmt(kpi.degraded),
+        hint: `${pct1(rate1(kpi.degraded, kpi.nonCompliant))} das NC`,
+        frac: rate1(kpi.degraded, kpi.nonCompliant),
+        bar: degColor,
+      },
+      {
+        label: "Indisponíveis",
+        color: indColor,
+        value: fmt(kpi.unavailable),
+        hint: `${pct1(rate1(kpi.unavailable, kpi.nonCompliant))} das NC`,
+        frac: rate1(kpi.unavailable, kpi.nonCompliant),
+        bar: indColor,
+      },
+    ];
+    const cards: C[] = [
+      {
+        label: "% Conformidade",
+        rawNum: kpi.pctCompliant,
+        decimals: 1,
+        isPercent: true,
+        sub: `${fmt(kpi.compliant)} conformes de ${fmt(kpi.total)}`,
+        rows: [
+          {
+            label: "Conformes",
+            color: GREEN,
+            value: fmt(kpi.compliant),
+            hint: pct1(confShare),
+            frac: confShare,
+            bar: GREEN,
+          },
+          {
+            label: "Não conformes",
+            color: RED,
+            value: fmt(kpi.nonCompliant),
+            hint: pct1(ncShare),
+            hintAlert: kpi.nonCompliant > 0,
+            frac: ncShare,
+            bar: RED,
+          },
+        ],
+        delay: 0,
+      },
+      {
+        label: "Não Conformes",
+        rawNum: kpi.nonCompliant,
+        sub: `${pct1(ncShare)} do inventário`,
+        rows: ncRows,
         alert: true,
-        delay: 200,
-      } as C]
-      : []),
-  ];
+        delay: 50,
+      },
+      ...(crit.total > 0
+        ? [{
+          label: "Críticas ESO+A",
+          rawNum: crit.total,
+          sub: `${fmt(crit.nc)} NC · ${
+            pct1(rate1(crit.nc, crit.total))
+          } do grupo`,
+          rows: crit.rows,
+          alert: crit.nc > 0,
+          delay: 100,
+        } as C]
+        : []),
+      ...(rest.total > 0
+        ? [{
+          label: "Não Críticas",
+          rawNum: rest.total,
+          sub: `${fmt(rest.nc)} NC · ${
+            pct1(rate1(rest.nc, rest.total))
+          } do grupo`,
+          rows: rest.rows,
+          delay: 150,
+        } as C]
+        : []),
+      ...((kpi.other ?? 0) > 0
+        ? [{
+          label: "Outros Status",
+          rawNum: kpi.other ?? 0,
+          sub: pct1(otherShare) + " do inv.",
+          share: otherShare,
+          alert: true,
+          delay: 200,
+        } as C]
+        : []),
+    ];
+    return cards;
+  }, [kpi]);
 
   return (
     <div

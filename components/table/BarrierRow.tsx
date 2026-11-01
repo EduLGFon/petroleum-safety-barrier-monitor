@@ -13,6 +13,7 @@ import type { CSSProperties } from "preact";
 import { ClockIcon } from "../ui/Icons.tsx";
 import { RowChk } from "./RowCheck.tsx";
 import { Badge } from "../ui/Badge.tsx";
+import { memo } from "preact/compat";
 
 interface BarrierRowProps {
   barrier: Barrier;
@@ -35,6 +36,8 @@ const tdC: CSSProperties = {
 };
 
 // BarrierRow: renders one ledger row with select checkbox, badges, and detail open.
+// Memoized: 25 rows skip re-render on parent ticks (poll, hover, KPI)
+// unless their own props (barrier ref, selected, columns, callbacks) change.
 // Entrance uses the shared .table-row-enter class (stagger via --row-delay)
 // so selection toggles reuse the DOM node without replaying the animation;
 // only newly mounted ids (filter/page/search/pageSize changes) animate in.
@@ -42,7 +45,7 @@ const tdC: CSSProperties = {
 // heights stay stable and identical on every page.
 // Centering: every cell is vertically middle + horizontally centered, except
 // the TAG column which stays left-aligned for mono scannability (per UX).
-export function BarrierRow(
+export const BarrierRow = memo(function BarrierRow(
   {
     barrier: b,
     index: i,
@@ -138,7 +141,7 @@ export function BarrierRow(
       </td>
     </tr>
   );
-}
+});
 
 interface CellProps {
   col: ColumnKey;

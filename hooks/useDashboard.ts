@@ -62,16 +62,28 @@ export function useDashboard(allBarriers: Barrier[], defaultLocation = "ALL") {
 
   // Persist on every change (after both slices hydrate, so the first
   // visibleCols write never clobbers persisted columns with defaults).
+  // Debounced 400ms trailing + beforeunload flush (see server.ts): query
+  // keystrokes skip the per-keypress serialize + write.
   useEffect(() => {
     if (!hydrated || !hydratedCols) return;
-    saveDash({
+    const snapshot = {
       location,
       filters,
       selectedIds: [...selectedIds],
       openId,
       visibleCols,
       hiddenPinned,
-    });
+    };
+    const timer = globalThis.setTimeout(() => saveDash(snapshot), 400);
+    const flush = () => {
+      globalThis.clearTimeout(timer);
+      saveDash(snapshot);
+    };
+    globalThis.addEventListener("beforeunload", flush);
+    return () => {
+      globalThis.clearTimeout(timer);
+      globalThis.removeEventListener("beforeunload", flush);
+    };
   }, [
     location,
     filters,

@@ -69,20 +69,28 @@ export function ComplianceChart(
   const [expanded, setExpanded] = useState(() => loadChartPrefs().expanded);
   const [view, setView] = useState<ChartView>(() => loadChartPrefs().view);
   const [query, setQuery] = useState("");
+  // Debounced query for the heavy prepare (filter + sort over all rows):
+  // the field stays instant while the derivation waits 200ms, same as the
+  // FilterBar search box, so fast typing never sorts per keystroke.
+  const [queryDeb, setQueryDeb] = useState("");
+  useEffect(() => {
+    const t = globalThis.setTimeout(() => setQueryDeb(query), 200);
+    return () => globalThis.clearTimeout(t);
+  }, [query]);
   // Remember-last-choice: view + sort + expanded survive reloads.
   useEffect(() => {
     saveChartPrefs({ sort, expanded, view });
   }, [sort, expanded, view]);
 
-  const searching = query.trim() !== "";
+  const searching = queryDeb.trim() !== "";
   const prepared = useMemo(
     () =>
       prepareChart(data, {
         limit: expanded || searching ? 0 : CHART_TOP_N,
-        query,
+        query: queryDeb,
         sort,
       }),
-    [data, expanded, searching, query, sort],
+    [data, expanded, searching, queryDeb, sort],
   );
   const scroll = Math.ceil(prepared.rows.length / CHART_COLUMNS) >
     SCROLL_AFTER_ROWS;

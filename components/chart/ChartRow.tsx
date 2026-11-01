@@ -11,6 +11,8 @@ import { fmt } from "../../lib/utils.ts";
 
 import { px } from "./geometry.ts";
 
+import { memo } from "preact/compat";
+
 interface Props {
   d: CategoryCompliance;
   index: number;
@@ -34,7 +36,8 @@ interface Props {
 }
 
 // ChartRow: stacked Conforme / Não Conforme segments plus count and hover target.
-export function ChartRow(
+// Memoized: hover moves re-render only the rows whose `dimmed` changes.
+export const ChartRow = memo(function ChartRow(
   {
     d,
     index,
@@ -161,4 +164,4 @@ export function ChartRow(
       )}
     </g>
   );
-}
+});
