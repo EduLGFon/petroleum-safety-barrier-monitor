@@ -4,6 +4,8 @@
 // leaves a gap above and below the plot (or margins at its sides).
 import {
   buildTicks,
+  chartGeometry,
+  chartHeight,
   COUNT_W,
   GEO,
   layoutChart,
@@ -59,4 +61,41 @@ Deno.test("layoutChart never crushes the plot below the minimum", () => {
   assertStrictEquals(plotW, MIN_PLOT_W);
   assertStrictEquals(width, GEO.compact.LABEL_W + MIN_PLOT_W + COUNT_W);
   assert(width > 330);
+});
+
+Deno.test("chartGeometry keeps the current geometry at scale 1", () => {
+  for (const [density, geo] of Object.entries(GEO)) {
+    const g = chartGeometry(density as keyof typeof GEO, 1);
+    assertStrictEquals(g.ROW_H, geo.ROW_H, density);
+    assertStrictEquals(g.BAR_H, geo.BAR_H, density);
+    assertStrictEquals(g.LABEL_W, geo.LABEL_W, density);
+    assertStrictEquals(g.COUNT_W, COUNT_W, density);
+    assertStrictEquals(g.LABEL_CHARS, 26, density);
+  }
+});
+
+Deno.test("chartGeometry grows rows and shrinks the label budget at 125%", () => {
+  const g = chartGeometry("comfortable", 1.25);
+  assertStrictEquals(g.ROW_H, 28);
+  assertStrictEquals(g.BAR_H, 19);
+  assertStrictEquals(g.LABEL_W, 230);
+  assertStrictEquals(g.COUNT_W, 70);
+  assertStrictEquals(g.AXIS_H, 33);
+  assertStrictEquals(g.TEXT_DY, 18);
+  assertStrictEquals(g.AXIS_TEXT_DY, 23);
+  assertStrictEquals(g.LABEL_CHARS, 23);
+});
+
+Deno.test("chartGeometry falls back to scale 1 for invalid scales", () => {
+  const base = chartGeometry("comfortable", 1);
+  for (const scale of [0, -1, NaN, Infinity]) {
+    assertEquals(chartGeometry("comfortable", scale), base);
+  }
+});
+
+Deno.test("layoutChart and chartHeight use the scaled columns", () => {
+  const { plotW, width } = layoutChart(1200, 230, 70);
+  assertStrictEquals(plotW, 1200 - 230 - 70);
+  assertStrictEquals(width, 1200);
+  assertStrictEquals(chartHeight(10, 28, 33), 6 + 280 + 33);
 });

@@ -26,13 +26,14 @@ type Ctx = ReturnType<typeof useSettings>;
 // Mounts the provider with a probe that records the context of every render.
 // Returns the storage plus a reader for the latest context, so a test can act
 // on the live setters and re-render exactly like a real panel would.
-async function mount(): Promise<{
+async function mount(initial: Record<string, string> = {}): Promise<{
   storage: Storage;
+  document: Document;
   latest: () => Ctx;
   rerender: () => Promise<void>;
 }> {
   const dom = setupDom();
-  const storage = memoryStorage();
+  const storage = memoryStorage(initial);
   Object.defineProperty(globalThis, "localStorage", {
     value: storage,
     configurable: true,
@@ -48,6 +49,7 @@ async function mount(): Promise<{
   await act(() => void render(tree, container));
   return {
     storage,
+    document: dom.document,
     latest: () => seen[seen.length - 1] as Ctx,
     rerender: () => act(() => void render(tree, container)),
   };
@@ -91,6 +93,7 @@ Deno.test("resetFilterDefaults keeps the appearance fields untouched", async () 
   const { latest, rerender } = await mount();
   latest().setTheme("amoled");
   latest().setDensity("compact");
+  latest().setFontSize("xlarge");
   await rerender();
   latest().setDefaults({ plan: "Sem plano" });
   await rerender();
@@ -99,5 +102,36 @@ Deno.test("resetFilterDefaults keeps the appearance fields untouched", async () 
   const s = latest().settings;
   assertStrictEquals(s.theme, "amoled");
   assertStrictEquals(s.density, "compact");
+  assertStrictEquals(s.fontSize, "xlarge");
   assertEquals(s.defaultFilters, {});
+});
+
+Deno.test("mount hydrates and applies a stored fontSize", async () => {
+  const { document, latest } = await mount({
+    [KEY]: JSON.stringify({ ...DEFAULTS, fontSize: "large" }),
+  });
+  assertStrictEquals(latest().settings.fontSize, "large");
+  assertStrictEquals(document.documentElement.dataset.fontSize, "large");
+});
+
+Deno.test("setFontSize updates context, storage and the dataset", async () => {
+  const { document, storage, latest, rerender } = await mount();
+  latest().setFontSize("xlarge");
+  await rerender();
+  assertStrictEquals(latest().settings.fontSize, "xlarge");
+  assertStrictEquals(stored(storage).fontSize, "xlarge");
+  assertStrictEquals(document.documentElement.dataset.fontSize, "xlarge");
+});
+
+Deno.test("setFontSize and setDensity in the same tick both land", async () => {
+  const { document, storage, latest, rerender } = await mount();
+  latest().setFontSize("large");
+  latest().setDensity("compact");
+  await rerender();
+  assertStrictEquals(latest().settings.fontSize, "large");
+  assertStrictEquals(latest().settings.density, "compact");
+  assertStrictEquals(stored(storage).fontSize, "large");
+  assertStrictEquals(stored(storage).density, "compact");
+  assertStrictEquals(document.documentElement.dataset.fontSize, "large");
+  assertStrictEquals(document.documentElement.dataset.density, "compact");
 });
