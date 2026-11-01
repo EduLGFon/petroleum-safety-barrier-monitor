@@ -3,6 +3,11 @@
 // the modal, picking from curated option lists or typing custom text.
 import { type FieldKey, SEED_DEFAULTS } from "../lib/field-options.ts";
 
+import {
+  FRACTTAL_SOURCES,
+  type FracttalSource,
+} from "../lib/field-ownership.ts";
+
 import { toPtError } from "../lib/api/error-pt.ts";
 
 import { useEffect, useState } from "preact/hooks";
@@ -51,6 +56,13 @@ export function BarrierEditor(
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
+  // Admin-owned fields (manualFields): the sync skips these until reverted.
+  // pendingSync tracks keys reverted this session whose upstream value only
+  // lands on the next sweep.
+  const [manualFields, setManualFields] = useState<string[]>(
+    barrier.manualFields ?? [],
+  );
+  const [pendingSync, setPendingSync] = useState<string[]>([]);
 
   // Identification & core fields
   const [tag, setTag] = useState(barrier.tag);
@@ -282,6 +294,137 @@ export function BarrierEditor(
     }
   }
 
+  // revertField: releases one owned field back to the sync (values stay
+  // until the next sweep, when Fracttal overwrites them).
+  async function revertField(fkey: string) {
+    setBusy(true);
+    setError("");
+    try {
+      const res = await apiFetch(`/api/barriers/${barrier.id}`, {
+        method: "PATCH",
+        credentials: "same-origin",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ releaseFields: [fkey] }),
+      });
+      if (!res.ok) {
+        let msg = `Erro ${res.status}`;
+        try {
+          const data = await res.json() as { error?: string };
+          if (data.error) msg = data.error;
+        } catch {
+          // fallback
+        }
+        throw new Error(msg);
+      }
+      const updated = (await res.json()) as Barrier;
+      setManualFields(updated.manualFields ?? []);
+      setPendingSync((prev) => prev.includes(fkey) ? prev : [...prev, fkey]);
+    } catch (err) {
+      setError(toPtError(err instanceof Error ? err.message : String(err)));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const sourceOf = (fkey: string): FracttalSource | undefined =>
+    (FRACTTAL_SOURCES as Partial<Record<string, FracttalSource>>)[fkey];
+
+  // fieldHead: label + Fracttal source caption + Manual badge + revert.
+  // fkey is the PATCH/ownership key; omit it (or pass a source directly) for
+  // captions without ownership affordances.
+  const fieldHead = (
+    label: string,
+    fkey?: string,
+    source?: FracttalSource,
+  ) => {
+    const src = source ?? (fkey ? sourceOf(fkey) : undefined);
+    const owned = fkey !== undefined && manualFields.includes(fkey);
+    const pending = fkey !== undefined && pendingSync.includes(fkey);
+    return (
+      <div style={{ display: "grid", gap: 2 }}>
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 6,
+            flexWrap: "wrap",
+          }}
+        >
+          <label
+            style={{
+              fontSize: "var(--d-micro)",
+              fontWeight: 700,
+              color: "var(--text-muted)",
+              textTransform: "uppercase",
+              letterSpacing: "0.1em",
+            }}
+          >
+            {label}
+          </label>
+          {owned && (
+            <span
+              title="Editado manualmente: o sync não sobrescreve este campo"
+              style={{
+                fontSize: "var(--d-micro)",
+                fontWeight: 800,
+                color: "var(--accent)",
+                border: "1px solid var(--accent)",
+                borderRadius: "var(--d-chip-radius)",
+                padding: "0 6px",
+                lineHeight: 1.6,
+              }}
+            >
+              Manual
+            </span>
+          )}
+          {owned && fkey && (
+            <button
+              type="button"
+              disabled={busy}
+              onClick={() => void revertField(fkey)}
+              title="Voltar a seguir o Fracttal neste campo (aplica no próximo sync)"
+              style={{
+                background: "none",
+                border: "none",
+                color: "var(--accent)",
+                cursor: "pointer",
+                padding: 0,
+                fontSize: "var(--d-micro)",
+                fontWeight: 700,
+                textDecoration: "underline",
+              }}
+            >
+              Reverter p/ Fracttal
+            </button>
+          )}
+          {pending && !owned && (
+            <span
+              style={{
+                fontSize: "var(--d-micro)",
+                color: "var(--text-muted)",
+                fontStyle: "italic",
+              }}
+            >
+              Aguarda próximo sync
+            </span>
+          )}
+        </div>
+        {src && (
+          <span
+            title={src.hint}
+            style={{
+              fontSize: "var(--d-micro)",
+              color: "var(--text-muted)",
+              opacity: 0.85,
+            }}
+          >
+            Fracttal: {src.field}
+          </span>
+        )}
+      </div>
+    );
+  };
+
   const renderSelectOrCombo = (
     label: string,
     fieldKey: FieldKey,
@@ -291,17 +434,7 @@ export function BarrierEditor(
     const opts = fieldOpts[fieldKey] ?? SEED_DEFAULTS[fieldKey] ?? [];
     return (
       <div style={{ display: "grid", gap: "var(--d-mini-gap)" }}>
-        <label
-          style={{
-            fontSize: "var(--d-micro)",
-            fontWeight: 700,
-            color: "var(--text-muted)",
-            textTransform: "uppercase",
-            letterSpacing: "0.1em",
-          }}
-        >
-          {label}
-        </label>
+        {fieldHead(label, fieldKey)}
         <div style={{ display: "flex", gap: 6 }}>
           <select
             value={opts.includes(value) ? value : "__custom__"}
@@ -378,6 +511,25 @@ export function BarrierEditor(
         </div>
       )}
 
+      {/* Standing disclaimer: manual edits win over the sync. */}
+      <div
+        style={{
+          padding: "10px 14px",
+          background: "var(--au-warn-bg, rgba(245,158,11,.1))",
+          border: "1px solid var(--border)",
+          borderRadius: "var(--d-row-radius)",
+          color: "var(--text-secondary)",
+          fontSize: "var(--d-body)",
+        }}
+      >
+        <strong>Edições manuais são preservadas:</strong>{" "}
+        campos alterados aqui deixam de ser atualizados pelo sync
+        {manualFields.length > 0 &&
+          ` (${manualFields.length} manual nesta barreira)`}{" "}
+        — prefira corrigir no Fracttal (campo indicado em cada item). Use{" "}
+        <em>Reverter p/ Fracttal</em> para voltar a seguir o sync.
+      </div>
+
       {/* Section: Identification */}
       <div>
         <div
@@ -400,17 +552,7 @@ export function BarrierEditor(
           }}
         >
           <div style={{ display: "grid", gap: "var(--d-mini-gap)" }}>
-            <label
-              style={{
-                fontSize: "var(--d-micro)",
-                fontWeight: 700,
-                color: "var(--text-muted)",
-                textTransform: "uppercase",
-                letterSpacing: "0.1em",
-              }}
-            >
-              TAG
-            </label>
+            {fieldHead("TAG", "tag")}
             <input
               type="text"
               value={tag}
@@ -421,17 +563,7 @@ export function BarrierEditor(
           </div>
 
           <div style={{ display: "grid", gap: "var(--d-mini-gap)" }}>
-            <label
-              style={{
-                fontSize: "var(--d-micro)",
-                fontWeight: 700,
-                color: "var(--text-muted)",
-                textTransform: "uppercase",
-                letterSpacing: "0.1em",
-              }}
-            >
-              Instalação
-            </label>
+            {fieldHead("Instalação", "locationId")}
             <select
               value={locationId ?? ""}
               onChange={(e) => setLocationId(Number(e.currentTarget.value))}
@@ -446,17 +578,7 @@ export function BarrierEditor(
           </div>
 
           <div style={{ display: "grid", gap: "var(--d-mini-gap)" }}>
-            <label
-              style={{
-                fontSize: "var(--d-micro)",
-                fontWeight: 700,
-                color: "var(--text-muted)",
-                textTransform: "uppercase",
-                letterSpacing: "0.1em",
-              }}
-            >
-              Tipologia
-            </label>
+            {fieldHead("Tipologia", "typologyId")}
             <select
               value={typologyId ?? ""}
               onChange={(e) => setTypologyId(Number(e.currentTarget.value))}
@@ -471,17 +593,7 @@ export function BarrierEditor(
           </div>
 
           <div style={{ display: "grid", gap: "var(--d-mini-gap)" }}>
-            <label
-              style={{
-                fontSize: "var(--d-micro)",
-                fontWeight: 700,
-                color: "var(--text-muted)",
-                textTransform: "uppercase",
-                letterSpacing: "0.1em",
-              }}
-            >
-              Categoria
-            </label>
+            {fieldHead("Categoria", "categoryId")}
             <select
               value={categoryId ?? ""}
               onChange={(e) => setCategoryId(Number(e.currentTarget.value))}
@@ -496,17 +608,7 @@ export function BarrierEditor(
           </div>
 
           <div style={{ display: "grid", gap: "var(--d-mini-gap)" }}>
-            <label
-              style={{
-                fontSize: "var(--d-micro)",
-                fontWeight: 700,
-                color: "var(--text-muted)",
-                textTransform: "uppercase",
-                letterSpacing: "0.1em",
-              }}
-            >
-              Agrupamento
-            </label>
+            {fieldHead("Agrupamento", "groupingId")}
             <select
               value={groupingId ?? ""}
               onChange={(e) => setGroupingId(Number(e.currentTarget.value))}
@@ -521,17 +623,7 @@ export function BarrierEditor(
           </div>
 
           <div style={{ display: "grid", gap: "var(--d-mini-gap)" }}>
-            <label
-              style={{
-                fontSize: "var(--d-micro)",
-                fontWeight: 700,
-                color: "var(--text-muted)",
-                textTransform: "uppercase",
-                letterSpacing: "0.1em",
-              }}
-            >
-              Dono
-            </label>
+            {fieldHead("Dono", "ownerId")}
             <select
               value={ownerId ?? ""}
               onChange={(e) => {
@@ -550,17 +642,7 @@ export function BarrierEditor(
           </div>
 
           <div style={{ display: "grid", gap: "var(--d-mini-gap)" }}>
-            <label
-              style={{
-                fontSize: "var(--d-micro)",
-                fontWeight: 700,
-                color: "var(--text-muted)",
-                textTransform: "uppercase",
-                letterSpacing: "0.1em",
-              }}
-            >
-              Criticidade
-            </label>
+            {fieldHead("Criticidade", "criticalityId")}
             <select
               value={criticalityId ?? ""}
               onChange={(e) => setCriticalityId(Number(e.currentTarget.value))}
@@ -575,17 +657,11 @@ export function BarrierEditor(
           </div>
 
           <div style={{ display: "grid", gap: "var(--d-mini-gap)" }}>
-            <label
-              style={{
-                fontSize: "var(--d-micro)",
-                fontWeight: 700,
-                color: "var(--text-muted)",
-                textTransform: "uppercase",
-                letterSpacing: "0.1em",
-              }}
-            >
-              Disponibilidade
-            </label>
+            {fieldHead("Disponibilidade", undefined, {
+              field: "OS/SS + flags",
+              hint:
+                "Fracttal: ordens e solicitações abertas, data fora de operação e flags do ativo (protegido por autoria: status manual não é revertido)",
+            })}
             <select
               value={availabilityId ?? ""}
               onChange={(e) => setAvailabilityId(Number(e.currentTarget.value))}
@@ -784,17 +860,7 @@ export function BarrierEditor(
             setHasContingency,
           )}
           <div style={{ display: "grid", gap: "var(--d-mini-gap)" }}>
-            <label
-              style={{
-                fontSize: "var(--d-micro)",
-                fontWeight: 700,
-                color: "var(--text-muted)",
-                textTransform: "uppercase",
-                letterSpacing: "0.1em",
-              }}
-            >
-              Código da Evidência
-            </label>
+            {fieldHead("Código da Evidência", "evidenceCode")}
             <input
               type="text"
               placeholder="Ex: GM-3655.01-2024-T-005"
@@ -805,17 +871,7 @@ export function BarrierEditor(
           </div>
         </div>
         <div style={{ display: "grid", gap: "var(--d-mini-gap)" }}>
-          <label
-            style={{
-              fontSize: "var(--d-micro)",
-              fontWeight: 700,
-              color: "var(--text-muted)",
-              textTransform: "uppercase",
-              letterSpacing: "0.1em",
-            }}
-          >
-            Descrição da Contingência
-          </label>
+          {fieldHead("Descrição da Contingência", "contingencyDesc")}
           <textarea
             rows={2}
             placeholder="Detalhes do contingenciamento aplicado..."
@@ -848,17 +904,7 @@ export function BarrierEditor(
           Degradação & Observações
         </div>
         <div style={{ display: "grid", gap: "var(--d-mini-gap)" }}>
-          <label
-            style={{
-              fontSize: "var(--d-micro)",
-              fontWeight: 700,
-              color: "var(--text-muted)",
-              textTransform: "uppercase",
-              letterSpacing: "0.1em",
-            }}
-          >
-            Descrição da Degradação
-          </label>
+          {fieldHead("Descrição da Degradação", "degradationDesc")}
           <textarea
             rows={2}
             placeholder="Descreva eventuais falhas ou degradação..."
@@ -869,17 +915,7 @@ export function BarrierEditor(
         </div>
 
         <div style={{ display: "grid", gap: "var(--d-mini-gap)" }}>
-          <label
-            style={{
-              fontSize: "var(--d-micro)",
-              fontWeight: 700,
-              color: "var(--text-muted)",
-              textTransform: "uppercase",
-              letterSpacing: "0.1em",
-            }}
-          >
-            Comentários
-          </label>
+          {fieldHead("Comentários", "comments")}
           <textarea
             rows={2}
             value={comments}
@@ -889,17 +925,7 @@ export function BarrierEditor(
         </div>
 
         <div style={{ display: "grid", gap: "var(--d-mini-gap)" }}>
-          <label
-            style={{
-              fontSize: "var(--d-micro)",
-              fontWeight: 700,
-              color: "var(--text-muted)",
-              textTransform: "uppercase",
-              letterSpacing: "0.1em",
-            }}
-          >
-            Comentários 2 (Complementares)
-          </label>
+          {fieldHead("Comentários 2 (Complementares)", "extraComments")}
           <textarea
             rows={2}
             value={extraComments}
@@ -909,17 +935,7 @@ export function BarrierEditor(
         </div>
 
         <div style={{ display: "grid", gap: "var(--d-mini-gap)" }}>
-          <label
-            style={{
-              fontSize: "var(--d-micro)",
-              fontWeight: 700,
-              color: "var(--text-muted)",
-              textTransform: "uppercase",
-              letterSpacing: "0.1em",
-            }}
-          >
-            Plano de Ação
-          </label>
+          {fieldHead("Plano de Ação", "actionPlan")}
           <textarea
             rows={2}
             placeholder="Ações previstas para restabelecimento..."
