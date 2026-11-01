@@ -1,7 +1,8 @@
 // Field option sets SQL - curated answer lists for sheet questions.
 // This is why it exists: admins settle default options in Settings and the
-// barrier editor offers them; rows seed from the GERAL extraction on first
-// read so a fresh database already suggests real workbook values.
+// barrier editor offers them; rows seed from the Fracttal-derived
+// SEED_DEFAULTS on first read so a fresh database already suggests the most
+// common upstream values.
 import { FIELD_KEYS, SEED_DEFAULTS } from "../../field-options.ts";
 
 import type { FieldKey } from "../../field-options.ts";

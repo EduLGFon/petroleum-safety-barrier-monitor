@@ -1,7 +1,7 @@
 // API: /api/field-options - curated answers for sheet questions.
 // This is why it exists: admins settle default options in Settings and the
-// barrier editor offers them; readers get seeded workbook values on a fresh
-// database without any admin action.
+// barrier editor offers them; readers get Fracttal-derived seeded values on
+// a fresh database without any admin action.
 import {
   authStoreUnavailable,
   denyByCredentials,

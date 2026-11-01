@@ -146,9 +146,9 @@ create table if not exists barriers (
   field_installed    text,                  -- Elemento Instalado em Campo? (Sim/Não)
   field_operational  text,                  -- Elemento Encontra-se Operacional? (Sim/Não)
   op_status          text,                  -- Status de Disponibilidade (Operacional)
-  has_maint_plan     text,                  -- Possui Plano de Manutenção? (Sim/Não/Verificar)
-  plan_followed      text,                  -- Plano de Manutenção Sendo Cumprido? (Sim/Não/Verificar)
-  failure_free       text,                  -- Ausência de Falha ou Defeito? (Sim/Não/Verificar)
+  has_maint_plan     text,                  -- Possui Plano de Manutenção? (Sim/Não)
+  plan_followed      text,                  -- Plano de Manutenção Sendo Cumprido? (Sim/Não)
+  failure_free       text,                  -- Ausência de Falha ou Defeito? (Sim/Não)
   maint_status       text,                  -- Status de Disponibilidade (Manutenção)
   has_contingency    text,                  -- Há Contingência? (Sim/Não)
   contingency_desc   text,                  -- Descrição da Contingência
@@ -200,6 +200,12 @@ alter table barriers add column if not exists contingency_desc text;
 alter table barriers add column if not exists evidence_code text;
 alter table barriers add column if not exists degradation_desc text;
 alter table barriers add column if not exists extra_comments text;
+-- Admin field ownership (manual edits the sync must not overwrite): which
+-- barrier columns an admin took over in the editor (camelCase PATCH keys).
+-- Empty = everything follows Fracttal. The sync excludes owned fields from
+-- its signature and UPDATE; PATCH adds edited keys and releaseFields removes
+-- them. Rides along idempotently like the sheet columns.
+alter table barriers add column if not exists manual_fields text[] not null default '{}';
 -- Upstream enable flag rides along idempotently like the sheet columns so
 -- existing databases gain it on the next migrate (default true = enabled).
 alter table barriers add column if not exists is_active boolean not null default true;
@@ -786,9 +792,9 @@ create index if not exists idx_throttle_reset on throttle_buckets(reset_at);
 
 -- ─── Field option sets (admin-curated answers for sheet questions) ─────────
 -- One row per barrier details field: admins settle default options in
--- Settings and the barrier editor offers them. Rows seed from the GERAL
--- extraction (see scripts/sheet-options.json) on first read, so a fresh
--- database already suggests real workbook values.
+-- Settings and the barrier editor offers them. Rows seed from the
+-- Fracttal-derived SEED_DEFAULTS in lib/field-options.ts on first read, so
+-- a fresh database already suggests the most common upstream values.
 create table if not exists field_option_sets (
   field      text        not null primary key,
   options    jsonb       not null default '[]'::jsonb,
