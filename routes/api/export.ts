@@ -233,6 +233,8 @@ function respond(
 }
 
 // fileHeaders: content type plus the download disposition for a file format.
+// Explicit no-store: downloads are per-selection bytes, never reusable, and
+// must not sit in a shared cache keyed without the session cookie.
 function fileHeaders(
   base: Record<string, string>,
   format: "csv" | "xlsx" | "pdf",
@@ -241,5 +243,7 @@ function fileHeaders(
     ...base,
     "content-type": FMT_MIME[format],
     "content-disposition": `attachment; filename="barreiras${FMT_EXT[format]}"`,
+    "cache-control": "private, no-store",
+    "vary": "Cookie",
   };
 }
