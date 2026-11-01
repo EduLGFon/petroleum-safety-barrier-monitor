@@ -2,7 +2,7 @@
 // selection semantics, validated restore, page clamp, and persistence.
 import { assertEquals, assertStrictEquals } from "jsr:@std/assert@^1";
 
-import { memoryStorage, renderHook } from "../scripts/test-dom.ts";
+import { memoryStorage, renderHook, waitFor } from "../scripts/test-dom.ts";
 
 import { loadDash, STORE_KEY } from "./dashboard/persistence.ts";
 
@@ -178,6 +178,9 @@ Deno.test("useDashboard persists location/filters/selection to storage", async (
   hh.get().setFilter({ query: "pump" });
   hh.get().toggleSelect(1);
   await hh.rerender(ALL);
+  // Persistence is debounced (400ms trailing) so query keystrokes skip the
+  // per-keypress write; the test waits for the trailing edge instead.
+  await waitFor(() => loadDash().filters?.query === "pump", 3000);
   const p = loadDash();
   assertStrictEquals(p.filters?.query, "pump");
   assertEquals(p.selectedIds, [1]);
