@@ -38,12 +38,20 @@ services:
     # No env_file: only POSTGRES_* (interpolated below from host .env) are
     # passed in. Mounting the full .env would leak DATABASE_URL/FRACTTAL_*
     # into the DB container for no benefit.
+    # PROD SAFETY: POSTGRES_PASSWORD has a dev-only default below. In prod the
+    # bundled `db` service must not run with it - fail closed. Either set a
+    # strong POSTGRES_PASSWORD in .env or point DATABASE_URL_DOCKER at an
+    # external DB and skip `db`. The check script deploy/check-compose-prod.sh
+    # (run it in CI/prod) aborts when the default is still in effect.
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-barreiras}
       POSTGRES_USER: ${POSTGRES_USER:-barrier}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-barrier}
     ports:
-      - "${POSTGRES_PORT:-5432}:5432"
+      # Loopback-only: Postgres is reachable from the host for migrate/seed
+      # but never from the LAN. Remove the 127.0.0.1: prefix only behind a
+      # documented exception (VPN + firewall rule).
+      - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
     volumes:
       - pgdata:/var/lib/postgresql/
     restart: unless-stopped
@@ -76,7 +84,10 @@ services:
       - ./.env:/app/.env:ro
       - ./secrets:/app/secrets:ro
     ports:
-      - "8300:8300"
+      # Loopback-only by default (dashboard is served via Caddy/TLS in prod;
+      # see deploy/windows/Caddyfile and docs/DEPLOY-WINDOWS.md). Binding
+      # 8300 to all interfaces would expose plain HTTP to the LAN.
+      - "127.0.0.1:8300:8300"
     restart: unless-stopped
     healthcheck:
       test: [

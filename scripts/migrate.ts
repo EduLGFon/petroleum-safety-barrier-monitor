@@ -1,6 +1,13 @@
 // Migrate - applies db/schema.sql, the unused-auth cleanup, then the seeds.
 // This is why it exists: idempotent one-command DB setup for Fresh routes.
 // Run with: deno task db:migrate
+//
+// Pre-flight (take before every migrate, production included):
+//   pg_dump -Fc "$DATABASE_URL" -f backup/pre-migrate-$(date +%F_%H%M).dump
+// Each file below runs inside its own transaction (BEGIN/COMMIT, ROLLBACK
+// on error) so a half-applied file can never leave the DB wedged. Applied
+// files are recorded in schema_migrations (gate/record table) so reruns and
+// audits can tell what already ran.
 import { fromFileUrl } from "@std/path";
 
 import { Pool } from "@db/postgres";
@@ -116,12 +123,33 @@ const pool = new Pool(connectionString, 1, true);
 
 async function applyFile(url: URL) {
   const path = fromFileUrl(url);
+  const filename = path.split(/[\\/]/).pop() ?? path;
   console.log(`-> applying ${path}`);
+  console.log(
+    `   pre-flight: pg_dump -Fc "$DATABASE_URL" -f backup/pre-migrate-$(date +%F_%H%M).dump (take before migrate)`,
+  );
   const text = await Deno.readTextFile(path);
   const client = await pool.connect();
   try {
-    for (const stmt of splitStatements(text)) {
-      await client.queryArray(stmt);
+    // Gate/record table: survives reruns, lets audits prove what ran.
+    await client.queryArray(
+      "create table if not exists schema_migrations (filename text primary key, applied_at timestamptz not null default now())",
+    );
+    await client.queryArray("BEGIN");
+    try {
+      for (const stmt of splitStatements(text)) {
+        await client.queryArray(stmt);
+      }
+      await client.queryArray(
+        "insert into schema_migrations (filename) values ($1) on conflict (filename) do update set applied_at = now()",
+        [filename],
+      );
+      await client.queryArray("COMMIT");
+    } catch (err) {
+      try {
+        await client.queryArray("ROLLBACK");
+      } catch { /* already aborted */ }
+      throw err;
     }
   } finally {
     client.release();

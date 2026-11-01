@@ -21,6 +21,10 @@ barreiras.example.com {
 
 	header {
 		# Hardening without breaking Preact hydration or export downloads.
+		# -Server strips the Server: Caddy banner (less fingerprinting);
+		# uncomment HSTS only after the first successful https smoke test
+		# (enabling it before TLS works bricks plain-HTTP clients for a year).
+		-Server
 		X-Content-Type-Options nosniff
 		X-Frame-Options DENY
 		Referrer-Policy no-referrer

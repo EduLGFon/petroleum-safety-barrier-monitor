@@ -1,6 +1,11 @@
 // Seed - populates barriers + barrier_status_history with demo data.
 // This is why it exists: reuses the deterministic mock generator so local
 // Postgres matches mock mode. Run: deno task db:seed [-- --force]
+// DESTRUCTIVE: with --force it TRUNCATEs barriers + barrier_status_history
+// (CASCADE). Pre-flight before any --force run:
+//   pg_dump -Fc "$DATABASE_URL" -f backup/pre-seed-$(date +%F_%H%M).dump
+// Gate: --force alone is NOT enough; SEED_FORCE=1 must also be set and an
+// interactive "YES" confirmation answered, otherwise the script aborts.
 import { LOCATION_DIST_BY_ID, LOCATIONS } from "../lib/constants.ts";
 
 import { CATEGORY_CODES } from "../lib/enums.ts";
@@ -67,12 +72,35 @@ type BarrierInsert = Record<(typeof BARRIER_COLS)[number], unknown>;
 type HistoryInsert = Record<(typeof HISTORY_COLS)[number], unknown>;
 
 // Builds a multi-row INSERT with numbered placeholders and flat args.
+// Allow-listed tables only: arbitrary identifiers would be SQL injection via
+// the table/column interpolation below. Columns are validated against the
+// caller-provided allow-list for that table.
+const ALLOWED_INSERT_TABLES: Record<string, ReadonlySet<string>> = {
+  barriers: new Set(BARRIER_COLS),
+  barrier_status_history: new Set(HISTORY_COLS),
+  locations: new Set(["id", "code", "type", "name"]),
+  categories: new Set(["id", "label"]),
+};
 function buildInsert(
   table: string,
   cols: readonly string[],
   rows: Array<Record<string, unknown>>,
   returning = "",
 ): { text: string; args: unknown[] } {
+  const allowed = ALLOWED_INSERT_TABLES[table];
+  if (!allowed) {
+    throw new Error(
+      `buildInsert: table "${table}" is not allow-listed (barriers, barrier_status_history, locations, categories only)`,
+    );
+  }
+  for (const col of cols) {
+    if (!allowed.has(col)) {
+      throw new Error(`buildInsert: column "${col}" not allowed for ${table}`);
+    }
+  }
+  if (!/^[a-z_][a-z0-9_]*$/.test(table)) {
+    throw new Error(`buildInsert: invalid table name "${table}"`);
+  }
   const args: unknown[] = [];
   const groups = rows.map((row) => {
     const marks = cols.map((col) => {
@@ -90,10 +118,21 @@ function buildInsert(
   };
 }
 
+// Transaction-aware helpers: when main() opens its seed transaction,
+// txClient is set and every query rides that single connection (so the
+// TRUNCATE + all inserts COMMIT/ROLLBACK atomically). Outside a transaction
+// they fall back to pooled connections as before.
+type PoolClient = Awaited<ReturnType<Pool["connect"]>>;
+let txClient: PoolClient | null = null;
+
 async function queryRows<T>(
   text: string,
   args: unknown[] = [],
 ): Promise<T[]> {
+  if (txClient) {
+    const result = await txClient.queryObject<T>(text, args);
+    return result.rows;
+  }
   const client = await pool.connect();
   try {
     const result = await client.queryObject<T>(text, args);
@@ -220,6 +259,48 @@ async function main() {
     Deno.exit(1);
   }
 
+  if (existing > 0 && force) {
+    // Destructive gate: --force alone is not enough. Require the env
+    // opt-in plus an interactive confirmation, and run inside a
+    // transaction so a later failure rolls the TRUNCATE back.
+    // Pre-flight: pg_dump -Fc "$DATABASE_URL" -f backup/pre-seed-$(date +%F_%H%M).dump
+    if (Deno.env.get("SEED_FORCE") !== "1") {
+      console.error(
+        "refusing to TRUNCATE: set SEED_FORCE=1 in the environment plus --force to confirm you took a pre-dump.",
+      );
+      Deno.exit(1);
+    }
+    const answer = globalThis.prompt(
+      `TRUNCATE barrier_status_history, barriers (${existing} rows) CASCADE? Type YES to proceed:`,
+    );
+    if (answer !== "YES") {
+      console.error("aborted: interactive confirmation did not answer YES.");
+      Deno.exit(1);
+    }
+  }
+
+  // Whole seed in one transaction: TRUNCATE + catalog + batches COMMIT
+  // together, else ROLLBACK leaves the previous dataset intact.
+  const client = await pool.connect();
+  txClient = client;
+  try {
+    await client.queryArray("BEGIN");
+    try {
+      await seedInner(existing);
+      await client.queryArray("COMMIT");
+    } catch (err) {
+      try {
+        await client.queryArray("ROLLBACK");
+      } catch { /* already aborted */ }
+      throw err;
+    }
+  } finally {
+    txClient = null;
+    client.release();
+  }
+}
+
+async function seedInner(existing: number) {
   if (existing > 0 && force) {
     console.log(
       `-> truncating barriers (${existing} rows) and barrier_status_history...`,

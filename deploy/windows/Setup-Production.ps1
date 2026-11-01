@@ -102,6 +102,12 @@ function Invoke-Download([string]$url, [string]$outFile) {
 }
 
 function Set-DotEnvKey([string]$file, [string]$key, [string]$value) {
+  # Sanitize: strip CR/LF so a pasted secret can never inject extra .env lines
+  # (e.g. "pass`nEVIL=1"). Tabs/spaces are preserved; only line breaks are cut.
+  $value = ($value -replace "`r", "") -replace "`n", ""
+  if ($value -match '[\x00-\x08\x0b\x0c\x0e-\x1f]') {
+    throw "SETUP ABORTED: value for $key contains control characters."
+  }
   $lines = Get-Content $file
   $pattern = "^(#\s*)?" + [regex]::Escape($key) + '\s*=.*$'
   $done = $false
@@ -118,6 +124,60 @@ $os = (Get-CimInstance Win32_OperatingSystem).Caption
 Write-Host "OS: $os"
 if (-not [Environment]::Is64BitOperatingSystem) { Write-Need '64-bit Windows is required.' }
 if ($os -notmatch '2022|2025') { Write-Warning "$os is not Server 2022/2025; continuing, verify paths manually." }
+# Postgres identifier gate: DbUser/DbName are interpolated into CREATE ROLE /
+# CREATE DATABASE, so they must be strict identifiers (no quoting tricks).
+# Pattern ^[a-z_][a-z0-9_]{0,62}$ matches Postgres' own 63-byte limit.
+foreach ($pair in @(@('DbUser', $DbUser), @('DbName', $DbName))) {
+  if ($pair[1] -cnotmatch '^[a-z_][a-z0-9_]{0,62}$') {
+    Write-Need "$($pair[0]) '$($pair[1])' invalid: must match ^[a-z_][a-z0-9_]{0,62}$ (lowercase, digits, underscore; max 63 chars)."
+  }
+}
+# Secrets hygiene: CLI args leak via process list + shell history. Prefer env
+# (ADMIN_PASSWORD / DB_PASSWORD / POSTGRES_SUPER_PASSWORD / FRACTTAL_SECRET /
+# SMTP_PASS) or an interactive prompt; CLI values below only warn and proceed
+# for backward compatibility. Never echo secrets to logs (see summary box).
+foreach ($s in @('AdminPassword', 'DbPassword', 'PostgresSuperPassword', 'FracttalSecret', 'SmtpPass')) {
+  if ($PSBoundParameters.ContainsKey($s) -and $PSBoundParameters[$s]) {
+    Write-Warning "secret -$s was passed on the CLI (visible in process list/history); prefer the $s env var or interactive prompt next time."
+  }
+}
+function Read-SecretEnvOrPrompt([string]$envName, [string]$label) {
+  $v = [Environment]::GetEnvironmentVariable($envName)
+  if (-not [string]::IsNullOrEmpty($v)) { return $v }
+  $sec = Read-Host -AsSecureString "$label (input hidden, from env $envName or type here; empty = generate)"
+  if ($sec -and $sec.Length -gt 0) {
+    $ptr = [Runtime.InteropServices.Marshal]::SecureStringToBSTR($sec)
+    try { return [Runtime.InteropServices.Marshal]::PtrToStringBSTR($ptr) }
+    finally { [Runtime.InteropServices.Marshal]::ZeroFreeBSTR($ptr) }
+  }
+  return ''
+}
+if (-not $AdminPassword) {
+  $fromEnv = Read-SecretEnvOrPrompt 'ADMIN_PASSWORD' 'Admin password'
+  if ($fromEnv) { $AdminPassword = $fromEnv }
+}
+if (-not $DbPassword) {
+  $fromEnv = Read-SecretEnvOrPrompt 'DB_PASSWORD' 'Postgres app password'
+  if ($fromEnv) { $DbPassword = $fromEnv }
+}
+if (-not $PostgresSuperPassword -and (Test-Path (Join-Path $PostgresBinDir 'pg_ctl.exe'))) {
+  # Existing Postgres needs the superuser now; missing value fails later with
+  # a clear message (no silent generation over an existing cluster).
+  $fromEnv = [Environment]::GetEnvironmentVariable('POSTGRES_SUPER_PASSWORD')
+  if ($fromEnv) { $PostgresSuperPassword = $fromEnv }
+}
+if (-not $FracttalSecret) {
+  $fromEnv = [Environment]::GetEnvironmentVariable('FRACTTAL_SECRET')
+  if ($fromEnv) { $FracttalSecret = $fromEnv }
+}
+if (-not $SmtpPass) {
+  $fromEnv = [Environment]::GetEnvironmentVariable('SMTP_PASS')
+  if ($fromEnv) { $SmtpPass = $fromEnv }
+  if (-not $SmtpPass) {
+    $alt = [Environment]::GetEnvironmentVariable('OPS_SMTP_PASS')
+    if ($alt) { $SmtpPass = $alt }
+  }
+}
 if ([string]::IsNullOrWhiteSpace($AdminEmail) -or $AdminEmail -notlike '*@*') {
   Write-Need 'pass -AdminEmail you@example.com (first admin account).'
 }
@@ -186,6 +246,19 @@ if (-not $Unattended) {
 }
 
 # ── 1. Deno (machine-wide so LocalSystem services see it) ────────────
+# Supply-chain pin: verify every downloaded installer against its published
+# SHA256 before executing (replace the placeholder hashes below with the
+# values from the official release pages for $DenoVersion/$CaddyVersion and
+# the EDB Postgres build, then uncomment the Assert-Sha256 calls). Until the
+# hashes are pinned, downloads are TLS-only + version-pinned, but not
+# hash-pinned - treat a hash mismatch as a hard abort, never warn-and-run.
+#   $DenoSha256     = '<paste deno-x86_64-pc-windows-msvc.zip SHA256>'
+#   $CaddySha256    = '<paste caddy_WINDOWS_amd64.zip SHA256>'
+#   $PostgresSha256 = '<paste postgresql-16.x-windows-x64.exe SHA256>'
+#   function Assert-Sha256([string]$file, [string]$expected) {
+#     $actual = (Get-FileHash $file -Algorithm SHA256).Hash.ToLower()
+#     if ($actual -ne $expected.ToLower()) { throw "SHA256 mismatch for $file (got $actual)" }
+#   }
 Write-Step "Ensuring Deno $DenoVersion (machine PATH)"
 $denoDir = Join-Path $ToolsDir 'deno'
 $denoExe = Join-Path $denoDir 'deno.exe'
@@ -356,8 +429,14 @@ Write-Step 'Building the Fresh bundle'
 Write-Step 'Applying database migrations (idempotent)'
 & $denoExe task db:migrate
 Write-Step "Ensuring admin $AdminEmail (warning is fine when it already exists)"
-& $denoExe task admin:create -- --email $AdminEmail --password $AdminPassword
-if ($LASTEXITCODE -ne 0) { Write-Warning 'admin:create did not report success; it likely already exists. Verify login later.' }
+# Secrets via env, never CLI: --password would leak through the process list.
+$env:ADMIN_PASSWORD = $AdminPassword
+try {
+  & $denoExe task admin:create -- --email $AdminEmail --confirm-existing
+  if ($LASTEXITCODE -ne 0) { Write-Warning 'admin:create did not report success; it likely already exists. Verify login later.' }
+} finally {
+  Remove-Item Env:\ADMIN_PASSWORD -ErrorAction SilentlyContinue
+}
 Pop-Location
 
 # ── 7. Services ─────────────────────────────────────────────────────
@@ -385,9 +464,12 @@ if ($caddyWanted) {
 $site {
 	reverse_proxy 127.0.0.1:$AppPort
 	header {
+		-Server
 		X-Content-Type-Options nosniff
 		X-Frame-Options DENY
 		Referrer-Policy no-referrer
+		# HSTS only after first successful https smoke test (see Caddyfile template).
+		# Strict-Transport-Security "max-age=31536000; includeSubDomains"
 	}
 	log {
 		output file $logPath
@@ -413,29 +495,41 @@ $site {
 }
 
 # ── 8. Firewall ─────────────────────────────────────────────────────
+# Default-deny posture: no inbound allow rule is created unless explicitly
+# required below. Web ports (80/443) REQUIRE -AllowedLanRanges (office/VPN
+# CIDRs); opening them to the whole internet in plain HTTP or even https is
+# refused - pass the LAN ranges or -SkipFirewall (and document the exception).
 if (-not $SkipFirewall) {
   Write-Step 'Configuring Windows Firewall'
   $fwScope = @{}
   if ($AllowedLanRanges.Count -gt 0) { $fwScope['RemoteAddress'] = $AllowedLanRanges }
   if ($caddyWanted) {
+    if ($AllowedLanRanges.Count -eq 0) {
+      Write-Need 'refusing to open TCP 80/443 to the whole network: pass -AllowedLanRanges (e.g. office/VPN CIDRs) or -SkipFirewall with a documented exception. Default-deny stays.'
+    }
     $webPorts = @('80')
     if ($Hostname) { $webPorts += '443' }
     foreach ($port in $webPorts) {
       $rule = "Barrier Monitor web ($port)"
       if (-not (Get-NetFirewallRule -DisplayName $rule -ErrorAction SilentlyContinue)) {
         New-NetFirewallRule -DisplayName $rule -Direction Inbound -Protocol TCP -LocalPort $port -Action Allow @fwScope | Out-Null
+      } else {
+        # Refresh scope on re-run so a widened rule is tightened back.
+        Set-NetFirewallRule -DisplayName $rule -RemoteAddress ($AllowedLanRanges -join ',') | Out-Null
       }
     }
-    if ($AllowedLanRanges.Count -gt 0) { Write-Host "inbound TCP $($webPorts -join '+') open, scoped to $($AllowedLanRanges -join ', '); app port stays loopback-only." }
-    elseif ($Hostname) { Write-Host 'inbound TCP 80+443 open; app port stays loopback-only.' }
-    else { Write-Warning 'inbound TCP 80 is open to the whole network in plain HTTP: pass -AllowedLanRanges (e.g. office subnets) to scope it. Never forward this port from the internet router.' }
+    Write-Host "inbound TCP $($webPorts -join '+') open, scoped to $($AllowedLanRanges -join ', '); app port stays loopback-only."
   } elseif ($AllowLanAppPort) {
-  } elseif ($AllowLanAppPort) {
+    if ($AllowedLanRanges.Count -eq 0) {
+      Write-Need 'refusing to open the app port to the whole network: pass -AllowedLanRanges to scope it (TLS-less port) or leave it loopback-only.'
+    }
     $rule = "Barrier Monitor app ($AppPort)"
     if (-not (Get-NetFirewallRule -DisplayName $rule -ErrorAction SilentlyContinue)) {
-      New-NetFirewallRule -DisplayName $rule -Direction Inbound -Protocol TCP -LocalPort $AppPort -Action Allow | Out-Null
+      New-NetFirewallRule -DisplayName $rule -Direction Inbound -Protocol TCP -LocalPort $AppPort -Action Allow @fwScope | Out-Null
+    } else {
+      Set-NetFirewallRule -DisplayName $rule -RemoteAddress ($AllowedLanRanges -join ',') | Out-Null
     }
-    Write-Warning "TCP $AppPort is open to the LAN without TLS: acceptable only behind VPN; prefer -Hostname with Caddy."
+    Write-Warning "TCP $AppPort is open to $($AllowedLanRanges -join ', ') without TLS: acceptable only behind VPN; prefer -Hostname with Caddy."
   } else {
     Write-Host 'no inbound rules created: app reachable from this host only until a proxy is added.'
   }

@@ -19,17 +19,36 @@ $ErrorActionPreference = 'Stop'
 New-Item -ItemType Directory -Force -Path $BackupDir | Out-Null
 
 # Load DATABASE_URL from .env next to the repo (same merge rule as doctor).
+# Values are sanitized (strip CR/LF, surrounding quotes) so a pasted secret
+# cannot inject lines; the URI is parsed with System.Uri + unescaping (not
+# naive Split(':')) so percent-encoded passwords (e.g. %40 for @) work.
 $repoRoot = Split-Path (Split-Path $PSScriptRoot -Parent) -Parent
 $envFile = Join-Path $repoRoot '.env'
 $databaseUrl = $env:DATABASE_URL
 if (-not $databaseUrl -and (Test-Path $envFile)) {
   foreach ($line in Get-Content $envFile) {
     if ($line -match '^\s*DATABASE_URL\s*=\s*(.+?)\s*$') {
-      $databaseUrl = $Matches[1].Trim('"', "'", ' ')
+      $databaseUrl = ($Matches[1].Trim('"', "'", ' ') -replace "`r", "") -replace "`n", ""
     }
   }
 }
 if (-not $databaseUrl) { throw 'DATABASE_URL not found in environment or .env.' }
+
+function Get-PgPasswordFromUrl([string]$url) {
+  try {
+    $uri = [Uri]$url
+  } catch {
+    throw "DATABASE_URL is not a parseable URI: $_"
+  }
+  if (-not $uri.UserInfo) { throw 'DATABASE_URL has no userinfo (expected postgres://user:password@host:port/db).' }
+  # UserInfo is still percent-encoded at this point: split on the FIRST colon
+  # (passwords may legally contain colons once encoded as %3A), then unescape.
+  $colon = $uri.UserInfo.IndexOf(':')
+  if ($colon -lt 0) { throw 'DATABASE_URL userinfo has no password part (expected user:password@).' }
+  $encPass = $uri.UserInfo.Substring($colon + 1)
+  if ([string]::IsNullOrEmpty($encPass)) { throw 'DATABASE_URL password is empty.' }
+  return [Uri]::UnescapeDataString($encPass)
+}
 
 $pgDump = 'C:\Program Files\PostgreSQL\16\bin\pg_dump.exe'
 if (-not (Test-Path $pgDump)) { $pgDump = (Get-Command pg_dump -ErrorAction SilentlyContinue).Source }
@@ -38,8 +57,10 @@ if (-not $pgDump) { throw 'pg_dump.exe not found. Install PostgreSQL 16 or add i
 $stamp = Get-Date -Format 'yyyy-MM-dd_HHmm'
 $out = Join-Path $BackupDir "barreiras-$stamp.dump"
 Write-Host "Backing up to $out …"
-$env:PGPASSWORD = ([Uri]$databaseUrl).UserInfo.Split(':')[1]
+$env:PGPASSWORD = Get-PgPasswordFromUrl $databaseUrl
 try {
+  # Pass the URL positionally: pg_dump accepts a conninfo/URI as dbname, and
+  # -Fc -f keep the custom-format dump + explicit output (no shell redirect).
   & $pgDump $databaseUrl -Fc -f $out
   if ($LASTEXITCODE -ne 0) { throw "pg_dump exited $LASTEXITCODE" }
 } finally {

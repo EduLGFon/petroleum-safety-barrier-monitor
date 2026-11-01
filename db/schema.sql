@@ -15,6 +15,24 @@
 -- Run this once against a fresh database:
 --   deno task db:migrate
 -- which executes this file followed by db/seed_lookups.sql.
+--
+-- DEPLOY BOUNDARIES (do not change schema without a migration + plan):
+--   - RLS boundary: Row-Level Security is intentionally NOT enabled on any
+--     table. Access scoping (station visibility via access_groups /
+--     user_access_groups, admin bypass) is enforced in the application layer
+--     (lib/server/sql/rowScope.ts + session auth). Do NOT assume the database
+--     filters rows by itself: a direct psql connection sees everything. If a
+--     future plan adds RLS policies, it must ship as a new migration file
+--     (ALTER TABLE ... ENABLE ROW LEVEL SECURITY + policies) with a rollout
+--     + rollback drill - never by editing this file in place on prod.
+--   - compliance_id REFERENCES note: barriers.compliance_id is a derived
+--     0/1 flag (0 = compliant, 1 = non-compliant) maintained by the
+--     trg_barriers_set_compliance trigger from availability_statuses
+--     .is_compliant - it is NOT a foreign key to availability_statuses(id)
+--     (whose ids are 0..5). Do NOT add REFERENCES without a migration: the
+--     values would violate it on day one. Any future change (e.g. a real FK
+--     to a compliance lookup) needs a migration file + backfill plan, not an
+--     in-place edit of the CREATE TABLE below.
 
 -- ─── Lookup tables (id ⇄ label pairs, mirrored in lib/enums.ts) ───────────
 
@@ -111,6 +129,9 @@ create table if not exists barriers (
   -- compliant status set lives in the availability_statuses lookup table
   -- rather than a hardcoded literal list, so a trigger is the mechanism
   -- instead.
+  -- Boundary note (see header): 0 = compliant, 1 = non-compliant. NOT a
+  -- REFERENCES to availability_statuses(id) - do not add a FK without a
+  -- migration + backfill plan (values 0/1 would violate it).
   compliance_id      integer    not null default 1,
 
   comments           text        not null default '',

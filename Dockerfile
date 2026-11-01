@@ -39,5 +39,12 @@ RUN --mount=type=cache,target=/tmp/dcache \
 
 EXPOSE 8300
 
+# Drop privileges: the deno base image ships a `deno` user; runtime processes
+# (app/poller/tools) must not run as root. /app and /deno-dir are chowned so
+# the bundle + cache stay readable after the switch. If a bind-mount needs
+# root-owned writes, chown the host path to 1000:1000 instead of removing USER.
+RUN chown -R deno:deno /app /deno-dir
+USER deno
+
 # Same boot path as local `deno task start` (reads the mounted .env).
 CMD ["task", "start"]
