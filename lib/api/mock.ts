@@ -141,7 +141,8 @@ function sortWire(
 
 export const mockAdapter: BarriersApi = {
   // Mock getBarriers: filters, sorts, paginates, resolves page to domain.
-  getBarriers(query) {
+  getBarriers(query, opts) {
+    opts?.signal?.throwIfAborted();
     const all = getWireBarriers().filter((w) => matchesQuery(w, query));
     const total = all.length;
     const page = query.page ?? 1;
@@ -156,14 +157,16 @@ export const mockAdapter: BarriersApi = {
   },
 
   // Mock getAllBarriers: filters/sorts all matches for export/KPI use.
-  getAllBarriers(query) {
+  getAllBarriers(query, opts) {
+    opts?.signal?.throwIfAborted();
     const all = getWireBarriers().filter((w) => matchesQuery(w, query));
     const sorted = sortWire(all, query.sortCol ?? "id", query.sortDir ?? "asc");
     return Promise.resolve(resolveBarriers(sorted));
   },
 
   // Mock getBarrierById: finds wire row by id, resolves to domain.
-  getBarrierById(id) {
+  getBarrierById(id, opts) {
+    opts?.signal?.throwIfAborted();
     const w = getWireBarriers().find((b) => b.id === id);
     return Promise.resolve(w ? resolveBarriers([w])[0] : null);
   },
@@ -172,7 +175,8 @@ export const mockAdapter: BarriersApi = {
   // Scope counts ride over the unscoped match so the admin band segments
   // always reflect the whole filter subset (mock rows are role-seeded, so
   // non-admin sets simply count zero hidden rows).
-  getKpi(query) {
+  getKpi(query, opts) {
+    opts?.signal?.throwIfAborted();
     const scoped = getWireBarriers().filter((w) => matchesQuery(w, query));
     const unscoped = getWireBarriers().filter((w) =>
       matchesQuery(w, { ...query, rowScope: "all" })
@@ -185,7 +189,8 @@ export const mockAdapter: BarriersApi = {
   },
 
   // Mock getChartData: filters by the full query and computes local rows.
-  getChartData(query) {
+  getChartData(query, opts) {
+    opts?.signal?.throwIfAborted();
     const all = getWireBarriers().filter((w) => matchesQuery(w, query));
     return Promise.resolve(computeChartData(resolveBarriers(all)));
   },

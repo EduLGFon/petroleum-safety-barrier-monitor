@@ -60,12 +60,30 @@ Deno.test("loadSyncConfig requires Fracttal credentials", () => {
 Deno.test("loadSyncConfig applies env and overrides", () => {
   const cfg = loadSyncConfig(
     env({ FRACTTAL_KEY: "k", FRACTTAL_SECRET: "s" }),
-    { baseUrl: "https://example.test", itemType: 7 },
+    { baseUrl: "https://app.fracttal.com/custom", itemType: 7 },
   );
   assertStrictEquals(cfg.key, "k");
   assertStrictEquals(cfg.secret, "s");
-  assertStrictEquals(cfg.baseUrl, "https://example.test");
+  assertStrictEquals(cfg.baseUrl, "https://app.fracttal.com/custom");
   assertStrictEquals(cfg.itemType, 7);
+});
+
+Deno.test("loadSyncConfig rejects non-allow-listed baseUrl hosts", () => {
+  assertThrows(() =>
+    loadSyncConfig(
+      env({ FRACTTAL_KEY: "k", FRACTTAL_SECRET: "s" }),
+      { baseUrl: "https://example.test", itemType: 7 },
+    )
+  );
+  assertThrows(() =>
+    loadSyncConfig(
+      env({
+        FRACTTAL_KEY: "k",
+        FRACTTAL_SECRET: "s",
+        FRACTTAL_BASE_URL: "https://evil.test/api",
+      }),
+    )
+  );
 });
 
 Deno.test("isDevFracttalRawEnabled reads the flag case-insensitively", () => {

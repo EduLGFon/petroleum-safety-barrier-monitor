@@ -166,10 +166,10 @@ Deno.test("summarizeCompliance topNC is most-NC-first, clean rows excluded", () 
   assertEquals(s.topNC.map((r) => r.name), ["Worst", "Mid"]);
 });
 
-Deno.test("summarizeCompliance of empty list is 100% with no top", () => {
+Deno.test("summarizeCompliance of empty list is 0% with no top", () => {
   const s = summarizeCompliance([]);
   assertStrictEquals(s.total, 0);
-  assertStrictEquals(s.pctCompliant, 100);
+  assertStrictEquals(s.pctCompliant, 0);
   assertEquals(s.topNC, []);
 });
 

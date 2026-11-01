@@ -40,12 +40,21 @@ export function streamExportPdf(
   });
   return new ReadableStream<Bytes>({
     async pull(controller) {
-      const { value, done } = await chunks.next();
-      if (done) {
-        controller.close();
-        return;
+      try {
+        const { value, done } = await chunks.next();
+        if (done) {
+          controller.close();
+          return;
+        }
+        controller.enqueue(value);
+      } catch (e) {
+        try {
+          await chunks.return?.(undefined);
+        } catch {
+          // Ignore cleanup failures; the source error is what matters.
+        }
+        throw e;
       }
-      controller.enqueue(value);
     },
     async cancel() {
       await chunks.return?.(undefined);

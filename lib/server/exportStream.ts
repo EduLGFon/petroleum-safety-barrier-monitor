@@ -43,36 +43,48 @@ export function textStream(
   return new ReadableStream<Uint8Array>({
     async pull(controller) {
       if (closed) return;
-      // First pull: the head needs the first batch, so the file starts with
-      // real data (and the empty scope still gets a head plus a tail).
-      if (!started) {
-        started = true;
-        const first = await iter.next();
-        const batch = first.done ? [] : first.value;
-        enqueue(
-          controller,
-          plan.head ? await plan.head(batch) : [],
-        );
-        if (first.done) {
+      try {
+        // First pull: the head needs the first batch, so the file starts with
+        // real data (and the empty scope still gets a head plus a tail).
+        if (!started) {
+          started = true;
+          const first = await iter.next();
+          const batch = first.done ? [] : first.value;
+          enqueue(
+            controller,
+            plan.head ? await plan.head(batch) : [],
+          );
+          if (first.done) {
+            closed = true;
+            enqueue(controller, plan.tail ? await plan.tail() : []);
+            controller.close();
+            return;
+          }
+          offset = batch.length;
+          controller.enqueue(encoder.encode(plan.render(batch, 0)));
+          return;
+        }
+        const next = await iter.next();
+        if (next.done) {
           closed = true;
           enqueue(controller, plan.tail ? await plan.tail() : []);
           controller.close();
           return;
         }
-        offset = batch.length;
-        controller.enqueue(encoder.encode(plan.render(batch, 0)));
-        return;
-      }
-      const next = await iter.next();
-      if (next.done) {
+        const at = offset;
+        offset += next.value.length;
+        controller.enqueue(encoder.encode(plan.render(next.value, at)));
+      } catch (e) {
+        // A throwing batch (DB failure) must release the generator, or the
+        // cursor leaks and the socket hangs instead of erroring.
         closed = true;
-        enqueue(controller, plan.tail ? await plan.tail() : []);
-        controller.close();
-        return;
+        try {
+          await iter.return?.(undefined);
+        } catch {
+          // Ignore cleanup failures; the source error is what matters.
+        }
+        throw e;
       }
-      const at = offset;
-      offset += next.value.length;
-      controller.enqueue(encoder.encode(plan.render(next.value, at)));
     },
     // Client hung up mid-export: let the generator release its iterator.
     async cancel() {

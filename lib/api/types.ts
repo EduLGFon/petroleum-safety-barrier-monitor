@@ -5,17 +5,23 @@
 import type { Barrier, CategoryCompliance, KpiSnapshot } from "../types.ts";
 import type { BarriersQuery } from "../wireTypes.ts";
 
+export interface ApiOpts {
+  signal?: AbortSignal;
+}
+
 export interface BarriersApi {
   /** Fetch a page of barriers matching the given (already id-encoded) query */
   getBarriers(
     query: BarriersQuery,
+    opts?: ApiOpts,
   ): Promise<{ items: Barrier[]; total: number; totalPages: number }>;
   /** Fetch every barrier matching the query, unpaginated (used for export & KPI/chart calc) */
   getAllBarriers(
     query: Omit<BarriersQuery, "page" | "pageSize">,
+    opts?: ApiOpts,
   ): Promise<Barrier[]>;
   /** Fetch a single barrier by id */
-  getBarrierById(id: number): Promise<Barrier | null>;
+  getBarrierById(id: number, opts?: ApiOpts): Promise<Barrier | null>;
   /** Fetch a precomputed KPI snapshot over the given filters */
   getKpi(
     query: Pick<
@@ -33,6 +39,7 @@ export interface BarriersApi {
       | "since"
       | "until"
     >,
+    opts?: ApiOpts,
   ): Promise<KpiSnapshot>;
   /** Fetch per-category Conforme totals over the given filters */
   getChartData(
@@ -51,6 +58,7 @@ export interface BarriersApi {
       | "since"
       | "until"
     >,
+    opts?: ApiOpts,
   ): Promise<CategoryCompliance[]>;
 }
 
