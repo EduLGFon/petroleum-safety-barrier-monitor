@@ -1,12 +1,14 @@
-// AppearanceSection.tsx - theme/density/accent pickers plus reduce-motion and preview.
+// AppearanceSection.tsx - theme/density/font-size/accent pickers plus toggles and preview.
 // Why: groups all appearance controls so the SettingsPanel shell stays focused on drawer chrome.
 import type {
   AccentColor,
   Density,
+  FontSize,
   SettingsState,
 } from "../../context/SettingsContext.tsx";
 import { SectTitle, Toggle } from "./SectionPrimitives.tsx";
 import { DensityPicker } from "./DensityPicker.tsx";
+import { FontSizePicker } from "./FontSizePicker.tsx";
 import { AccentPicker } from "./AccentPicker.tsx";
 import { ThemePicker } from "./ThemePicker.tsx";
 import type { Theme } from "../../lib/types.ts";
@@ -15,9 +17,11 @@ interface Props {
   settings: SettingsState;
   activeTheme: Theme | null;
   activeDensity: Density | null;
+  activeFontSize: FontSize | null;
   activeAccent: AccentColor | null;
   onTheme: (t: Theme) => void;
   onDensity: (d: Density) => void;
+  onFontSize: (f: FontSize) => void;
   onAccent: (c: AccentColor) => void;
   onReduceMotion: (v: boolean) => void;
   onDisableBlur: (v: boolean) => void;
@@ -29,9 +33,11 @@ export function AppearanceSection(
     settings,
     activeTheme,
     activeDensity,
+    activeFontSize,
     activeAccent,
     onTheme,
     onDensity,
+    onFontSize,
     onAccent,
     onReduceMotion,
     onDisableBlur,
@@ -56,6 +62,11 @@ export function AppearanceSection(
         density={settings.density}
         activeDensity={activeDensity}
         onDensity={onDensity}
+      />
+      <FontSizePicker
+        fontSize={settings.fontSize}
+        activeFontSize={activeFontSize}
+        onFontSize={onFontSize}
       />
       <AccentPicker
         accentColor={settings.accentColor}
@@ -162,6 +173,16 @@ export function AppearanceSection(
           }}
         >
           Prévia
+        </div>
+        <div
+          style={{
+            fontSize: "var(--d-body)",
+            color: "var(--text-secondary)",
+            lineHeight: 1.6,
+            marginBottom: "var(--d-opt-gap)",
+          }}
+        >
+          Exemplo de leitura: conformidade, criticidade e rastreabilidade.
         </div>
         <div
           style={{

@@ -1,11 +1,13 @@
 // SettingsPanel - slide-over dialog for appearance, filters, account, admin.
-// This is why it exists: centralizes theme / accent / density / reduce-motion
-// plus startup filter defaults from SettingsContext, with a Conta tab (own
-// profile plus self-service password change) for every authenticated user and
-// an admin-only tab (users, recipients, alert rules) for administrators.
+// This is why it exists: centralizes theme / accent / density / font size /
+// reduce-motion plus startup filter defaults from SettingsContext, with a
+// Conta tab (own profile plus self-service password change) for every
+// authenticated user and an admin-only tab (users, recipients, alert rules)
+// for administrators.
 import {
   type AccentColor,
   type Density,
+  type FontSize,
   useSettings,
 } from "../context/SettingsContext.tsx";
 
@@ -69,6 +71,7 @@ export function SettingsPanel(
     setTheme,
     setAccent,
     setDensity,
+    setFontSize,
     setDefaults,
     setDefaultLoc,
     resetFilterDefaults,
@@ -83,6 +86,7 @@ export function SettingsPanel(
   const [activeTheme, setActiveTheme] = useState<Theme | null>(null);
   const [activeAccent, setActiveAccent] = useState<AccentColor | null>(null);
   const [activeDensity, setActiveDensity] = useState<Density | null>(null);
+  const [activeFontSize, setActiveFontSize] = useState<FontSize | null>(null);
 
   useEffect(() => {
     if (!open) return;
@@ -119,6 +123,12 @@ export function SettingsPanel(
     setActiveDensity(d);
     setDensity(d);
     setTimeout(() => setActiveDensity(null), 350);
+  };
+  // handleFontSize: applies the text-size preset with a brief press animation.
+  const handleFontSize = (f: FontSize) => {
+    setActiveFontSize(f);
+    setFontSize(f);
+    setTimeout(() => setActiveFontSize(null), 350);
   };
 
   // Focus management: remember the trigger on open, focus the panel, restore
@@ -268,9 +278,11 @@ export function SettingsPanel(
             settings={settings}
             activeTheme={activeTheme}
             activeDensity={activeDensity}
+            activeFontSize={activeFontSize}
             activeAccent={activeAccent}
             onTheme={handleTheme}
             onDensity={handleDensity}
+            onFontSize={handleFontSize}
             onAccent={handleAccent}
             onReduceMotion={setReduceMotion}
             onDisableBlur={setDisableBlur}
