@@ -178,9 +178,9 @@ export function FieldOptionsManager(
                   disabled={busy}
                   onClick={restoreDefaults}
                   style={{ ...ghostBtn, fontSize: "var(--d-small)" }}
-                  title="Restaura os valores extraídos da planilha original"
+                  title="Restaura os valores mais comuns do Fracttal"
                 >
-                  Restaurar planilha
+                  Restaurar padrão
                 </button>
               </div>
               <div
