@@ -42,7 +42,9 @@ a correção na fonte.
 
 ## 6. Configurações
 
-Tema, cor, densidade, movimento reduzido, filtros padrão, ordenação padrão, alteração de senha, edição de perfil e, para admins, usuários, destinatários, regras de alerta e opções de campos.
+Tema, cor, densidade, tamanho do texto, movimento reduzido, filtros padrão, ordenação padrão, alteração de senha, edição de perfil e, para admins, usuários, destinatários, regras de alerta e opções de campos.
+
+O tamanho do texto tem quatro opções (Pequeno, Padrão, Grande e Muito grande). A densidade continua controlando o espaçamento; o tamanho do texto ajusta apenas a leitura e é salvo neste navegador.
 
 ## 7. Exportação
 

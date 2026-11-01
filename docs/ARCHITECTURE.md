@@ -8,7 +8,7 @@ Deno-only Fresh 2 + Vite + Preact islands. No ORM, no `package.json`.
 
 Key tasks: `check`, `test`, `dev`, `build`, `preview`, `start`, `db:migrate`, `db:seed`, `fracttal:*`, `alerts:*`, `admin:create`, `docker:*`.
 
-`COMPANY_NAME` is read per request. `_app.tsx` renders the shell and restores theme/accent/density/motion from `barrier-settings`.
+`COMPANY_NAME` is read per request. `_app.tsx` renders the shell and restores theme/accent/density/font size/motion from `barrier-settings`.
 
 ## Layers
 
