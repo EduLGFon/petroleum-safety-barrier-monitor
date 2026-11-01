@@ -1282,3 +1282,12 @@ html.no-blur {
   border-color: var(--accent);
   box-shadow: 0 0 0 3px var(--glow);
 }
+
+/* Collapsible blocks in the barrier details modal: affordance + spacing. */
+.collapsible-chevron {
+  display: inline-flex;
+  transition: transform 0.15s ease;
+}
+details[open] > summary .collapsible-chevron {
+  transform: rotate(90deg);
+}

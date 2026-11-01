@@ -14,6 +14,8 @@ import type { Barrier } from "../../lib/types.ts";
 
 import { FR, Txt } from "./primitives.tsx";
 
+import { ChevronRightIcon } from "../ui/Icons.tsx";
+
 export function BarrierDetails({ b }: { b: Barrier }) {
   const deleted = (b.deletedAt ?? null) !== null;
   const inactive = !deleted && (b.isActive ?? true) === false;
@@ -32,8 +34,17 @@ export function BarrierDetails({ b }: { b: Barrier }) {
 
   return (
     <div style={{ padding: "var(--d-dialog-body)" }}>
-      <details open style={{ marginBottom: "var(--d-block-gap)" }}>
-        <summary style={summaryStyle}>Identificação</summary>
+      <details open style={{ marginBottom: "var(--d-stack-sm)" }}>
+        <summary style={summaryStyle}>
+          <span>Identificação</span>
+          <span className="collapsible-chevron">
+            <ChevronRightIcon
+              size={12}
+              color="var(--text-muted)"
+              strokeWidth={2}
+            />
+          </span>
+        </summary>
         <div
           style={{
             display: "grid",
@@ -70,15 +81,24 @@ export function BarrierDetails({ b }: { b: Barrier }) {
         </div>
       </details>
 
-      <details style={{ marginBottom: "var(--d-block-gap)" }}>
-        <summary style={summaryStyle}>Ficha do Inventário</summary>
+      <details style={{ marginBottom: "var(--d-stack-sm)" }}>
+        <summary style={summaryStyle}>
+          <span>Ficha do Inventário</span>
+          <span className="collapsible-chevron">
+            <ChevronRightIcon
+              size={12}
+              color="var(--text-muted)"
+              strokeWidth={2}
+            />
+          </span>
+        </summary>
         <div
           style={{
             display: "grid",
             gridTemplateColumns: "1fr 1fr 1fr",
             gap: "var(--d-details-gap)",
             marginTop: "var(--d-stack-sm)",
-            marginBottom: "var(--d-block-gap)",
+            marginBottom: "var(--d-stack-sm)",
           }}
         >
           <FR
@@ -132,15 +152,24 @@ export function BarrierDetails({ b }: { b: Barrier }) {
         </div>
       </details>
 
-      <details open style={{ marginBottom: "var(--d-block-gap)" }}>
-        <summary style={summaryStyle}>Plano de Manutenção</summary>
+      <details open style={{ marginBottom: "var(--d-stack-sm)" }}>
+        <summary style={summaryStyle}>
+          <span>Plano de Manutenção</span>
+          <span className="collapsible-chevron">
+            <ChevronRightIcon
+              size={12}
+              color="var(--text-muted)"
+              strokeWidth={2}
+            />
+          </span>
+        </summary>
         <div
           style={{
             display: "grid",
             gridTemplateColumns: "1fr 1fr 1fr",
             gap: "var(--d-details-gap)",
             marginTop: "var(--d-stack-sm)",
-            marginBottom: "var(--d-block-gap)",
+            marginBottom: "var(--d-stack-sm)",
           }}
         >
           <FR
@@ -164,8 +193,17 @@ export function BarrierDetails({ b }: { b: Barrier }) {
         </div>
       </details>
 
-      <details open style={{ marginBottom: "var(--d-block-gap)" }}>
-        <summary style={summaryStyle}>Degradação</summary>
+      <details open style={{ marginBottom: "var(--d-stack-sm)" }}>
+        <summary style={summaryStyle}>
+          <span>Degradação</span>
+          <span className="collapsible-chevron">
+            <ChevronRightIcon
+              size={12}
+              color="var(--text-muted)"
+              strokeWidth={2}
+            />
+          </span>
+        </summary>
         <div style={{ marginTop: "var(--d-stack-sm)" }}>
           <Txt
             value={b.degradationDesc || "Sem degradação registrada."}
@@ -175,16 +213,34 @@ export function BarrierDetails({ b }: { b: Barrier }) {
       </details>
 
       {showComments && (
-        <details open style={{ marginBottom: "var(--d-block-gap)" }}>
-          <summary style={summaryStyle}>Comentários</summary>
+        <details open style={{ marginBottom: "var(--d-stack-sm)" }}>
+          <summary style={summaryStyle}>
+            <span>Comentários</span>
+            <span className="collapsible-chevron">
+              <ChevronRightIcon
+                size={12}
+                color="var(--text-muted)"
+                strokeWidth={2}
+              />
+            </span>
+          </summary>
           <div style={{ marginTop: "var(--d-stack-sm)" }}>
             <Txt value={comments} />
           </div>
         </details>
       )}
 
-      <details open style={{ marginBottom: "var(--d-block-gap)" }}>
-        <summary style={summaryStyle}>Comentários complementares</summary>
+      <details open style={{ marginBottom: "var(--d-stack-sm)" }}>
+        <summary style={summaryStyle}>
+          <span>Comentários complementares</span>
+          <span className="collapsible-chevron">
+            <ChevronRightIcon
+              size={12}
+              color="var(--text-muted)"
+              strokeWidth={2}
+            />
+          </span>
+        </summary>
         <div style={{ marginTop: "var(--d-stack-sm)" }}>
           <Txt
             value={b.extraComments || "Sem comentários complementares."}
@@ -193,8 +249,17 @@ export function BarrierDetails({ b }: { b: Barrier }) {
         </div>
       </details>
 
-      <details open style={{ marginBottom: "var(--d-block-gap)" }}>
-        <summary style={summaryStyle}>Plano de Ação</summary>
+      <details open style={{ marginBottom: "var(--d-stack-sm)" }}>
+        <summary style={summaryStyle}>
+          <span>Plano de Ação</span>
+          <span className="collapsible-chevron">
+            <ChevronRightIcon
+              size={12}
+              color="var(--text-muted)"
+              strokeWidth={2}
+            />
+          </span>
+        </summary>
         <div style={{ marginTop: "var(--d-stack-sm)" }}>
           <Txt
             value={actionPlanText}
@@ -209,6 +274,10 @@ export function BarrierDetails({ b }: { b: Barrier }) {
 
 const summaryStyle = {
   cursor: "pointer",
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "space-between",
+  gap: "var(--d-mini-gap)",
   fontSize: "var(--d-caption)",
   fontWeight: 800,
   color: "var(--text-muted)",
