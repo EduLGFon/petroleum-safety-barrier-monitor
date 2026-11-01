@@ -14,7 +14,14 @@ import { useFocusTrap } from "../../hooks/useFocusTrap.ts";
 
 import { UnsavedChangesDialog } from "./UnsavedChangesDialog.tsx";
 
-import { BarrierEditor } from "../../islands/BarrierEditor.tsx";
+// BarrierEditor loads on first Editar-tab open: the 982-line form (30+
+// states, dual lookup fetch) never parses on dashboard load.
+import { lazy, Suspense } from "preact/compat";
+const BarrierEditor = lazy(() =>
+  import("../../islands/BarrierEditor.tsx").then((m) => ({
+    default: m.BarrierEditor,
+  }))
+);
 
 import { lockBody, unlockBody } from "../../lib/body-lock.ts";
 
@@ -137,12 +144,19 @@ export function BarrierModal(
           // Above SyncDetailsModal (990/991) so opening a barrier from the
           // sync changes list blurs/dims the sync dialog too, not just the page.
           zIndex: 992,
+          // Hidden (not just transparent) when closed: fullscreen
+          // backdrop-filter snapshots the page even at opacity 0.
+          // Visibility flips after the fade so close still fades out.
+          visibility: isOpen ? "visible" : "hidden",
+          contain: "strict",
           background: "rgba(0,0,0,.55)",
           backdropFilter: "blur(6px)",
           WebkitBackdropFilter: "blur(6px)",
           opacity: isOpen ? 1 : 0,
           pointerEvents: isOpen ? "auto" : "none",
-          transition: "opacity .28s var(--ease-std)",
+          transition: isOpen
+            ? "opacity .28s var(--ease-std)"
+            : "opacity .28s var(--ease-std), visibility 0s .28s",
         }}
       />
       <div
@@ -336,18 +350,26 @@ function Content(
         )}
         {tab === "history" && <BarrierHistory b={local} />}
         {tab === "edit" && canEditBarrier(local, isAdmin) && (
-          <BarrierEditor
-            key={local.id}
-            barrier={local}
-            onDirtyChange={onDirtyChange}
-            onSaved={(updated) => {
-              if (updated) setLocal(updated);
-              onSavedClean();
-              setTab("details");
-              onSaved?.();
-            }}
-            onCancel={() => runOrConfirm(() => setTab("details"))}
-          />
+          <Suspense
+            fallback={
+              <div style={{ padding: 24, color: "var(--text-muted)" }}>
+                Carregando editor…
+              </div>
+            }
+          >
+            <BarrierEditor
+              key={local.id}
+              barrier={local}
+              onDirtyChange={onDirtyChange}
+              onSaved={(updated) => {
+                if (updated) setLocal(updated);
+                onSavedClean();
+                setTab("details");
+                onSaved?.();
+              }}
+              onCancel={() => runOrConfirm(() => setTab("details"))}
+            />
+          </Suspense>
         )}
       </div>
     </>

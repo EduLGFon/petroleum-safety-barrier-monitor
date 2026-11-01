@@ -17,7 +17,14 @@ import { AccountSection } from "./settings/AccountSection.tsx";
 
 import { FiltersSection } from "./settings/FiltersSection.tsx";
 
-import { AdminSection } from "./settings/AdminSection.tsx";
+// AdminSection (Rules/Users/Recipients managers, ~5k lines) loads on first
+// admin-tab open: non-admins and non-admin tabs never parse it.
+import { lazy, Suspense } from "preact/compat";
+const AdminSection = lazy(() =>
+  import("./settings/AdminSection.tsx").then((m) => ({
+    default: m.AdminSection,
+  }))
+);
 
 import { lockBody, unlockBody } from "../lib/body-lock.ts";
 
@@ -141,11 +148,19 @@ export function SettingsPanel(
           position: "fixed",
           inset: 0,
           zIndex: 1000,
+          // Hidden (not just transparent) when closed: a fullscreen
+          // backdrop-filter snapshots the page even at opacity 0.
+          // Visibility flips after the fade so close still fades out.
+          visibility: open ? "visible" : "hidden",
+          contain: "strict",
           background: "rgba(0,0,0,.5)",
           backdropFilter: "blur(4px)",
+          WebkitBackdropFilter: "blur(4px)",
           opacity: open ? 1 : 0,
           pointerEvents: open ? "auto" : "none",
-          transition: "opacity .28s var(--ease-std)",
+          transition: open
+            ? "opacity .28s var(--ease-std)"
+            : "opacity .28s var(--ease-std), visibility 0s .28s",
         }}
       />
 
@@ -166,13 +181,18 @@ export function SettingsPanel(
           maxWidth: "96vw",
           background: "var(--bg-surface)",
           borderLeft: "1px solid var(--border)",
-          backdropFilter: "blur(20px)",
-          WebkitBackdropFilter: "blur(20px)",
+          // 12px over the near-opaque surface reads identical to 20px at a
+          // fraction of the kernel cost; contained + promoted so the slide
+          // runs on the compositor without re-rasterizing the page.
+          backdropFilter: "blur(12px)",
+          WebkitBackdropFilter: "blur(12px)",
+          contain: "paint",
           zIndex: 1001,
           display: "flex",
           flexDirection: "column",
           overflowY: "auto",
-          transform: open ? "translateX(0)" : "translateX(100%)",
+          transform: open ? "translateX(0) translateZ(0)" : "translateX(100%)",
+          willChange: open ? "transform" : "auto",
           transition: "transform .32s var(--ease-out)",
           boxShadow: open ? "var(--shadow-lg)" : "none",
         }}
@@ -280,7 +300,15 @@ export function SettingsPanel(
 
         {/* ── ADMIN ── */}
         {section === "admin" && sessionUser?.role === "admin" && (
-          <AdminSection sessionUser={sessionUser} />
+          <Suspense
+            fallback={
+              <div style={{ padding: 24, color: "var(--text-muted)" }}>
+                Carregando administração…
+              </div>
+            }
+          >
+            <AdminSection sessionUser={sessionUser} />
+          </Suspense>
         )}
       </aside>
     </>

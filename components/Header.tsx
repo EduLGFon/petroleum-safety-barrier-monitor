@@ -11,7 +11,14 @@ import {
 
 import { type Conn, useConnection } from "../hooks/useConnection.ts";
 
-import { SyncDetailsModal } from "./header/SyncDetailsModal.tsx";
+// SyncDetailsModal (252-line dialog + changes list) loads on first open:
+// every dashboard load skips it until the sync bulb is clicked.
+import { lazy, Suspense } from "preact/compat";
+const SyncDetailsModal = lazy(() =>
+  import("./header/SyncDetailsModal.tsx").then((m) => ({
+    default: m.SyncDetailsModal,
+  }))
+);
 
 import type { AuthUser, SyncStatus } from "../lib/types.ts";
 
@@ -302,13 +309,15 @@ export function Header(
         </div>
       </header>
       {detailsOpen && syncStatus !== null && (
-        <SyncDetailsModal
-          sync={syncStatus}
-          conn={conn}
-          baseUrl={apiBaseUrl}
-          onClose={() => setDetailsOpen(false)}
-          onOpenBarrier={onOpenBarrier}
-        />
+        <Suspense fallback={null}>
+          <SyncDetailsModal
+            sync={syncStatus}
+            conn={conn}
+            baseUrl={apiBaseUrl}
+            onClose={() => setDetailsOpen(false)}
+            onOpenBarrier={onOpenBarrier}
+          />
+        </Suspense>
       )}
     </>
   );
