@@ -38,14 +38,37 @@ function createPool(): Pool {
         database: decodeUrlPart(url.pathname.replace(/^\//, "")),
         tls: { enabled: false },
       },
-      10,
+      poolSize(),
       true,
     );
   }
-  // Lazy pool of 10: connections open on first use, reused across requests.
-  return new Pool(connectionString, 10, true);
+  // Lazy pool (default 10, POOL_SIZE to tune): connections open on first
+  // use, reused across requests.
+  return new Pool(connectionString, poolSize(), true);
 }
 
+// poolSize: per-process ceiling from POOL_SIZE (app 10 default; single-loop
+// workers set 4/2 via env). Three processes (app + poller + alerts) each
+// open their own pool, so the DB sees 3x this number at most.
+function poolSize(): number {
+  const raw = Deno.env.get("POOL_SIZE");
+  if (raw === undefined || raw.trim() === "") return 10;
+  const n = Number(raw);
+  if (!Number.isInteger(n) || n < 1 || n > 50) return 10;
+  return n;
+}
+
+// statementTimeoutMs: per-statement guard from POOL_STATEMENT_TIMEOUT_MS
+// (30s default). Export cursor walks are already chunked (EXPORT_PAGE_ROWS),
+// so a sane ceiling never aborts legitimate work - it fails stuck queries
+// fast instead of pinning pool slots.
+function statementTimeoutMs(): number {
+  const raw = Deno.env.get("POOL_STATEMENT_TIMEOUT_MS");
+  if (raw === undefined || raw.trim() === "") return 30_000;
+  const n = Number(raw);
+  if (!Number.isInteger(n) || n < 1000 || n > 600_000) return 30_000;
+  return n;
+}
 // parseDatabaseUrl: null when DATABASE_URL is not a parseable URL (the
 // driver then owns the error); never throws out of pool creation.
 function parseDatabaseUrl(connectionString: string): URL | null {
@@ -157,10 +180,27 @@ export async function queryRows<T>(
 
 // runOnce: single attempt - checkout, query, guarded release. Release is
 // best-effort because closing a dead connection can itself throw (the
-// EPIPE surfaces in Connection.end, not just query).
+// EPIPE surfaces in Connection.end, not just query). Checkout wait over
+// 1s logs once (pool-exhaustion signal); every checkout enforces the
+// session statement_timeout so one stuck query never pins a slot.
 async function runOnce<T>(text: string, args: Array<unknown>): Promise<T[]> {
+  const t0 = Date.now();
   const client = await getPool().connect();
   try {
+    const waited = Date.now() - t0;
+    if (waited > 1000) {
+      log.child({ scope: "db" }).warn("pool checkout waited", {
+        waitedMs: waited,
+      });
+    }
+    try {
+      await client.queryObject(
+        `select set_config('statement_timeout', $1, false)`,
+        [String(statementTimeoutMs())],
+      );
+    } catch {
+      // Best-effort guard only; the real query still runs.
+    }
     const result = await client.queryObject<T>(text, args);
     return result.rows;
   } finally {

@@ -253,11 +253,25 @@ create index if not exists idx_barriers_criticality     on barriers(criticality_
 -- Additive only, no query or contract change. See DECISIONS.md#D01.
 create index if not exists idx_barriers_typology        on barriers(typology_id);
 create index if not exists idx_barriers_owner           on barriers(owner_id);
--- Plain btree on tag (equality + prefix LIKE). Named *_tag on purpose: a
--- trigram GIN index would be needed for real %q% search (pg_trgm), which this
--- schema deliberately does not require. Drops the legacy misleading name.
-drop index if exists idx_barriers_tag_trgm;
+-- Plain btree on tag (equality + prefix LIKE). The trigram GIN below
+-- covers real %q% substring search (lib/server/sql/where.ts tag/location
+-- ILIKE); guarded DO blocks so a database without pg_trgm privileges still
+-- migrates (the index is an optimization, never a requirement).
 create index if not exists idx_barriers_tag              on barriers using btree (tag);
+do $$
+begin
+  create extension if not exists pg_trgm;
+exception when insufficient_privilege then
+  raise notice 'pg_trgm extension unavailable: substring search stays sequential';
+end
+$$;
+do $$
+begin
+  create index if not exists idx_barriers_tag_trgm on barriers using gin (tag gin_trgm_ops);
+exception when undefined_object then
+  raise notice 'pg_trgm operators unavailable: skipping idx_barriers_tag_trgm';
+end
+$$;
 create index if not exists idx_barriers_status_since     on barriers(status_since);
 
 -- Scope provenance per barrier (which gate admitted the row: keyword, eso,
@@ -484,6 +498,11 @@ create index if not exists idx_alert_events_transition
   on alert_events(transition_date desc);
 create index if not exists idx_alert_events_barrier_created
   on alert_events(barrier_id, created_at desc);
+-- Anti-noise cooldown reads filter (barrier_id, payload.ruleId, created_at)
+-- (countRuleEvents in lib/server/sql/alerts.ts, hot per (rule, barrier) per
+-- cycle). Expression index matches the equality/equality/range shape.
+create index if not exists idx_alert_events_rule_barrier_created
+  on alert_events(barrier_id, ((payload ->> 'ruleId')), created_at);
 
 -- Provider receipt (generic alert provider cutover): correlation id for
 -- direct lookup, parcial flag for incomplete delivery. Full response
@@ -531,6 +550,8 @@ create table if not exists access_group_locations (
 );
 
 create index if not exists idx_agl_group on access_group_locations(group_id);
+-- Reverse lookup for group-membership admin pages (locations -> groups).
+create index if not exists idx_agl_location on access_group_locations(location_id);
 
 create table if not exists user_access_groups (
   user_id  integer not null references users(id) on delete cascade,
@@ -539,6 +560,8 @@ create table if not exists user_access_groups (
 );
 
 create index if not exists idx_uag_user on user_access_groups(user_id);
+-- Reverse lookup for group-membership admin pages (groups -> users).
+create index if not exists idx_uag_group on user_access_groups(group_id);
 
 drop trigger if exists trg_access_groups_updated_at on access_groups;
 create trigger trg_access_groups_updated_at
