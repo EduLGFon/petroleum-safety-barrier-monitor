@@ -42,6 +42,8 @@ export interface BarrierRow {
   evidence_code: string | null;
   degradation_desc: string | null;
   extra_comments: string | null;
+  // Admin-owned fields (empty array when all follow the sync).
+  manual_fields: string[] | null;
 }
 
 export interface HistoryEntry {
@@ -108,6 +110,10 @@ export function toWireBarrier(r: BarrierRow): WireBarrier {
     evidenceCode: sheet(r.evidence_code),
     degradationDesc: sheet(r.degradation_desc),
     extraComments: sheet(r.extra_comments),
+    // Pre-migration nulls read as sync-owned (the old default views).
+    manualFields: Array.isArray(r.manual_fields)
+      ? r.manual_fields.filter((v): v is string => typeof v === "string")
+      : [],
   };
 }
 
@@ -125,7 +131,7 @@ export const SELECT_COLUMNS = `
   b.equip_typology, b.field_installed, b.field_operational, b.op_status,
   b.has_maint_plan, b.plan_followed, b.failure_free, b.maint_status,
   b.has_contingency, b.contingency_desc, b.evidence_code, b.degradation_desc,
-  b.extra_comments, cont.contingency_tag
+  b.extra_comments, b.manual_fields, cont.contingency_tag
 `;
 
 // List projection: same scalars as SELECT_COLUMNS but WITHOUT the history
@@ -145,7 +151,7 @@ export const SELECT_LIST_COLUMNS = `
   b.equip_typology, b.field_installed, b.field_operational, b.op_status,
   b.has_maint_plan, b.plan_followed, b.failure_free, b.maint_status,
   b.has_contingency, b.contingency_desc, b.evidence_code, b.degradation_desc,
-  b.extra_comments, cont.contingency_tag
+  b.extra_comments, b.manual_fields, cont.contingency_tag
 `;
 
 export const HISTORY_LATERAL = `

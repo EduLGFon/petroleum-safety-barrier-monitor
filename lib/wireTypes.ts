@@ -39,8 +39,8 @@ export interface WireBarrier {
   // Optional so old fixtures/servers keep parsing; absent reads as live.
   isActive?: boolean;
   deletedAt?: string | null;
-  // Sheet inventory columns (GERAL). Free text, "" = unset; Fracttal does
-  // not feed them (import writes ""), admins fill them in later.
+  // Sheet inventory columns. Free text, "" = unset; the Fracttal sync derives
+  // them, admins may take individual fields over (see manualFields).
   origin: string;
   externalCode: string;
   locationName: string;
@@ -60,6 +60,9 @@ export interface WireBarrier {
   evidenceCode: string;
   degradationDesc: string;
   extraComments: string;
+  // Admin-owned fields (empty = everything follows the Fracttal sync).
+  // Optional so old servers keep parsing; absent reads as sync-owned.
+  manualFields?: string[];
 }
 
 export interface WireKpiSnapshot {

@@ -73,8 +73,8 @@ export interface Barrier {
   // Optional so old payloads keep parsing; absent reads as active/live.
   isActive?: boolean;
   deletedAt?: string | null;
-  // Sheet inventory columns (GERAL). Free text, "" = unset; Fracttal does
-  // not feed them (import writes ""), admins fill them in later.
+  // Sheet inventory columns. Free text, "" = unset; the Fracttal sync derives
+  // them, admins may take individual fields over (see manualFields).
   origin: string;
   externalCode: string;
   locationName: string;
@@ -94,6 +94,8 @@ export interface Barrier {
   evidenceCode: string;
   degradationDesc: string;
   extraComments: string;
+  // Admin-owned fields (empty/absent = everything follows the sync).
+  manualFields?: string[];
 }
 
 export interface Location {

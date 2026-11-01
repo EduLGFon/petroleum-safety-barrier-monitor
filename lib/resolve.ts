@@ -122,6 +122,7 @@ export function resolveBarrier(
     evidenceCode: w.evidenceCode,
     degradationDesc: w.degradationDesc,
     extraComments: w.extraComments,
+    manualFields: w.manualFields ?? [],
   };
 }
 
