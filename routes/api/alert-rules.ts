@@ -34,10 +34,14 @@ import { readJsonBody } from "../../lib/server/validation.ts";
 
 import { define } from "../../utils.ts";
 
+import { denyIfCrossSite } from "../../lib/server/csrf.ts";
+
 export const handler = define.handlers({
   // GET - lists rules (?activeOnly=1 filters to enabled rows).
   async GET(ctx) {
     const requestId = newRequestId();
+    const csrf = denyIfCrossSite(ctx.req, requestId);
+    if (csrf) return csrf;
     const limit = readThrottle.check(routeClientKey(ctx));
     if (!limit.allowed) {
       return rateLimited("too many requests", requestId, limit.retryAfterMs);
@@ -75,6 +79,8 @@ export const handler = define.handlers({
   // POST - creates a rule; duplicate names are rejected as 400.
   async POST(ctx) {
     const requestId = newRequestId();
+    const csrf = denyIfCrossSite(ctx.req, requestId);
+    if (csrf) return csrf;
     const limit = writeThrottle.check(routeClientKey(ctx));
     if (!limit.allowed) {
       return rateLimited("too many requests", requestId, limit.retryAfterMs);

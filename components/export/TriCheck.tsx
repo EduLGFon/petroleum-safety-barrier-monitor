@@ -19,11 +19,27 @@ export function TriCheck(
 ) {
   const a = checked || indeterminate;
   const full = variant === "full" && checked;
+  const ariaChecked = checked ? "true" : indeterminate ? "mixed" : "false";
   return (
     <div
+      role="checkbox"
+      aria-checked={ariaChecked as "true" | "false" | "mixed"}
+      tabIndex={0}
+      aria-label={checked
+        ? "Todas selecionadas"
+        : indeterminate
+        ? "Seleção parcial"
+        : "Selecionar"}
       onClick={(e) => {
         e.stopPropagation();
         onChange();
+      }}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          e.stopPropagation();
+          onChange();
+        }
       }}
       style={{
         width: "var(--d-chk)",

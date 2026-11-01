@@ -35,6 +35,8 @@ import { readJsonBody } from "../../lib/server/validation.ts";
 
 import { define } from "../../utils.ts";
 
+import { denyIfCrossSite } from "../../lib/server/csrf.ts";
+
 async function guard(
   ctx: unknown,
   req: Request,
@@ -65,6 +67,8 @@ export const handler = define.handlers({
   // GET the recipient list (activeOnly=1 filters).
   async GET(ctx) {
     const requestId = newRequestId();
+    const csrf = denyIfCrossSite(ctx.req, requestId);
+    if (csrf) return csrf;
     const denied = await guard(
       ctx,
       ctx.req,
@@ -89,6 +93,8 @@ export const handler = define.handlers({
   // POST { email, name?, phone? } - creates or revives (upsert on email).
   async POST(ctx) {
     const requestId = newRequestId();
+    const csrf = denyIfCrossSite(ctx.req, requestId);
+    if (csrf) return csrf;
     const denied = await guard(
       ctx,
       ctx.req,

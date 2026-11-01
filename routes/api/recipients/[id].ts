@@ -27,10 +27,14 @@ import { loadServerConfig } from "../../../lib/server/config.ts";
 
 import { define } from "../../../utils.ts";
 
+import { denyIfCrossSite } from "../../../lib/server/csrf.ts";
+
 export const handler = define.handlers({
   // PATCH { name?, phone?, active? } - partial update; 404 when missing.
   async PATCH(ctx) {
     const requestId = newRequestId();
+    const csrf = denyIfCrossSite(ctx.req, requestId);
+    if (csrf) return csrf;
     const limit = writeThrottle.check(routeClientKey(ctx));
     if (!limit.allowed) {
       return rateLimited("too many requests", requestId, limit.retryAfterMs);
@@ -93,6 +97,8 @@ export const handler = define.handlers({
   // DELETE - removes the recipient; 404 when missing.
   async DELETE(ctx) {
     const requestId = newRequestId();
+    const csrf = denyIfCrossSite(ctx.req, requestId);
+    if (csrf) return csrf;
     const limit = writeThrottle.check(routeClientKey(ctx));
     if (!limit.allowed) {
       return rateLimited("too many requests", requestId, limit.retryAfterMs);

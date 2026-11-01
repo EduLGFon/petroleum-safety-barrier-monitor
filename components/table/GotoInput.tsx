@@ -20,16 +20,18 @@ export function GotoInput({ page, totalPages, onChange }: GotoInputProps) {
   // Escape sets this so the blur it triggers reverts instead of committing
   // (the blur handler still sees the pre-Escape draft - render is async).
   const cancelRef = useRef(false);
+  // Never clamp to page 0: an empty result still reports one pager slot.
+  const max = Math.max(1, totalPages);
   const commitDraft = () => {
     const cancelled = cancelRef.current;
     cancelRef.current = false;
     setFocused(false);
     if (cancelled || draft === null) return;
     const parsed = parseInt(draft, 10);
-    // NaN (empty/garbage) keeps the page; out-of-range clamps to 1..total.
+    // NaN (empty/garbage) keeps the page; out-of-range clamps to 1..max.
     const n = Math.min(
       Math.max(Number.isNaN(parsed) ? page : parsed, 1),
-      totalPages,
+      max,
     );
     setDraft(null);
     if (n !== page) onChange(n);
@@ -41,7 +43,7 @@ export function GotoInput({ page, totalPages, onChange }: GotoInputProps) {
       autoComplete="off"
       spellcheck={false}
       aria-label="Ir para a página"
-      title={`Ir para a página (1-${totalPages})`}
+      title={`Ir para a página (1-${Math.max(1, totalPages)})`}
       placeholder={focused ? String(page) : "…"}
       value={draft ?? ""}
       // NOTE: onInput, not onChange. Preact 10 binds onChange to the
@@ -67,7 +69,7 @@ export function GotoInput({ page, totalPages, onChange }: GotoInputProps) {
         // Idle: same width as the ellipsis chip. Focused: fits the widest
         // page number with room to type.
         width: focused
-          ? `calc(${String(totalPages).length + 1}ch + 14px)`
+          ? `calc(${String(Math.max(1, totalPages)).length + 1}ch + 14px)`
           : "var(--d-page-btn)",
         minWidth: "var(--d-page-btn)",
       }}

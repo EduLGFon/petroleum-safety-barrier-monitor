@@ -30,10 +30,14 @@ import { loadAuthConfig } from "../../../lib/server/config.ts";
 
 import { define } from "../../../utils.ts";
 
+import { denyIfCrossSite } from "../../../lib/server/csrf.ts";
+
 export const handler = define.handlers({
   // POST - revokes the current session and clears the cookie.
   async POST(ctx) {
     const requestId = newRequestId();
+    const csrf = denyIfCrossSite(ctx.req, requestId);
+    if (csrf) return csrf;
     const limit = writeThrottle.check(routeClientKey(ctx));
     if (!limit.allowed) {
       return rateLimited("too many requests", requestId, limit.retryAfterMs);

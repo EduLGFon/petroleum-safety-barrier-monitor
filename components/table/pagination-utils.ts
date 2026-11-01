@@ -30,6 +30,7 @@ export const bs = (active: boolean, disabled: boolean): CSSProperties => ({
 
 // buildPages: windowed page list (cur ± 1 plus first/last with "…"); returns all pages when tot <= 7.
 export function buildPages(cur: number, tot: number): (number | "…")[] {
+  if (tot < 1) return [1];
   if (tot <= 7) return Array.from({ length: tot }, (_, i) => i + 1);
   const r: (number | "…")[] = [1];
   if (cur > 3) r.push("…");

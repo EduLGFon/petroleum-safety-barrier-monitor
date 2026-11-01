@@ -55,6 +55,8 @@ import { forRequest } from "../../../../lib/server/log.ts";
 
 import { define } from "../../../../utils.ts";
 
+import { denyIfCrossSite } from "../../../../lib/server/csrf.ts";
+
 interface StatusBody {
   statusId?: number;
   authorId?: number;
@@ -67,6 +69,8 @@ export const handler = define.handlers({
   // explicit authorId contract.
   async PATCH(ctx) {
     const requestId = newRequestId();
+    const csrf = denyIfCrossSite(ctx.req, requestId);
+    if (csrf) return csrf;
     const reqLog = forRequest(requestId, "status");
     const limit = writeThrottle.check(routeClientKey(ctx));
     if (!limit.allowed) {

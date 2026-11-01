@@ -18,10 +18,16 @@ interface Props {
 // Escape and backdrop dismiss to onStay, so data loss needs an explicit click.
 export function UnsavedChangesDialog({ open, onStay, onDiscard }: Props) {
   const stayRef = useRef<HTMLButtonElement | null>(null);
+  // Editor focus captured on open so "Continuar editando" can return focus
+  // to the form field the user was editing instead of stranding it on the
+  // unmounted dialog button.
+  const editorFocusRef = useRef<HTMLElement | null>(null);
 
   // Escape keeps the user in the editor; focus lands on the safe action.
   useEffect(() => {
     if (!open) return;
+    editorFocusRef.current = document.activeElement as HTMLElement | null;
+    const raf = requestAnimationFrame(() => stayRef.current?.focus());
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
         e.stopPropagation();
@@ -29,8 +35,17 @@ export function UnsavedChangesDialog({ open, onStay, onDiscard }: Props) {
       }
     };
     globalThis.addEventListener("keydown", onKey, true);
-    stayRef.current?.focus();
-    return () => globalThis.removeEventListener("keydown", onKey, true);
+    return () => {
+      cancelAnimationFrame(raf);
+      globalThis.removeEventListener("keydown", onKey, true);
+      // Return focus to the editor the user was editing (the confirm's
+      // safe path is "keep editing", so the form regains keyboard focus).
+      // Guarded by isConnected: a discard unmounts the editor, so only a
+      // still-mounted editor regains focus.
+      const el = editorFocusRef.current;
+      editorFocusRef.current = null;
+      if (el?.isConnected) el.focus?.();
+    };
   }, [open, onStay]);
 
   if (!open || typeof document === "undefined") return null;

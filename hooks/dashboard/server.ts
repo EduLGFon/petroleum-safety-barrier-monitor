@@ -12,7 +12,11 @@ import type {
 
 import { useCallback, useEffect, useMemo, useState } from "preact/hooks";
 
-import { restoreSelection, useSelection } from "./selection.ts";
+import {
+  isNarrowingPatch,
+  restoreSelection,
+  useSelection,
+} from "./selection.ts";
 
 import { httpAdapterFactory } from "../../lib/api/http.ts";
 
@@ -88,6 +92,7 @@ export function useServerDashboard(
   const {
     visibleCols,
     hiddenPinned,
+    hydratedCols,
     toggleCol,
     moveCol,
     resetCols,
@@ -99,8 +104,16 @@ export function useServerDashboard(
     vocabularies ?? null,
   );
   // Picks up a fresh SSR vocabulary if the prop ever changes (navigation).
+  // Dep guard: only replace when the payload actually differs, so a parent
+  // re-render with an identical object never resets idMaps (which would
+  // rebuild the adapter and refetch a second time on top of reloadKey).
   useEffect(() => {
-    if (vocabularies) setLiveVocab(vocabularies);
+    if (!vocabularies) return;
+    setLiveVocab((prev) =>
+      prev !== null && sameVocabularies(prev, vocabularies)
+        ? prev
+        : vocabularies
+    );
   }, [vocabularies]);
   const idMaps = useMemo(
     () =>
@@ -160,9 +173,10 @@ export function useServerDashboard(
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Persist on every change (after hydration)
+  // Persist on every change (after both slices hydrate, so the first
+  // visibleCols write never clobbers persisted columns with defaults).
   useEffect(() => {
-    if (!hydrated) return;
+    if (!hydrated || !hydratedCols) return;
     saveDash({
       location,
       filters,
@@ -175,6 +189,7 @@ export function useServerDashboard(
     location,
     filters,
     hydrated,
+    hydratedCols,
     selectedIds,
     openId,
     visibleCols,
@@ -189,11 +204,12 @@ export function useServerDashboard(
   );
 
   // Fetch page + KPI + chart on scope change; superseded responses are
-  // dropped via cancellation so fast typing never renders stale data. KPI
+  // dropped via AbortSignal so fast typing never renders stale data. KPI
   // and chart honor the same filters as the table (minus paging/sort).
   useEffect(() => {
     if (!hydrated) return;
-    let cancelled = false;
+    const ctrl = new AbortController();
+    const { signal } = ctrl;
     setLoading(true);
     setError(null);
     const wq = {
@@ -202,12 +218,13 @@ export function useServerDashboard(
       pageSize: filters.pageSize,
     };
     const scope = filterScope(wq);
+    const opts = { signal };
     Promise.all([
-      adapter.getBarriers(wq),
-      adapter.getKpi(scope),
-      adapter.getChartData(scope),
+      adapter.getBarriers(wq, opts),
+      adapter.getKpi(scope, opts),
+      adapter.getChartData(scope, opts),
     ]).then(([page, snapshot, chart]) => {
-      if (cancelled) return;
+      if (signal.aborted) return;
       setItems(page.items);
       setTotal(page.total);
       setPages(page.totalPages);
@@ -215,7 +232,8 @@ export function useServerDashboard(
       setChartData(chart);
       setLoading(false);
     }).catch((err) => {
-      if (cancelled) return;
+      if (signal.aborted) return;
+      if (err instanceof DOMException && err.name === "AbortError") return;
       // Dead session mid-use: back to login with a return ticket instead
       // of stranding the dashboard on an error banner.
       if (isAuthExpired(err)) {
@@ -226,7 +244,7 @@ export function useServerDashboard(
       setLoading(false);
     });
     return () => {
-      cancelled = true;
+      ctrl.abort();
     };
   }, [
     adapter,
@@ -259,10 +277,10 @@ export function useServerDashboard(
     resetFil();
     clearAll();
   }, [resetFil, clearAll]);
-  // Patches filters; a visibility-scope change clears the selection so ids
+  // Patches filters; any narrowing change clears the selection so ids
   // from one scope never leak into another scope's export.
   const setFilter = useCallback((patch: Partial<FilterState>) => {
-    if (patch.rowScope !== undefined) clearAll();
+    if (isNarrowingPatch(patch)) clearAll();
     setFil(patch);
   }, [setFil, clearAll]);
 
@@ -273,7 +291,9 @@ export function useServerDashboard(
     if (filters.page > pages) setFil({ page: pages });
   }, [hydrated, filters.page, pages, setFil]);
 
-  // Selects all rows on the current page; persisted via saveDash effect.
+  // Selects the current page (replaces the set); persisted via saveDash.
+  // Unified with client mode: selectAll = page replace, selectPage = page
+  // merge, selectAllFiltered = whole filtered set.
   const selectAll = useCallback(
     () => setSelectedIds(new Set(items.map((b) => b.id))),
     [items, setSelectedIds],
@@ -293,10 +313,12 @@ export function useServerDashboard(
 
   // Selects every row matching the current filter scope (Gmail-style
   // "select all that match") by resolving all ids through the adapter.
-  // Page-local selectAll stays for the toolbar contract; the table header
-  // prompt calls this to extend a page selection to the full filtered set.
-  const selectAllFiltered = useCallback(async () => {
-    const all = await adapter.getAllBarriers(scopeQuery);
+  // Unified with client mode: selectAll = page replace, selectAllFiltered =
+  // whole filtered set; the table header prompt calls this to extend a page
+  // selection to the full filtered set. Aborts superseded extensions.
+  const selectAllFiltered = useCallback(async (signal?: AbortSignal) => {
+    const all = await adapter.getAllBarriers(scopeQuery, { signal });
+    if (signal?.aborted) return;
     setSelectedIds(new Set(all.map((b) => b.id)));
   }, [adapter, scopeQuery, setSelectedIds]);
 
@@ -312,14 +334,17 @@ export function useServerDashboard(
       setFetchedBarrier(null);
       return;
     }
-    let cancelled = false;
-    adapter.getBarrierById(openId).then((b) => {
-      if (!cancelled) setFetchedBarrier(b);
-    }).catch(() => {
-      if (!cancelled) setFetchedBarrier(null);
+    const ctrl = new AbortController();
+    const { signal } = ctrl;
+    adapter.getBarrierById(openId, { signal }).then((b) => {
+      if (!signal.aborted) setFetchedBarrier(b);
+    }).catch((err) => {
+      if (signal.aborted) return;
+      if (err instanceof DOMException && err.name === "AbortError") return;
+      setFetchedBarrier(null);
     });
     return () => {
-      cancelled = true;
+      ctrl.abort();
     };
   }, [adapter, openId, pageHit, reloadKey]);
   const openBarrier = pageHit ?? fetchedBarrier;
@@ -414,6 +439,7 @@ export function useServerDashboard(
     totalPages: pages,
     hasActiveFilters,
     hydrated,
+    hydratedCols,
     selectedIds,
     openBarrier,
     setOpenId,

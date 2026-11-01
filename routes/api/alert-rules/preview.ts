@@ -28,9 +28,25 @@ import { define } from "../../../utils.ts";
 function parseIds(value: string | null): number[] | null {
   if (value === null || value.trim() === "") return null;
   const ids = value.split(",").map((s) => Number(s.trim())).filter((n) =>
-    Number.isInteger(n) && n >= 0
+    Number.isInteger(n) && n > 0
   );
   return ids.length > 0 ? ids : null;
+}
+
+// hasInvalidIds: true when a comma list holds a zero, negative, or
+// non-numeric token. Such scopes never match a real row, so the route
+// answers 400 instead of silently counting the unfiltered table. Blank
+// entries (",", "1,,2") are skipped, matching parseIds.
+function hasInvalidIds(value: string | null): boolean {
+  if (value === null || value.trim() === "") return false;
+  const parts = value.split(",");
+  for (const p of parts) {
+    const t = p.trim();
+    if (t === "") continue;
+    const n = Number(t);
+    if (!Number.isInteger(n) || n <= 0) return true;
+  }
+  return false;
 }
 
 export const handler = define.handlers({
@@ -64,6 +80,20 @@ export const handler = define.handlers({
     if (!auth.ok) return denyByCredentials(ctx.req, auth.message, requestId);
     try {
       const q = ctx.url.searchParams;
+      for (
+        const key of [
+          "categoryIds",
+          "locationIds",
+          "criticalityIds",
+          "typologyIds",
+          "groupingIds",
+          "ownerIds",
+        ]
+      ) {
+        if (hasInvalidIds(q.get(key))) {
+          return badRequest(`${key} must be positive integers`, requestId);
+        }
+      }
       const categoryIds = parseIds(q.get("categoryIds"));
       const locationIds = parseIds(q.get("locationIds"));
       const criticalityIds = parseIds(q.get("criticalityIds"));

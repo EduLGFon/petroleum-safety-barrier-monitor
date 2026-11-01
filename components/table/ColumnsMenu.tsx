@@ -14,6 +14,8 @@ import {
 
 import { useEffect, useRef, useState } from "preact/hooks";
 
+import { useFocusTrap } from "../../hooks/useFocusTrap.ts";
+
 import { ColumnsIcon } from "../ui/Icons.tsx";
 
 import { createPortal } from "preact/compat";
@@ -39,23 +41,34 @@ export function ColumnsMenu(
 ) {
   const [open, setOpen] = useState(false);
   const panelRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const restoreFocusRef = useRef<HTMLElement | null>(null);
   const close = () => setOpen(false);
 
-  // Escape closes while open; opening moves focus into the panel.
+  // Escape closes while open; opening captures the trigger and moves focus
+  // into the panel, closing restores the trigger for keyboard users.
   useEffect(() => {
     if (!open) return;
+    restoreFocusRef.current = (document.activeElement as HTMLElement | null) ??
+      triggerRef.current;
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") close();
     };
     globalThis.addEventListener("keydown", onKey);
     panelRef.current?.focus();
-    return () => globalThis.removeEventListener("keydown", onKey);
+    return () => {
+      globalThis.removeEventListener("keydown", onKey);
+      restoreFocusRef.current?.focus();
+      restoreFocusRef.current = null;
+    };
   }, [open]);
+  useFocusTrap(panelRef, open);
 
   return (
     <>
       <button
         type="button"
+        ref={triggerRef}
         onClick={() => setOpen(true)}
         aria-haspopup="dialog"
         aria-label="Escolher colunas da tabela"

@@ -6,6 +6,8 @@
 // set, full-filtered offers an inline clear link.
 import { fmt } from "../../lib/utils.ts";
 
+import { isAllFilteredSelected } from "../../hooks/dashboard/selection.ts";
+
 import { useState } from "preact/hooks";
 
 interface Props {
@@ -59,8 +61,13 @@ export function SelectionScope(
     0,
   );
   const allPageSel = pageIds.length > 0 && selOnPage === pageIds.length;
-  const allFilteredSel = filteredTotal > 0 &&
-    selectedIds.size >= filteredTotal && allPageSel;
+  // Subset check (not `>=`): stale ids outside the narrowed scope must not
+  // flip the full-filtered badge via size alone.
+  const allFilteredSel = isAllFilteredSelected(
+    selectedIds,
+    pageIds,
+    filteredTotal,
+  );
   const showExtend = allPageSel && !allFilteredSel &&
     filteredTotal > pageIds.length;
   if (selOnPage === 0) return null;

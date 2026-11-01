@@ -79,11 +79,20 @@ export function ExportMenu(
   // Measures the trigger into the portal anchor. Called while opening (so the
   // panel never paints a frame at 0,0) and again while open (page scroll and
   // resize), rAF-throttled with an equality guard so a fling issues at most
-  // one update per frame and identical rects skip the render.
+  // one update per frame and identical rects skip the render. The left edge
+  // is clamped so the right-aligned panel (which grows leftwards from the
+  // anchor) never runs off the viewport on narrow screens.
   function place(): void {
     const r = btnRef.current?.getBoundingClientRect();
     if (!r) return;
-    const next = { left: Math.round(r.right), top: Math.round(r.bottom + 4) };
+    const rawLeft = Math.round(r.right);
+    const vw = typeof globalThis.innerWidth === "number"
+      ? globalThis.innerWidth
+      : 1024;
+    // Panel min-width (190) + margin: the anchor must sit at least that far
+    // from the left edge, and never past the right edge.
+    const left = Math.min(Math.max(rawLeft, 198), Math.max(vw - 8, 198));
+    const next = { left, top: Math.round(r.bottom + 4) };
     setAnchor((prev) =>
       prev.left === next.left && prev.top === next.top ? prev : next
     );

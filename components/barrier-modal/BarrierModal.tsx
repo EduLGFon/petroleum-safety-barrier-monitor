@@ -107,14 +107,19 @@ export function BarrierModal(
   const isOpen = !!barrier;
   // Focus management: remember the trigger on open, focus the dialog, restore
   // the trigger on close so keyboard users land back where they started.
+  // Only captures on a closed->open transition: swapping from one row to
+  // another while open must not re-anchor the return focus mid-session.
   const dialogRef = useRef<HTMLDivElement | null>(null);
   const restoreFocusRef = useRef<HTMLElement | null>(null);
+  const wasOpenRef = useRef(false);
   const activeEl = () => document.activeElement as HTMLElement | null;
   useEffect(() => {
-    if (barrier) {
+    const wasOpen = wasOpenRef.current;
+    wasOpenRef.current = !!barrier;
+    if (barrier && !wasOpen) {
       restoreFocusRef.current = activeEl();
       dialogRef.current?.focus();
-    } else if (restoreFocusRef.current) {
+    } else if (!barrier && wasOpen && restoreFocusRef.current) {
       restoreFocusRef.current.focus();
       restoreFocusRef.current = null;
     }

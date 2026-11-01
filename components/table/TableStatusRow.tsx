@@ -9,6 +9,7 @@
 // filter row.
 import { SelectionScope } from "./SelectionScope.tsx";
 import { TriCheck } from "../export/TriCheck.tsx";
+import { isAllFilteredSelected } from "../../hooks/dashboard/selection.ts";
 import { FilterIcon } from "../ui/Icons.tsx";
 import { AURORA } from "../../lib/aurora.ts";
 import { fmt } from "../../lib/utils.ts";
@@ -52,8 +53,14 @@ export function TableStatusRow(
   );
   const allPageSel = pageIds.length > 0 && selOnPage === pageIds.length;
   const somePageSel = selOnPage > 0 && !allPageSel;
-  const allFilteredSel = filteredTotal > 0 &&
-    selectedIds.size >= filteredTotal && allPageSel;
+  // Subset check (not `>=`): stale ids outside the narrowed scope must not
+  // flip the full-filtered badge. Size must match exactly and the visible
+  // page must be a subset of the selection.
+  const allFilteredSel = isAllFilteredSelected(
+    selectedIds,
+    pageIds,
+    filteredTotal,
+  );
   const hasSel = selOnPage > 0;
   const toggle = () => {
     if (pageIds.length === 0) return;

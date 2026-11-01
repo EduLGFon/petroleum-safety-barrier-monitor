@@ -63,6 +63,12 @@ export function BarrierRow(
         background: isSel ? "rgba(99,102,241,.12)" : "transparent",
         cursor: "pointer",
       } as CSSProperties}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" && e.target === e.currentTarget) {
+          e.preventDefault();
+          onSelect(b);
+        }
+      }}
       onMouseEnter={(e) => {
         if (!isSel) {
           (e.currentTarget as HTMLTableRowElement).style.background =

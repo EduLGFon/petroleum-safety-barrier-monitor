@@ -78,12 +78,13 @@ export function SettingsPanel(
   const [activeDensity, setActiveDensity] = useState<Density | null>(null);
 
   useEffect(() => {
+    if (!open) return;
     const h = (e: KeyboardEvent) => {
       if (e.key === "Escape") onClose();
     };
     document.addEventListener("keydown", h);
     return () => document.removeEventListener("keydown", h);
-  }, [onClose]);
+  }, [open, onClose]);
 
   // Shared counter with BarrierModal: scroll resumes only after the last
   // overlay closes, so closing the panel cannot unlock scroll under the modal.

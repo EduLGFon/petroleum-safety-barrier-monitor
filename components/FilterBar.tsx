@@ -87,10 +87,15 @@ function DateBound(
   },
 ) {
   const commit = (v: string) => {
-    // Slice to YYYY-MM-DD so datetime payloads still match the date-only
-    // SQL/client compare; malformed input clears instead of wedging.
-    const d = v ? v.slice(0, 10) : "";
-    onChange(/^\d{4}-\d{2}-\d{2}$/.test(d) ? d : v === "" ? "" : d);
+    // Valid-or-empty only: "" clears the bound, a full YYYY-MM-DD applies,
+    // anything else (partial typing, datetime payloads that fail the strict
+    // check) is ignored so a malformed keystroke never wedges the filter.
+    if (v === "") {
+      onChange("");
+      return;
+    }
+    const d = v.slice(0, 10);
+    if (/^\d{4}-\d{2}-\d{2}$/.test(d)) onChange(d);
   };
   return (
     <input

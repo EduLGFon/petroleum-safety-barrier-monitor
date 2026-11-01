@@ -3,6 +3,8 @@
 // semantics; select-all over filtered rows stays with the caller (it owns data).
 import { useCallback, useState } from "preact/hooks";
 
+import type { FilterState } from "../../lib/types.ts";
+
 // Restores validated selection/openId from a persisted blob; shared by both
 // dashboard modes so corrupt ids fall back instead of wedging selection.
 export function restoreSelection(
@@ -20,6 +22,43 @@ export function restoreSelection(
   if (Number.isInteger(p.openId) && (p.openId as number) > 0) {
     setOpenId(p.openId as number);
   }
+}
+
+// isSubset: true when every id in `needles` is present in `haystack`.
+export function isSubset(
+  needles: Iterable<number>,
+  haystack: Set<number>,
+): boolean {
+  for (const id of needles) {
+    if (!haystack.has(id)) return false;
+  }
+  return true;
+}
+
+// isAllFilteredSelected: subset check for the full-filtered badge.
+// True only when the selection size exactly matches the filtered total AND
+// every visible page id is selected. The size check alone (`>=`) over-reports
+// after a filter narrow: stale ids outside the new scope keep the count high
+// while the page is fully picked.
+export function isAllFilteredSelected(
+  selectedIds: Set<number>,
+  pageIds: number[],
+  filteredTotal: number,
+): boolean {
+  if (filteredTotal <= 0 || pageIds.length === 0) return false;
+  if (selectedIds.size !== filteredTotal) return false;
+  return isSubset(pageIds, selectedIds);
+}
+
+// isNarrowingPatch: true when a filter patch can shrink the result scope
+// (anything beyond pure paging/sort navigation). Callers clear the selection
+// on narrowing so stale ids never leak into another scope's export or flip
+// the full-filtered badge via the fixed `>=` over-report.
+const NON_NARROWING = new Set(["page", "pageSize", "sortCol", "sortDir"]);
+export function isNarrowingPatch(patch: Partial<FilterState>): boolean {
+  const keys = Object.keys(patch);
+  if (keys.length === 0) return false;
+  return keys.some((k) => !NON_NARROWING.has(k));
 }
 
 // Row selection state; persisted by the composer effect once hydrated.

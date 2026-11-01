@@ -90,6 +90,9 @@ export function useVisibleColumns() {
   return {
     visibleCols,
     hiddenPinned,
+    // Hydration gate for composers: saveDash must wait for hydratedCols as
+    // well as filter hydration, or the first persist overwrites stored
+    // columns with defaults.
     hydratedCols: hydrated,
     toggleCol,
     moveCol,

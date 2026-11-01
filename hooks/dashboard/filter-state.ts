@@ -1,7 +1,13 @@
 // Filter state - location/filters/sort reducer with validated restore.
 // This is why it exists: client and server dashboard modes share the same
 // filter semantics; only the data source differs. Data-agnostic on purpose.
-import { useCallback, useEffect, useReducer, useState } from "preact/hooks";
+import {
+  useCallback,
+  useEffect,
+  useReducer,
+  useRef,
+  useState,
+} from "preact/hooks";
 import type { FilterState, SortableColumn } from "../../lib/types.ts";
 import { defaultFilters, restoredFilters } from "../../lib/utils.ts";
 import { loadDash } from "./persistence.ts";
@@ -16,11 +22,18 @@ export function useFilterState(defaultLocation = "ALL") {
     filters: defaultFilters(),
   });
   const [hydrated, setHydrated] = useState(false);
+  // Dep guard: restore once (StrictMode double-invokes effects, and the
+  // defaultLocation prop is stable per mount). Without the ref, a parent
+  // re-render with a fresh defaultLocation identity would replay persisted
+  // filters and clobber in-flight user edits.
+  const restoredRef = useRef(false);
 
   // After mount: restore validated persisted filters (corrupt values fall
   // back to defaults instead of wedging filters or page), migrating away the
   // defaults a previous version shipped implicitly.
   useEffect(() => {
+    if (restoredRef.current) return;
+    restoredRef.current = true;
     const p = loadDash();
     const location = typeof p.location === "string" && p.location.trim() !== ""
       ? p.location
@@ -28,8 +41,7 @@ export function useFilterState(defaultLocation = "ALL") {
     const filters = restoredFilters(p.filters, Number(p.defaultsVersion));
     dispatch({ type: "RESTORE", payload: { location, ...filters } });
     setHydrated(true);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [defaultLocation]);
 
   // Sets location (page resets to 1 via reducer); persisted by composer effect.
   const setLocation = useCallback((code: string) => {

@@ -13,6 +13,8 @@ import { useFilterState } from "./dashboard/filter-state.ts";
 
 import { restoreSelection } from "./dashboard/selection.ts";
 
+import { isNarrowingPatch } from "./dashboard/selection.ts";
+
 import type { Barrier, FilterState } from "../lib/types.ts";
 
 import { useSelection } from "./dashboard/selection.ts";
@@ -44,6 +46,7 @@ export function useDashboard(allBarriers: Barrier[], defaultLocation = "ALL") {
   const {
     visibleCols,
     hiddenPinned,
+    hydratedCols,
     toggleCol,
     moveCol,
     resetCols,
@@ -57,9 +60,10 @@ export function useDashboard(allBarriers: Barrier[], defaultLocation = "ALL") {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Persist on every change (after hydration)
+  // Persist on every change (after both slices hydrate, so the first
+  // visibleCols write never clobbers persisted columns with defaults).
   useEffect(() => {
-    if (!hydrated) return;
+    if (!hydrated || !hydratedCols) return;
     saveDash({
       location,
       filters,
@@ -72,6 +76,7 @@ export function useDashboard(allBarriers: Barrier[], defaultLocation = "ALL") {
     location,
     filters,
     hydrated,
+    hydratedCols,
     selectedIds,
     openId,
     visibleCols,
@@ -93,10 +98,10 @@ export function useDashboard(allBarriers: Barrier[], defaultLocation = "ALL") {
     setLoc(code);
     clearAll();
   }, [setLoc, clearAll]);
-  // Patches filters; a visibility-scope change clears the selection so ids
+  // Patches filters; any narrowing change clears the selection so ids
   // from one scope never leak into another scope's export.
   const setFilter = useCallback((patch: Partial<FilterState>) => {
-    if (patch.rowScope !== undefined) clearAll();
+    if (isNarrowingPatch(patch)) clearAll();
     setFil(patch);
   }, [setFil, clearAll]);
   // Resets filters and the station tab to defaults, and clears selection;
@@ -114,10 +119,12 @@ export function useDashboard(allBarriers: Barrier[], defaultLocation = "ALL") {
     if (filters.page > totalPages) setFil({ page: totalPages });
   }, [hydrated, filters.page, totalPages, setFil]);
 
-  // Selects all currently filtered rows; persisted as selectedIds via saveDash effect.
+  // Selects the current page (replaces the set); persisted via saveDash.
+  // Unified with server mode: page vs filtered stay distinct (selectPage
+  // merges, selectAllFiltered covers the whole filtered set).
   const selectAll = useCallback(
-    () => setSelectedIds(new Set(sorted.map((b) => b.id))),
-    [sorted, setSelectedIds],
+    () => setSelectedIds(new Set(rows.map((b) => b.id))),
+    [rows, setSelectedIds],
   );
 
   // Selects only the current page slice (merges into the existing set so
@@ -134,6 +141,12 @@ export function useDashboard(allBarriers: Barrier[], defaultLocation = "ALL") {
     [rows, setSelectedIds],
   );
 
+  // Selects every filtered row (the full-scope counterpart to selectAll).
+  const selectAllFiltered = useCallback(
+    () => setSelectedIds(new Set(sorted.map((b) => b.id))),
+    [sorted, setSelectedIds],
+  );
+
   return {
     location,
     locationDetails,
@@ -146,6 +159,7 @@ export function useDashboard(allBarriers: Barrier[], defaultLocation = "ALL") {
     totalPages,
     hasActiveFilters,
     hydrated,
+    hydratedCols,
     selectedIds,
     openBarrier,
     setOpenId,
@@ -157,6 +171,7 @@ export function useDashboard(allBarriers: Barrier[], defaultLocation = "ALL") {
     toggleSelect,
     selectAll,
     selectPage,
+    selectAllFiltered,
     clearAll,
     visibleCols,
     hiddenPinned,

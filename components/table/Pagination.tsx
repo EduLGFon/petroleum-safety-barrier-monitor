@@ -30,9 +30,11 @@ interface PaginationProps {
 export function Pagination(
   { page, totalPages, total, pageSize, onChange, onPageSize }: PaginationProps,
 ) {
-  const from = ((page - 1) * pageSize) + 1,
-    to = Math.min(page * pageSize, total);
-  const pages = buildPages(page, totalPages);
+  const safeTotalPages = Math.max(1, totalPages);
+  const safePage = Math.min(Math.max(page, 1), safeTotalPages);
+  const from = total === 0 ? 0 : ((safePage - 1) * pageSize) + 1,
+    to = Math.min(safePage * pageSize, total);
+  const pages = buildPages(safePage, safeTotalPages);
   // The goto chip sits where the trailing ellipsis would be, so mid-list
   // (deep pages) it reads as the right-hand gap instead of a hole between
   // "1" and the current window. When the window hugs the last page and no
@@ -91,6 +93,7 @@ export function Pagination(
             type="button"
             onClick={() => onChange(1)}
             disabled={page === 1}
+            aria-label="Primeira página"
             style={bs(false, page === 1)}
           >
             <ChevronsLeftIcon size={14} />
@@ -99,6 +102,7 @@ export function Pagination(
             type="button"
             onClick={() => onChange(page - 1)}
             disabled={page === 1}
+            aria-label="Página anterior"
             style={bs(false, page === 1)}
           >
             <ChevronLeftIcon size={14} />
@@ -117,6 +121,7 @@ export function Pagination(
                 : (
                   <span
                     key={`e${i}`}
+                    aria-hidden="true"
                     style={{ ...bs(false, true), cursor: "default" }}
                   >
                     …
@@ -127,6 +132,8 @@ export function Pagination(
                   type="button"
                   key={p}
                   onClick={() => onChange(p as number)}
+                  aria-label={`Página ${p}`}
+                  aria-current={page === p ? "page" : undefined}
                   style={bs(page === p, false)}
                 >
                   {p}
@@ -144,6 +151,7 @@ export function Pagination(
             type="button"
             onClick={() => onChange(page + 1)}
             disabled={page === totalPages}
+            aria-label="Próxima página"
             style={bs(false, page === totalPages)}
           >
             <ChevronRightIcon size={14} />
@@ -152,6 +160,7 @@ export function Pagination(
             type="button"
             onClick={() => onChange(totalPages)}
             disabled={page === totalPages}
+            aria-label="Última página"
             style={bs(false, page === totalPages)}
           >
             <ChevronsRightIcon size={14} />

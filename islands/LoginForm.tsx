@@ -52,6 +52,11 @@ const labelStyle = {
 function safeNext(raw: string | null): string {
   if (!raw || !raw.startsWith("/") || raw.startsWith("//")) return "/";
   if (raw.includes("\\") || /^[a-zA-Z][a-zA-Z0-9+.-]*:/.test(raw)) return "/";
+  const pathOnly = raw.split("?")[0].split("#")[0];
+  if (
+    pathOnly === "/api" || pathOnly.startsWith("/api/") ||
+    pathOnly === "/auth" || pathOnly.startsWith("/auth/")
+  ) return "/";
   return raw;
 }
 

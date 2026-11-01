@@ -19,7 +19,7 @@ import {
   SEED_DEFAULTS,
 } from "../../../lib/field-options.ts";
 import { adminApi } from "../../../lib/api/admin-client.ts";
-import { useEffect, useState } from "preact/hooks";
+import { useEffect, useRef, useState } from "preact/hooks";
 
 interface SetItem {
   field: string;
@@ -38,6 +38,10 @@ export function FieldOptionsManager(
   const [newItem, setNewItem] = useState("");
   const [busy, setBusy] = useState(false);
   const [success, setSuccess] = useState("");
+  // Serializes PUTs: rapid add/remove clicks queue instead of racing, so
+  // the last write wins on the server instead of an earlier response
+  // clobbering a later one.
+  const saveQueueRef = useRef<Promise<void>>(Promise.resolve());
 
   async function refresh() {
     try {
@@ -61,23 +65,28 @@ export function FieldOptionsManager(
 
   const currentOpts = data[selected] ?? SEED_DEFAULTS[selected] ?? [];
 
-  async function save(next: string[]) {
-    setBusy(true);
-    setError("");
-    setSuccess("");
-    try {
-      await adminApi(`/api/field-options?field=${selected}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ options: next }),
-      });
-      setData((prev) => ({ ...prev, [selected]: next }));
-      setSuccess("Opções salvas com sucesso.");
-    } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
-    } finally {
-      setBusy(false);
-    }
+  function save(next: string[]) {
+    const field = selected;
+    const task = saveQueueRef.current.then(async () => {
+      setBusy(true);
+      setError("");
+      setSuccess("");
+      try {
+        await adminApi(`/api/field-options?field=${field}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ options: next }),
+        });
+        setData((prev) => ({ ...prev, [field]: next }));
+        setSuccess("Opções salvas com sucesso.");
+      } catch (err) {
+        setError(err instanceof Error ? err.message : String(err));
+      } finally {
+        setBusy(false);
+      }
+    });
+    saveQueueRef.current = task.catch(() => {});
+    return task;
   }
 
   function addOption(e: Event) {

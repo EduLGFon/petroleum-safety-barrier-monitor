@@ -36,10 +36,14 @@ import { loadServerConfig } from "../../lib/server/config.ts";
 
 import { define } from "../../utils.ts";
 
+import { denyIfCrossSite } from "../../lib/server/csrf.ts";
+
 export const handler = define.handlers({
   // GET - lists every field's option set (any authenticated reader).
   async GET(ctx) {
     const requestId = newRequestId();
+    const csrf = denyIfCrossSite(ctx.req, requestId);
+    if (csrf) return csrf;
     const limit = readThrottle.check(routeClientKey(ctx));
     if (!limit.allowed) {
       return rateLimited("too many requests", requestId, limit.retryAfterMs);
@@ -76,6 +80,8 @@ export const handler = define.handlers({
   // PUT - replaces one field's list (?field=key); admin only.
   async PUT(ctx) {
     const requestId = newRequestId();
+    const csrf = denyIfCrossSite(ctx.req, requestId);
+    if (csrf) return csrf;
     const limit = writeThrottle.check(routeClientKey(ctx));
     if (!limit.allowed) {
       return rateLimited("too many requests", requestId, limit.retryAfterMs);
