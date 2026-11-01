@@ -1,6 +1,11 @@
 // Settings storage - loadSettings with per-field validation plus save helper for the barrier-settings key.
 // This is why it exists: isolates localStorage hydration and persistence from the provider so it stays slim.
-import type { AccentColor, Density, SettingsState } from "./presets.ts";
+import type {
+  AccentColor,
+  Density,
+  FontSize,
+  SettingsState,
+} from "./presets.ts";
 import { ACCENT_PRESETS, DEFAULTS, KEY } from "./presets.ts";
 import { sanitizeFilterPatch } from "../../lib/utils.ts";
 import type { Theme } from "../../lib/types.ts";
@@ -26,6 +31,10 @@ export function loadSettings(): SettingsState {
         raw.density === "spacious"
       ? raw.density
       : DEFAULTS.density;
+    const fontSize: FontSize = raw.fontSize === "small" ||
+        raw.fontSize === "large" || raw.fontSize === "xlarge"
+      ? raw.fontSize
+      : DEFAULTS.fontSize;
     const defaultLocation = typeof raw.defaultLocation === "string" &&
         raw.defaultLocation.trim() !== ""
       ? raw.defaultLocation
@@ -36,6 +45,7 @@ export function loadSettings(): SettingsState {
       theme,
       accentColor,
       density,
+      fontSize,
       defaultLocation,
       reduceMotion: typeof raw.reduceMotion === "boolean"
         ? raw.reduceMotion

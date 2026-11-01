@@ -1,10 +1,11 @@
-// Settings context - persists theme, accent, and filter defaults.
+// Settings context - persists theme, accent, font size, and filter defaults.
 // This is why it exists: single store for appearance and filter defaults,
 // hydrated from localStorage after mount for SSR consistency.
 import {
   applyAccent,
   applyBlur,
   applyDensity,
+  applyFontSize,
   applyMotion,
   applyTheme,
 } from "./settings/appliers.ts";
@@ -13,6 +14,7 @@ import {
   type AccentColor,
   DEFAULTS,
   type Density,
+  type FontSize,
   type SettingsState,
 } from "./settings/presets.ts";
 
@@ -20,6 +22,7 @@ export {
   ACCENT_PRESETS,
   DEFAULTS,
   DENSITY_PRESETS,
+  FONT_SIZE_PRESETS,
   KEY,
 } from "./settings/presets.ts";
 
@@ -34,6 +37,7 @@ import {
 export type {
   AccentColor,
   Density,
+  FontSize,
   SettingsState,
 } from "./settings/presets.ts";
 
@@ -50,6 +54,7 @@ interface Ctx {
   setTheme: (t: Theme) => void;
   setAccent: (c: AccentColor) => void;
   setDensity: (d: Density) => void;
+  setFontSize: (f: FontSize) => void;
   setDefaults: (f: Partial<FilterState>) => void;
   setDefaultLoc: (l: string) => void;
   // Clears the startup filter defaults back to the shipped DEFAULTS in one
@@ -64,6 +69,7 @@ const SettingsCtx = createContext<Ctx>({
   setTheme: () => {},
   setAccent: () => {},
   setDensity: () => {},
+  setFontSize: () => {},
   setDefaults: () => {},
   setDefaultLoc: () => {},
   resetFilterDefaults: () => {},
@@ -90,6 +96,7 @@ export function SettingsProvider(
     applyTheme(s.theme);
     applyAccent(s.accentColor);
     applyDensity(s.density);
+    applyFontSize(s.fontSize);
     applyMotion(s.reduceMotion);
     applyBlur(s.disableBlur);
   }, []);
@@ -118,6 +125,11 @@ export function SettingsProvider(
   const setDensity = useCallback((d: Density) => {
     applyDensity(d);
     patch({ density: d });
+  }, [patch]);
+  // Applies the font-size preset then persists via patch (`barrier-settings`).
+  const setFontSize = useCallback((f: FontSize) => {
+    applyFontSize(f);
+    patch({ fontSize: f });
   }, [patch]);
   // Persists defaultFilters via patch (`barrier-settings`); no DOM side effect.
   // Merges the patch over the current default filters so partial updates
@@ -155,6 +167,7 @@ export function SettingsProvider(
         setTheme,
         setAccent,
         setDensity,
+        setFontSize,
         setDefaults,
         setDefaultLoc,
         resetFilterDefaults,

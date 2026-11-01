@@ -109,10 +109,42 @@ export const DENSITY_PRESETS: Record<
   spacious: { label: "Amplo", hint: "Monitores maiores de 16″" },
 };
 
+export type FontSize = "small" | "standard" | "large" | "xlarge";
+
+// Keep these scales in sync with the [data-font-size] percentages in
+// static/styles.css. The CSS is the rendering source; scale drives chart
+// geometry, which must grow with the text.
+export const FONT_SIZE_PRESETS: Record<
+  FontSize,
+  { label: string; hint: string; scale: number }
+> = {
+  small: {
+    label: "Pequeno",
+    hint: "93,75% · mais conteúdo na tela",
+    scale: 0.9375,
+  },
+  standard: {
+    label: "Padrão",
+    hint: "100% · equilíbrio padrão",
+    scale: 1,
+  },
+  large: {
+    label: "Grande",
+    hint: "112,5% · leitura confortável",
+    scale: 1.125,
+  },
+  xlarge: {
+    label: "Muito grande",
+    hint: "125% · máxima legibilidade",
+    scale: 1.25,
+  },
+};
+
 export interface SettingsState {
   theme: Theme;
   accentColor: AccentColor;
   density: Density;
+  fontSize: FontSize;
   defaultFilters: Partial<FilterState>;
   defaultLocation: string;
   reduceMotion: boolean;
@@ -123,6 +155,7 @@ export const DEFAULTS: SettingsState = {
   theme: "dark",
   accentColor: "aurora",
   density: "comfortable",
+  fontSize: "standard",
   defaultFilters: {},
   defaultLocation: "ALL",
   reduceMotion: false,

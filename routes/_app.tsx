@@ -5,7 +5,8 @@
 import { getCompanyName, withBrand } from "../lib/company.ts";
 import { define } from "../utils.ts";
 
-// Runs before island hydration: restores theme/accent to prevent FOUC.
+// Runs before island hydration: restores theme/accent/density/font size to
+// prevent FOUC.
 const INIT = `(function(){try{
   var s=JSON.parse(localStorage.getItem('barrier-settings')||'{}');
   var t=s.theme||'dark';
@@ -28,6 +29,10 @@ const INIT = `(function(){try{
   var dn=s.density;
   dn=(dn==='compact'||dn==='spacious')?dn:'comfortable';
   document.documentElement.dataset.density=dn;
+  var fs=s.fontSize;
+  fs=(fs==='small'||fs==='standard'||fs==='large'||fs==='xlarge')
+    ?fs:'standard';
+  document.documentElement.dataset.fontSize=fs;
 }catch(e){console.error("[settings-restore]",e);} })();`;
 
 // Font loader: same raw-script rule as INIT. Preact escapes text children

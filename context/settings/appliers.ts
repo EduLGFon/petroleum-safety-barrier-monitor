@@ -1,6 +1,6 @@
-// Settings appliers - DOM side effects for accent, theme, motion and density tokens.
+// Settings appliers - DOM side effects for accent, theme, motion, density and font-size tokens.
 // This is why it exists: keeps documentElement mutations out of the provider so they stay reusable and testable.
-import type { AccentColor, Density } from "./presets.ts";
+import type { AccentColor, Density, FontSize } from "./presets.ts";
 import { ACCENT_PRESETS, DEFAULTS } from "./presets.ts";
 import type { Theme } from "../../lib/types.ts";
 
@@ -35,4 +35,15 @@ export function applyDensity(d: Density) {
   // Density only switches tokens: every component sizes itself from
   // var(--d-*) (see styles.css), so the whole UI re-rhythms at once.
   document.documentElement.dataset.density = key;
+}
+
+// Applies the font-size preset via dataset.fontSize (falls back to
+// standard); persisted via save, not here.
+export function applyFontSize(f: FontSize) {
+  const key: FontSize = f === "small" || f === "large" || f === "xlarge"
+    ? f
+    : "standard";
+  // The attribute switches the root percentage; every type token is rem,
+  // so the whole UI rescales at once while density keeps its rhythm.
+  document.documentElement.dataset.fontSize = key;
 }
