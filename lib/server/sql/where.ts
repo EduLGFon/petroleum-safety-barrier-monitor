@@ -16,7 +16,8 @@ export const SORTABLE: Record<string, string> = {
   category: "b.category_id",
   owner: "b.owner_id",
   availability: "b.availability_id",
-  compliance: "b.compliance_id",
+  compliance:
+    "(case when (case when b.availability_id in (4, 5) and lower(trim(coalesce(b.has_contingency, ''))) = 'sim' then case when b.availability_id = 4 then 3 else 2 end else b.availability_id end) in (0, 1, 2, 3) then 0 else 1 end)",
   contingency: "cont.contingency_tag",
   statusSince: "b.status_since",
 };

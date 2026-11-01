@@ -29,6 +29,8 @@ Deno.test("diffSignatureFields names changed keys plus availability", () => {
     planFollowed: "",
     failureFree: "",
     maintStatus: "",
+    hasContingency: "Não",
+    contingencyDesc: "",
     evidenceCode: "",
     degradationDesc: "",
     extraComments: "",
@@ -43,4 +45,49 @@ Deno.test("diffSignatureFields names changed keys plus availability", () => {
   // Signature parity: identical inputs share a signature.
   assertEquals(fieldsSignature(old), fieldsSignature(same));
   assertEquals(snapshotOf(old, 4), { ...old, availabilityId: 4 });
+});
+
+Deno.test("snapshotOf strips non-signature extras for symmetry", () => {
+  const base = {
+    tag: "A",
+    locationId: 1,
+    typologyId: 1,
+    locDescId: 0,
+    criticalityId: 1,
+    categoryId: 7,
+    groupingId: 0,
+    ownerId: null,
+    comments: "",
+    actionPlan: "",
+    isActive: true,
+    scopeSource: "all",
+    origin: "",
+    installLocal: "",
+    equipTypology: "",
+    fieldInstalled: "",
+    fieldOperational: "",
+    opStatus: "",
+    hasMaintPlan: "",
+    planFollowed: "",
+    failureFree: "",
+    maintStatus: "",
+    hasContingency: "Sim",
+    contingencyDesc: "GM-1",
+    evidenceCode: "",
+    degradationDesc: "",
+    extraComments: "",
+  };
+  const withExtras = {
+    ...base,
+    externalCode: "X-1",
+    history: { note: "n", sourceAuthor: null, participants: [] },
+    sourceUpdatedAt: "2026-09-11",
+  };
+  // Extra SyncBarrierInput keys never leak into the audit snapshot.
+  assertEquals(snapshotOf(withExtras, 4), { ...base, availabilityId: 4 });
+  // Contingency rides the signature: Sim -> Não clearing is a diff.
+  assertEquals(
+    diffSignatureFields(base, { ...base, hasContingency: "Não" }, false),
+    ["hasContingency"],
+  );
 });
