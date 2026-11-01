@@ -16,6 +16,14 @@ export async function checkDbThrottle(
 ): Promise<ThrottleDecision> {
   const now = Date.now();
   const resetAt = new Date(now + windowMs).toISOString();
+  // Opportunistic sweep: expired windows never become readable again, so
+  // delete them on write to keep the table bounded without a sweeper job.
+  // Best-effort: a failed sweep must not block the throttle decision.
+  try {
+    await queryRows(`delete from throttle_buckets where reset_at <= now()`);
+  } catch {
+    // Fall through to the upsert below.
+  }
   const rows = await queryRows<{ count: string; reset_at: string }>(
     `insert into throttle_buckets (bucket, key, count, reset_at)
      values ($1, $2, 1, $3)

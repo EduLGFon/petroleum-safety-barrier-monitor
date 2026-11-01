@@ -143,7 +143,11 @@ export function createAdaptiveRate(
   ): void => {
     if (remaining !== null && remaining !== undefined) {
       if (remaining <= RATE_HOLD) {
-        const resetMs = Math.max(0, resetSecs) * 1000;
+        // Floor the hold at 5 minutes: a missing or tiny reset would
+        // otherwise release the flood immediately and re-trip the limit.
+        // takeToken still caps each sleep at maxWaitMs, so callers wait in
+        // bounded slices until the hold lifts.
+        const resetMs = Math.max(5 * 60, Math.max(0, resetSecs)) * 1000;
         holdUntil = Math.max(holdUntil, now() + resetMs);
         tokens = Math.min(tokens, 0);
         successes = 0;

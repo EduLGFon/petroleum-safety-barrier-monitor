@@ -89,6 +89,9 @@ export function createPollLoop(
   let stopped = false;
   let started = false;
   let handle: unknown = null;
+  // In-flight tick, awaited by stop() like createCycleLoop so stop() is
+  // safe mid-run instead of abandoning a poll half-way.
+  let current: Promise<void> | null = null;
   const timers = opts.timers ?? defaultTimerSource;
   // Legacy lines already carry their own [poll] prefix, so the adapter
   // stays unscoped: a child scope here would print doubled brackets.
@@ -96,21 +99,29 @@ export function createPollLoop(
 
   const tick = async (): Promise<void> => {
     if (stopped) return;
+    const work = (async (): Promise<void> => {
+      try {
+        const outcome = await pollOnce(scope, {
+          run: opts.run,
+          lock: opts.lock,
+          notifier: {
+            syncFailed: (info) => notifyFailureToAll(opts.notifiers, info),
+          },
+        });
+        logLine(`[poll] scope=${scope} ${outcome.outcome}`);
+      } catch (err) {
+        logLine(
+          `[poll] scope=${scope} crashed: ${
+            err instanceof Error ? err.message : String(err)
+          }`,
+        );
+      }
+    })();
+    current = work;
     try {
-      const outcome = await pollOnce(scope, {
-        run: opts.run,
-        lock: opts.lock,
-        notifier: {
-          syncFailed: (info) => notifyFailureToAll(opts.notifiers, info),
-        },
-      });
-      logLine(`[poll] scope=${scope} ${outcome.outcome}`);
-    } catch (err) {
-      logLine(
-        `[poll] scope=${scope} crashed: ${
-          err instanceof Error ? err.message : String(err)
-        }`,
-      );
+      await work;
+    } finally {
+      current = null;
     }
     if (!stopped) handle = timers.setTimeout(tick, opts.intervalMs);
   };
@@ -121,13 +132,13 @@ export function createPollLoop(
       started = true;
       handle = timers.setTimeout(tick, 0);
     },
-    stop(): Promise<void> {
+    async stop(): Promise<void> {
       stopped = true;
       if (handle !== null) {
         timers.clearTimeout(handle);
         handle = null;
       }
-      return Promise.resolve();
+      await current;
     },
   };
 }

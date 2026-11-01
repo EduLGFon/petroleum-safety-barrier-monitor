@@ -4,7 +4,7 @@
 // optional and env-gated (OPS_SMTP_*/OPS_EMAIL_TO). Notification is
 // best-effort by contract: a throwing notifier never propagates into the
 // sync path, so an unusable mail relay cannot take down the pipeline.
-import { sendMail, type SmtpConfig } from "./smtp.ts";
+import { sendMail, smtpRequireTls, type SmtpConfig } from "./smtp.ts";
 
 import { log } from "../log.ts";
 
@@ -123,7 +123,11 @@ export function smtpConfigFromEnv(
   const hostname = get("OPS_SMTP_HOST") ?? get("MAIL_HOST");
   const to = get("OPS_EMAIL_TO");
   if (!hostname || !to) return null;
-  const port = Number(get("OPS_SMTP_PORT") ?? 587);
+  // Validate port 1-65535, else fall back to 587 (plain + STARTTLS).
+  const rawPort = Number(get("OPS_SMTP_PORT") ?? 587);
+  const port = Number.isInteger(rawPort) && rawPort >= 1 && rawPort <= 65535
+    ? rawPort
+    : 587;
   const user = get("OPS_SMTP_USER") ?? get("MAIL_USER");
   return {
     hostname,
@@ -133,6 +137,10 @@ export function smtpConfigFromEnv(
     pass: get("OPS_SMTP_PASS") ?? get("MAIL_PASS"),
     from: get("OPS_EMAIL_FROM") ?? user ?? "barrier-monitor@local",
     to,
+    // STARTTLS downgrade guard lives in sendMail (refuses plaintext auth
+    // when SMTP_REQUIRE_TLS=1, default in prod); propagate the env default
+    // here so the notifier config carries the same policy.
+    requireTls: smtpRequireTls(),
   };
 }
 

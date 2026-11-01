@@ -67,6 +67,8 @@ export function parseLogFormat(
 const SECRET_SUBSTRINGS = [
   "password",
   "passwd",
+  "pass",
+  "pwd",
   "secret",
   "token",
   "authorization",
@@ -109,10 +111,18 @@ function normalizeValue(
     return truncate(value);
   }
   if (value instanceof Error) {
+    const message = looksLikeConnectionString(value.message)
+      ? "[REDACTED connection-string]"
+      : truncate(value.message);
+    const stack = value.stack === undefined
+      ? undefined
+      : looksLikeConnectionString(value.stack)
+      ? "[REDACTED connection-string]"
+      : truncate(value.stack);
     return {
       name: value.name,
-      message: truncate(value.message),
-      stack: value.stack ? truncate(value.stack) : undefined,
+      message,
+      stack,
     };
   }
   if (Array.isArray(value)) {

@@ -54,14 +54,12 @@ export const sqlAlertStore: AlertStore = {
       `select h.barrier_id, h.date::text as transition_date, h.status_id
        from barrier_status_history h
        where ($1::date is null or h.date >= $1::date)
-       order by h.date, h.id`,
-      [since],
+         and ($2::int[] is null or h.barrier_id = any($2))
+       order by h.date, h.id
+       limit 20000`,
+      [since, onlyBarrierIds ?? null],
     );
-    const only = onlyBarrierIds === undefined
-      ? undefined
-      : new Set(onlyBarrierIds);
     return rows
-      .filter((r) => only === undefined || only.has(r.barrier_id))
       .map((r) => ({
         barrierId: r.barrier_id,
         transitionDate: r.transition_date.slice(0, 10),
@@ -71,43 +69,50 @@ export const sqlAlertStore: AlertStore = {
 
   async enqueue(events: NewAlertEvent[]): Promise<number> {
     if (events.length === 0) return 0;
-    const values: string[] = [];
-    const args: unknown[] = [];
-    for (const e of events) {
-      args.push(
-        e.barrierId,
-        e.transitionDate,
-        e.statusId,
-        e.dedupKey,
-        e.payload,
-        e.kind ?? "barrier_transition",
+    let total = 0;
+    for (let off = 0; off < events.length; off += 500) {
+      const chunk = events.slice(off, off + 500);
+      const values: string[] = [];
+      const args: unknown[] = [];
+      for (const e of chunk) {
+        args.push(
+          e.barrierId,
+          e.transitionDate,
+          e.statusId,
+          e.dedupKey,
+          e.payload,
+          e.kind ?? "barrier_transition",
+        );
+        const base = args.length - 6;
+        values.push(
+          `($${base + 1}, $${base + 2}::date, $${base + 3}, $${base + 4}, $${
+            base + 5
+          }::jsonb, $${base + 6})`,
+        );
+      }
+      const rows = await queryRows<{ id: number }>(
+        `insert into alert_events
+           (barrier_id, transition_date, status_id, dedup_key, payload, kind)
+         values ${values.join(", ")}
+         on conflict (dedup_key) do nothing
+         returning id`,
+        args,
       );
-      const base = args.length - 6;
-      values.push(
-        `($${base + 1}, $${base + 2}::date, $${base + 3}, $${base + 4}, $${
-          base + 5
-        }::jsonb, $${base + 6})`,
-      );
+      total += rows.length;
     }
-    const rows = await queryRows<{ id: number }>(
-      `insert into alert_events
-         (barrier_id, transition_date, status_id, dedup_key, payload, kind)
-       values ${values.join(", ")}
-       on conflict (dedup_key) do nothing
-       returning id`,
-      args,
-    );
-    return rows.length;
+    return total;
   },
 
-  async listUnsent(): Promise<UnsentAlert[]> {
+  async listUnsent(limit = 200, offset = 0): Promise<UnsentAlert[]> {
     const rows = await queryRows<EventRow>(
       `select id, barrier_id, transition_date::text as transition_date,
               status_id, dedup_key, payload
        from alert_events
        where sent_at is null
          and coalesce((payload->>'dead_letter')::boolean, false) = false
-       order by id`,
+       order by id
+       limit $1 offset $2`,
+      [limit, offset],
     );
     return rows.map(toUnsent);
   },
@@ -220,9 +225,9 @@ export const sqlAlertStore: AlertStore = {
     const rows = await queryRows<{ n: string }>(
       `select count(*)::text as n from alert_events
        where barrier_id = $1
-         and (payload->>'ruleId')::int = $2
+         and (payload->>'ruleId') = $2::text
          and created_at >= $3::timestamptz`,
-      [barrierId, ruleId, sinceIso],
+      [barrierId, String(ruleId), sinceIso],
     );
     return Number(rows[0]?.n ?? 0);
   },

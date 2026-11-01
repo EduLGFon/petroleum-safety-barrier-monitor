@@ -65,10 +65,16 @@ export async function verifyPassword(
   stored: string,
 ): Promise<boolean> {
   try {
+    // Bound input before the KDF: an unbounded password burns CPU in
+    // deriveKey (DoS) without strengthening the digest.
+    if (password.length > 1000) return false;
     const parts = stored.split("$");
     if (parts.length !== 4 || parts[0] !== "pbkdf2") return false;
     const iterations = Number(parts[1]);
-    if (!Number.isInteger(iterations) || iterations <= 0) return false;
+    if (
+      !Number.isInteger(iterations) || iterations < 10000 ||
+      iterations > 1000000
+    ) return false;
     const salt = fromBase64(parts[2]!);
     const expected = fromBase64(parts[3]!);
     const actual = await deriveKey(password, salt, iterations);

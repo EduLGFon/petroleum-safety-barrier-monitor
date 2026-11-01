@@ -28,24 +28,43 @@ export function createThrottle(options: ThrottleOptions): Throttle {
   const { limit, windowMs, now = () => Date.now() } = options;
   const buckets = new Map<string, Bucket>();
 
+  // evictExpired: drops windows whose reset already passed so a burst of
+  // distinct keys cannot pin dead entries. Runs only when the map exceeds
+  // the cap, keeping the steady-state check O(1).
+  const evictIfNeeded = (at: number): void => {
+    if (buckets.size <= 5000) return;
+    for (const [k, b] of buckets) {
+      if (at >= b.resetAt) buckets.delete(k);
+      if (buckets.size <= 5000) return;
+    }
+    // Still over budget (all entries live): evict oldest first. Map
+    // iteration order is insertion order, and hits refresh recency below,
+    // so the head is the least-recently-used key.
+    while (buckets.size > 5000) {
+      const oldest = buckets.keys().next().value;
+      if (oldest === undefined) break;
+      buckets.delete(oldest);
+    }
+  };
+
   return {
     check(key: string): ThrottleDecision {
       const at = now();
       const bucket = buckets.get(key);
+      // Expiry on read: a passed window resets on next touch, no timer needed.
       if (bucket === undefined || at >= bucket.resetAt) {
         buckets.set(key, { count: 1, resetAt: at + windowMs });
-        if (buckets.size > 10_000) {
-          for (const [k, b] of buckets) {
-            if (at >= b.resetAt) buckets.delete(k);
-          }
-        }
+        evictIfNeeded(at);
         return { allowed: true, retryAfterMs: 0 };
       }
+      // Refresh LRU recency on hit so the cap above evicts cold keys first.
+      buckets.delete(key);
+      buckets.set(key, bucket);
       if (bucket.count < limit) {
         bucket.count++;
         return { allowed: true, retryAfterMs: 0 };
       }
-      return { allowed: false, retryAfterMs: bucket.resetAt - at };
+      return { allowed: false, retryAfterMs: Math.max(0, bucket.resetAt - at) };
     },
   };
 }
@@ -90,6 +109,17 @@ export function routeClientKey(ctx: unknown): string {
 
 // throttleKey: client identity for a request. Remote address only - never
 // X-Forwarded-For, which any client can spoof into someone else's bucket.
+// Proxy note: deployments sit behind a TLS-terminating reverse proxy
+// (Caddy, see deploy/windows/Caddyfile) that forwards to loopback :8300.
+// Deno's remoteAddr is then the proxy's address, so all clients share one
+// bucket unless the proxy injects a trusted client IP that the app reads.
+// That header is deliberately NOT read here: X-Forwarded-For is
+// client-controlled on a direct connection and would let one client evict
+// another's bucket or dodge its own limit. If per-client limits behind a
+// proxy are required, terminate the proxy with a fixed, authenticated
+// `X-Real-IP`-style header stripped at the edge and key on it explicitly -
+// or prefer lib/server/sql/throttle.ts, which shares one budget across
+// isolates instead of one bucket per isolate.
 export function throttleKey(remoteAddr: unknown): string {
   if (
     typeof remoteAddr === "object" && remoteAddr !== null &&

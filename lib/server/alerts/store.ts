@@ -78,7 +78,7 @@ export interface AlertStore {
     onlyBarrierIds?: number[],
   ): Promise<TransitionCandidate[]>;
   enqueue(events: NewAlertEvent[]): Promise<number>;
-  listUnsent(): Promise<UnsentAlert[]>;
+  listUnsent(limit?: number, offset?: number): Promise<UnsentAlert[]>;
   // countDead: parked events (sent_at null + dead flag). listUnsent hides
   // them by design, so the cycle needs this separately for observability.
   countDead(): Promise<number>;

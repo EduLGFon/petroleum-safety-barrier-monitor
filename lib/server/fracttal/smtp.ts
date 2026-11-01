@@ -49,19 +49,104 @@ export interface SmtpConfig {
   to: string;
   secure?: boolean;
   connector?: SmtpConnector; // defaults to defaultSmtpConnector
+  // requireTls overrides SMTP_REQUIRE_TLS env (default 1 in prod).
+  requireTls?: boolean;
+  // timeoutMs bounds one submission (default 30_000).
+  timeoutMs?: number;
+}
+
+// SMTP_SEND_TIMEOUT_MS: one submission must stay bounded so a hung relay
+// can never stall the poll cycle/runner (they await notifiers).
+export const SMTP_SEND_TIMEOUT_MS = 30_000;
+
+// smtpRequireTls: SMTP_REQUIRE_TLS=0/false opts out; "1"/"true" opts in.
+// Unset defaults to 1 in prod (DENO_ENV/NODE_ENV/ENV=production) and 0
+// elsewhere so local dev and headless tests keep plaintext fakes working.
+export function smtpRequireTls(explicit?: boolean): boolean {
+  if (explicit !== undefined) return explicit;
+  try {
+    const raw = Deno.env.get("SMTP_REQUIRE_TLS");
+    if (raw !== undefined) {
+      const v = raw.trim().toLowerCase();
+      if (v === "0" || v === "false" || v === "no" || v === "off") {
+        return false;
+      }
+      if (v === "1" || v === "true" || v === "yes" || v === "on") {
+        return true;
+      }
+      if (v !== "") return true;
+    }
+  } catch {
+    return false;
+  }
+  try {
+    const env = (Deno.env.get("DENO_ENV") ?? Deno.env.get("NODE_ENV") ??
+      Deno.env.get("ENV") ?? "").trim().toLowerCase();
+    if (env === "production" || env === "prod") return true;
+  } catch {
+    // No env access - stay permissive for headless tests.
+  }
+  return false;
+}
+
+// raceWithSignal: bounds one socket op by an AbortSignal (timeout or
+// caller cancel). The underlying read/write promise stays pending but the
+// submission rejects promptly, so SmtpLineIO honors the signal.
+function raceWithSignal<T>(task: Promise<T>, signal?: AbortSignal): Promise<T> {
+  if (!signal) return task;
+  if (signal.aborted) return Promise.reject(signal.reason ?? new Error("[smtp] aborted"));
+  return Promise.race([
+    task,
+    new Promise<never>((_, reject) => {
+      signal.addEventListener(
+        "abort",
+        () => reject(signal.reason ?? new Error("[smtp] timed out")),
+        { once: true },
+      );
+    }),
+  ]);
+}
+
+function timeoutSignal(ms: number): AbortSignal {
+  if (typeof AbortSignal.timeout === "function") return AbortSignal.timeout(ms);
+  const ctrl = new AbortController();
+  setTimeout(() => ctrl.abort(new Error("[smtp] timed out")), ms);
+  return ctrl.signal;
+}
+
+function combineSignals(a: AbortSignal, b: AbortSignal): AbortSignal {
+  if (typeof (AbortSignal as unknown as { any?: unknown }).any === "function") {
+    return (AbortSignal as unknown as { any: (s: AbortSignal[]) => AbortSignal }).any([a, b]);
+  }
+  if (a.aborted) return a;
+  if (b.aborted) return b;
+  const ctrl = new AbortController();
+  const onAbort = () => ctrl.abort(a.aborted ? a.reason : b.reason);
+  a.addEventListener("abort", onAbort, { once: true });
+  b.addEventListener("abort", onAbort, { once: true });
+  return ctrl.signal;
 }
 
 // SmtpLineIO: command/response state machine over a streaming socket.
+// Accepts an optional AbortSignal so a hung relay (or the 30s sendMail
+// timeout) bounds every read/write; the poll cycle/runner stay bounded
+// because they await notifiers that await this bounded send.
 class SmtpLineIO {
   #socket: SmtpSocket;
   #reader: ReadableStreamDefaultReader<Uint8Array> | null;
   #buffer = "";
   #decoder = new TextDecoder();
   #encoder = new TextEncoder();
+  #signal?: AbortSignal;
 
-  constructor(socket: SmtpSocket) {
+  constructor(socket: SmtpSocket, signal?: AbortSignal) {
     this.#socket = socket;
     this.#reader = socket.readable.getReader();
+    this.#signal = signal;
+  }
+
+  #throwIfAborted(): void {
+    this.#signal?.throwIfAborted();
   }
 
   // releaseReader: releases the reader lock so the underlying socket can be
@@ -83,6 +168,7 @@ class SmtpLineIO {
 
   // nextRawLine: next CRLF line, reconnecting the reader after an upgrade.
   private async nextRawLine(): Promise<string> {
+    this.#throwIfAborted();
     while (true) {
       const nl = this.#buffer.indexOf("\n");
       if (nl >= 0) {
@@ -93,7 +179,10 @@ class SmtpLineIO {
       if (this.#reader === null) {
         throw new Error("[smtp] reader released before reply");
       }
-      const { value, done } = await this.#reader.read();
+      const { value, done } = await raceWithSignal(
+        this.#reader.read(),
+        this.#signal,
+      );
       if (done) throw new Error("[smtp] connection closed mid-line");
       this.#buffer += this.#decoder.decode(value, { stream: true });
     }
@@ -128,9 +217,13 @@ class SmtpLineIO {
   }
 
   private async writeRaw(data: string): Promise<void> {
+    this.#throwIfAborted();
     const writer = this.#socket.writable.getWriter();
     try {
-      await writer.write(this.#encoder.encode(data));
+      await raceWithSignal(
+        writer.write(this.#encoder.encode(data)),
+        this.#signal,
+      );
     } finally {
       writer.releaseLock();
     }
@@ -159,10 +252,14 @@ class SmtpLineIO {
 
   // sendData: the message body, dot-stuffed, terminated by ".".
   async sendData(message: string): Promise<void> {
+    this.#throwIfAborted();
     const stuffed = message.replace(/^\./gm, "..");
     const writer = this.#socket.writable.getWriter();
     try {
-      await writer.write(this.#encoder.encode(`${stuffed}\r\n.\r\n`));
+      await raceWithSignal(
+        writer.write(this.#encoder.encode(`${stuffed}\r\n.\r\n`)),
+        this.#signal,
+      );
     } finally {
       writer.releaseLock();
     }
@@ -196,6 +293,23 @@ class SmtpLineIO {
   }
 }
 
+// sanitizeHeader: strip CR/LF to block header injection, cap at 998 chars
+// (RFC 5322 line limit) before building the DATA head.
+function sanitizeHeader(v: string): string {
+  return v.replace(/[\r\n]+/g, " ").slice(0, 998);
+}
+
+// assertEnvelopeAddress: validates MAIL FROM / RCPT TO envelope addresses.
+// Throws on CR/LF or angle brackets (injection) and on non-email shapes.
+function assertEnvelopeAddress(addr: string, label: string): void {
+  if (/[\r\n<>]/.test(addr)) {
+    throw new Error(`[smtp] invalid ${label} address`);
+  }
+  if (!/^[^\s@<>]+@[^\s@<>]+$/.test(addr)) {
+    throw new Error(`[smtp] invalid ${label} address`);
+  }
+}
+ 
 // b64 utf8: base64 for AUTH PLAIN and RFC2047 subject encoding.
 function b64(data: Uint8Array): string {
   let bin = "";
@@ -221,11 +335,19 @@ export function composeMessage(
   date: string,
   html?: string,
 ): string {
+  // Validate envelope addresses on the raw values first (sanitizing would
+  // hide an injection attempt); headers are sanitized before building head.
+  assertEnvelopeAddress(from, "from");
+  assertEnvelopeAddress(to, "to");
+  const safeFrom = sanitizeHeader(from);
+  const safeTo = sanitizeHeader(to);
+  const safeSubject = sanitizeHeader(subject);
+  const safeDate = sanitizeHeader(date);
   const head = [
-    `From: ${from}`,
-    `To: ${to}`,
-    `Subject: ${encodeSubject(subject)}`,
-    `Date: ${date}`,
+    `From: ${safeFrom}`,
+    `To: ${safeTo}`,
+    `Subject: ${encodeSubject(safeSubject)}`,
+    `Date: ${safeDate}`,
     `MIME-Version: 1.0`,
   ];
   const bodyCrlf = body.replace(/\n/g, "\r\n");
@@ -321,30 +443,60 @@ async function authenticate(
 
 // sendMail: one submission, best-effort semantics live in the caller.
 // html (when given) rides as the multipart/alternative rich part.
+// Bounded by timeoutMs (default SMTP_SEND_TIMEOUT_MS): the connector and
+// every line IO race an AbortSignal.timeout so a hung relay can never stall
+// the poll cycle/runner that awaits notifiers.
 export async function sendMail(
   config: SmtpConfig,
   subject: string,
   body: string,
   html?: string,
+  options?: { signal?: AbortSignal; timeoutMs?: number },
 ): Promise<void> {
+  // Validate envelope addresses before any network IO (header sanitizing in
+  // composeMessage would otherwise hide an injection attempt).
+  assertEnvelopeAddress(config.from, "from");
+  assertEnvelopeAddress(config.to, "to");
+  const timeoutMs = options?.timeoutMs ?? config.timeoutMs ??
+    SMTP_SEND_TIMEOUT_MS;
+  const timeout = timeoutSignal(timeoutMs);
+  const signal = options?.signal
+    ? combineSignals(options.signal, timeout)
+    : timeout;
+  signal.throwIfAborted();
   const secure = config.secure ?? config.port === 465;
   const connector = config.connector ?? defaultSmtpConnector;
-  const { socket, upgrade } = await connector({
-    hostname: config.hostname,
-    port: config.port,
-    secure,
-  });
+  const { socket, upgrade } = await raceWithSignal(
+    connector({
+      hostname: config.hostname,
+      port: config.port,
+      secure,
+    }),
+    signal,
+  );
   let conn: SmtpSocket = socket;
-  let io = new SmtpLineIO(conn);
+  let io = new SmtpLineIO(conn, signal);
+  let upgraded = false;
   try {
     await io.expectCode(220);
     let caps = await io.ehlo([]);
     if (!secure && upgrade && caps.has("STARTTLS")) {
       await io.command("STARTTLS", 220);
       await io.releaseReader();
-      conn = await upgrade(conn);
-      io = new SmtpLineIO(conn);
+      conn = await raceWithSignal(upgrade(conn), signal);
+      io = new SmtpLineIO(conn, signal);
       caps = await io.ehlo([]);
+      upgraded = true;
+    }
+    // STARTTLS downgrade guard: credentials must not cross plaintext.
+    // SMTP_REQUIRE_TLS=1 (default in prod) refuses; otherwise log the
+    // downgrade and continue for local/dev fakes.
+    if (config.user !== undefined && !(secure || upgraded)) {
+      const requireTLS = smtpRequireTls(config.requireTls);
+      const msg =
+        "[smtp] STARTTLS downgrade: refusing plaintext auth without TLS (SMTP_REQUIRE_TLS=1)";
+      if (requireTLS) throw new Error(msg);
+      console.warn(msg);
     }
     if (config.user !== undefined) {
       await authenticate(io, caps, config.user, config.pass ?? "");

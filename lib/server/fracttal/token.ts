@@ -77,7 +77,9 @@ export function createTokenCache(
     if (typeof token.access_token !== "string" || token.access_token === "") {
       throw new Error("[fracttal] token response missing access_token");
     }
-    const expiresIn = Number(token.expires_in) || 0;
+    // Clamp short/zero expiries up to 60s so a degenerate upstream value
+    // cannot cause a refresh stampede (expiry already passed on receipt).
+    const expiresIn = Math.max(60, Number(token.expires_in) || 0);
     current = {
       accessToken: token.access_token,
       refreshToken: token.refresh_token,
@@ -88,6 +90,8 @@ export function createTokenCache(
 
   return {
     get() {
+      // Reuse the in-flight grant: concurrent callers share one token
+      // request instead of stampeding the token endpoint.
       if (pending) return pending;
       const fresh = current && now() < current.expiresAtMs;
       if (fresh && current) return Promise.resolve(current.accessToken);
@@ -104,7 +108,9 @@ export function createTokenCache(
     },
     // Refresh on 401: rewrites pending with the refresh grant so callers of
     // get() (which pending short-circuits) cannot race a stale token.
+    // Reuses an in-flight grant when one already exists.
     refresh() {
+      if (pending) return pending;
       pending = acquire("refresh_token").finally(() => {
         pending = null;
       });

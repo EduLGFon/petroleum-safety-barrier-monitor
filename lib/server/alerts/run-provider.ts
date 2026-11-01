@@ -2,6 +2,7 @@
 // Replaces the local SMTP digest: delivery, templates and retry belong to
 // the upstream provider. Detection, rules, watermark and dedup stay local.
 import {
+  assertHttpsUrl,
   buildAlertPayload,
   mapLanding,
   type ProviderAccept,
@@ -12,7 +13,12 @@ import { detectUrgentTransitions, landingLabel } from "./detect.ts";
 
 import { fromCriticalityId, fromLocationId } from "../../enums.ts";
 
-import { type AlertStore, isDead, withFailure } from "./store.ts";
+import {
+  type AlertStore,
+  isDead,
+  type UnsentAlert,
+  withFailure,
+} from "./store.ts";
 
 import { matchesStaleScope, sortedRules } from "./rules.ts";
 
@@ -82,33 +88,68 @@ export function staleDedupKey(
   return `stale:${ruleId}:${barrierId}:${date}`;
 }
 
+type CountCache = Map<string, Promise<number>>;
+
+function cachedCount(
+  store: AlertStore,
+  cache: CountCache | undefined,
+  ruleId: number,
+  barrierId: number,
+  sinceIso: string,
+): Promise<number> {
+  if (!store.countRuleEvents) return Promise.resolve(0);
+  if (!cache) return store.countRuleEvents(ruleId, barrierId, sinceIso);
+  const key = `${ruleId}:${barrierId}:${sinceIso}`;
+  let hit = cache.get(key);
+  if (!hit) {
+    hit = store.countRuleEvents(ruleId, barrierId, sinceIso);
+    // Drop failures from the cache so a transient DB error does not poison
+    // later checks in the same cycle.
+    hit.catch(() => cache.delete(key));
+    cache.set(key, hit);
+  }
+  return hit;
+}
+
 async function throttleAllows(
   store: AlertStore,
   rule: AlertRule,
   barrierId: number,
   at: Date,
+  cache?: CountCache,
 ): Promise<boolean> {
   if (!store.countRuleEvents) return true;
-  if (rule.cooldown_minutes !== null && rule.cooldown_minutes !== undefined) {
-    const since = new Date(at.getTime() - rule.cooldown_minutes * 60_000)
-      .toISOString();
-    if (await store.countRuleEvents(rule.id, barrierId, since) > 0) {
-      return false;
-    }
-  }
-  if (rule.max_per_day !== null && rule.max_per_day !== undefined) {
-    const dayStart = `${at.toISOString().slice(0, 10)}T00:00:00Z`;
-    if (
-      await store.countRuleEvents(rule.id, barrierId, dayStart) >=
-        rule.max_per_day
-    ) return false;
-  }
+  const cooldownSince = (rule.cooldown_minutes !== null &&
+      rule.cooldown_minutes !== undefined)
+    ? new Date(at.getTime() - rule.cooldown_minutes * 60_000).toISOString()
+    : null;
+  const dayStart = (rule.max_per_day !== null && rule.max_per_day !== undefined)
+    ? `${at.toISOString().slice(0, 10)}T00:00:00Z`
+    : null;
+  // Batch the two anti-noise reads concurrently; the cache dedups identical
+  // (rule, barrier, window) triples across events in one cycle.
+  const [cooldownHits, dayHits] = await Promise.all([
+    cooldownSince !== null
+      ? cachedCount(store, cache, rule.id, barrierId, cooldownSince)
+      : Promise.resolve(0),
+    dayStart !== null
+      ? cachedCount(store, cache, rule.id, barrierId, dayStart)
+      : Promise.resolve(0),
+  ]);
+  if (cooldownSince !== null && cooldownHits > 0) return false;
+  if (
+    dayStart !== null && rule.max_per_day !== null &&
+    rule.max_per_day !== undefined && dayHits >= rule.max_per_day
+  ) return false;
   return true;
 }
 
 function ocorridoEm(transitionDate: string, now: Date): string {
   const day = transitionDate.slice(0, 10);
-  if (/^\d{4}-\d{2}-\d{2}$/.test(day)) return `${day}T12:00:00-03:00`;
+  if (/^\d{4}-\d{2}-\d{2}$/.test(day)) {
+    const candidate = `${day}T12:00:00-03:00`;
+    if (!Number.isNaN(Date.parse(candidate))) return candidate;
+  }
   return now.toISOString();
 }
 
@@ -116,9 +157,26 @@ function barrierLink(
   appBaseUrl: string | undefined,
   barrierId: number | null,
 ): string | undefined {
-  const base = (appBaseUrl ?? "").replace(/\/+$/, "");
-  if (!base || barrierId === null) return undefined;
-  return `${base}/barriers/${barrierId}`;
+  const raw = (appBaseUrl ?? "").trim().replace(/\/+$/, "");
+  if (!raw || barrierId === null) return undefined;
+  // Public links must be https (plain http only for loopback dev). An
+  // invalid or non-https base omits the link instead of breaking the cycle.
+  try {
+    const normalized = assertHttpsUrl(raw, "APP_BASE_URL");
+    return `${normalized}/barriers/${barrierId}`;
+  } catch {
+    return undefined;
+  }
+}
+
+function withPostTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const timeout = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => reject(new Error("provider post timed out")), ms);
+  });
+  return Promise.race([promise, timeout]).finally(() => {
+    if (timer !== undefined) clearTimeout(timer);
+  }) as Promise<T>;
 }
 
 export async function runProviderCycle(
@@ -173,6 +231,9 @@ export async function runProviderCycle(
   result.detected = detected.length;
 
   const staleEvents: typeof detected = [];
+  // Cycle-scoped dedup for anti-noise reads: identical (rule, barrier,
+  // window) checks across stale + transition events share one DB round-trip.
+  const countCache: CountCache = new Map();
   if (listStale) {
     const days = [
       ...new Set(
@@ -214,14 +275,24 @@ export async function runProviderCycle(
               at,
             )
           ) continue;
+          const statusDay = c.statusSince.slice(0, 10);
+          const parsedToday = Date.parse(`${today}T00:00:00Z`);
+          const parsedSince = Date.parse(`${statusDay}T00:00:00Z`);
+          if (!Number.isFinite(parsedToday) || !Number.isFinite(parsedSince)) {
+            continue;
+          }
           const daysSince = Math.floor(
-            (Date.parse(`${today}T00:00:00Z`) -
-              Date.parse(`${c.statusSince.slice(0, 10)}T00:00:00Z`)) /
-              86_400_000,
+            (parsedToday - parsedSince) / 86_400_000,
           );
-          const repeat = r.stale_repeat_days ?? 1;
+          if (!Number.isFinite(daysSince)) continue;
+          // Guard a zero/negative repeat (DB check should prevent it) back
+          // to 1 so the modulo below never divides by zero.
+          const rawRepeat = r.stale_repeat_days ?? 1;
+          const repeat = rawRepeat > 0 ? rawRepeat : 1;
           if (daysSince >= 0 && (daysSince - d) % repeat !== 0) continue;
-          if (!(await throttleAllows(store, r, c.id, at))) continue;
+          if (!(await throttleAllows(store, r, c.id, at, countCache))) {
+            continue;
+          }
           staleEvents.push({
             barrierId: c.id,
             transitionDate: today,
@@ -257,17 +328,28 @@ export async function runProviderCycle(
     const at = now();
     const byRule = new Map<number, AlertRule>();
     for (const r of rules) byRule.set(r.id, r);
-    for (const e of detected) {
-      const ruleId = e.payload.ruleId ?? null;
-      const rule = ruleId !== null ? byRule.get(ruleId) : undefined;
-      if (!rule) {
-        throttled.push(e);
-        if (ruleId !== null) options.onRuleFired?.(ruleId);
-        continue;
-      }
-      if (await throttleAllows(store, rule, e.barrierId, at)) {
-        throttled.push(e);
-        options.onRuleFired?.(rule.id);
+    // Batch the anti-noise reads: one Promise.all over the cycle instead
+    // of sequential DB round-trips, sharing the countCache above.
+    const decisions = await Promise.all(
+      detected.map(async (e) => {
+        const ruleId = e.payload.ruleId ?? null;
+        const rule = ruleId !== null ? byRule.get(ruleId) : undefined;
+        if (!rule) return { e, allow: true, ruleId };
+        const allow = await throttleAllows(
+          store,
+          rule,
+          e.barrierId,
+          at,
+          countCache,
+        );
+        return { e, allow, ruleId: rule.id };
+      }),
+    );
+    for (const { e, allow, ruleId } of decisions) {
+      if (!allow) continue;
+      throttled.push(e);
+      if (ruleId !== null && ruleId !== undefined) {
+        options.onRuleFired?.(ruleId);
       }
     }
   } else {
@@ -288,8 +370,19 @@ export async function runProviderCycle(
     result.enqueued = await store.enqueue(toEnqueue);
   }
 
-  const unsent = await store.listUnsent();
-  const sendable = unsent.filter((e) => !isDead(e.payload));
+  // Paginated fetch (200/page) so an alert backlog never loads unbounded
+  // rows into one query. Snapshot before any marks so offsets stay stable.
+  const SEND_BATCH = 200;
+  const SEND_CONCURRENCY = 4;
+  const POST_TIMEOUT_MS = 15_000;
+  const allUnsent: UnsentAlert[] = [];
+  for (let offset = 0;; offset += SEND_BATCH) {
+    const batch = await store.listUnsent(SEND_BATCH, offset);
+    if (batch.length === 0) break;
+    allUnsent.push(...batch);
+    if (batch.length < SEND_BATCH) break;
+  }
+  const sendable = allUnsent.filter((e) => !isDead(e.payload));
   result.skippedDead = await store.countDead();
   if (sendable.length === 0 || active.length === 0) {
     logger(
@@ -305,23 +398,31 @@ export async function runProviderCycle(
   ] as number[];
   const wires = await loadBarriers(wireIds);
   const at = now();
-  for (const event of sendable) {
+
+  async function processEvent(event: UnsentAlert): Promise<void> {
     const mapping = mapLanding(event.statusId);
     if (!mapping.send) {
-      if (store.markProviderAccepted) {
-        await store.markProviderAccepted(event.id, {
-          parcial: false,
-          enfileirados: 0,
-          rejeitados: [],
-          avisos: ["suppressed: planned stop"],
-        });
-      } else {
-        for (const r of active) {
-          await store.markDelivered(event.id, r.email, true);
+      try {
+        if (store.markProviderAccepted) {
+          await store.markProviderAccepted(event.id, {
+            parcial: false,
+            enfileirados: 0,
+            rejeitados: [],
+            avisos: ["suppressed: planned stop"],
+          });
+        } else {
+          for (const r of active) {
+            await store.markDelivered(event.id, r.email, true);
+          }
         }
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        logger(`[provider] event ${event.id} accept failed: ${message}`);
+        result.failed++;
+        return;
       }
       result.sent++;
-      continue;
+      return;
     }
     const wire = event.barrierId !== null
       ? wires.get(event.barrierId)
@@ -354,10 +455,10 @@ export async function runProviderCycle(
     });
     if (!payload) {
       logger(`[provider] event ${event.id} has no valid destinos, skipping`);
-      continue;
+      return;
     }
     try {
-      const res = await sender.post(payload);
+      const res = await withPostTimeout(sender.post(payload), POST_TIMEOUT_MS);
       result.posted++;
       if (res.aviso_token) {
         logger(
@@ -366,20 +467,27 @@ export async function runProviderCycle(
           }`,
         );
       }
-      if (store.markProviderAccepted) {
-        await store.markProviderAccepted(event.id, {
-          correlationId: res.correlation_id,
-          parcial: res.parcial,
-          eventoId: res.evento_id,
-          idempotencyKey: res.idempotency_key,
-          enfileirados: res.enfileirados,
-          rejeitados: res.rejeitados,
-          avisos: res.avisos,
-        });
-      } else {
-        for (const r of active) {
-          await store.markDelivered(event.id, r.email, true);
+      try {
+        if (store.markProviderAccepted) {
+          await store.markProviderAccepted(event.id, {
+            correlationId: res.correlation_id,
+            parcial: res.parcial,
+            eventoId: res.evento_id,
+            idempotencyKey: res.idempotency_key,
+            enfileirados: res.enfileirados,
+            rejeitados: res.rejeitados,
+            avisos: res.avisos,
+          });
+        } else {
+          for (const r of active) {
+            await store.markDelivered(event.id, r.email, true);
+          }
         }
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        logger(`[provider] event ${event.id} accept failed: ${message}`);
+        result.failed++;
+        return;
       }
       result.sent++;
       if (res.parcial) {
@@ -401,11 +509,32 @@ export async function runProviderCycle(
         message,
         deadNow ? 1 : PROVIDER_MAX_SEND_RUNS,
       );
-      await store.markFailed(event.id, message, next.deadLetter || deadNow);
+      try {
+        await store.markFailed(event.id, message, next.deadLetter || deadNow);
+      } catch (dbErr) {
+        const dbMsg = dbErr instanceof Error ? dbErr.message : String(dbErr);
+        logger(`[provider] event ${event.id} markFailed failed: ${dbMsg}`);
+      }
       result.failed++;
       logger(`[provider] event ${event.id} failed: ${message}`);
     }
   }
+
+  // Bounded parallelism (4): one slow provider POST never head-blocks the
+  // rest, and the upstream never sees an unbounded burst. A per-event
+  // try/catch above keeps one DB failure from stopping the batch.
+  let nextIndex = 0;
+  const workers = Array.from(
+    { length: Math.min(SEND_CONCURRENCY, sendable.length) },
+    async () => {
+      while (true) {
+        const i = nextIndex++;
+        if (i >= sendable.length) break;
+        await processEvent(sendable[i]!);
+      }
+    },
+  );
+  await Promise.all(workers);
   return result;
 }
 
@@ -494,7 +623,7 @@ export async function maybeSendProviderImmediate(options: {
     recipients: active,
   });
   if (!payload) return { enqueued, posted: 0 };
-  const unsent = await store.listUnsent();
+  const unsent = await store.listUnsent(200, 0);
   const pending = unsent.find((e) => e.dedupKey === event.dedupKey);
   if (!pending) return { enqueued, posted: 0 };
   try {

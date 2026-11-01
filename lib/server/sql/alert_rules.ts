@@ -529,9 +529,9 @@ export async function countRuleEventsSince(
   const rows = await queryRows<{ n: string }>(
     `select count(*)::text as n from alert_events
      where barrier_id = $1
-       and (payload->>'ruleId')::int = $2
+       and (payload->>'ruleId') = $2::text
        and created_at >= $3::timestamptz`,
-    [barrierId, ruleId, sinceIso],
+    [barrierId, String(ruleId), sinceIso],
   );
   return Number(rows[0]?.n ?? 0);
 }

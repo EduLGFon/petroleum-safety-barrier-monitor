@@ -127,6 +127,14 @@ export function isStaleConnection(err: unknown): boolean {
 // attempts). External Postgres kills idle sockets and the lazy pool hands
 // out dead ones; without the reset every poller/app tick would 500 until
 // restart. The retry logs one warn line, not a stack trace.
+// isSelectQuery: true for read-only statements safe to replay on a fresh
+// connection. Only SELECT (and WITH ... SELECT) retries: replaying a
+// half-applied INSERT/UPDATE/DELETE on a new connection is unsafe.
+function isSelectQuery(text: string): boolean {
+  const t = text.trimStart().toLowerCase();
+  return t.startsWith("select") || t.startsWith("with");
+}
+
 export async function queryRows<T>(
   text: string,
   args: Array<unknown> = [],
@@ -134,7 +142,7 @@ export async function queryRows<T>(
   try {
     return await runOnce<T>(text, args);
   } catch (err) {
-    if (!isStaleConnection(err)) throw err;
+    if (!isSelectQuery(text) || !isStaleConnection(err)) throw err;
     const detail = err instanceof Error ? err.message : String(err);
     log.child({ scope: "db" }).warn(
       "pooled connection failed, resetting pool",

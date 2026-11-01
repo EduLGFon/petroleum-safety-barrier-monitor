@@ -75,13 +75,40 @@ export function mapLanding(statusId: number): ProviderMapping {
   };
 }
 
+function isLoopbackHostname(hostname: string): boolean {
+  const h = hostname.toLowerCase();
+  return h === "localhost" || h === "127.0.0.1" || h === "::1" ||
+    h === "[::1]";
+}
+
+// assertHttpsUrl: parses + enforces https, allowing plain http only for
+// loopback development. Throws on malformed URLs so a typo fails fast at
+// boot instead of on the first post. Exported for barrierLink/appBaseUrl.
+export function assertHttpsUrl(raw: string, field: string): string {
+  const trimmed = raw.trim().replace(/\/+$/, "");
+  let url: URL;
+  try {
+    url = new URL(trimmed);
+  } catch {
+    throw new Error(`${field} must be a valid URL`);
+  }
+  if (url.protocol !== "https:" && url.protocol !== "http:") {
+    throw new Error(`${field} must use http or https`);
+  }
+  if (url.protocol === "http:" && !isLoopbackHostname(url.hostname)) {
+    throw new Error(`${field} must use https outside local development`);
+  }
+  return trimmed;
+}
+
 export function providerConfigFromEnv(
   get: (name: string) => string | undefined = (n) => Deno.env.get(n),
 ): ProviderConfig {
-  const baseUrl = (get("ALERT_PROVIDER_BASE_URL") ?? "").replace(/\/+$/, "");
+  const rawBase = (get("ALERT_PROVIDER_BASE_URL") ?? "").replace(/\/+$/, "");
   const token = get("ALERT_PROVIDER_TOKEN") ?? "";
-  if (!baseUrl) throw new Error("ALERT_PROVIDER_BASE_URL is not set");
+  if (!rawBase) throw new Error("ALERT_PROVIDER_BASE_URL is not set");
   if (!token) throw new Error("ALERT_PROVIDER_TOKEN is not set");
+  const baseUrl = assertHttpsUrl(rawBase, "ALERT_PROVIDER_BASE_URL");
   const companyId = Number(get("ALERT_PROVIDER_COMPANY_ID") ?? "1") || 1;
   return { baseUrl, token, companyId };
 }
@@ -302,6 +329,33 @@ function failure(
   return err;
 }
 
+// MAX_JSON_BYTES: caps provider response bodies (Content-Length pre-check
+// + post-read check) so a misbehaving upstream cannot OOM the poller.
+const MAX_JSON_BYTES = 1_000_000;
+
+async function readCappedJson(res: Response): Promise<Record<string, unknown>> {
+  const lenRaw = res.headers.get("content-length");
+  if (lenRaw !== null) {
+    const len = Number(lenRaw);
+    if (Number.isFinite(len) && len > MAX_JSON_BYTES) {
+      throw failure(0, "oversized", "provider response too large");
+    }
+  }
+  const text = await res.text();
+  if (text.length > MAX_JSON_BYTES) {
+    throw failure(0, "oversized", "provider response too large");
+  }
+  if (!text) return {};
+  try {
+    const parsed: unknown = JSON.parse(text);
+    return typeof parsed === "object" && parsed !== null
+      ? parsed as Record<string, unknown>
+      : {};
+  } catch {
+    return {};
+  }
+}
+
 async function postJson(
   config: ProviderConfig,
   path: string,
@@ -320,12 +374,13 @@ async function postJson(
       body: JSON.stringify(body),
       signal: ctrl.signal,
     });
-    const json = await res.json().catch(() => ({})) as Record<
-      string,
-      unknown
-    >;
+    const json = await readCappedJson(res);
     return { status: res.status, json };
   } catch (err) {
+    if (
+      err instanceof Error && "status" in err &&
+      typeof (err as { status?: unknown }).status === "number"
+    ) throw err;
     if (err instanceof Error && err.name === "AbortError") {
       throw failure(0, "timeout", "provider request timed out");
     }
@@ -404,15 +459,25 @@ export async function pingProvider(
       headers: { "X-MSGFLOW-TOKEN": config.token },
       signal: ctrl.signal,
     });
-    const json = await res.json().catch(() => ({})) as Record<
-      string,
-      unknown
-    >;
+    const json = await readCappedJson(res);
     return {
       ok: json["ok"] === true,
       pronto: (json["pronto"] as boolean) === true,
       rotacao: json["rotacao_de_token"] ?? json["rotacao"] ?? undefined,
     };
+  } catch (err) {
+    if (
+      err instanceof Error && "status" in err &&
+      typeof (err as { status?: unknown }).status === "number"
+    ) throw err;
+    if (err instanceof Error && err.name === "AbortError") {
+      throw failure(0, "timeout", "provider ping timed out");
+    }
+    throw failure(
+      0,
+      "network",
+      err instanceof Error ? err.message : String(err),
+    );
   } finally {
     clearTimeout(timer);
   }
