@@ -12,6 +12,7 @@ import {
   denyDataAuth,
   requireAdminAuth,
   requireDataAuth,
+  resolveAllowedLocationIds,
 } from "../../../../lib/server/auth.ts";
 
 import {
@@ -43,6 +44,8 @@ import { loadServerConfig } from "../../../../lib/server/config.ts";
 
 import { define } from "../../../../utils.ts";
 
+import { denyIfCrossSite } from "../../../../lib/server/csrf.ts";
+
 function loadConfig(
   method: string,
   id: string | undefined,
@@ -65,13 +68,17 @@ async function getDataAuth(
   req: Request,
   requestId: string,
 ): Promise<
-  | { ok: true; role: "admin" | "user" }
+  | {
+    ok: true;
+    role: "admin" | "user";
+    user?: { allowedLocationIds?: number[] | null } | null;
+  }
   | { response: Response }
 > {
   try {
     const auth = await requireDataAuth(req);
     if (!auth.ok) return { response: denyDataAuth(auth, requestId) };
-    return { ok: true, role: auth.role };
+    return { ok: true, role: auth.role, user: auth.user };
   } catch (err) {
     return {
       response: authStoreUnavailable(
@@ -86,6 +93,8 @@ async function getDataAuth(
 export const handler = define.handlers({
   async GET(ctx) {
     const requestId = newRequestId();
+    const csrf = denyIfCrossSite(ctx.req, requestId);
+    if (csrf) return csrf;
     const limit = readThrottle.check(routeClientKey(ctx));
     if (!limit.allowed) {
       return rateLimited("too many requests", requestId, limit.retryAfterMs);
@@ -106,9 +115,11 @@ export const handler = define.handlers({
       const barrier = await getBarrierById(barrierId, {
         includeDeleted: auth.role === "admin",
       });
+      const allowed = resolveAllowedLocationIds(auth);
       if (
         !barrier || (auth.role !== "admin" &&
-          (barrier.deletedAt !== null || barrier.isActive === false))
+          (barrier.deletedAt !== null || barrier.isActive === false ||
+            (allowed !== null && !allowed.includes(barrier.locationId))))
       ) {
         return notFound("Barrier not found", requestId);
       }
@@ -116,6 +127,7 @@ export const handler = define.handlers({
         barrierId,
         rawQuery?.trim() ?? "",
         auth.role === "admin",
+        allowed,
       );
       return await okWithEtag(ctx.req, data, requestId);
     } catch (err) {
@@ -130,6 +142,8 @@ export const handler = define.handlers({
 
   async POST(ctx) {
     const requestId = newRequestId();
+    const csrf = denyIfCrossSite(ctx.req, requestId);
+    if (csrf) return csrf;
     const limit = writeThrottle.check(routeClientKey(ctx));
     if (!limit.allowed) {
       return rateLimited("too many requests", requestId, limit.retryAfterMs);
@@ -211,6 +225,8 @@ export const handler = define.handlers({
 
   async PATCH(ctx) {
     const requestId = newRequestId();
+    const csrf = denyIfCrossSite(ctx.req, requestId);
+    if (csrf) return csrf;
     const limit = writeThrottle.check(routeClientKey(ctx));
     if (!limit.allowed) {
       return rateLimited("too many requests", requestId, limit.retryAfterMs);
@@ -278,6 +294,8 @@ export const handler = define.handlers({
 
   async DELETE(ctx) {
     const requestId = newRequestId();
+    const csrf = denyIfCrossSite(ctx.req, requestId);
+    if (csrf) return csrf;
     const limit = writeThrottle.check(routeClientKey(ctx));
     if (!limit.allowed) {
       return rateLimited("too many requests", requestId, limit.retryAfterMs);

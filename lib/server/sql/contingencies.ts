@@ -66,7 +66,15 @@ export async function listBarrierContingencies(
   barrierId: number,
   query: string,
   includeOffScope: boolean,
+  allowedLocationIds: number[] | null = null,
 ): Promise<BarrierContingencies> {
+  const allowed = Array.isArray(allowedLocationIds)
+    ? allowedLocationIds
+    : null;
+  if (allowed !== null && allowed.length === 0) {
+    return { outgoing: [], incoming: [], candidates: [], candidatesHaveMore: false };
+  }
+  const allowedParam = allowed;
   const [outgoingRows, incomingRows, candidateRows] = await Promise.all([
     queryRows<ContingencyLinkRow>(
       `${LINK_SELECT} where b.id = $1
@@ -74,8 +82,9 @@ export async function listBarrierContingencies(
            b.deleted_at is null and b.is_active
            and c.deleted_at is null and c.is_active
          ))
+         and ($3::int[] is null or b.location_id = any($3::int[]))
        order by c.tag, c.id`,
-      [barrierId, includeOffScope],
+      [barrierId, includeOffScope, allowedParam],
     ),
     queryRows<ContingencyLinkRow>(
       `${LINK_SELECT} where c.id = $1
@@ -83,8 +92,9 @@ export async function listBarrierContingencies(
            b.deleted_at is null and b.is_active
            and c.deleted_at is null and c.is_active
          ))
+         and ($3::int[] is null or b.location_id = any($3::int[]))
        order by b.tag, b.id`,
-      [barrierId, includeOffScope],
+      [barrierId, includeOffScope, allowedParam],
     ),
     queryRows<ContingencyCandidate>(
       `select c.id, c.tag
@@ -92,6 +102,7 @@ export async function listBarrierContingencies(
        join barriers c on c.location_id = b.location_id and c.id <> b.id
        join availability_statuses a on a.id = c.availability_id
        where b.id = $1 and b.deleted_at is null
+         and ($4::int[] is null or b.location_id = any($4::int[]))
          and c.deleted_at is null and c.is_active
          and a.label = 'Disponível' and a.is_compliant
          and c.tag ilike $2 escape '\\'
@@ -106,6 +117,7 @@ export async function listBarrierContingencies(
         barrierId,
         `%${escapeLike(query)}%`,
         CANDIDATE_LIMIT + 1,
+        allowedParam,
       ],
     ),
   ]);
