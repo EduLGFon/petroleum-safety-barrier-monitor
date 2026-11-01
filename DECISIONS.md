@@ -23,4 +23,10 @@ Append-only architecture decision records. Newest last.
   Client: export builders + editor + admin managers load lazily, memoized
   rows/chart, debounced searches/persistence, 30s health heartbeat.
 
+- D20: admin field ownership for Fracttal-synced barrier columns. PATCH records
+  newly-different keys in `barriers.manual_fields` (no-change saves take
+  nothing); the sync excludes owned fields from its signature and UPDATE so
+  manual edits survive sweeps; `releaseFields` returns them to the sync.
+  Adds the `manual_fields text[]` column via idempotent migration.
+
 See git history for full context.

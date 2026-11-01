@@ -30,7 +30,11 @@ Core: `locations`, `categories`, `criticality_levels`, `typologies`, `groupings`
 - `barriers.external_code` is the upsert key for Fracttal sync.
 - `deleted_at` marks soft-deleted rows.
 - `compliance_id` is trigger-derived.
-- Status changes use `record_status_change()` only; direct `availability_id` writes are rejected.
+- `manual_fields` (text[]) lists barrier columns an admin took over in the
+  editor; the Fracttal sync skips those columns and leaves them untouched
+  until they are released back to the sync.
+- Status changes use `record_status_change()` only; direct `availability_id`
+  writes are rejected.
 - Same-status calls do not create history.
 - Sync runs are recorded in `sync_state`.
 - Exports stream in 5,000-row batches with a 200,000-row ceiling.

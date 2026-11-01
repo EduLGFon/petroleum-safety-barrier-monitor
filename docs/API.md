@@ -19,13 +19,19 @@ Wire/domain types: `lib/wireTypes.ts`, `lib/types.ts`, `lib/api/types.ts`, `lib/
 
 ## Main routes
 
-Reads (session cookie or `ADMIN_TOKEN`): `/api/health`, `/api/barriers`, `/api/barriers/:id`, `/api/barriers/:id/contingencies`, `/api/kpi`, `/api/chart`, `/api/vocabularies`, `/api/sync-status`, `/api/sync-runs`, `/api/sync-changes`, `/api/barriers/:id/sync-detail`, `/api/export`, `/api/lookups`, `/api/field-options`. Admin-only reads: `/api/barriers/deleted`, `/api/barriers/:id/fracttal-raw` (`DEV=true`).
+Reads (session cookie or `ADMIN_TOKEN`): `/api/health`, `/api/barriers`, `/api/barriers/ids`, `/api/barriers/:id`, `/api/barriers/:id/contingencies`, `/api/kpi`, `/api/chart`, `/api/vocabularies`, `/api/sync-status`, `/api/sync-runs`, `/api/sync-changes`, `/api/barriers/:id/sync-detail`, `/api/export`, `/api/lookups`, `/api/field-options`. Admin-only reads: `/api/barriers/deleted`, `/api/barriers/:id/fracttal-raw` (`DEV=true`).
 
 Writes (admin): status, barrier edit, contingency links, recipients, users, alert rules, field options. Auth: `/api/auth/login`, `/api/auth/logout`, `/api/auth/me`, `/api/auth/password`.
 
 ## Key behaviors
 
 - `/api/barriers` supports location, availability, compliance, category, typology, criticality, criticalOnly, hasActionPlan, rowScope, query, since/until, page, pageSize, sortCol, sortDir.
+- `/api/barriers/ids` returns the id list for the active filters (used for
+  select-all across pages).
+- Barrier edits (PATCH `/api/barriers/:id`) accept `releaseFields`: a list of
+  owned field keys returned to the Fracttal sync; edited fields join
+  `manualFields` so the sync stops overwriting them.
+- Barriers carry `manualFields`: the list of columns an admin took over.
 - Exports stream CSV/XLSX/PDF over the whole filtered scope, 5,000-row batches, 200,000-row ceiling.
 - Soft-deleted rows are visible only to admins through `rowScope`.
 - Errors use `{ error, code, requestId }` plus `x-request-id`.

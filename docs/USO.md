@@ -34,6 +34,12 @@ Abas: Detalhes, Contingência, Histórico. Admins também veem Edição.
 
 Contingência: vínculos da barreira como contingência e vice-versa. Elegíveis: ativas, não excluídas, Disponível, Conforme, mesma instalação. Admins criam/removem vínculos e preenchem referências.
 
+Campos manuais: ao editar uma barreira, os campos alterados passam a ser
+marcados como "Manual" e a sincronização Fracttal deixa de sobrescrevê-los.
+O botão "Devolver ao sync" libera o campo para seguir o Fracttal novamente
+na próxima sincronização. Cada campo exibe a origem no Fracttal para orientar
+a correção na fonte.
+
 ## 6. Configurações
 
 Tema, cor, densidade, movimento reduzido, filtros padrão, ordenação padrão, alteração de senha, edição de perfil e, para admins, usuários, destinatários, regras de alerta e opções de campos.

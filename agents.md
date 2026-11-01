@@ -187,7 +187,7 @@ requirements from security best practices/project policies. Never invent legal r
 controls/draft text; legal sign-off by owner/lawyer/DPO. Document applicable requirement + implementation in
 `docs/ARCHITECTURE.md` + `DECISIONS.md` (and `docs/` privacy doc when created).
 
-Privacy by Design: Data minimization: collect only schema/cache-declared data: `barriers` + `barrier_status_history` + lookups,
+Privacy by Design: Data minimization: collect only schema/cache-declared data: `barriers` (incl. `manual_fields`) + `barrier_status_history` + lookups,
 `sync_state` + `sync_barrier_changes`, `alert_events` + `alert_recipients` + `alert_rules`, `users` + `sessions`,
 `field_option_sets`, `throttle_buckets`, SSR vocabularies, three `localStorage` keys (`barrier-dashboard`, `barrier-chart`,
 `barrier-settings`). No new stored field/log/metric/cache/third-party call touching personal data without ADR + inventory update

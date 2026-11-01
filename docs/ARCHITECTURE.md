@@ -27,6 +27,9 @@ Key tasks: `check`, `test`, `dev`, `build`, `preview`, `start`, `db:migrate`, `d
 - Status writes go only through `record_status_change()`.
 - Filtering and sorting are centralized in `lib/server/sql/where.ts`.
 - Exports stream from the database in batches.
+- Admin field ownership: `barriers.manual_fields` records per-barrier columns
+  an admin took over in the editor; the Fracttal sync skips those columns and
+  `releaseFields` returns them to the sync.
 
 ## Data
 
