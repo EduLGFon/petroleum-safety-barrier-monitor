@@ -71,11 +71,20 @@ export interface UnsentAlert {
   payload: AlertPayload;
 }
 
+export interface TransitionCursor {
+  date: string; // YYYY-MM-DD of the last row of the previous page
+  id: number; // its history-row id tiebreaker
+}
+
 export interface AlertStore {
   watermark(): Promise<string | null>;
+  // Cursor walk: pass the previous page's last (date, id) to stream large
+  // windows without OFFSET rescans (idx_history_date_id). limit caps one
+  // call (default 20000, the legacy ceiling); after caps the walk.
   recentTransitions(
     since: string | null,
     onlyBarrierIds?: number[],
+    opts?: { limit?: number; after?: TransitionCursor | null },
   ): Promise<TransitionCandidate[]>;
   enqueue(events: NewAlertEvent[]): Promise<number>;
   listUnsent(limit?: number, offset?: number): Promise<UnsentAlert[]>;
@@ -103,6 +112,14 @@ export interface AlertStore {
     barrierId: number,
     sinceIso: string,
   ): Promise<number>;
+  // countRuleEventsBulk: cycle-wide prefetch for the helper above (optional;
+  // the cycle falls back to per-pair reads). One GROUP BY per (rule, window)
+  // instead of one query per candidate; absent barriers read as 0.
+  countRuleEventsBulk?(
+    ruleId: number,
+    barrierIds: number[],
+    sinceIso: string,
+  ): Promise<Record<number, number>>;
 }
 
 // dedupKey: barrier:date:status, matching the alert_events comment.

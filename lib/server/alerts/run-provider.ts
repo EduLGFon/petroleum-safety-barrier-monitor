@@ -90,6 +90,54 @@ export function staleDedupKey(
 
 type CountCache = Map<string, Promise<number>>;
 
+// throttleWindows: the (rule, window) anti-noise instants for one check.
+function throttleWindows(
+  rule: AlertRule,
+  at: Date,
+): Array<{ sinceIso: string }> {
+  const out: Array<{ sinceIso: string }> = [];
+  if (rule.cooldown_minutes !== null && rule.cooldown_minutes !== undefined) {
+    out.push({
+      sinceIso: new Date(at.getTime() - rule.cooldown_minutes * 60_000)
+        .toISOString(),
+    });
+  }
+  if (rule.max_per_day !== null && rule.max_per_day !== undefined) {
+    out.push({ sinceIso: `${at.toISOString().slice(0, 10)}T00:00:00Z` });
+  }
+  return out;
+}
+
+// warmThrottleCache: bulk-prefetches (rule, barriers, window) counts into
+// the cycle cache - one GROUP BY per distinct (rule, sinceIso) instead of
+// one query per candidate. Stores without the bulk read keep the per-pair
+// fallback inside cachedCount; failures here never fail the cycle.
+async function warmThrottleCache(
+  store: AlertStore,
+  cache: CountCache | undefined,
+  groups: Array<
+    { ruleId: number; barrierIds: number[]; sinceIso: string }
+  >,
+): Promise<void> {
+  if (!store.countRuleEventsBulk || !cache || groups.length === 0) return;
+  await Promise.all(groups.map(async ({ ruleId, barrierIds, sinceIso }) => {
+    if (barrierIds.length === 0) return;
+    try {
+      const counts = await store.countRuleEventsBulk!(
+        ruleId,
+        barrierIds,
+        sinceIso,
+      );
+      for (const bid of barrierIds) {
+        const key = `${ruleId}:${bid}:${sinceIso}`;
+        if (!cache.has(key)) cache.set(key, Promise.resolve(counts[bid] ?? 0));
+      }
+    } catch {
+      // Per-pair fallback inside cachedCount still applies.
+    }
+  }));
+}
+
 function cachedCount(
   store: AlertStore,
   cache: CountCache | undefined,
@@ -247,6 +295,25 @@ export async function runProviderCycle(
     for (const d of days) {
       const cands = await listStale(d);
       const wires = await loadBarriers(cands.map((c) => c.id));
+      // Bulk warm: one GROUP BY per (rule, window) over this day's
+      // candidates instead of one cooldown query per barrier below.
+      {
+        const ids = cands.map((c) => c.id);
+        const groups: Array<
+          { ruleId: number; barrierIds: number[]; sinceIso: string }
+        > = [];
+        for (const r of ordered) {
+          if (!r.active || r.stale_days !== d) continue;
+          for (const w of throttleWindows(r, at)) {
+            groups.push({
+              ruleId: r.id,
+              barrierIds: ids,
+              sinceIso: w.sinceIso,
+            });
+          }
+        }
+        await warmThrottleCache(store, countCache, groups);
+      }
       for (const c of cands) {
         if (
           options.onlyBarrierIds !== undefined &&
@@ -328,6 +395,29 @@ export async function runProviderCycle(
     const at = now();
     const byRule = new Map<number, AlertRule>();
     for (const r of rules) byRule.set(r.id, r);
+    // Bulk warm: group the cycle's events per (rule, window) and prefetch
+    // one GROUP BY each, so the per-event checks below hit warm cache.
+    {
+      const idsByRule = new Map<number, number[]>();
+      for (const e of detected) {
+        const ruleId = e.payload.ruleId ?? null;
+        if (ruleId === null) continue;
+        const list = idsByRule.get(ruleId) ?? [];
+        list.push(e.barrierId);
+        idsByRule.set(ruleId, list);
+      }
+      const groups: Array<
+        { ruleId: number; barrierIds: number[]; sinceIso: string }
+      > = [];
+      for (const [ruleId, ids] of idsByRule) {
+        const rule = byRule.get(ruleId);
+        if (!rule) continue;
+        for (const w of throttleWindows(rule, at)) {
+          groups.push({ ruleId, barrierIds: ids, sinceIso: w.sinceIso });
+        }
+      }
+      await warmThrottleCache(store, countCache, groups);
+    }
     // Batch the anti-noise reads: one Promise.all over the cycle instead
     // of sequential DB round-trips, sharing the countCache above.
     const decisions = await Promise.all(

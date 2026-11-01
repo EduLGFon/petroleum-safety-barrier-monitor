@@ -45,7 +45,24 @@ export const sqlAlertStore: AlertStore = {
   async recentTransitions(
     since: string | null,
     onlyBarrierIds?: number[],
+    opts?: {
+      limit?: number;
+      after?: { date: string; id: number } | null;
+    },
   ): Promise<TransitionCandidate[]> {
+    const limit = Math.min(
+      20000,
+      Math.max(1, Math.floor(opts?.limit ?? 20000) || 20000),
+    );
+    const after = opts?.after ?? null;
+    const args: unknown[] = [since, onlyBarrierIds ?? null];
+    let cursor = "";
+    if (after !== null) {
+      args.push(after.date, after.id);
+      cursor = ` and (h.date, h.id) > ($${
+        args.length - 1
+      }::date, $${args.length})`;
+    }
     const rows = await queryRows<{
       barrier_id: number;
       transition_date: string;
@@ -54,10 +71,10 @@ export const sqlAlertStore: AlertStore = {
       `select h.barrier_id, h.date::text as transition_date, h.status_id
        from barrier_status_history h
        where ($1::date is null or h.date >= $1::date)
-         and ($2::int[] is null or h.barrier_id = any($2))
+         and ($2::int[] is null or h.barrier_id = any($2))${cursor}
        order by h.date, h.id
-       limit 20000`,
-      [since, onlyBarrierIds ?? null],
+       limit ${limit}`,
+      args,
     );
     return rows
       .map((r) => ({
@@ -230,5 +247,31 @@ export const sqlAlertStore: AlertStore = {
       [barrierId, String(ruleId), sinceIso],
     );
     return Number(rows[0]?.n ?? 0);
+  },
+
+  // countRuleEventsBulk: one GROUP BY for a whole cycle's (rule, barriers,
+  // window) checks instead of one query per candidate. Missing barriers
+  // are absent from the map (read as 0 by the caller).
+  async countRuleEventsBulk(
+    ruleId: number,
+    barrierIds: number[],
+    sinceIso: string,
+  ): Promise<Record<number, number>> {
+    const unique = [...new Set(barrierIds)].filter((n) => Number.isInteger(n));
+    if (unique.length === 0) return {};
+    const out: Record<number, number> = {};
+    for (let at = 0; at < unique.length; at += 2000) {
+      const chunk = unique.slice(at, at + 2000);
+      const rows = await queryRows<{ barrier_id: number; n: number }>(
+        `select barrier_id, count(*)::int as n from alert_events
+         where barrier_id = any($1::int[])
+           and (payload->>'ruleId') = $2::text
+           and created_at >= $3::timestamptz
+         group by barrier_id`,
+        [chunk, String(ruleId), sinceIso],
+      );
+      for (const r of rows) out[r.barrier_id] = r.n;
+    }
+    return out;
   },
 };
