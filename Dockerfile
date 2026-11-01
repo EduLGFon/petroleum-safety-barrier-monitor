@@ -37,6 +37,30 @@ COPY . ./
 RUN --mount=type=cache,target=/tmp/dcache \
     DENO_DIR=/tmp/dcache deno task build
 
+# Runtime prune: node_modules is 100MB+ of build/test toolchain (vite +
+# esbuild/rollup family, linkedom test DOM, xlsx test validator) that the
+# prebuilt `_fresh/` bundle + server routes never import at runtime (kept:
+# preact/signals/render-to-string, openid-client auth, Fresh/jsr in
+# /deno-dir). Name-prefix globs survive version bumps in deno.lock.
+# Verified below via `deno check --cached-only` on the app + worker
+# entrypoints: any surviving runtime import of a pruned package fails the
+# build here instead of a container at 3am. Dev (`target: base`) and host
+# runs keep the full tree, so tests/scripts stay untouched.
+RUN rm -rf \
+      node_modules/vite node_modules/rollup node_modules/esbuild \
+      node_modules/esbuild-wasm node_modules/linkedom node_modules/xlsx \
+      node_modules/codepage node_modules/caniuse-lite \
+      node_modules/@esbuild node_modules/@rollup node_modules/@types \
+      node_modules/@babel \
+      node_modules/.deno/vite@* node_modules/.deno/rollup@* \
+      node_modules/.deno/esbuild@* node_modules/.deno/esbuild-wasm@* \
+      node_modules/.deno/linkedom@* node_modules/.deno/xlsx@* \
+      node_modules/.deno/codepage@* node_modules/.deno/caniuse-lite@* \
+      node_modules/.deno/@esbuild+* node_modules/.deno/@rollup+* \
+      node_modules/.deno/@types+* node_modules/.deno/@babel+* && \
+    DENO_DIR=/deno-dir deno check --cached-only main.ts \
+      scripts/fracttal-poll.ts scripts/alerts-poll.ts scripts/migrate.ts
+
 EXPOSE 8300
 
 # Drop privileges: the deno base image ships a `deno` user; runtime processes
