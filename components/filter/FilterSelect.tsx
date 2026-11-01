@@ -223,11 +223,13 @@ export function Combo(
               // underneath instead of the near-transparent elevated wash that
               // let rows bleed through the text.
               background: AURORA.dialog,
-              backdropFilter: "blur(16px) saturate(1.25)",
-              WebkitBackdropFilter: "blur(16px) saturate(1.25)",
+              backdropFilter: "blur(10px) saturate(1.1)",
+              WebkitBackdropFilter: "blur(10px) saturate(1.1)",
               border: `1px solid ${AURORA.segBorder}`,
               borderRadius: 10,
               boxShadow: "0 12px 32px rgba(0,0,0,.35)",
+              contain: "paint",
+              transform: "translateZ(0)",
             }}
           >
             <li
@@ -401,11 +403,13 @@ export function MultiCombo(
               maxHeight: 240,
               overflowY: "auto",
               background: AURORA.dialog,
-              backdropFilter: "blur(16px) saturate(1.25)",
-              WebkitBackdropFilter: "blur(16px) saturate(1.25)",
+              backdropFilter: "blur(10px) saturate(1.1)",
+              WebkitBackdropFilter: "blur(10px) saturate(1.1)",
               border: `1px solid ${AURORA.segBorder}`,
               borderRadius: 10,
               boxShadow: "0 12px 32px rgba(0,0,0,.35)",
+              contain: "paint",
+              transform: "translateZ(0)",
             }}
           >
             {opts.map((o) => (
