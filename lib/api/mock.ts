@@ -164,6 +164,14 @@ export const mockAdapter: BarriersApi = {
     return Promise.resolve(resolveBarriers(sorted));
   },
 
+  // Mock getBarrierIds: id-only walk over the same match (no row copies).
+  getBarrierIds(query, opts) {
+    opts?.signal?.throwIfAborted();
+    const all = getWireBarriers().filter((w) => matchesQuery(w, query));
+    const sorted = sortWire(all, query.sortCol ?? "id", query.sortDir ?? "asc");
+    return Promise.resolve(sorted.map((w) => w.id));
+  },
+
   // Mock getBarrierById: finds wire row by id, resolves to domain.
   getBarrierById(id, opts) {
     opts?.signal?.throwIfAborted();

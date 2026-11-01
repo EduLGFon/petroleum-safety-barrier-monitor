@@ -11,14 +11,20 @@ import type {
 
 import {
   type BarrierRow,
+  CONTINGENCY_LATERAL,
   HISTORY_JOIN,
+  LIST_JOIN,
   SELECT_COLUMNS,
+  SELECT_LIST_COLUMNS,
   toWireBarrier,
 } from "./mappers.ts";
 
 export {
+  CONTINGENCY_LATERAL,
   HISTORY_JOIN,
+  LIST_JOIN,
   SELECT_COLUMNS,
+  SELECT_LIST_COLUMNS,
   toHistory,
   toWireBarrier,
 } from "./mappers.ts";
@@ -31,11 +37,17 @@ export type { BarrierRow, HistoryEntry } from "./mappers.ts";
 
 import { queryRows } from "../db.ts";
 
+import { EXPORT_MAX_ROWS } from "../../export/limits.ts";
+
 // Lists paged wire barriers + total for the given BarriersQuery filters.
 // Single round-trip: the total rides along as count(*) OVER() on every row,
 // so the page and the count share one filtered scan. Out-of-range pages
 // (zero rows past offset 0) fall back to one count query so totalPages
 // stays exact instead of reading 0.
+// List projection: scalars + contingency only, NO history lateral (the
+// detail modal fetches history via getBarrierById). Page size is capped at
+// 1000: bulk flows must use the streaming export walk or the ids listing,
+// never a giant page.
 export async function listBarriers(
   q: BarriersQuery,
 ): Promise<BarriersResponse> {
@@ -43,7 +55,7 @@ export async function listBarriers(
   // NaN falls back to defaults via ||.
   const page = Math.max(1, Math.floor(q.page ?? 1) || 1);
   const pageSize = Math.min(
-    100_000,
+    1000,
     Math.max(1, Math.floor(q.pageSize ?? 25) || 25),
   );
   const offset = (page - 1) * pageSize;
@@ -53,10 +65,10 @@ export async function listBarriers(
   const offsetIdx = where.args.length + 2;
 
   const rows = await queryRows<BarrierRow & { full_count: string }>(
-    `select ${SELECT_COLUMNS}, count(*) over () as full_count
+    `select ${SELECT_LIST_COLUMNS}, count(*) over () as full_count
        from barriers b
        join locations loc on loc.id = b.location_id
-       ${HISTORY_JOIN} ${where.text}
+       ${LIST_JOIN} ${where.text}
        order by ${orderBy} limit $${limitIdx} offset $${offsetIdx}`,
     [...where.args, pageSize, offset],
   );
@@ -98,6 +110,7 @@ export async function getBarrierById(
 // batch out. b.id is appended as a tiebreaker: a single-column sort has ties
 // (same TAG, same owner), and without a unique key Postgres may return them
 // in a different order per page, which would drop or repeat rows mid-export.
+// List projection (no history lateral): exports render table columns only.
 export async function listBarrierWindow(
   q: BarriersQuery,
   limit: number,
@@ -106,9 +119,9 @@ export async function listBarrierWindow(
   const where = buildWhere(q);
   const orderBy = `${resolveOrderBy(q.sortCol, q.sortDir)}, b.id asc`;
   const rows = await queryRows<BarrierRow>(
-    `select ${SELECT_COLUMNS} from barriers b
+    `select ${SELECT_LIST_COLUMNS} from barriers b
      join locations loc on loc.id = b.location_id
-     ${HISTORY_JOIN} ${where.text}
+     ${LIST_JOIN} ${where.text}
      order by ${orderBy} limit $${where.args.length + 1} offset $${
       where.args.length + 2
     }`,
@@ -193,9 +206,11 @@ export async function listBarrierWindowAfter(
   const dir = q.sortDir === "desc" ? "desc" : "asc";
   const where = buildWhere(q);
   const orderBy = `${resolveOrderBy(q.sortCol, q.sortDir)}, b.id asc`;
-  let text = `select ${SELECT_COLUMNS}, ${cursorSelect(sortKey)} from barriers b
+  let text = `select ${SELECT_LIST_COLUMNS}, ${
+    cursorSelect(sortKey)
+  } from barriers b
      join locations loc on loc.id = b.location_id
-     ${HISTORY_JOIN} ${where.text}`;
+     ${LIST_JOIN} ${where.text}`;
   let args: unknown[] = [...where.args];
   if (after !== null) {
     // NOTE: id binds only the id (no sort value), so every bound param is
@@ -229,6 +244,7 @@ export async function listBarrierWindowAfter(
 // resolves hundreds of candidates per run - one query each would stall it).
 // Chunked IN lists keep placeholder counts bounded; missing/deleted ids are
 // simply absent from the map unless includeDeleted grants the admin view.
+// Full projection (with history): detail, alerts and PATCH paths only.
 export async function getBarriersByIds(
   ids: number[],
   opts: { includeDeleted?: boolean } = {},
@@ -253,6 +269,25 @@ export async function getBarriersByIds(
     }
   }
   return out;
+}
+
+// listBarrierIds: id-only walk over the filter scope for "select all that
+// match" and bulk id resolution. No history lateral, no wide columns, capped
+// at EXPORT_MAX_ROWS so a single call never materializes an unbounded array.
+// Keeps the contingency lateral: contingency sort references it. The table
+// selection only needs ids; full rows come from the page or export.
+export async function listBarrierIds(q: BarriersQuery): Promise<number[]> {
+  const where = buildWhere(q);
+  const orderBy = `${resolveOrderBy(q.sortCol, q.sortDir)}, b.id asc`;
+  const lim = where.args.length + 1;
+  const rows = await queryRows<{ id: number }>(
+    `select b.id from barriers b
+     join locations loc on loc.id = b.location_id
+     ${CONTINGENCY_LATERAL} ${where.text}
+     order by ${orderBy} limit $${lim}`,
+    [...where.args, EXPORT_MAX_ROWS],
+  );
+  return rows.map((r) => r.id);
 }
 
 // Computes KPI snapshot counts over the given filters (location-only callers

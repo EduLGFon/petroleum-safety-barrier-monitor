@@ -129,11 +129,21 @@ export function httpAdapterFactory(
         totalPages: data.totalPages,
       };
     },
+    // HTTP getBarrierIds: id-only walk for "select all that match" (one int
+    // per row, no laterals server-side, no domain resolution client-side).
+    async getBarrierIds(query, opts) {
+      const qs = buildQueryString(query);
+      const data = await fetchJson<{ ids: number[] }>(
+        `/api/barriers/ids?${qs}`,
+        opts,
+      );
+      return data.ids;
+    },
     // HTTP getAllBarriers: pages through the whole scope, resolving to domain.
-    // Loops to the first page's ceiling so scopes past one pageSize still
-    // return every row instead of silently truncating at 100k.
+    // Small pages (1000, the server cap): bulk flows should use the streaming
+    // export endpoint or getBarrierIds instead; this stays for back-compat.
     async getAllBarriers(query, opts) {
-      const pageSize = 100000;
+      const pageSize = 1000;
       const firstQs = buildQueryString({ ...query, page: 1, pageSize });
       const first = await fetchJson<BarriersResponse>(
         `/api/barriers?${firstQs}`,

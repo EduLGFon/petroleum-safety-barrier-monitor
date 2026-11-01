@@ -128,7 +128,27 @@ export const SELECT_COLUMNS = `
   b.extra_comments, cont.contingency_tag
 `;
 
-export const HISTORY_JOIN = `
+// List projection: same scalars as SELECT_COLUMNS but WITHOUT the history
+// lateral (the per-row json_agg over barrier_status_history). Table pages,
+// exports and id-walks never render the timeline - the detail modal fetches
+// it via getBarrierById - so list queries skip N history aggregations per
+// page. status_history is a constant empty array; toWireBarrier maps it to
+// [] via toHistory. Contingency lateral is kept: the table renders it.
+export const SELECT_LIST_COLUMNS = `
+  b.id, b.tag, b.typology_id, b.location_id, b.loc_desc_id, b.criticality_id,
+  b.category_id, b.grouping_id, coalesce(b.owner_id, -1) as owner_id,
+  b.availability_id, b.comments, b.action_plan,
+  to_char(b.status_since, 'YYYY-MM-DD') as status_since,
+  '[]'::json as status_history,
+  b.is_active, to_char(b.deleted_at, 'YYYY-MM-DD"T"HH24:MI:SS"Z"') as deleted_at,
+  b.origin, b.external_code, loc.name as location_name, b.install_local,
+  b.equip_typology, b.field_installed, b.field_operational, b.op_status,
+  b.has_maint_plan, b.plan_followed, b.failure_free, b.maint_status,
+  b.has_contingency, b.contingency_desc, b.evidence_code, b.degradation_desc,
+  b.extra_comments, cont.contingency_tag
+`;
+
+export const HISTORY_LATERAL = `
   left join lateral (
     select json_agg(
       json_build_object(
@@ -144,10 +164,23 @@ export const HISTORY_JOIN = `
     from barrier_status_history bsh
     where bsh.barrier_id = b.id
   ) h on true
+`;
+
+export const CONTINGENCY_LATERAL = `
   left join lateral (
     select string_agg(c.tag, ', ' order by c.tag) as contingency_tag
     from barrier_contingencies bc
     join barriers c on c.id = bc.contingency_barrier_id
     where bc.barrier_id = b.id and c.deleted_at is null and c.is_active
   ) cont on true
+`;
+
+// List join: contingency only, no history aggregation (see SELECT_LIST_COLUMNS).
+export const LIST_JOIN = `
+  ${CONTINGENCY_LATERAL}
+`;
+
+export const HISTORY_JOIN = `
+  ${HISTORY_LATERAL}
+  ${CONTINGENCY_LATERAL}
 `;

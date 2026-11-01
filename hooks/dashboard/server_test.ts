@@ -117,6 +117,7 @@ Deno.test("useServerDashboard surfaces a fetch failure and clears loading", asyn
   const fail: BarriersApi = {
     getBarriers: () => Promise.reject(new Error("boom")),
     getAllBarriers: () => Promise.reject(new Error("boom")),
+    getBarrierIds: () => Promise.reject(new Error("boom")),
     getBarrierById: () => Promise.reject(new Error("boom")),
     getKpi: () => Promise.reject(new Error("boom")),
     getChartData: () => Promise.reject(new Error("boom")),
@@ -141,6 +142,7 @@ Deno.test("useServerDashboard retry recovers after a failure", async () => {
         : mockAdapter.getBarriers(q);
     },
     getAllBarriers: (q) => mockAdapter.getAllBarriers(q),
+    getBarrierIds: (q) => mockAdapter.getBarrierIds(q),
     getBarrierById: (id) => mockAdapter.getBarrierById(id),
     getKpi: (q) => mockAdapter.getKpi(q),
     getChartData: (q) => mockAdapter.getChartData(q),

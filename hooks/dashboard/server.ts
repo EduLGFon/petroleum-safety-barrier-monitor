@@ -175,16 +175,29 @@ export function useServerDashboard(
 
   // Persist on every change (after both slices hydrate, so the first
   // visibleCols write never clobbers persisted columns with defaults).
+  // Debounced 400ms trailing + beforeunload flush: free-text query
+  // keystrokes no longer JSON-serialize + localStorage-write per keypress;
+  // selection/page/filter commits still persist well within a tab close.
   useEffect(() => {
     if (!hydrated || !hydratedCols) return;
-    saveDash({
+    const snapshot = {
       location,
       filters,
       selectedIds: [...selectedIds],
       openId,
       visibleCols,
       hiddenPinned,
-    });
+    };
+    const timer = globalThis.setTimeout(() => saveDash(snapshot), 400);
+    const flush = () => {
+      globalThis.clearTimeout(timer);
+      saveDash(snapshot);
+    };
+    globalThis.addEventListener("beforeunload", flush);
+    return () => {
+      globalThis.clearTimeout(timer);
+      globalThis.removeEventListener("beforeunload", flush);
+    };
   }, [
     location,
     filters,
@@ -312,25 +325,27 @@ export function useServerDashboard(
   );
 
   // Selects every row matching the current filter scope (Gmail-style
-  // "select all that match") by resolving all ids through the adapter.
-  // Unified with client mode: selectAll = page replace, selectAllFiltered =
-  // whole filtered set; the table header prompt calls this to extend a page
-  // selection to the full filtered set. Aborts superseded extensions.
+  // "select all that match") via the id-only endpoint: one int per row over
+  // the wire, no full-row paging, no domain resolution. Aborts superseded
+  // extensions.
   const selectAllFiltered = useCallback(async (signal?: AbortSignal) => {
-    const all = await adapter.getAllBarriers(scopeQuery, { signal });
+    const ids = await adapter.getBarrierIds(scopeQuery, { signal });
     if (signal?.aborted) return;
-    setSelectedIds(new Set(all.map((b) => b.id)));
+    setSelectedIds(new Set(ids));
   }, [adapter, scopeQuery, setSelectedIds]);
 
   // Detail resolves from the current page; when the id is not on this page
-  // (e.g. opened from the sync-changes modal), fetch it on demand so the
-  // modal still opens. The fetched row clears on page hit or close.
+  // (e.g. opened from the sync-changes modal) - or the page row carries no
+  // history (list projection ships [] to skip N history aggregations per
+  // page) - fetch the full row on demand so the modal timeline still opens.
+  // The fetched row clears on page hit with history or close.
   // reloadKey is a dep so a post-sync refresh re-resolves an off-page row
   // instead of leaving a stale snapshot open.
   const [fetchedBarrier, setFetchedBarrier] = useState<Barrier | null>(null);
   const pageHit = openId ? items.find((b) => b.id === openId) ?? null : null;
+  const pageHitComplete = pageHit !== null && pageHit.statusHistory.length > 0;
   useEffect(() => {
-    if (!openId || pageHit) {
+    if (!openId || pageHitComplete) {
       setFetchedBarrier(null);
       return;
     }
@@ -346,8 +361,10 @@ export function useServerDashboard(
     return () => {
       ctrl.abort();
     };
-  }, [adapter, openId, pageHit, reloadKey]);
-  const openBarrier = pageHit ?? fetchedBarrier;
+  }, [adapter, openId, pageHitComplete, reloadKey]);
+  // Prefer the fetched full row (history included); fall back to the page
+  // row so the modal opens instantly while the detail loads.
+  const openBarrier = fetchedBarrier ?? pageHit;
 
   // Split loading into initial vs refresh so row updates (filter/page/search/
   // pageSize) keep stale rows on screen instead of flashing the full splash.

@@ -20,6 +20,11 @@ export interface BarriersApi {
     query: Omit<BarriersQuery, "page" | "pageSize">,
     opts?: ApiOpts,
   ): Promise<Barrier[]>;
+  /** Fetch only the ids matching the query (lightweight "select all" path) */
+  getBarrierIds(
+    query: Omit<BarriersQuery, "page" | "pageSize">,
+    opts?: ApiOpts,
+  ): Promise<number[]>;
   /** Fetch a single barrier by id */
   getBarrierById(id: number, opts?: ApiOpts): Promise<Barrier | null>;
   /** Fetch a precomputed KPI snapshot over the given filters */
