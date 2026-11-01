@@ -250,6 +250,7 @@ export const defaultSyncIo: SyncIo = {
       evidence_code: string | null;
       degradation_desc: string | null;
       extra_comments: string | null;
+      manual_fields: string[] | null;
     }>(
       `select id, external_code, location_id, availability_id, deleted_at,
          is_active,
@@ -260,7 +261,7 @@ export const defaultSyncIo: SyncIo = {
          field_operational, op_status, has_maint_plan, plan_followed,
          failure_free, maint_status, has_contingency, contingency_desc,
          evidence_code, degradation_desc,
-         extra_comments
+         extra_comments, manual_fields
         from barriers
         where external_code is not null
           and (location_id = any($1) or external_code = any($2))
@@ -298,12 +299,17 @@ export const defaultSyncIo: SyncIo = {
         degradationDesc: r.degradation_desc ?? "",
         extraComments: r.extra_comments ?? "",
       };
+      // Pre-migration nulls read as sync-owned (the old default views).
+      const manualFields = Array.isArray(r.manual_fields)
+        ? r.manual_fields.filter((v): v is string => typeof v === "string")
+        : [];
       return {
         id: r.id,
         externalCode: r.external_code,
         availabilityId: r.availability_id,
         deletedAt: r.deleted_at,
-        signature: fieldsSignature(fields),
+        signature: fieldsSignature(fields, manualFields),
+        manualFields,
         fields,
       };
     });
@@ -447,54 +453,86 @@ export const defaultSyncIo: SyncIo = {
           // is sync-owned (M1/M2): an explicit Sim/ Não always lands so a
           // closed work order clears a stale auto Sim; a null desc becomes
           // null, a Sim keeps its source and a Não clears to null.
+          // Admin-owned fields (barriers.manual_fields) are excluded from
+          // the SET so manual edits survive sweeps. hasContingency owns the
+          // pair: a manual flag keeps its description too, since the auto
+          // desc is only meaningful with the auto flag.
+          const owned = new Set(entry.local.manualFields ?? []);
+          const sets: string[] = [];
+          const updateArgs: unknown[] = [entry.local.id];
+          const add = (col: string, val: unknown) => {
+            updateArgs.push(val);
+            sets.push(`${col} = $${updateArgs.length}`);
+          };
+          if (!owned.has("tag")) add("tag", input.tag);
+          if (!owned.has("locationId")) add("location_id", input.locationId);
+          if (!owned.has("typologyId")) add("typology_id", input.typologyId);
+          if (!owned.has("locDescId")) add("loc_desc_id", input.locDescId);
+          if (!owned.has("criticalityId")) {
+            add("criticality_id", input.criticalityId);
+          }
+          if (!owned.has("categoryId")) add("category_id", input.categoryId);
+          if (!owned.has("groupingId")) add("grouping_id", input.groupingId);
+          if (!owned.has("ownerId")) add("owner_id", input.ownerId);
+          if (!owned.has("comments")) add("comments", input.comments);
+          if (!owned.has("actionPlan")) add("action_plan", input.actionPlan);
+          add("source_updated_at", input.sourceUpdatedAt);
+          add("scope_source", input.scopeSource);
+          add("is_active", input.isActive);
+          updateArgs.push(entry.kind === "restore");
+          sets.push(
+            `deleted_at = case when $${updateArgs.length} then null else deleted_at end`,
+          );
+          if (!owned.has("hasContingency")) {
+            updateArgs.push(input.hasContingency ?? null);
+            const flagParam = updateArgs.length;
+            sets.push(`has_contingency = coalesce($${flagParam}, 'Não')`);
+            if (!owned.has("contingencyDesc")) {
+              updateArgs.push(input.contingencyDesc ?? null);
+              const descParam = updateArgs.length;
+              sets.push(
+                `contingency_desc = case when coalesce($${flagParam}, 'Não') = 'Sim' then nullif($${descParam}, '') else null end`,
+              );
+            }
+          }
+          if (!owned.has("origin")) add("origin", input.origin);
+          if (!owned.has("installLocal")) {
+            add("install_local", input.installLocal);
+          }
+          if (!owned.has("equipTypology")) {
+            add("equip_typology", input.equipTypology);
+          }
+          if (!owned.has("fieldInstalled")) {
+            add("field_installed", input.fieldInstalled);
+          }
+          if (!owned.has("fieldOperational")) {
+            add("field_operational", input.fieldOperational);
+          }
+          if (!owned.has("opStatus")) add("op_status", input.opStatus);
+          if (!owned.has("hasMaintPlan")) {
+            add("has_maint_plan", input.hasMaintPlan);
+          }
+          if (!owned.has("planFollowed")) {
+            add("plan_followed", input.planFollowed);
+          }
+          if (!owned.has("failureFree")) {
+            add("failure_free", input.failureFree);
+          }
+          if (!owned.has("maintStatus")) {
+            add("maint_status", input.maintStatus);
+          }
+          if (!owned.has("evidenceCode")) {
+            add("evidence_code", input.evidenceCode);
+          }
+          if (!owned.has("degradationDesc")) {
+            add("degradation_desc", input.degradationDesc);
+          }
+          if (!owned.has("extraComments")) {
+            add("extra_comments", input.extraComments);
+          }
           await tx(
-            `update barriers set
-               tag = $2, location_id = $3, typology_id = $4, loc_desc_id = $5,
-               criticality_id = $6, category_id = $7, grouping_id = $8,
-               owner_id = $9, comments = $10, action_plan = $11,
-               source_updated_at = $12, scope_source = $13, is_active = $14,
-               deleted_at = case when $15 then null else deleted_at end,
-               has_contingency = coalesce($16, 'Não'),
-               contingency_desc = case when coalesce($16, 'Não') = 'Sim'
-                 then nullif($17, '') else null end,
-               origin = $18, install_local = $19, equip_typology = $20,
-               field_installed = $21, field_operational = $22, op_status = $23,
-               has_maint_plan = $24, plan_followed = $25, failure_free = $26,
-               maint_status = $27, evidence_code = $28, degradation_desc = $29,
-               extra_comments = $30
-             where id = $1`,
-            [
-              entry.local.id,
-              input.tag,
-              input.locationId,
-              input.typologyId,
-              input.locDescId,
-              input.criticalityId,
-              input.categoryId,
-              input.groupingId,
-              input.ownerId,
-              input.comments,
-              input.actionPlan,
-              input.sourceUpdatedAt,
-              input.scopeSource,
-              input.isActive,
-              entry.kind === "restore",
-              input.hasContingency ?? null,
-              input.contingencyDesc ?? null,
-              input.origin,
-              input.installLocal,
-              input.equipTypology,
-              input.fieldInstalled,
-              input.fieldOperational,
-              input.opStatus,
-              input.hasMaintPlan,
-              input.planFollowed,
-              input.failureFree,
-              input.maintStatus,
-              input.evidenceCode,
-              input.degradationDesc,
-              input.extraComments,
-            ],
+            `update barriers set ${sets.join(", ")} where id = $1`,
+            updateArgs,
           );
           // Every sync-touched id is pre-seeded with null, so this is never
           // undefined at runtime; coalesce to keep the type narrow.
@@ -531,6 +569,7 @@ export const defaultSyncIo: SyncIo = {
               entry.local.fields,
               input,
               propagateStatus,
+              [...owned],
             ),
             oldSnapshot: entry.local.fields
               ? snapshotOf(entry.local.fields, entry.local.availabilityId)
