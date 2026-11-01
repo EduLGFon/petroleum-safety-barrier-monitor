@@ -7,6 +7,8 @@ import type { CategoryCompliance } from "../../lib/types.ts";
 export const COUNT_W = 56;
 export const TOP = 6;
 export const AXIS_H = 26;
+export const TEXT_DY = 14;
+export const AXIS_TEXT_DY = 18;
 
 /* Floating tooltip geometry - offset from the cursor, margin from edges. */
 export const TIP_OFFSET = 14;
@@ -25,6 +27,41 @@ export const GEO = {
 
 // DensityKey: valid density names matching the GEO keys.
 export type DensityKey = keyof typeof GEO;
+
+export interface ChartGeometry {
+  ROW_H: number;
+  BAR_H: number;
+  LABEL_W: number;
+  COUNT_W: number;
+  AXIS_H: number;
+  TEXT_DY: number;
+  AXIS_TEXT_DY: number;
+  LABEL_CHARS: number;
+}
+
+// chartGeometry: density geometry scaled by the user font-size preset.
+// Row and bar heights follow the font scale. The label column grows more
+// slowly (capped at 1.15x) so the plot keeps usable width, and the label
+// character budget shrinks when the font outgrows the column.
+export function chartGeometry(
+  density: DensityKey,
+  scale: number,
+): ChartGeometry {
+  const g = GEO[density] ?? GEO.comfortable;
+  const s = Number.isFinite(scale) && scale > 0 ? scale : 1;
+  const labelW = Math.round(g.LABEL_W * Math.min(s, 1.15));
+  const widthRatio = labelW / g.LABEL_W;
+  return {
+    ROW_H: Math.round(g.ROW_H * s),
+    BAR_H: Math.round(g.BAR_H * s),
+    LABEL_W: labelW,
+    COUNT_W: Math.max(COUNT_W, Math.round(COUNT_W * s)),
+    AXIS_H: Math.round(AXIS_H * s),
+    TEXT_DY: Math.round(TEXT_DY * s),
+    AXIS_TEXT_DY: Math.round(AXIS_TEXT_DY * s),
+    LABEL_CHARS: Math.max(8, Math.floor(26 * widthRatio / s)),
+  };
+}
 
 // Narrowest plot a bar row is drawn on, in SVG user units. Below it the
 // viewBox stays wider than the column, so the browser scales the whole SVG
@@ -46,9 +83,13 @@ export interface ChartLayout {
 // plot absorbs the slack, so the SVG scales 1:1 with the column instead of
 // being centred inside it (side margins) or shrunk to fit (vertical
 // letterboxing) - the two dead-space shapes a fixed viewBox produced.
-export function layoutChart(available: number, labelW: number): ChartLayout {
-  const plotW = Math.max(MIN_PLOT_W, available - labelW - COUNT_W);
-  return { plotW, width: labelW + plotW + COUNT_W };
+export function layoutChart(
+  available: number,
+  labelW: number,
+  countW = COUNT_W,
+): ChartLayout {
+  const plotW = Math.max(MIN_PLOT_W, available - labelW - countW);
+  return { plotW, width: labelW + plotW + countW };
 }
 
 // rowTotal: combined Conforme + Não Conforme count for one category.
@@ -83,6 +124,10 @@ export function px(n: number): string {
 }
 
 // chartHeight: total SVG height for rowCount rows at the given row height.
-export function chartHeight(rowCount: number, rowH: number): number {
-  return TOP + rowCount * rowH + AXIS_H;
+export function chartHeight(
+  rowCount: number,
+  rowH: number,
+  axisH = AXIS_H,
+): number {
+  return TOP + rowCount * rowH + axisH;
 }

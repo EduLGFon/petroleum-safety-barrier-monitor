@@ -7,9 +7,9 @@
 // row) when the station changes; rows play a staggered entrance on mount.
 import {
   buildTicks,
+  chartGeometry,
   chartHeight,
   computeMax,
-  GEO,
   layoutChart,
   makeW,
   px,
@@ -18,7 +18,7 @@ import {
 
 import { useElementWidth } from "../hooks/useElementWidth.ts";
 
-import { useSettings } from "../context/SettingsContext.tsx";
+import { FONT_SIZE_PRESETS, useSettings } from "../context/SettingsContext.tsx";
 
 import type { CategoryCompliance } from "../lib/types.ts";
 
@@ -72,7 +72,17 @@ export default function ComplianceChartInner(
     null,
   );
   const { settings } = useSettings();
-  const { ROW_H, BAR_H, LABEL_W } = GEO[settings.density] ?? GEO.comfortable;
+  const scale = FONT_SIZE_PRESETS[settings.fontSize]?.scale ?? 1;
+  const {
+    ROW_H,
+    BAR_H,
+    LABEL_W,
+    COUNT_W: countW,
+    AXIS_H,
+    TEXT_DY,
+    AXIS_TEXT_DY,
+    LABEL_CHARS,
+  } = chartGeometry(settings.density, scale);
   // Measured column width drives the viewBox, so the drawing always spans the
   // column exactly: no side margins on a wide monitor, no vertical gap under
   // the toolbar when the column is narrower than a fixed viewBox would be.
@@ -91,8 +101,8 @@ export default function ComplianceChartInner(
     };
   }, []);
   const max = maxOverride ?? computeMax(data);
-  const height = chartHeight(data.length, ROW_H);
-  const { plotW, width } = layoutChart(available, LABEL_W);
+  const height = chartHeight(data.length, ROW_H, AXIS_H);
+  const { plotW, width } = layoutChart(available, LABEL_W, countW);
   const ticks = buildTicks(max);
   // w: linear value→pixels scale against the max row total. Memoized on
   // inputs so memoized ChartRows see a stable closure across hover ticks.
@@ -147,7 +157,7 @@ export default function ComplianceChartInner(
             />
             <text
               x={LABEL_W + w(t)}
-              y={TOP + data.length * ROW_H + 18}
+              y={TOP + data.length * ROW_H + AXIS_TEXT_DY}
               style={{
                 textAnchor: "middle",
                 fontSize: "var(--d-body)",
@@ -173,6 +183,8 @@ export default function ComplianceChartInner(
             barH={BAR_H}
             rowH={ROW_H}
             plotW={plotW}
+            maxLabelChars={LABEL_CHARS}
+            textDy={TEXT_DY}
             w={w}
             onHover={onHover}
             onLeave={onLeave}

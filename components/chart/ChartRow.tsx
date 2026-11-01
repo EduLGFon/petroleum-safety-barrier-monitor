@@ -23,6 +23,9 @@ interface Props {
   rowH: number;
   // Width of the plot area, so the hover target covers the whole row.
   plotW: number;
+  // Label budget and text baseline from the scaled chart geometry.
+  maxLabelChars: number;
+  textDy: number;
   w: (v: number) => number;
   onHover: (i: number, x: number, y: number) => void;
   onLeave: () => void;
@@ -47,6 +50,8 @@ export const ChartRow = memo(function ChartRow(
     barH,
     rowH,
     plotW,
+    maxLabelChars,
+    textDy,
     w,
     onHover,
     onLeave,
@@ -99,7 +104,7 @@ export const ChartRow = memo(function ChartRow(
     >
       <text
         x={labelW - 8}
-        y={y + 14}
+        y={y + textDy}
         style={{
           textAnchor: "end",
           fontSize: "var(--d-body)",
@@ -107,7 +112,7 @@ export const ChartRow = memo(function ChartRow(
           fontStyle: outros ? "italic" : undefined,
         }}
       >
-        {truncateLabel(d.name)}
+        {truncateLabel(d.name, maxLabelChars)}
         <title>{outros ? `${d.name} - clique para expandir` : d.name}</title>
       </text>
       <rect
@@ -151,7 +156,7 @@ export const ChartRow = memo(function ChartRow(
           key={total}
           className="animate-num"
           x={labelW + w(total) + 8}
-          y={y + 14}
+          y={y + textDy}
           style={{
             fontSize: "var(--d-body)",
             fill: "var(--text-muted)",
