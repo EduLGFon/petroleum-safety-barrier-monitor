@@ -53,6 +53,12 @@ const seconds = Math.max(
 let running = true;
 let wake: (() => void) | null = null;
 
+// Fingerprint-gated label cache (see cycle()): one cached generation of
+// resolver labels + status map, reused while rules/recipients are stable.
+let lastFingerprint: string | null = null;
+let lastLabels: Awaited<ReturnType<typeof getResolverLabels>> | undefined;
+let lastStatusInfo: StatusInfo | undefined;
+
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => {
     const timer = setTimeout(() => {
@@ -111,13 +117,30 @@ async function cycle(
     await fail(err instanceof Error ? err.message : String(err));
     return;
   }
+  // Fingerprint-gated label reload: rules + recipients change rarely, but
+  // every cycle re-read 7 lookup tables + the status map. A stable
+  // fingerprint reuses the previous cycle's objects (zero queries); any
+  // membership/content change reloads. Bounded to one cached generation.
+  const fingerprint = JSON.stringify([
+    recipients.map((r) => r.email),
+    rules.map((r) => [r.id, r.active, r.updated_at ?? null]),
+  ]);
   let labels: Awaited<ReturnType<typeof getResolverLabels>> | undefined;
-  try {
-    labels = await getResolverLabels();
-  } catch {
-    labels = undefined;
+  let statusInfo: StatusInfo | undefined;
+  if (fingerprint !== lastFingerprint) {
+    try {
+      labels = await getResolverLabels();
+    } catch {
+      labels = undefined;
+    }
+    statusInfo = await loadStatusInfo();
+    lastFingerprint = fingerprint;
+    lastLabels = labels;
+    lastStatusInfo = statusInfo;
+  } else {
+    labels = lastLabels;
+    statusInfo = lastStatusInfo;
   }
-  const statusInfo = await loadStatusInfo();
   const dryRun = provider === null;
   try {
     const result = await runProviderCycle({
@@ -186,7 +209,14 @@ function main(): void {
   (async () => {
     while (running) {
       await cycle(provider, notifiers, new Date(), dashboardUrl);
-      if (running) await sleep(seconds * 1000);
+      // ±10% jitter so app/poller/alerts ticks never phase-lock.
+      if (running) {
+        const wait = Math.max(
+          1000,
+          Math.round(seconds * 1000 * (1 + (Math.random() * 2 - 1) * 0.1)),
+        );
+        await sleep(wait);
+      }
     }
     Deno.exit(0);
   })();

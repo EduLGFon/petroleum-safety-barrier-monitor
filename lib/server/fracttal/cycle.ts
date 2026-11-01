@@ -46,6 +46,10 @@ export interface CycleOptions<Shared> {
   lock: ScopeLock;
   notifiers: OpsNotifier[];
   intervalMs: number;
+  // jitterRatio: ±fraction of intervalMs applied per wait (default 0).
+  // De-phase-locks app/poller/alerts ticks sharing a host cadence; 0.1
+  // spreads a 300s pause over 270-330s with no throughput change.
+  jitterRatio?: number;
   // cycleScope labels cycle-level failure notes (default "cycle").
   cycleScope?: string;
   // onCycleFailure persists cycle-level failures (shared fetch) that never
@@ -83,7 +87,15 @@ export function createCycleLoop<Shared>(
   const cycleScope = opts.cycleScope ?? "cycle";
 
   const schedule = (): void => {
-    if (!stopped) handle = timers.setTimeout(tick, opts.intervalMs);
+    if (stopped) return;
+    const ratio = opts.jitterRatio ?? 0;
+    const wait = ratio > 0
+      ? Math.max(
+        1000,
+        Math.round(opts.intervalMs * (1 + (Math.random() * 2 - 1) * ratio)),
+      )
+      : opts.intervalMs;
+    handle = timers.setTimeout(tick, wait);
   };
 
   const tick = (): void => {

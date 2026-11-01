@@ -21,6 +21,10 @@
 //                                        aborts loudly - raise it)
 //   FRACTTAL_SYNC_WORK_MAX_PAGES         newest work pages per endpoint per
 //                                        cycle (default 5 x 100, shared)
+//   FRACTTAL_WORK_OPEN_MAX_PAGES         open-status sweep cap per ot_status
+//                                        (default 40 x 100; decoupled from the
+//                                        item cap so one backlog status cannot
+//                                        trigger a 25k-row sweep per cycle)
 //   FRACTTAL_RATE_PER_MIN                initial adaptive rate (default 180;
 //                                        climbs toward MAX when clean, cuts on
 //                                        406/429 or low ratelimit-remaining)
@@ -87,6 +91,8 @@ interface PollFlags {
   itemType: ItemTypeValue;
   maxPages: number;
   workMaxPages: number;
+  // Open-status sweep cap per ot_status (decoupled from the item cap).
+  workOpenMaxPages: number;
   ratePerMin: number;
   maxRatePerMin: number;
   minRatePerMin: number;
@@ -102,7 +108,10 @@ function parseFlags(): PollFlags {
   // for one-shot sync/capture CLIs, validated via assertFixturePath there).
   const rawBaseUrl = Deno.env.get("FRACTTAL_BASE_URL") ?? DEFAULT_BASE_URL;
   return {
-    seconds: Math.max(5, Number(Deno.env.get("FRACTTAL_POLL_SECONDS")) || 300),
+    // Floor 60s: a 5s floor with a wide max_pages re-sweeps up to 25k rows
+    // + a full reconcile every 5s; the dashboard moves per sync run
+    // (minutes), never per handful of seconds.
+    seconds: Math.max(60, Number(Deno.env.get("FRACTTAL_POLL_SECONDS")) || 300),
     itemType: (Number(Deno.env.get("FRACTTAL_SYNC_ITEM_TYPE")) ||
       2) as ItemTypeValue,
     maxPages: Math.max(
@@ -112,6 +121,10 @@ function parseFlags(): PollFlags {
     workMaxPages: Math.max(
       1,
       Math.floor(Number(Deno.env.get("FRACTTAL_SYNC_WORK_MAX_PAGES")) || 5),
+    ),
+    workOpenMaxPages: Math.max(
+      1,
+      Math.floor(Number(Deno.env.get("FRACTTAL_WORK_OPEN_MAX_PAGES")) || 40),
     ),
     ratePerMin: Math.max(
       1,
@@ -278,7 +291,7 @@ function main(): void {
       const work = await fetchWorkSignals(client, {
         maxPages: flags.workMaxPages,
         openStatuses,
-        openMaxPages: flags.maxPages,
+        openMaxPages: flags.workOpenMaxPages,
         concurrency: flags.concurrency,
         itemIdToCode: (id) => map.get(id) ?? null,
       });
@@ -307,6 +320,9 @@ function main(): void {
     },
     notifiers,
     intervalMs: flags.seconds * 1000,
+    // ±10% jitter so app/poller/alerts ticks sharing a host never
+    // phase-lock into synchronized stampedes.
+    jitterRatio: 0.1,
     cycleScope: "fracttal-cycle",
     // Pre-run failures (shared work fetch) persist as failed rows so the
     // dashboard shows them instead of an ever-aging success.
@@ -340,7 +356,8 @@ function main(): void {
   console.log(
     `[fracttal-poll] sweeping every ${flags.seconds}s ` +
       `(item_type=${flags.itemType}, max_pages=${flags.maxPages}, ` +
-      `work_pages=${flags.workMaxPages}, rate=${flags.ratePerMin}/min ` +
+      `work_pages=${flags.workMaxPages}, work_open_pages=${flags.workOpenMaxPages}, ` +
+      `rate=${flags.ratePerMin}/min ` +
       `(max ${flags.maxRatePerMin}, min ${flags.minRatePerMin}, burst ${flags.rateBurst}), ` +
       `concurrency=${flags.concurrency})`,
   );
