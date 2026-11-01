@@ -21,7 +21,14 @@ export function LoginShell({ children }: { children: ComponentChildren }) {
         overflow: "clip",
       }}
     >
-      <div style={{ position: "absolute", inset: 0, pointerEvents: "none" }}>
+      <div
+        style={{
+          position: "absolute",
+          inset: 0,
+          pointerEvents: "none",
+          contain: "strict",
+        }}
+      >
         <div
           style={{
             position: "absolute",
@@ -29,6 +36,7 @@ export function LoginShell({ children }: { children: ComponentChildren }) {
             backgroundImage:
               "linear-gradient(rgba(99,102,241,.06) 1px,transparent 1px),linear-gradient(90deg,rgba(99,102,241,.06) 1px,transparent 1px)",
             backgroundSize: "48px 48px",
+            contain: "strict",
             maskImage:
               "radial-gradient(ellipse 90% 70% at 50% 30%,black 30%,transparent 75%)",
             WebkitMaskImage:
@@ -36,18 +44,20 @@ export function LoginShell({ children }: { children: ComponentChildren }) {
           }}
         />
         <div
+          className="aurora-orb"
           style={{
             position: "absolute",
             top: "18%",
             left: "50%",
             transform: "translate(-50%,-50%)",
-            width: 720,
-            height: 720,
+            width: 560,
+            height: 560,
             maxWidth: "120vw",
             borderRadius: "50%",
             background:
               "radial-gradient(circle,rgba(99,102,241,.14) 0%,rgba(34,211,238,.06) 40%,transparent 65%)",
             animation: "orb 9s ease-in-out infinite",
+            willChange: "transform",
           }}
         />
       </div>

@@ -33,7 +33,10 @@ export function SplashCard(
         background: "var(--au-card, rgba(255,255,255,.06))",
         border: "1px solid var(--au-card-border, rgba(255,255,255,.1))",
         borderRadius: "var(--d-splash-radius, 24px)",
-        boxShadow: "0 32px 80px rgba(0,0,0,.55)",
+        // 24/60 reads the same depth as 32/80 with a smaller shadow kernel;
+        // the shadow renders on the card's own promoted layer.
+        boxShadow: "0 24px 60px rgba(0,0,0,.55)",
+        transform: "translateZ(0)",
         flexShrink: 0,
         // No entrance animation on purpose: the scaleIn transform used to
         // rasterize this text mid-zoom (plus backdrop-blur compositing),
@@ -189,6 +192,8 @@ export function SplashCard(
                     "linear-gradient(90deg,transparent 30%,rgba(255,255,255,.3) 50%,transparent 70%)",
                   backgroundSize: "200% 100%",
                   animation: "shimmer 1.4s linear infinite",
+                  contain: "paint",
+                  transform: "translateZ(0)",
                 }}
               />
             )}

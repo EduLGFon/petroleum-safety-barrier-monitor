@@ -4,12 +4,21 @@
 // first close re-enabling scroll under a still-open dialog.
 let locks = 0;
 
+// has-overlay body flag: while any fullscreen blurred overlay is open, CSS
+// pauses ambient orb animations (body.has-overlay .aurora-orb) so blurred
+// snapshots above stop invalidating every frame. The blur itself stays.
+function syncOverlayFlag(): void {
+  if (typeof document === "undefined") return;
+  document.body.classList.toggle("has-overlay", locks > 0);
+}
+
 // Locks body scroll; safe to call during SSR (no document there). Returns a
 // cleanup that releases the lock, so effects can `return lockBody()`.
 export function lockBody(): () => void {
   if (typeof document === "undefined") return () => {};
   locks++;
   document.body.style.overflow = "hidden";
+  syncOverlayFlag();
   return unlockBody;
 }
 
@@ -18,4 +27,5 @@ export function unlockBody(): void {
   if (typeof document === "undefined") return;
   locks = Math.max(0, locks - 1);
   if (locks === 0) document.body.style.overflow = "";
+  syncOverlayFlag();
 }

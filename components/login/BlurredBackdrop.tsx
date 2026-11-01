@@ -13,6 +13,9 @@ const TILES = [
 ];
 
 // BlurredBackdrop: blurred skeleton grid, hidden from assistive tech.
+// Cached as one composited layer: filter: blur() re-rasterizes the whole
+// subtree on CPU whenever anything underneath animates, so the grid carries
+// contain + promotion and tiles skip per-tile invalidation.
 export function BlurredBackdrop() {
   return (
     <div
@@ -25,6 +28,8 @@ export function BlurredBackdrop() {
         opacity: 0.55,
         pointerEvents: "none",
         userSelect: "none",
+        contain: "paint",
+        transform: "translateZ(0)",
       }}
     >
       {TILES.map((t) => (
@@ -39,6 +44,7 @@ export function BlurredBackdrop() {
             fontSize: 12,
             whiteSpace: "nowrap",
             overflow: "hidden",
+            contain: "content",
           }}
         >
           {t}

@@ -134,7 +134,8 @@ export function LoginForm({
             border: `1px solid ${AURORA.cardBorder}`,
             borderRadius: 20,
             padding: "30px 28px 24px",
-            boxShadow: "0 32px 80px rgba(0,0,0,.6)",
+            // 24/60 reads the same depth as 32/80 with a smaller kernel.
+            boxShadow: "0 24px 60px rgba(0,0,0,.6)",
           }}
         >
           <div

@@ -63,11 +63,14 @@ export default define.page(function App({ Component }) {
         {
           /* Non-blocking font load: a render-blocking stylesheet from a
           third party keeps first paint hostage when that host stalls, so
-          the page paints with system fonts first and swaps when ready. */
+          the page paints with system fonts first and swaps when ready.
+          Inter Tight covers UI + display (the stack falls back to Inter
+          only for glyphs Tight lacks); the duplicate full Inter family was
+          dropped (overlapping glyphs, ~4 extra woff2). */
         }
         <link
           id="font-css"
-          href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Inter:wght@400;500;600;700&display=swap"
+          href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap"
           rel="stylesheet"
           media="print"
         />

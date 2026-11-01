@@ -253,19 +253,21 @@ input[type="search"]::-webkit-search-cancel-button {
   }
 }
 
-/* ── Smooth theme/colour transitions ───────────────────────────────────────── */
+/* ── Smooth theme/colour transitions ─────────────────────────────────────────
+   Scoped to structural surfaces only: the old `[data-theme] *` rule
+   transitioned every element (including all blurred cards) on any
+   theme/accent switch. Same visual, fraction of invalidated nodes. */
 *,
 *::before,
 *::after {
   box-sizing: border-box;
 }
 body,
-[data-theme] * {
+.glass-card,
+.glass-pill {
   transition:
     background-color 0.3s cubic-bezier(0.4,0,0.2,1),
-    border-color 0.3s cubic-bezier(0.4,0,0.2,1),
-    color 0.2s cubic-bezier(0.4,0,0.2,1),
-    box-shadow 0.25s cubic-bezier(0.4,0,0.2,1);
+    border-color 0.3s cubic-bezier(0.4,0,0.2,1);
 }
 
 /* ── Scrollbar ─────────────────────────────────────────────────────────────── */
@@ -329,10 +331,17 @@ html {
 .glass-card {
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
+  /* One rule, every glass surface: bounds the blur sampling to the card so
+     repaints above/below never re-rasterize the backdrop, and promotes the
+     card to its own layer once (static transform, not will-change). */
+  contain: paint;
+  transform: translateZ(0);
 }
 .glass-pill {
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
+  contain: paint;
+  transform: translateZ(0);
 }
 ::placeholder {
   color: var(--au-sub);
@@ -1098,15 +1107,24 @@ select option {
 }
 tbody.table-refreshing {
   opacity: 0.6;
+  /* saturate stays static (no transition on filter): animating filter
+     re-rasterizes the whole table per frame; opacity alone fades cheaply
+     on the compositor while the desaturation applies instantly. */
   filter: saturate(0.92);
-  transition: opacity 0.18s var(--ease-std), filter 0.18s var(--ease-std);
+  transition: opacity 0.18s var(--ease-std);
   pointer-events: none;
 }
 .table-row-enter {
-  animation: rowRefreshIn 0.18s var(--ease-out) var(--row-delay, 0ms) both;
+  animation: rowRefreshIn 0.15s var(--ease-out) var(--row-delay, 0ms) both;
   content-visibility: auto;
+  contain: paint;
   contain-intrinsic-size: auto 56px;
   transition: background 0.15s var(--ease-std);
+}
+/* Paused ambience: while any fullscreen overlay is open, orbs freeze so
+   blurred snapshots above stop invalidating every frame. The blur stays. */
+body.has-overlay .aurora-orb {
+  animation-play-state: paused;
 }
 /* Single-line clamp keeps every row the same height so pageSize growth
    extends downward smoothly and column widths never jitter. */

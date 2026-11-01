@@ -301,6 +301,7 @@ export function SkeletonRows() {
               "linear-gradient(90deg,var(--bg-elevated) 25%,var(--bg-hover) 50%,var(--bg-elevated) 75%)",
             backgroundSize: "200% 100%",
             animation: "shimmer 1.4s linear infinite",
+            contain: "paint",
           }}
         />
       ))}

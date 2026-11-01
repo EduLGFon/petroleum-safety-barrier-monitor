@@ -73,8 +73,10 @@ export function SyncDetailsModal(
           position: "fixed",
           inset: 0,
           zIndex: 990,
+          contain: "strict",
           background: "rgba(0,0,0,.55)",
           backdropFilter: "blur(6px)",
+          WebkitBackdropFilter: "blur(6px)",
         }}
       />
       <div

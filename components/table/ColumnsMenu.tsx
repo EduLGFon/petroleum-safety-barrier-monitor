@@ -99,6 +99,7 @@ export function ColumnsMenu(
               position: "fixed",
               inset: 0,
               zIndex: 950,
+              contain: "strict",
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
@@ -126,6 +127,7 @@ export function ColumnsMenu(
                 borderRadius: 14,
                 boxShadow: "0 24px 70px rgba(0,0,0,.55)",
                 padding: "var(--d-dialog-body)",
+                transform: "translateZ(0)",
               }}
             >
               <div

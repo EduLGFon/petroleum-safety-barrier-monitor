@@ -30,6 +30,9 @@ export function PanelHeader({ onClose }: { onClose: () => void }) {
           borderRadius: "50%",
           background: "radial-gradient(circle,var(--glow) 0%,transparent 70%)",
           pointerEvents: "none",
+          // Sits inside an already-blurred panel: contain so the glow never
+          // re-triggers the backdrop sampling around it.
+          contain: "paint",
         }}
       />
       <div>

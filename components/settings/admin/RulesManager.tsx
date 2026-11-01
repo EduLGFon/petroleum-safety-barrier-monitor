@@ -527,7 +527,9 @@ export function RulesManager({ onCount }: { onCount?: (n: number) => void }) {
               aria-invalid={fieldErr(form.staleDays) !== null}
             />
             {fieldErr(form.staleDays) && (
-              <div role="alert" style={errStyle}>{fieldErr(form.staleDays)}</div>
+              <div role="alert" style={errStyle}>
+                {fieldErr(form.staleDays)}
+              </div>
             )}
           </Field>
           <Field label="Repetir lembrete a cada N dias">
@@ -838,8 +840,10 @@ export function RulesManager({ onCount }: { onCount?: (n: number) => void }) {
               position: "fixed",
               inset: 0,
               zIndex: 1200,
+              contain: "strict",
               background: "rgba(0,0,0,.55)",
               backdropFilter: "blur(4px)",
+              WebkitBackdropFilter: "blur(4px)",
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
