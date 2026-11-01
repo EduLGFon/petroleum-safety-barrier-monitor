@@ -4,9 +4,10 @@
 import {
   consumeAuthFlow,
   countAuthFlows,
-  createAuthFlow,
   deleteExpiredAuthFlows,
 } from "../../sql/auth-flows.ts";
+
+import { queryRows } from "../../db.ts";
 
 import { constantTimeEqual } from "../constant-time.ts";
 
@@ -77,21 +78,37 @@ export async function createFlow(input: {
   returnTo: string;
   ttlSeconds: number;
 }): Promise<void> {
+  // One statement does the sweep, the capacity guard, and the insert: expired
+  // rows are pruned first so the cap counts only live flows, the WHERE clause
+  // refuses new rows at FLOW_CAP, and ON CONFLICT DO NOTHING absorbs a state
+  // re-use (a retry after a partial failure) instead of erroring. Residual
+  // race: concurrent bursts can overshoot the cap by the racing window; the
+  // login throttle is the real backstop, the cap only bounds the table.
   await deleteExpiredAuthFlows();
-  if (await countAuthFlows() >= FLOW_CAP) {
-    await deleteExpiredAuthFlows();
-    if (await countAuthFlows() >= FLOW_CAP) {
-      throw new Error("flow_capacity");
-    }
+  const stateHash = await sha256Hex(input.state);
+  const rows = await queryRows<{ state_hash: string }>(
+    `insert into auth_flows
+       (state_hash, browser_hash, nonce, code_verifier, return_to, expires_at)
+     select $1, $2, $3, $4, $5, $6::timestamptz
+     where (select count(*) from auth_flows) < ${FLOW_CAP}
+     on conflict (state_hash) do nothing
+     returning state_hash`,
+    [
+      stateHash,
+      await sha256Hex(input.browserToken),
+      input.nonce,
+      input.codeVerifier,
+      input.returnTo,
+      new Date(Date.now() + input.ttlSeconds * 1000).toISOString(),
+    ],
+  );
+  if (rows.length === 0) {
+    // Either the table is at capacity, or (with ~2^-256 probability) the
+    // random state collided with a live row. Both mean "try the login again",
+    // so both surface as flow_capacity after confirming the count.
+    if ((await countAuthFlows()) >= FLOW_CAP) throw new Error("flow_capacity");
+    throw new Error("flow_capacity");
   }
-  await createAuthFlow({
-    stateHash: await sha256Hex(input.state),
-    browserHash: await sha256Hex(input.browserToken),
-    nonce: input.nonce,
-    codeVerifier: input.codeVerifier,
-    returnTo: input.returnTo,
-    expiresAt: new Date(Date.now() + input.ttlSeconds * 1000),
-  });
 }
 
 export async function consumeFlow(

@@ -44,7 +44,12 @@ function redirect(location: string, headers?: HeadersInit): Response {
 export const handler = define.handlers({
   async GET(ctx) {
     const requestId = newRequestId();
-    const limit = writeThrottle.check(routeClientKey(ctx));
+    // Route-scoped throttle key: every route shares writeThrottle, so a bare
+    // client IP would let one endpoint's traffic eat another's budget (and
+    // lump every unidentifiable client into one "unknown" bucket).
+    const limit = writeThrottle.check(
+      `GET /auth/entra/login:${routeClientKey(ctx)}`,
+    );
     if (!limit.allowed) {
       return rateLimited("too many requests", requestId, limit.retryAfterMs);
     }

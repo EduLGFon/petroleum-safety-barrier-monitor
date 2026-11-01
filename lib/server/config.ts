@@ -36,6 +36,10 @@ export interface EntraConfig {
   tenantId: string;
   clientId: string;
   credential: EntraCredential;
+  // clientAssertionAlg: JWS alg for the private_key_jwt client assertion.
+  // Entra requires RS256 (RSASSA-PKCS1-v1_5); PS256 stays accepted only as an
+  // explicit override for non-Entra issuers in development.
+  clientAssertionAlg: string;
   forceAccountPicker: boolean;
   flowTtlSeconds: number;
   clockToleranceSeconds: number;
@@ -82,15 +86,67 @@ export function loadSyncConfig(
       "FRACTTAL_KEY/FRACTTAL_SECRET required (prod tenant, reviewed; never committed)",
     );
   }
+  const baseUrl = overrides.baseUrl ??
+    get("FRACTTAL_BASE_URL") ??
+    "https://app.fracttal.com/api";
   return {
     key,
     secret,
-    baseUrl: overrides.baseUrl ??
-      get("FRACTTAL_BASE_URL") ??
-      "https://app.fracttal.com/api",
+    baseUrl: assertFracttalBaseUrl(baseUrl),
     itemType: overrides.itemType ??
       (Number(get("FRACTTAL_SYNC_ITEM_TYPE")) || 2),
   };
+}
+
+// Fracttal network boundary: the only upstream host ever contacted is the
+// prod API. A --base-url / FRACTTAL_BASE_URL pointing elsewhere (typo,
+// SSRF probe, staging leak) must fail closed here, not on first fetch.
+export const ALLOWED_FRACTTAL_HOSTS = ["app.fracttal.com"] as const;
+
+export function assertFracttalBaseUrl(raw: string): string {
+  let host: string;
+  try {
+    host = new URL(raw).hostname.toLowerCase();
+  } catch {
+    throw new Error(`FRACTTAL_BASE_URL is not a valid URL: ${raw}`);
+  }
+  if (!(ALLOWED_FRACTTAL_HOSTS as readonly string[]).includes(host)) {
+    throw new Error(
+      `FRACTTAL_BASE_URL host "${host}" not allow-listed (allowed: ${
+        ALLOWED_FRACTTAL_HOSTS.join(", ")
+      })`,
+    );
+  }
+  return raw;
+}
+
+// Fixture boundary: --fixture/--output/--work-fixture must stay inside
+// scripts/fixtures/*.json so a CLI flag can never overwrite arbitrary
+// files (path traversal) or exfiltrate outside the reviewed fixture dir.
+export function assertFixturePath(raw: string, flag = "--fixture"): string {
+  if (raw.includes("\0")) throw new Error(`${flag} contains NUL`);
+  const norm = raw.replace(/\\/g, "/");
+  if (norm.includes("..")) {
+    throw new Error(`${flag} must not contain ".." (got ${raw})`);
+  }
+  if (!norm.endsWith(".json")) {
+    throw new Error(`${flag} must end in .json (got ${raw})`);
+  }
+  // Allowed forms: scripts/fixtures/<name>.json (repo-relative) or an
+  // absolute path that ends with scripts/fixtures/<name>.json.
+  const idx = norm.indexOf("scripts/fixtures/");
+  if (idx < 0) {
+    throw new Error(
+      `${flag} must be inside scripts/fixtures/*.json (got ${raw})`,
+    );
+  }
+  const rest = norm.slice(idx + "scripts/fixtures/".length);
+  if (rest === "" || rest.includes("/")) {
+    throw new Error(
+      `${flag} must be a direct child of scripts/fixtures/*.json (got ${raw})`,
+    );
+  }
+  return raw;
 }
 
 const GUID_RE =
@@ -141,6 +197,35 @@ function normalizePath(name: string, raw: string | undefined): string {
   return value;
 }
 
+function normalizeClientAssertionAlg(raw: string | undefined): string {
+  if (raw === undefined || raw.trim() === "") return "RS256";
+  const value = raw.trim().toUpperCase();
+  if (value !== "RS256" && value !== "PS256") {
+    throw new Error("AUTH_ENTRA_CLIENT_ASSERTION_ALG must be RS256 or PS256");
+  }
+  return value;
+}
+
+function assertCredentialFilesReadable(credential: EntraCredential): void {
+  if (credential.type !== "key") return;
+  // Fail fast at boot: an unreadable key/cert path must surface here, not as
+  // a private_key_jwt failure on the first login attempt. The doctor sso-key
+  // check re-validates the material itself at runtime.
+  const paths = [
+    ["AUTH_ENTRA_PRIVATE_KEY_PATH", credential.privateKeyPath],
+    ["AUTH_ENTRA_CERTIFICATE_PATH", credential.certificatePath],
+  ] as const;
+  for (const [name, path] of paths) {
+    let stat: Deno.FileInfo;
+    try {
+      stat = Deno.statSync(path);
+    } catch {
+      throw new Error(`${name} is not readable: ${path}`);
+    }
+    if (!stat.isFile) throw new Error(`${name} is not a file: ${path}`);
+  }
+}
+
 function normalizeAppBaseUrl(raw: string | undefined): string {
   const value = (raw ?? "").trim();
   if (value === "") {
@@ -176,8 +261,9 @@ function normalizeAppBaseUrl(raw: string | undefined): string {
 }
 
 // loadAuthConfig: SSO and local-login configuration. SSO stays disabled by
-// default, so an unchanged deployment keeps working. File reads are deferred to
-// the Entra client; this function validates strings only.
+// default, so an unchanged deployment keeps working. Key/cert file contents
+// are read lazily by the Entra client, but their paths are stat-checked here
+// so a typo fails fast at boot instead of on the first login attempt.
 export function loadAuthConfig(get: EnvGetter = defaultEnv): AuthConfig {
   const localEnabled = parseBoolFlag(
     "AUTH_LOCAL_ENABLED",
@@ -242,6 +328,7 @@ export function loadAuthConfig(get: EnvGetter = defaultEnv): AuthConfig {
       ),
     };
   }
+  assertCredentialFilesReadable(credential);
   const appBaseUrl = normalizeAppBaseUrl(get("APP_BASE_URL"));
   const redirectUri = `${appBaseUrl}/auth/entra/callback`;
   const postLogoutRedirectUri = `${appBaseUrl}/auth/entra/logged-out`;
@@ -252,6 +339,9 @@ export function loadAuthConfig(get: EnvGetter = defaultEnv): AuthConfig {
       tenantId,
       clientId,
       credential,
+      clientAssertionAlg: normalizeClientAssertionAlg(
+        get("AUTH_ENTRA_CLIENT_ASSERTION_ALG"),
+      ),
       forceAccountPicker: parseBoolFlag(
         "AUTH_SSO_FORCE_ACCOUNT_PICKER",
         get("AUTH_SSO_FORCE_ACCOUNT_PICKER"),

@@ -5,6 +5,7 @@ import {
   authorizationCodeGrant,
   buildAuthorizationUrl,
   ClientSecretPost,
+  clockTolerance as clockToleranceSymbol,
   type Configuration,
   customFetch,
   discovery,
@@ -54,7 +55,9 @@ export async function getOidcConfiguration(
         const h = header as Record<string, unknown>;
         const p = payload as Record<string, unknown>;
         h.typ = "JWT";
-        h.alg = "PS256";
+        // RS256 per Entra; configurable via AUTH_ENTRA_CLIENT_ASSERTION_ALG
+        // (default RS256) for non-Entra issuers in development.
+        h.alg = entra.clientAssertionAlg ?? "RS256";
         h["x5t#S256"] = thumbprint;
         p.aud = tokenEndpoint(entra.tenantId);
         p.iss = entra.clientId;
@@ -74,7 +77,13 @@ export async function getOidcConfiguration(
       ? "private_key_jwt"
       : "client_secret_post",
     id_token_signed_response_alg: "RS256",
-    clockTolerance: entra.clockToleranceSeconds,
+    // openid-client v6 reads clock tolerance through this symbol key, not
+    // the "clockTolerance" string: a plain string property is ignored and
+    // the 30s default applies. The symbol form is what discovery() forwards
+    // to the internal client (see openid-client build/index.js), so the
+    // AUTH_SSO_CLOCK_TOLERANCE_SECONDS setting is honored here. Re-applied
+    // on the Configuration after discovery as defense in depth.
+    [clockToleranceSymbol]: entra.clockToleranceSeconds,
   };
 
   const cfg = await discovery(
@@ -84,6 +93,8 @@ export async function getOidcConfiguration(
     resolvedClientAuth,
     { timeout: Math.max(1, Math.ceil(entra.httpTimeoutMs / 1000)) },
   );
+  (cfg as unknown as Record<symbol, unknown>)[clockToleranceSymbol] =
+    entra.clockToleranceSeconds;
   cfg[customFetch] = safeFetch as never;
   discoveryCache.set(cacheKey, {
     value: cfg,

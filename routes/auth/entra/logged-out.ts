@@ -1,7 +1,11 @@
 // Route: GET /auth/entra/logged-out - registered post-logout landing.
 // This is why it exists: Entra redirects here after logout; the route clears
 // any local session and sends the browser back to login.
-import { getSessionTokenFromRequest } from "../../../lib/server/auth/session.ts";
+import {
+  buildExpiredCookie,
+  getSessionTokenFromRequest,
+  isSecureRequest,
+} from "../../../lib/server/auth/session.ts";
 
 import { hashSessionToken } from "../../../lib/server/auth/session.ts";
 
@@ -20,10 +24,9 @@ export const handler = define.handlers({
       }
     }
     const headers = new Headers();
-    headers.set(
-      "set-cookie",
-      "barrier_session=; Path=/; HttpOnly; SameSite=Lax; Expires=Thu, 01 Jan 1970 00:00:00 GMT",
-    );
+    // Mirror Secure on the clear so it revokes the Secure session cookie set
+    // at login; isSecureRequest falls back to APP_BASE_URL for proxies.
+    headers.set("set-cookie", buildExpiredCookie(isSecureRequest(ctx.req)));
     headers.set("cache-control", "no-store");
     headers.set("pragma", "no-cache");
     headers.set("referrer-policy", "no-referrer");

@@ -45,16 +45,23 @@ export async function loadPrivateKey(config: EntraConfig): Promise<CryptoKey> {
     throw new Error("private key is not configured");
   }
   const path = config.credential.privateKeyPath;
-  const cached = keyCache.get(path);
+  const cacheKey = `${config.clientAssertionAlg}:${path}`;
+  const cached = keyCache.get(cacheKey);
   if (cached) return cached;
   const promise = (async () => {
     const pem = await Deno.readTextFile(path);
     const der = pemToDer(pem, "PRIVATE KEY");
+    // RSASSA-PKCS1-v1_5 (RS256): Entra private_key_jwt requires RS256.
+    // RSA-PSS (PS256) imports fine here but the token endpoint rejects the
+    // assertion, so the algorithm is pinned to the configured value.
+    const name = config.clientAssertionAlg === "PS256"
+      ? "RSA-PSS"
+      : "RSASSA-PKCS1-v1_5";
     try {
       return await crypto.subtle.importKey(
         "pkcs8",
         der as unknown as BufferSource,
-        { name: "RSA-PSS", hash: "SHA-256" },
+        { name, hash: "SHA-256" },
         false,
         ["sign"],
       );
@@ -66,7 +73,7 @@ export async function loadPrivateKey(config: EntraConfig): Promise<CryptoKey> {
       );
     }
   })();
-  keyCache.set(path, promise);
+  keyCache.set(cacheKey, promise);
   try {
     return await promise;
   } catch (err) {

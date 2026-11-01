@@ -14,6 +14,7 @@ import {
 import {
   buildSessionCookie,
   createSessionToken,
+  getSessionTokenFromRequest,
   hashSessionToken,
 } from "../../../lib/server/auth/session.ts";
 
@@ -26,6 +27,7 @@ import {
 import {
   createSession,
   deleteExpiredSessions,
+  deleteSession,
 } from "../../../lib/server/sql/sessions.ts";
 
 import {
@@ -43,6 +45,8 @@ import { readJsonBody } from "../../../lib/server/validation.ts";
 
 import { define } from "../../../utils.ts";
 
+import { denyIfCrossSite } from "../../../lib/server/csrf.ts";
+
 // DUMMY_PASSWORD_HASH: valid 210k-iteration digest verified when the e-mail
 // is unknown or the account is inactive. Always paying the PBKDF2 cost keeps
 // response timing from revealing which emails exist; the generic 401 already
@@ -55,7 +59,11 @@ export const handler = define.handlers({
   // POST { email, password } - validates credentials, creates a session.
   async POST(ctx) {
     const requestId = newRequestId();
-    const limit = writeThrottle.check(routeClientKey(ctx));
+    const csrf = denyIfCrossSite(ctx.req, requestId);
+    if (csrf) return csrf;
+    const limit = writeThrottle.check(
+      `POST /api/auth/login:${routeClientKey(ctx)}`,
+    );
     if (!limit.allowed) {
       return rateLimited("too many requests", requestId, limit.retryAfterMs);
     }
@@ -99,6 +107,16 @@ export const handler = define.handlers({
       }
       const token = createSessionToken();
       const expires = sessionExpiry();
+      // Session fixation: revoke the presented session (if any) before
+      // minting a new one, so a planted anonymous token cannot survive login.
+      const presented = getSessionTokenFromRequest(ctx.req);
+      if (presented) {
+        try {
+          await deleteSession(await hashSessionToken(presented));
+        } catch {
+          // Best effort: revocation failure must not block the login.
+        }
+      }
       await createSession(
         activeUser.id,
         await hashSessionToken(token),

@@ -4,6 +4,7 @@
 import {
   buildSessionCookie,
   createSessionToken,
+  getSessionTokenFromRequest,
   hashSessionToken,
   isSecureRequest,
   sessionExpiry,
@@ -35,14 +36,20 @@ import { deleteExpiredSessions } from "../../../lib/server/sql/sessions.ts";
 
 import { getUserByEntraIdentity } from "../../../lib/server/sql/users.ts";
 
-import { createSession } from "../../../lib/server/sql/sessions.ts";
+import { createSession, deleteSession } from "../../../lib/server/sql/sessions.ts";
 
 import { loadAuthConfig } from "../../../lib/server/config.ts";
 
 import { define } from "../../../utils.ts";
 
-function redirect(location: string, headers?: HeadersInit): Response {
-  return new Response(null, { status: 303, headers: { location, ...headers } });
+function redirect(location: string, headers?: Headers): Response {
+  // Callers pass a Headers instance, never a plain object: spreading a
+  // Headers into `{ location, ...headers }` yields no entries and would drop
+  // Set-Cookie entirely. Copying via `new Headers(headers)` preserves every
+  // entry, including repeated Set-Cookie values.
+  const out = new Headers(headers);
+  out.set("location", location);
+  return new Response(null, { status: 303, headers: out });
 }
 
 function loginError(code: string, next?: string): string {
@@ -55,7 +62,9 @@ function loginError(code: string, next?: string): string {
 export const handler = define.handlers({
   async GET(ctx) {
     const requestId = newRequestId();
-    const limit = writeThrottle.check(routeClientKey(ctx));
+    const limit = writeThrottle.check(
+      `GET /auth/entra/callback:${routeClientKey(ctx)}`,
+    );
     if (!limit.allowed) {
       return rateLimited("too many requests", requestId, limit.retryAfterMs);
     }
@@ -159,6 +168,16 @@ export const handler = define.handlers({
 
     const token = createSessionToken();
     const expires = sessionExpiry();
+    // Session fixation: revoke the presented session (if any) before minting
+    // a new one, so a planted anonymous token cannot survive the login.
+    const presented = getSessionTokenFromRequest(ctx.req);
+    if (presented) {
+      try {
+        await deleteSession(await hashSessionToken(presented));
+      } catch {
+        // Best effort: revocation failure must not block the login.
+      }
+    }
     try {
       await createSession(user.id, await hashSessionToken(token), expires, {
         authMethod: "entra",
@@ -170,18 +189,27 @@ export const handler = define.handlers({
       return unavailable("Auth store unreachable", requestId);
     }
 
-    cookieHeaders.set(
-      "set-cookie",
-      buildSessionCookie(
-        token,
-        expires,
-        isSecureRequest(ctx.req, authConfig.entra.appBaseUrl),
-      ),
-    );
-    // Clear the binding cookie in the same response. Append a second Set-Cookie.
-    // Fresh/Response supports multiple headers via Headers.append.
-    cookieHeaders.append("set-cookie", clearBindingCookie(secure));
-    return redirect(flow.returnTo, cookieHeaders);
+    // Success: set the session cookie and clear the one-time binding cookie
+    // in the same 303. A headers array keeps the two Set-Cookie values as
+    // separate header lines; Headers.set would overwrite the first, and
+    // merging into a plain object would combine or drop them.
+    const headers: [string, string][] = [
+      ["cache-control", "no-store"],
+      ["pragma", "no-cache"],
+      ["referrer-policy", "no-referrer"],
+      ["x-content-type-options", "nosniff"],
+      [
+        "set-cookie",
+        buildSessionCookie(
+          token,
+          expires,
+          isSecureRequest(ctx.req, authConfig.entra.appBaseUrl),
+        ),
+      ],
+      ["set-cookie", clearBindingCookie(secure)],
+      ["location", flow.returnTo],
+    ];
+    return new Response(null, { status: 303, headers });
   },
 });
 
@@ -193,7 +221,13 @@ function getCookie(req: Request, name: string): string | null {
     if (idx < 0) continue;
     if (part.slice(0, idx).trim() !== name) continue;
     const value = part.slice(idx + 1).trim().replace(/^"|"$/g, "");
-    if (value) return decodeURIComponent(value);
+    if (!value) continue;
+    try {
+      return decodeURIComponent(value);
+    } catch {
+      // Malformed percent-encoding parses as "no binding token".
+      return null;
+    }
   }
   return null;
 }

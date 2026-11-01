@@ -29,6 +29,13 @@ export async function validateEntraClaims(
   const audience = Array.isArray(claims.aud) ? claims.aud : [claims.aud];
   if (!audience.includes(config.clientId)) throw new Error("invalid_claims");
 
+  // OIDC Core 3.1.3.7: when aud is an array the token MUST carry an azp
+  // claim for this client. Without this, a token minted for another party
+  // that merely lists our client id would be accepted.
+  if (Array.isArray(claims.aud) && claims.azp === undefined) {
+    throw new Error("invalid_claims");
+  }
+
   if (claims.tid !== config.tenantId) throw new Error("invalid_claims");
 
   if (typeof claims.oid !== "string" || !GUID_RE.test(claims.oid)) {

@@ -28,6 +28,7 @@ export function sessionExpiry(now = Date.now()): Date {
 }
 
 // getSessionTokenFromRequest: parses the Cookie header for our cookie name.
+// A malformed percent-encoding must never throw: it parses as "no session".
 export function getSessionTokenFromRequest(req: Request): string | null {
   const header = req.headers.get("cookie");
   if (!header) return null;
@@ -37,7 +38,12 @@ export function getSessionTokenFromRequest(req: Request): string | null {
     const name = part.slice(0, idx).trim();
     if (name !== SESSION_COOKIE) continue;
     const value = part.slice(idx + 1).trim().replace(/^"|"$/g, "");
-    if (value) return decodeURIComponent(value);
+    if (!value) continue;
+    try {
+      return decodeURIComponent(value);
+    } catch {
+      return null;
+    }
   }
   return null;
 }
@@ -60,23 +66,35 @@ export function buildSessionCookie(
 }
 
 // buildExpiredCookie: Set-Cookie value that clears the session on logout.
-export function buildExpiredCookie(): string {
-  return `${SESSION_COOKIE}=; Path=/; HttpOnly; SameSite=Lax; Expires=Thu, 01 Jan 1970 00:00:00 GMT`;
+// Pass isSecure=true on https deployments so the clear matches the Secure
+// attribute of the cookie it revokes; without it some browsers keep the
+// Secure session cookie and the logout looks like it never happened.
+export function buildExpiredCookie(isSecure = false): string {
+  const parts = [
+    `${SESSION_COOKIE}=; Path=/; HttpOnly; SameSite=Lax; Expires=Thu, 01 Jan 1970 00:00:00 GMT`,
+  ];
+  if (isSecure) parts.push("Secure");
+  return parts.join("; ");
 }
 
 // appBaseUrlIsHttps: APP_BASE_URL is the public site URL. Behind a TLS
 // terminating proxy the upstream request is plain http:// even though the
 // browser is on https://, so the request protocol alone would drop Secure.
+// Fail closed: an unset APP_BASE_URL defaults to Secure. Production must
+// set APP_BASE_URL explicitly to its https public URL.
 function appBaseUrlIsHttps(appBaseUrl: string | undefined): boolean {
-  let value = appBaseUrl;
-  if (value === undefined) {
-    try {
-      value = Deno.env.get("APP_BASE_URL") ?? "";
-    } catch {
-      value = "";
-    }
+  if (appBaseUrl !== undefined) {
+    return appBaseUrl.trim().toLowerCase().startsWith("https://");
   }
-  return value.trim().toLowerCase().startsWith("https://");
+  let env: string | undefined;
+  try {
+    env = Deno.env.get("APP_BASE_URL");
+  } catch {
+    // No env access (headless tests): treat as unset -> Secure.
+    return true;
+  }
+  if (env === undefined) return true;
+  return env.trim().toLowerCase().startsWith("https://");
 }
 
 // isSecureRequest: Secure cookies over https, including deployments behind a
