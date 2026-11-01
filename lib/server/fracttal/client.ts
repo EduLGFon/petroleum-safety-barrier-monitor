@@ -427,12 +427,16 @@ export function createFracttalClient(
   // fetchRawItem: one asset by code (reference: Query an Asset,
   // GET /items/{code}). Targeted verification without a scope sweep; the
   // sync pipeline parses the row downstream. A missing asset resolves to a
-  // null row, never a throw (absence is data, not an outage).
+  // null row, never a throw (absence is data, not an outage). The envelope
+  // may carry a single object or a one-element array; both resolve to the
+  // row.
   async function fetchRawItem(code: string): Promise<{ row: unknown }> {
     const body = await getJson(`/items/${encodeURIComponent(code)}`);
     const envelope = parseEnvelope(body);
-    const rows = Array.isArray(envelope.data) ? envelope.data : [];
-    return { row: rows[0] ?? null };
+    const data = envelope.data;
+    if (Array.isArray(data)) return { row: data[0] ?? null };
+    if (typeof data === "object" && data !== null) return { row: data };
+    return { row: null };
   }
 
   async function listRawWorkOrders(
