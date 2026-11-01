@@ -14,7 +14,7 @@ body {
 }
 body {
   font-family: var(--font-sans);
-  font-size: 15px;
+  font-size: 0.9375rem;
   line-height: 1.6;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
@@ -371,26 +371,60 @@ select option {
   --font-mono: "JetBrains Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
 }
 
+/* ── Text size preference ─────────────────────────────────────────────────
+   Percentages keep the browser's own default text size in the calculation;
+   every type token below is rem, so the whole UI scales while density keeps
+   its spacing rhythm. Keep these keys and percentages in sync with
+   FONT_SIZE_PRESETS in context/settings/presets.ts. */
+:root {
+  font-size: 100%;
+}
+[data-font-size="small"] {
+  font-size: 93.75%;
+}
+[data-font-size="standard"] {
+  font-size: 100%;
+}
+[data-font-size="large"] {
+  font-size: 112.5%;
+}
+[data-font-size="xlarge"] {
+  font-size: 125%;
+}
+
 /* ── Interface density ────────────────────────────────────────────────────
    Type scale + spacing rhythm per mode. Comfortable is the reference
    design; compact tightens every metric, spacious opens them up.
    Components consume these via var(--d-*) so a single data-density
-   switch re-rhythms the entire UI (no zoom hacks). */
+   switch re-rhythms the entire UI (no zoom hacks).
+   Legibility floor: informational captions stay at 11px or more in every
+   mode. Micro/tiny are reserved for compact badges, never for field labels
+   or provenance text. */
 :root,
 [data-density="comfortable"] {
-  /* Type scale */
-  --d-hero: 19px;
-  --d-display: 27px;
-  --d-band-num: 20px;
-  --d-dialog-title: 21px;
-  --d-arrow: 16px;
-  --d-lead: 14px;
-  --d-body: 13px;
-  --d-small: 12px;
-  --d-caption: 11px;
-  --d-micro: 10px;
-  --d-tiny: 9px;
-  --d-page-fs: 15px;
+  /* Legibility floors for the smallest informational text. The Pequeno
+     preset must not push these below the readability-pass minimum. */
+  --d-floor-small: 11px;
+  --d-floor-caption: 11px;
+  --d-floor-micro: 10px;
+  --d-floor-tiny: 9px;
+  --d-floor-badge-xs: 10px;
+  --d-floor-badge-sm: 11px;
+  --d-floor-badge-md: 12px;
+  /* Type scale - rem values so the text-size preset and the browser's
+     default text size both compose with density. Spacing tokens stay px. */
+  --d-hero: 1.1875rem;
+  --d-display: 1.6875rem;
+  --d-band-num: 1.25rem;
+  --d-dialog-title: 1.3125rem;
+  --d-arrow: 1rem;
+  --d-lead: 0.875rem;
+  --d-body: 0.8125rem;
+  --d-small: max(0.75rem, var(--d-floor-small));
+  --d-caption: max(0.75rem, var(--d-floor-caption));
+  --d-micro: max(0.6875rem, var(--d-floor-micro));
+  --d-tiny: max(0.625rem, var(--d-floor-tiny));
+  --d-page-fs: 0.9375rem;
   /* Page rhythm */
   --d-page: 18px 22px;
   --d-shell: 20px 18px 40px;
@@ -456,11 +490,11 @@ select option {
   --d-page-btn: 32px;
   --d-rowchk: 15px;
   /* Badges */
-  --d-badge-xs-fs: 10px;
+  --d-badge-xs-fs: max(0.6875rem, var(--d-floor-badge-xs));
   --d-badge-xs-pad: 2px 7px;
-  --d-badge-sm-fs: 11px;
+  --d-badge-sm-fs: max(0.75rem, var(--d-floor-badge-sm));
   --d-badge-sm-pad: 3px 8px;
-  --d-badge-md-fs: 12px;
+  --d-badge-md-fs: max(0.8125rem, var(--d-floor-badge-md));
   --d-badge-md-pad: 4px 11px;
   --d-badge-dot: 6px;
   --d-badge-dot-xs: 5px;
@@ -480,7 +514,7 @@ select option {
   --d-history-gap: 16px;
   /* Settings panel */
   --d-panel-w: 420px;
-  --d-panel-title: 18px;
+  --d-panel-title: 1.125rem;
   --d-panel-body: 22px;
   --d-panel-gap-lg: 26px;
   --d-panel-gap: 18px;
@@ -500,7 +534,7 @@ select option {
   --d-toggle-h: 24px;
   --d-toggle-knob: 18px;
   --d-density-pad: 14px 6px 12px;
-  --d-density-hint: 9.5px;
+  --d-density-hint: max(0.75rem, var(--d-floor-caption));
   /* NC alert (dashboard) */
   --d-alert-pad: 13px 18px;
   --d-alert-btn: 7px 14px;
@@ -514,18 +548,18 @@ select option {
 }
 
 [data-density="compact"] {
-  --d-hero: 17px;
-  --d-display: 23px;
-  --d-band-num: 18px;
-  --d-dialog-title: 19px;
-  --d-arrow: 14px;
-  --d-lead: 13px;
-  --d-body: 12px;
-  --d-small: 11px;
-  --d-caption: 10px;
-  --d-micro: 9px;
-  --d-tiny: 8px;
-  --d-page-fs: 14px;
+  --d-hero: 1.0625rem;
+  --d-display: 1.4375rem;
+  --d-band-num: 1.125rem;
+  --d-dialog-title: 1.1875rem;
+  --d-arrow: 0.875rem;
+  --d-lead: 0.8125rem;
+  --d-body: 0.75rem;
+  --d-small: max(0.6875rem, var(--d-floor-small));
+  --d-caption: max(0.6875rem, var(--d-floor-caption));
+  --d-micro: max(0.625rem, var(--d-floor-micro));
+  --d-tiny: max(0.5625rem, var(--d-floor-tiny));
+  --d-page-fs: 0.875rem;
   --d-page: 12px 14px;
   --d-shell: 14px 12px 28px;
   --d-section: 14px;
@@ -580,11 +614,11 @@ select option {
   --d-empty-pad: 38px;
   --d-page-btn: 28px;
   --d-rowchk: 13px;
-  --d-badge-xs-fs: 9px;
+  --d-badge-xs-fs: max(0.625rem, var(--d-floor-badge-xs));
   --d-badge-xs-pad: 1px 6px;
-  --d-badge-sm-fs: 10px;
+  --d-badge-sm-fs: max(0.6875rem, var(--d-floor-badge-sm));
   --d-badge-sm-pad: 2px 7px;
-  --d-badge-md-fs: 11px;
+  --d-badge-md-fs: max(0.75rem, var(--d-floor-badge-md));
   --d-badge-md-pad: 3px 9px;
   --d-badge-dot: 5px;
   --d-badge-dot-xs: 4px;
@@ -602,7 +636,7 @@ select option {
   --d-close-btn: 30px;
   --d-history-gap: 12px;
   --d-panel-w: 380px;
-  --d-panel-title: 16px;
+  --d-panel-title: 1rem;
   --d-panel-body: 16px;
   --d-panel-gap-lg: 19px;
   --d-panel-gap: 13px;
@@ -622,7 +656,7 @@ select option {
   --d-toggle-h: 22px;
   --d-toggle-knob: 16px;
   --d-density-pad: 11px 5px 10px;
-  --d-density-hint: 8.5px;
+  --d-density-hint: max(0.6875rem, var(--d-floor-caption));
   --d-alert-pad: 10px 14px;
   --d-alert-btn: 5px 11px;
   --d-tip-pad: 8px 11px;
@@ -633,18 +667,18 @@ select option {
 }
 
 [data-density="spacious"] {
-  --d-hero: 21px;
-  --d-display: 31px;
-  --d-band-num: 22px;
-  --d-dialog-title: 23px;
-  --d-arrow: 18px;
-  --d-lead: 15px;
-  --d-body: 14px;
-  --d-small: 13px;
-  --d-caption: 12px;
-  --d-micro: 11px;
-  --d-tiny: 10px;
-  --d-page-fs: 16px;
+  --d-hero: 1.3125rem;
+  --d-display: 1.9375rem;
+  --d-band-num: 1.375rem;
+  --d-dialog-title: 1.4375rem;
+  --d-arrow: 1.125rem;
+  --d-lead: 0.9375rem;
+  --d-body: 0.875rem;
+  --d-small: max(0.8125rem, var(--d-floor-small));
+  --d-caption: max(0.8125rem, var(--d-floor-caption));
+  --d-micro: max(0.75rem, var(--d-floor-micro));
+  --d-tiny: max(0.6875rem, var(--d-floor-tiny));
+  --d-page-fs: 1rem;
   --d-page: 26px 32px;
   --d-shell: 28px 24px 52px;
   --d-section: 26px;
@@ -699,11 +733,11 @@ select option {
   --d-empty-pad: 66px;
   --d-page-btn: 36px;
   --d-rowchk: 17px;
-  --d-badge-xs-fs: 11px;
+  --d-badge-xs-fs: max(0.75rem, var(--d-floor-badge-xs));
   --d-badge-xs-pad: 3px 8px;
-  --d-badge-sm-fs: 12px;
+  --d-badge-sm-fs: max(0.8125rem, var(--d-floor-badge-sm));
   --d-badge-sm-pad: 4px 10px;
-  --d-badge-md-fs: 13px;
+  --d-badge-md-fs: max(0.875rem, var(--d-floor-badge-md));
   --d-badge-md-pad: 5px 13px;
   --d-badge-dot: 7px;
   --d-badge-dot-xs: 6px;
@@ -721,7 +755,7 @@ select option {
   --d-close-btn: 38px;
   --d-history-gap: 20px;
   --d-panel-w: 460px;
-  --d-panel-title: 20px;
+  --d-panel-title: 1.25rem;
   --d-panel-body: 28px;
   --d-panel-gap-lg: 32px;
   --d-panel-gap: 23px;
@@ -741,7 +775,7 @@ select option {
   --d-toggle-h: 26px;
   --d-toggle-knob: 20px;
   --d-density-pad: 17px 7px 14px;
-  --d-density-hint: 10.5px;
+  --d-density-hint: max(0.8125rem, var(--d-floor-caption));
   --d-alert-pad: 16px 22px;
   --d-alert-btn: 9px 17px;
   --d-tip-pad: 12px 17px;
@@ -1269,7 +1303,7 @@ html.no-blur {
   border-radius: 10px;
   padding: 11px 13px;
   color: var(--au-value);
-  font-size: 14px;
+  font-size: 0.875rem;
   outline: none;
   transition:
     border-color 0.18s var(--ease-std),
