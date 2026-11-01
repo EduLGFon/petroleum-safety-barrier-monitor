@@ -52,7 +52,7 @@ export function BrandHeader(
       <div
         className="font-display"
         style={{
-          fontSize: 24,
+          fontSize: "1.5rem",
           fontWeight: 300,
           letterSpacing: "-.02em",
           color: AURORA.value,
@@ -63,7 +63,7 @@ export function BrandHeader(
       </div>
       <div
         style={{
-          fontSize: 13,
+          fontSize: "var(--d-body)",
           color: AURORA.sub,
           marginTop: 6,
           lineHeight: 1.5,

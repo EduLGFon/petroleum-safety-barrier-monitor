@@ -86,7 +86,7 @@ export function ChartSummary(
             y={64}
             textAnchor="middle"
             style={{
-              fontSize: 22,
+              fontSize: "1.375rem",
               fontWeight: 700,
               fill: "var(--text-primary)",
             }}
@@ -97,7 +97,7 @@ export function ChartSummary(
             x={66}
             y={82}
             textAnchor="middle"
-            style={{ fontSize: 10, fill: "var(--text-muted)" }}
+            style={{ fontSize: "var(--d-caption)", fill: "var(--text-muted)" }}
           >
             conforme
           </text>
@@ -143,7 +143,7 @@ export function ChartSummary(
         <div
           className="tnum"
           style={{
-            fontSize: 10,
+            fontSize: "var(--d-caption)",
             fontWeight: 800,
             color: AURORA.label,
             textTransform: "uppercase",
@@ -156,7 +156,11 @@ export function ChartSummary(
         {summary.topNC.length === 0
           ? (
             <div
-              style={{ fontSize: 13, color: AURORA.sub, padding: "8px 0" }}
+              style={{
+                fontSize: "var(--d-body)",
+                color: AURORA.sub,
+                padding: "8px 0",
+              }}
             >
               Nenhuma Não Conformidade - todas as categorias conformes.
             </div>

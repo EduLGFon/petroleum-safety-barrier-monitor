@@ -62,13 +62,13 @@ export const AURORA_TYPE = {
   sans: '"Inter Tight","Inter",-apple-system,"Segoe UI",sans-serif',
   display: '"Inter Tight","Inter",-apple-system,"Segoe UI",sans-serif',
   mono: '"JetBrains Mono",ui-monospace,SFMono-Regular,Menlo,monospace',
-  eyebrow: { fontSize: 10, fontWeight: 600, letterSpacing: ".22em" },
-  hero: { fontSize: 22, fontWeight: 300, letterSpacing: "-.02em" },
-  kpiLabel: { fontSize: 10, fontWeight: 600, letterSpacing: ".14em" },
-  kpiValue: { fontSize: 30, fontWeight: 500, letterSpacing: "-.02em" },
-  bandLabel: { fontSize: 10, fontWeight: 600 },
-  bandValue: { fontSize: 18, fontWeight: 500 },
-  tag: { fontSize: 13, fontWeight: 500 },
+  eyebrow: { fontSize: "0.6875rem", fontWeight: 600, letterSpacing: ".22em" },
+  hero: { fontSize: "1.375rem", fontWeight: 300, letterSpacing: "-.02em" },
+  kpiLabel: { fontSize: "0.6875rem", fontWeight: 600, letterSpacing: ".14em" },
+  kpiValue: { fontSize: "1.875rem", fontWeight: 500, letterSpacing: "-.02em" },
+  bandLabel: { fontSize: "0.6875rem", fontWeight: 600 },
+  bandValue: { fontSize: "1.125rem", fontWeight: 500 },
+  tag: { fontSize: "0.8125rem", fontWeight: 500 },
 } as const;
 
 // Connection-dot palette for the hero title. Connected is ALWAYS the

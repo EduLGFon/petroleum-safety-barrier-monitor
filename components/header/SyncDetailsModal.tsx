@@ -126,7 +126,9 @@ export function SyncDetailsModal(
                 {healthLabel(kind)}
               </span>
               {end && (
-                <span style={{ color: "var(--au-sub)", fontSize: 11 }}>
+                <span
+                  style={{ color: "var(--au-sub)", fontSize: "var(--d-small)" }}
+                >
                   {end.relative}
                 </span>
               )}
@@ -143,7 +145,7 @@ export function SyncDetailsModal(
                 width: 28,
                 height: 28,
                 cursor: "pointer",
-                fontSize: 14,
+                fontSize: "0.875rem",
                 lineHeight: 1,
                 flexShrink: 0,
               }}
@@ -158,7 +160,7 @@ export function SyncDetailsModal(
               gap: 10,
               padding: 16,
               overflowY: "auto",
-              fontSize: 12,
+              fontSize: "var(--d-small)",
               color: "var(--au-pill-text)",
             }}
           >
@@ -180,7 +182,7 @@ export function SyncDetailsModal(
                 <SectionTitle text="DETALHE TÉCNICO" />
                 <div
                   style={{
-                    fontSize: 11,
+                    fontSize: "var(--d-small)",
                     color: "var(--au-sub)",
                     overflowWrap: "anywhere",
                   }}
@@ -210,7 +212,7 @@ export function SyncDetailsModal(
                     borderRadius: 8,
                     padding: "6px 8px",
                     cursor: "pointer",
-                    fontSize: 12,
+                    fontSize: "var(--d-small)",
                     fontWeight: tab === "last-run" ? 700 : 400,
                   }}
                 >
@@ -231,7 +233,7 @@ export function SyncDetailsModal(
                     borderRadius: 8,
                     padding: "6px 8px",
                     cursor: "pointer",
-                    fontSize: 12,
+                    fontSize: "var(--d-small)",
                     fontWeight: tab === "last-day" ? 700 : 400,
                   }}
                 >

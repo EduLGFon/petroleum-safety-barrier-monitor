@@ -75,7 +75,7 @@ export function SplashCard(
           <div
             style={{
               fontFamily: 'system-ui,-apple-system,"Segoe UI",sans-serif',
-              fontSize: "var(--d-micro, 10px)",
+              fontSize: "var(--d-caption, 0.75rem)",
               fontWeight: 700,
               letterSpacing: "0.2em",
               textTransform: "uppercase",
@@ -100,7 +100,7 @@ export function SplashCard(
             // shipped (800 was synthesized faux-bold, another source of
             // crowded/overlapping glyphs).
             fontFamily: 'system-ui,-apple-system,"Segoe UI",sans-serif',
-            fontSize: "var(--d-band-num, 20px)",
+            fontSize: "var(--d-band-num, 1.25rem)",
             fontWeight: 700,
             letterSpacing: "-0.01em",
             color: "var(--au-value, #ffffff)",
@@ -133,7 +133,7 @@ export function SplashCard(
             display: "flex",
             justifyContent: "space-between",
             gap: 12,
-            fontSize: "var(--d-caption, 11px)",
+            fontSize: "var(--d-caption, 0.6875rem)",
             fontWeight: 600,
             color: "var(--au-sub, #64748b)",
             letterSpacing: "0.06em",

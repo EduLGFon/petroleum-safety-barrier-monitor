@@ -35,7 +35,7 @@ export function Row({ k, v }: { k: string; v: string }) {
         style={{
           color: "var(--au-value)",
           fontFamily: "var(--font-mono)",
-          fontSize: 11,
+          fontSize: "var(--d-small)",
           textAlign: "right",
           overflowWrap: "anywhere",
         }}
@@ -58,9 +58,9 @@ export function Stat(
         style={{
           fontFamily: "var(--font-mono)",
           fontVariantNumeric: "tabular-nums",
-          fontSize: 19,
+          fontSize: "1.1875rem",
           fontWeight: 700,
-          lineHeight: "22px",
+          lineHeight: 22 / 19,
           color,
         }}
       >
@@ -68,7 +68,7 @@ export function Stat(
       </div>
       <div
         style={{
-          fontSize: 10,
+          fontSize: "var(--d-caption)",
           fontWeight: 600,
           letterSpacing: ".04em",
           color: "var(--au-sub)",
@@ -87,7 +87,7 @@ export function SectionTitle({ text }: { text: string }) {
   return (
     <div
       style={{
-        fontSize: 10,
+        fontSize: "var(--d-caption)",
         fontWeight: 700,
         letterSpacing: ".12em",
         color: "var(--au-sub)",
@@ -136,7 +136,7 @@ export function SyncHoverCard({ sync, conn, onOpenDetails }: Props) {
           display: "flex",
           flexDirection: "column",
           gap: 8,
-          fontSize: 12,
+          fontSize: "var(--d-small)",
           color: "var(--au-pill-text)",
         }}
       >
@@ -145,7 +145,9 @@ export function SyncHoverCard({ sync, conn, onOpenDetails }: Props) {
             {healthLabel(kind)}
           </span>
           {headlineRel && (
-            <span style={{ color: "var(--au-sub)", fontSize: 11 }}>
+            <span
+              style={{ color: "var(--au-sub)", fontSize: "var(--d-small)" }}
+            >
               {headlineRel}
             </span>
           )}
@@ -192,7 +194,7 @@ export function SyncHoverCard({ sync, conn, onOpenDetails }: Props) {
               color: "var(--au-pill-text)",
               borderRadius: 8,
               padding: "7px 10px",
-              fontSize: 12,
+              fontSize: "var(--d-small)",
               fontWeight: 600,
               cursor: "pointer",
               textAlign: "center",
@@ -206,7 +208,7 @@ export function SyncHoverCard({ sync, conn, onOpenDetails }: Props) {
             borderTop: "1px solid var(--au-row)",
             paddingTop: 6,
             color: "var(--au-sub)",
-            fontSize: 11,
+            fontSize: "var(--d-small)",
           }}
         >
           {sync && `${fmt(sync.totals.barriers)} barreiras monitoradas`}
