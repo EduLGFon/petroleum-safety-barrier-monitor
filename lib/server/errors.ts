@@ -77,10 +77,15 @@ function matchesEtag(req: Request, etag: string): boolean {
 // okWithEtag: ok() plus conditional-request support for GET handlers.
 // Every 200 carries an ETag over its bytes plus private/no-cache (shared
 // caches never store authenticated bodies; clients revalidate instead of
-// reusing blindly). A matching If-None-Match answers 304 with no body.
+// reusing blindly) and Vary: Cookie (a downstream cache must key per
+// session, never poison one scope with another's bytes). A matching
+// If-None-Match answers 304 with no body.
 // Safe by construction: the tag hashes the actual output, so a 304 fires
 // only when the bytes would be identical, and callers that never send the
 // header see exactly what ok() always sent.
+// NOTE: keep volatile timestamps (e.g. KPI syncedAt) STABLE inside the
+// response-memo TTL window (see lib/server/cache.ts) - a per-request
+// new Date().toISOString() in the body defeats the ETag on every call.
 export async function okWithEtag(
   req: Request,
   data: unknown,
@@ -91,12 +96,17 @@ export async function okWithEtag(
   if (matchesEtag(req, etag)) {
     return new Response(null, {
       status: 304,
-      headers: { etag, "x-request-id": requestId },
+      headers: { etag, "x-request-id": requestId, "vary": "Cookie" },
     });
   }
   const res = ok(data, requestId, init);
   res.headers.set("etag", etag);
   res.headers.set("cache-control", "private, no-cache");
+  res.headers.set("vary", "Cookie");
+  // Stable Date header so clients can show staleness without a body field.
+  if (!res.headers.has("date")) {
+    res.headers.set("date", new Date().toUTCString());
+  }
   return res;
 }
 
