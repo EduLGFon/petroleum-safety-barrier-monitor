@@ -24,6 +24,8 @@ import { loadServerConfig } from "../../lib/server/config.ts";
 
 import { getChartData } from "../../lib/server/sql/chart.ts";
 
+import { memoGetOrCompute, scopeKey } from "../../lib/server/cache.ts";
+
 import { hasDateParamError, parseFilterQuery } from "./_params.ts";
 
 import { define } from "../../utils.ts";
@@ -73,7 +75,13 @@ export const handler = define.handlers({
     }
 
     try {
-      const rows = await getChartData(filter);
+      // 30s memo like KPI: chart ticks share one aggregation.
+      const key = scopeKey(["chart", dataAuth.role, JSON.stringify(filter)]);
+      const rows = await memoGetOrCompute(
+        key,
+        30_000,
+        () => getChartData(filter),
+      );
       return okWithEtag(ctx.req, rows, requestId);
     } catch (err) {
       return internal(

@@ -13,6 +13,8 @@ import {
 
 import { getVocabularies } from "../../lib/server/sql/vocabularies.ts";
 
+import { memoGetOrCompute, scopeKey } from "../../lib/server/cache.ts";
+
 import { guardRequest } from "../../lib/server/api-guard.ts";
 
 import { define } from "../../utils.ts";
@@ -30,11 +32,14 @@ export const handler = define.handlers({
     const dataAuth = g.dataAuth as Extract<DataAuth, { ok: true }>;
     try {
       const allowed = resolveAllowedLocationIds(dataAuth);
-      return await okWithEtag(
-        ctx.req,
-        await getVocabularies(allowed),
-        requestId,
+      // 60s memo: lookups change rarely (imports), ticks must not rescan.
+      const key = scopeKey(["vocab", dataAuth.role, JSON.stringify(allowed)]);
+      const vocab = await memoGetOrCompute(
+        key,
+        60_000,
+        () => getVocabularies(allowed),
       );
+      return await okWithEtag(ctx.req, vocab, requestId);
     } catch (err) {
       return internal(
         "GET /api/vocabularies",

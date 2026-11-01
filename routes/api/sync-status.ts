@@ -21,6 +21,8 @@ import { loadServerConfig } from "../../lib/server/config.ts";
 
 import { getSyncStatus } from "../../lib/server/sql/sync.ts";
 
+import { memoGetOrCompute } from "../../lib/server/cache.ts";
+
 import { define } from "../../utils.ts";
 
 export const handler = define.handlers({
@@ -57,7 +59,13 @@ export const handler = define.handlers({
     if (!dataAuth.ok) return denyDataAuth(dataAuth, requestId);
 
     try {
-      return okWithEtag(ctx.req, await getSyncStatus(), requestId);
+      // 15s memo: the indicator polls often; the underlying state moves
+      // per sync run (minutes), never per tick.
+      return okWithEtag(
+        ctx.req,
+        await memoGetOrCompute("sync-status", 15_000, () => getSyncStatus()),
+        requestId,
+      );
     } catch (err) {
       return internal(
         "GET /api/sync-status",

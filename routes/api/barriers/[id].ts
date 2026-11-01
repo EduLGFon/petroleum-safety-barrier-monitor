@@ -296,10 +296,26 @@ export const handler = define.handlers({
       // is configured. Failures only log; the poll cycle retries.
       if (statusChangedTo !== undefined) {
         try {
-          const [rules, recipients] = await Promise.all([
-            listAlertRules(false),
-            listRecipients(true),
-          ]);
+          // Independent reads in one batch: rules, recipients, labels and
+          // status maps resolve concurrently, not in sequence (~4 round
+          // trips collapse to one wave). Each is best-effort below.
+          const [rulesRes, recipRes, labelsRes, statusRes] = await Promise
+            .allSettled([
+              listAlertRules(false),
+              listRecipients(true),
+              getResolverLabels(),
+              (async () => {
+                const { queryRows } = await import(
+                  "../../../lib/server/db.ts"
+                );
+                return await queryRows<
+                  { id: number; label: string; ok: boolean }
+                >(
+                  `select id, label, is_compliant as ok from availability_statuses`,
+                );
+              })(),
+            ]);
+          const rules = rulesRes.status === "fulfilled" ? rulesRes.value : [];
           void rules;
           let provider:
             | Awaited<ReturnType<typeof providerConfigFromEnv>>
@@ -309,28 +325,17 @@ export const handler = define.handlers({
           } catch {
             provider = undefined;
           }
-          let labels:
-            | Awaited<ReturnType<typeof getResolverLabels>>
-            | undefined;
-          try {
-            labels = await getResolverLabels();
-          } catch {
-            labels = undefined;
-          }
+          const labels = labelsRes.status === "fulfilled"
+            ? labelsRes.value
+            : undefined;
           let statusInfo:
             | Awaited<
               import("../../../lib/server/alerts/detect.ts").StatusInfo
             >
             | undefined;
           try {
-            const { queryRows } = await import(
-              "../../../lib/server/db.ts"
-            );
-            const rows = await queryRows<
-              { id: number; label: string; ok: boolean }
-            >(
-              `select id, label, is_compliant as ok from availability_statuses`,
-            );
+            if (statusRes.status !== "fulfilled") throw new Error("no status");
+            const rows = statusRes.value;
             const labelById = new Map(rows.map((r) => [r.id, r.label]));
             const okById = new Map(rows.map((r) => [r.id, r.ok]));
             statusInfo = {
@@ -341,6 +346,9 @@ export const handler = define.handlers({
           } catch {
             statusInfo = undefined;
           }
+          const recipients = recipRes.status === "fulfilled"
+            ? recipRes.value
+            : [];
           const { getBarriersByIds } = await import(
             "../../../lib/server/sql/barriers.ts"
           );

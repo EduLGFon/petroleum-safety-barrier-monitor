@@ -74,37 +74,58 @@ export function toSyncStatus(args: {
   return { state: "idle", runningSince: null, lastRun, totals };
 }
 
-// getSyncStatus: dashboard indicator data.
+// getSyncStatus: dashboard indicator data. Single round trip: four scalar
+// subselects return one row (three JSON blobs + the barrier count) instead
+// of four sequential/parallel statements.
 export async function getSyncStatus(): Promise<SyncStatus> {
-  const [finished, running, stale, counted] = await Promise.all([
-    queryRows<SyncStatusRow>(
-      `select id, scope, status, inserts, updates, deletes, skips, note,
-        started_at, finished_at
-       from sync_state where status != 'running'
-       order by id desc limit 1`,
-    ),
-    queryRows<{ scope: string; started_at: string }>(
-      `select scope, started_at from sync_state
-       where status = 'running'
-         and finished_at >= now() - make_interval(mins => $1)
-       order by id desc limit 1`,
-      [SYNC_FRESH_MINUTES],
-    ),
-    queryRows<{ id: number; started_at: string }>(
-      `select id, started_at from sync_state
-       where status = 'running'
-         and finished_at < now() - make_interval(mins => $1)
-       order by id desc limit 1`,
-      [SYNC_STALE_MINUTES],
-    ),
-    queryRows<{ n: number }>(
-      `select count(*)::int as n from barriers where deleted_at is null`,
-    ),
-  ]);
-  const latest = finished[0] ?? null;
-  const staleRow = stale[0] ?? null;
+  const rows = await queryRows<{
+    latest: SyncStatusRow | null;
+    running: { scope: string; started_at: string } | null;
+    stale: { id: number; started_at: string } | null;
+    n: number;
+  }>(
+    `select
+       (select to_jsonb(t) from (
+         select id, scope, status, inserts, updates, deletes, skips, note,
+           started_at, finished_at
+         from sync_state where status != 'running'
+         order by id desc limit 1
+       ) t) as latest,
+       (select to_jsonb(t) from (
+         select scope, started_at from sync_state
+         where status = 'running'
+           and finished_at >= now() - make_interval(mins => $1)
+         order by id desc limit 1
+       ) t) as running,
+       (select to_jsonb(t) from (
+         select id, started_at from sync_state
+         where status = 'running'
+           and finished_at < now() - make_interval(mins => $2)
+         order by id desc limit 1
+       ) t) as stale,
+       (select count(*)::int from barriers where deleted_at is null) as n`,
+    [SYNC_FRESH_MINUTES, SYNC_STALE_MINUTES],
+  );
+  const row = rows[0];
+  // to_jsonb serializes timestamptz as ISO strings already; asIsoString
+  // passes strings through and converts Dates (other drivers) alike.
+  // The driver usually parses jsonb to objects, but coalesce/cast paths
+  // have returned text elsewhere (see toHistory) - parse defensively.
+  const asObj = <T>(v: unknown): T | null => {
+    if (v === null || v === undefined) return null;
+    if (typeof v === "string") {
+      try {
+        return JSON.parse(v) as T;
+      } catch {
+        return null;
+      }
+    }
+    return v as T;
+  };
+  const latest = asObj<SyncStatusRow>(row?.latest);
+  const staleRow = asObj<{ id: number; started_at: string }>(row?.stale);
   const staleRunning = isStaleActive(staleRow, latest);
-  const run = running[0] ?? null;
+  const run = asObj<{ scope: string; started_at: string }>(row?.running);
   return toSyncStatus({
     latest: latest === null ? null : {
       ...latest,
@@ -116,7 +137,7 @@ export async function getSyncStatus(): Promise<SyncStatus> {
       started_at: asIsoString(run.started_at),
     },
     staleRunning,
-    barriers: counted[0]?.n ?? 0,
+    barriers: row?.n ?? 0,
   });
 }
 

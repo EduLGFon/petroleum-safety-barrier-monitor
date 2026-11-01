@@ -38,6 +38,8 @@ import type { CatalogNeeds, MapContext } from "../fracttal/map.ts";
 
 import { queryRows, type TxQuery, withTx } from "../db.ts";
 
+import { memoGetOrCompute, scopeKey } from "../cache.ts";
+
 import { getResolverLabels } from "./vocabularies.ts";
 
 import { log } from "../log.ts";
@@ -1104,11 +1106,27 @@ export async function listSyncChanges(
       changedAt: r.created_at,
       runId: r.run_id,
     }));
-    const summary = await summarizeAuditRows(
-      run?.id ?? null,
-      sinceIso,
-      args.allowedLocationIds,
-    );
+    const summary = run !== null
+      // Finished runs are immutable: cache the summary per (run, scope) so
+      // page turns share it instead of recomputing 3 aggregations per turn.
+      // 60s TTL bounds staleness when the run is still in flight; live
+      // windows (sinceIso, run null) stay uncached - the rows move.
+      ? await memoGetOrCompute(
+        scopeKey([
+          "sync-summary",
+          run.id,
+          run.status,
+          JSON.stringify(args.allowedLocationIds ?? null),
+        ]),
+        60_000,
+        () =>
+          summarizeAuditRows(run.id, sinceIso, args.allowedLocationIds),
+      )
+      : await summarizeAuditRows(
+        null,
+        sinceIso,
+        args.allowedLocationIds,
+      );
     return {
       run,
       items,

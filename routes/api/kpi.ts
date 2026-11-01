@@ -22,6 +22,8 @@ import { hasDateParamError, parseFilterQuery } from "./_params.ts";
 
 import { guardRequest } from "../../lib/server/api-guard.ts";
 
+import { memoGetOrCompute, scopeKey } from "../../lib/server/cache.ts";
+
 import { define } from "../../utils.ts";
 
 export const handler = define.handlers({
@@ -50,9 +52,15 @@ export const handler = define.handlers({
     }
 
     try {
-      const snapshot = await getKpi(filter, {
-        scopeCounts: dataAuth.role === "admin",
-      });
+      // 30s memo keyed by scope + filters: dashboard ticks share one
+      // snapshot (and one stable syncedAt, so ETags 304) instead of
+      // stampeding Postgres per poll.
+      const key = scopeKey(["kpi", dataAuth.role, JSON.stringify(filter)]);
+      const snapshot = await memoGetOrCompute(
+        key,
+        30_000,
+        () => getKpi(filter, { scopeCounts: dataAuth.role === "admin" }),
+      );
       return await okWithEtag(ctx.req, snapshot, requestId);
     } catch (err) {
       return internal(
