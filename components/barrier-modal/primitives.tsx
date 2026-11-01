@@ -29,10 +29,10 @@ export function FR({
           marginBottom: "var(--d-mini-gap)",
         }}
       >
-        <Icon size={10} color="var(--text-muted)" strokeWidth={2} />
+        <Icon size={12} color="var(--text-muted)" strokeWidth={2} />
         <span
           style={{
-            fontSize: "var(--d-micro)",
+            fontSize: "var(--d-caption)",
             fontWeight: 700,
             color: "var(--text-muted)",
             textTransform: "uppercase",
@@ -78,7 +78,7 @@ export function Lbl({ children }: { children: ComponentChildren }) {
   return (
     <div
       style={{
-        fontSize: "var(--d-micro)",
+        fontSize: "var(--d-caption)",
         fontWeight: 700,
         color: "var(--text-muted)",
         textTransform: "uppercase",

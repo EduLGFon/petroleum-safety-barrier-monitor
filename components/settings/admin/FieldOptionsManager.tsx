@@ -234,7 +234,7 @@ export function FieldOptionsManager(
                         color: "var(--text-muted)",
                         cursor: "pointer",
                         padding: 0,
-                        fontSize: 13,
+                        fontSize: "var(--d-body)",
                         lineHeight: 1,
                       }}
                     >

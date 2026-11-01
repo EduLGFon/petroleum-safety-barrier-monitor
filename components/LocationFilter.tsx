@@ -118,7 +118,7 @@ function Tab(
         alignItems: "center",
         gap: 8,
         padding: "8px 14px",
-        fontSize: 13,
+        fontSize: "var(--d-body)",
         fontWeight: active ? 700 : 500,
         borderRadius: AURORA.segRadius,
         border: active
@@ -140,7 +140,7 @@ function Tab(
       <span
         className="tnum"
         style={{
-          fontSize: 11,
+          fontSize: "var(--d-caption)",
           fontWeight: 600,
           padding: "1px 7px",
           borderRadius: 5,

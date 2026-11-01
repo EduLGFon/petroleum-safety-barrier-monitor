@@ -148,7 +148,7 @@ export function AdminSection(
                 <span
                   className="tnum"
                   style={{
-                    fontSize: "var(--d-micro)",
+                    fontSize: "var(--d-caption)",
                     fontWeight: 800,
                     background: active
                       ? "rgba(255,255,255,.22)"

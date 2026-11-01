@@ -84,7 +84,7 @@ export function AccentPicker({ accentColor, activeAccent, onAccent }: Props) {
                 </button>
                 <span
                   style={{
-                    fontSize: "var(--d-tiny)",
+                    fontSize: "var(--d-caption)",
                     color: "var(--text-muted)",
                     fontWeight: 500,
                     textAlign: "center",

@@ -352,7 +352,7 @@ export function BarrierEditor(
         >
           <label
             style={{
-              fontSize: "var(--d-micro)",
+              fontSize: "var(--d-caption)",
               fontWeight: 700,
               color: "var(--text-muted)",
               textTransform: "uppercase",
@@ -365,7 +365,7 @@ export function BarrierEditor(
             <span
               title="Editado manualmente: o sync não sobrescreve este campo"
               style={{
-                fontSize: "var(--d-micro)",
+                fontSize: "var(--d-caption)",
                 fontWeight: 800,
                 color: "var(--accent)",
                 border: "1px solid var(--accent)",
@@ -389,7 +389,7 @@ export function BarrierEditor(
                 color: "var(--accent)",
                 cursor: "pointer",
                 padding: 0,
-                fontSize: "var(--d-micro)",
+                fontSize: "var(--d-caption)",
                 fontWeight: 700,
                 textDecoration: "underline",
               }}
@@ -400,7 +400,7 @@ export function BarrierEditor(
           {pending && !owned && (
             <span
               style={{
-                fontSize: "var(--d-micro)",
+                fontSize: "var(--d-caption)",
                 color: "var(--text-muted)",
                 fontStyle: "italic",
               }}
@@ -413,9 +413,10 @@ export function BarrierEditor(
           <span
             title={src.hint}
             style={{
-              fontSize: "var(--d-micro)",
-              color: "var(--text-muted)",
-              opacity: 0.85,
+              fontSize: "var(--d-small)",
+              fontWeight: 500,
+              color: "var(--text-secondary)",
+              lineHeight: 1.45,
             }}
           >
             Fracttal: {src.field}
@@ -684,7 +685,7 @@ export function BarrierEditor(
             <div style={{ marginTop: 10 }}>
               <label
                 style={{
-                  fontSize: "var(--d-micro)",
+                  fontSize: "var(--d-caption)",
                   fontWeight: 700,
                   color: "var(--accent)",
                   textTransform: "uppercase",

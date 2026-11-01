@@ -64,7 +64,7 @@ export function SyncChangeRow(
         <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
           <span
             style={{
-              fontSize: 10,
+              fontSize: "var(--d-caption)",
               fontWeight: 800,
               color: meta.color,
               background: `color-mix(in srgb, ${meta.color} 13%, transparent)`,
@@ -78,7 +78,7 @@ export function SyncChangeRow(
           <span
             style={{
               fontFamily: "var(--font-mono)",
-              fontSize: 12,
+              fontSize: "var(--d-small)",
               color: "var(--au-value)",
               overflow: "hidden",
               textOverflow: "ellipsis",
@@ -88,14 +88,18 @@ export function SyncChangeRow(
             {item.tag}
           </span>
           <span
-            style={{ marginLeft: "auto", color: "var(--au-sub)", fontSize: 11 }}
+            style={{
+              marginLeft: "auto",
+              color: "var(--au-sub)",
+              fontSize: "var(--d-small)",
+            }}
           >
             {open ? "▾" : "▸"}
           </span>
         </div>
         <div
           style={{
-            fontSize: 11,
+            fontSize: "var(--d-small)",
             color: "var(--au-sub)",
             overflow: "hidden",
             textOverflow: "ellipsis",
@@ -116,7 +120,7 @@ export function SyncChangeRow(
               <span
                 key={f}
                 style={{
-                  fontSize: 10,
+                  fontSize: "var(--d-caption)",
                   color: "var(--au-pill-text)",
                   background: "var(--au-row)",
                   borderRadius: 99,
@@ -127,7 +131,9 @@ export function SyncChangeRow(
               </span>
             ))}
             {extra > 0 && (
-              <span style={{ fontSize: 10, color: "var(--au-sub)" }}>
+              <span
+                style={{ fontSize: "var(--d-caption)", color: "var(--au-sub)" }}
+              >
                 +{extra}
               </span>
             )}
@@ -139,7 +145,7 @@ export function SyncChangeRow(
           style={{
             borderTop: "1px solid var(--au-row)",
             padding: "6px 8px",
-            fontSize: 11,
+            fontSize: "var(--d-small)",
           }}
         >
           {loading && (
@@ -203,7 +209,7 @@ export function SyncChangeRow(
                     borderRadius: 8,
                     padding: "4px 10px",
                     cursor: "pointer",
-                    fontSize: 11,
+                    fontSize: "var(--d-small)",
                   }}
                 >
                   Abrir barreira

@@ -33,7 +33,7 @@ export class ErrorBoundary extends Component<Props, State> {
           </div>
           <div
             style={{
-              fontSize: 13,
+              fontSize: "var(--d-body)",
               color: "var(--text-muted)",
               marginBottom: 12,
             }}

@@ -27,7 +27,7 @@ export function StatusBadge(
   return (
     <span
       style={{
-        fontSize: "var(--d-micro)",
+        fontSize: "var(--d-caption)",
         fontWeight: 700,
         letterSpacing: ".06em",
         textTransform: "uppercase",
@@ -149,7 +149,7 @@ export function Avatar({ name }: { name: string }) {
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
-        fontSize: 13,
+        fontSize: "var(--d-body)",
         fontWeight: 800,
         color: "#fff",
         background: "linear-gradient(135deg,var(--accent),var(--accent-2))",

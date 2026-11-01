@@ -127,7 +127,7 @@ export function ExportButtons(
             )
             : <Icon size={14} color={color} strokeWidth={2} />}
           {label}
-          <span style={{ fontSize: "var(--d-micro)", opacity: .6 }}>
+          <span style={{ fontSize: "var(--d-caption)", opacity: .8 }}>
             {ext}
           </span>
         </button>

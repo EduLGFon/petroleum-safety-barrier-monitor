@@ -136,7 +136,7 @@ export const thSt: CSSProperties = {
   padding: "var(--d-cell-pad)",
   textAlign: "center",
   verticalAlign: "middle",
-  fontSize: 10,
+  fontSize: "var(--d-caption)",
   fontWeight: 700,
   textTransform: "uppercase",
   letterSpacing: "0.14em",

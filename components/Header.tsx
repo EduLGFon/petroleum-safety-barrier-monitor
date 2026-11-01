@@ -238,8 +238,8 @@ export function Header(
                 border: `1px solid ${AURORA.pillBorder}`,
                 borderRadius: 99,
                 color: AURORA.pillText,
-                fontSize: 12,
-                maxWidth: 260,
+                fontSize: "var(--d-small)",
+                maxWidth: 280,
               }}
             >
               <span
@@ -253,7 +253,7 @@ export function Header(
               </span>
               <span
                 style={{
-                  fontSize: 10,
+                  fontSize: "var(--d-caption)",
                   fontWeight: 700,
                   letterSpacing: ".08em",
                   textTransform: "uppercase",
@@ -274,7 +274,7 @@ export function Header(
                   border: 0,
                   background: "transparent",
                   color: AURORA.pillText,
-                  fontSize: 12,
+                  fontSize: "var(--d-small)",
                   fontWeight: 600,
                   cursor: "pointer",
                   padding: "4px 6px",

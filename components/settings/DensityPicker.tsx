@@ -85,7 +85,7 @@ export function DensityPicker({ density, activeDensity, onDensity }: Props) {
                   {value === "comfortable" && (
                     <span
                       style={{
-                        fontSize: "var(--d-tiny)",
+                        fontSize: "var(--d-caption)",
                         fontWeight: 800,
                         letterSpacing: "0.1em",
                         textTransform: "uppercase",

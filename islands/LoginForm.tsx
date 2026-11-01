@@ -40,7 +40,7 @@ async function postJson(url: string, body: unknown): Promise<unknown> {
 const labelStyle = {
   display: "grid",
   gap: 6,
-  fontSize: 12,
+  fontSize: "var(--d-small)",
   fontWeight: 600,
   color: "var(--au-label)",
   letterSpacing: ".02em",
@@ -230,7 +230,7 @@ export function LoginForm({
                       border: 0,
                       background: "transparent",
                       color: "var(--au-sub)",
-                      fontSize: 12,
+                      fontSize: "var(--d-small)",
                       fontWeight: 600,
                       cursor: "pointer",
                       padding: "6px 8px",
@@ -250,7 +250,7 @@ export function LoginForm({
                     color: "var(--au-danger-fg)",
                     borderRadius: 10,
                     padding: "10px 12px",
-                    fontSize: 13,
+                    fontSize: "var(--d-body)",
                     lineHeight: 1.5,
                   }}
                 >
@@ -267,7 +267,7 @@ export function LoginForm({
                   borderRadius: 10,
                   background: AURORA.grad,
                   color: "#fff",
-                  fontSize: 14,
+                  fontSize: "var(--d-lead)",
                   fontWeight: 700,
                   letterSpacing: ".01em",
                   cursor: busy ? "wait" : "pointer",

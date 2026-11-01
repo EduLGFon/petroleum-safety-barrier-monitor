@@ -234,7 +234,7 @@ export function ColumnsMenu(
                 <div
                   style={{
                     padding: "0 10px 4px",
-                    fontSize: "var(--d-micro)",
+                    fontSize: "var(--d-caption)",
                     fontWeight: 700,
                     textTransform: "uppercase",
                     letterSpacing: "0.12em",

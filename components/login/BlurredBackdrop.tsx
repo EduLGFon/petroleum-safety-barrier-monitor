@@ -41,7 +41,7 @@ export function BlurredBackdrop() {
             borderRadius: 12,
             padding: "18px 14px",
             color: AURORA.sub,
-            fontSize: 12,
+            fontSize: "var(--d-small)",
             whiteSpace: "nowrap",
             overflow: "hidden",
             contain: "content",

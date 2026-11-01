@@ -124,7 +124,7 @@ function CardRows({ rows }: { rows: CardRow[] }) {
               display: "flex",
               alignItems: "baseline",
               gap: 7,
-              fontSize: 12,
+              fontSize: "var(--d-small)",
             }}
           >
             <span
@@ -378,7 +378,9 @@ export function KpiGrid({ kpi }: Props) {
               isPercent={c.isPercent}
             />
           </div>
-          <div style={{ fontSize: 12, color: AURORA.sub }}>{c.sub}</div>
+          <div style={{ fontSize: "var(--d-small)", color: AURORA.sub }}>
+            {c.sub}
+          </div>
           {c.rows ? <CardRows rows={c.rows} /> : c.share !== undefined && (
             <div
               style={{

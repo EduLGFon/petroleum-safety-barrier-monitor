@@ -41,7 +41,7 @@ export function SyncChangesSummary(
             <span
               key={label}
               style={{
-                fontSize: 11,
+                fontSize: "var(--d-small)",
                 color: "var(--au-sub)",
                 border: "1px solid var(--au-row)",
                 borderRadius: 99,

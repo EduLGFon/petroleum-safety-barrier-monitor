@@ -137,7 +137,7 @@ export function ComplianceChart(
         <div
           className="tnum"
           style={{
-            fontSize: 10,
+            fontSize: "var(--d-caption)",
             fontWeight: 800,
             color: AURORA.label,
             textTransform: "uppercase",
@@ -159,7 +159,7 @@ export function ComplianceChart(
               display: "inline-flex",
               alignItems: "center",
               gap: 6,
-              fontSize: 11,
+              fontSize: "var(--d-small)",
               fontWeight: 700,
               padding: "2px 4px 2px 10px",
               borderRadius: 99,
@@ -204,7 +204,7 @@ export function ComplianceChart(
                 title={v.title}
                 style={{
                   padding: "4px 12px",
-                  fontSize: 12,
+                  fontSize: "var(--d-small)",
                   fontWeight: on ? 700 : 500,
                   borderRadius: 99,
                   border: on
@@ -253,7 +253,7 @@ export function ComplianceChart(
                   flex: "1 1 160px",
                   maxWidth: 260,
                   padding: "6px 12px",
-                  fontSize: 12,
+                  fontSize: "var(--d-small)",
                   ...GLASS_INPUT,
                   boxSizing: "border-box",
                 }}
@@ -274,7 +274,7 @@ export function ComplianceChart(
                       title={s.title}
                       style={{
                         padding: "5px 11px",
-                        fontSize: 12,
+                        fontSize: "var(--d-small)",
                         fontWeight: on ? 700 : 500,
                         borderRadius: 8,
                         border: on
@@ -296,7 +296,11 @@ export function ComplianceChart(
             {prepared.rows.length === 0
               ? (
                 <div
-                  style={{ fontSize: 13, color: AURORA.sub, padding: "8px 0" }}
+                  style={{
+                    fontSize: "var(--d-body)",
+                    color: AURORA.sub,
+                    padding: "8px 0",
+                  }}
                 >
                   Nenhuma categoria encontrada para “{query.trim()}”.
                 </div>
@@ -348,7 +352,7 @@ export function ComplianceChart(
                   onClick={() => setExpanded((e) => !e)}
                   aria-expanded={expanded}
                   style={{
-                    fontSize: 12,
+                    fontSize: "var(--d-small)",
                     fontWeight: 700,
                     padding: "5px 14px",
                     borderRadius: 99,

@@ -242,7 +242,7 @@ export function ExportMenu(
                 className="tnum"
                 style={{
                   padding: "6px 10px 4px",
-                  fontSize: "var(--d-micro)",
+                  fontSize: "var(--d-caption)",
                   fontWeight: 700,
                   textTransform: "uppercase",
                   letterSpacing: "0.12em",
@@ -296,7 +296,7 @@ export function ExportMenu(
                     )
                     : <Icon size={14} color={color} strokeWidth={2} />}
                   {label}
-                  <span style={{ fontSize: "var(--d-micro)", opacity: 0.6 }}>
+                  <span style={{ fontSize: "var(--d-caption)", opacity: 0.8 }}>
                     {ext}
                   </span>
                 </button>
@@ -322,7 +322,7 @@ export function ExportMenu(
                 className="tnum"
                 style={{
                   padding: "6px 10px 4px",
-                  fontSize: "var(--d-micro)",
+                  fontSize: "var(--d-caption)",
                   color: AURORA.sub,
                   whiteSpace: "normal",
                 }}

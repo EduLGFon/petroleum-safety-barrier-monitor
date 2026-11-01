@@ -70,7 +70,7 @@ export function SyncChangesList(
             border: "1px solid var(--au-card-border)",
             borderRadius: 8,
             padding: "4px 8px",
-            fontSize: 12,
+            fontSize: "var(--d-small)",
           }}
         >
           <option value="all">Todas</option>
@@ -91,17 +91,17 @@ export function SyncChangesList(
             border: "1px solid var(--au-card-border)",
             borderRadius: 8,
             padding: "4px 8px",
-            fontSize: 12,
+            fontSize: "var(--d-small)",
           }}
         />
       </div>
       {list.loading && list.items.length === 0 && (
-        <div style={{ color: "var(--au-sub)", fontSize: 11 }}>
+        <div style={{ color: "var(--au-sub)", fontSize: "var(--d-small)" }}>
           Carregando alterações…
         </div>
       )}
       {list.error && (
-        <div style={{ fontSize: 11 }}>
+        <div style={{ fontSize: "var(--d-small)" }}>
           <span style={{ color: "#f31260" }}>{list.error}</span>{" "}
           <button
             type="button"
@@ -112,7 +112,7 @@ export function SyncChangesList(
               color: "var(--au-value)",
               cursor: "pointer",
               textDecoration: "underline",
-              fontSize: 11,
+              fontSize: "var(--d-small)",
             }}
           >
             Tentar de novo
@@ -120,7 +120,7 @@ export function SyncChangesList(
         </div>
       )}
       {!list.loading && !list.error && list.total === 0 && (
-        <div style={{ color: "var(--au-sub)", fontSize: 11 }}>
+        <div style={{ color: "var(--au-sub)", fontSize: "var(--d-small)" }}>
           {scope === "last-run"
             ? "Nenhuma alteração nesta sincronização."
             : "Nenhuma alteração nas últimas 24h."}
@@ -142,7 +142,7 @@ export function SyncChangesList(
             display: "flex",
             alignItems: "center",
             justifyContent: "space-between",
-            fontSize: 11,
+            fontSize: "var(--d-small)",
             color: "var(--au-sub)",
           }}
         >
