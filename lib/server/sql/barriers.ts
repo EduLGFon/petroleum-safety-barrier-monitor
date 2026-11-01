@@ -19,6 +19,12 @@ import {
   toWireBarrier,
 } from "./mappers.ts";
 
+import {
+  FIELD_COLUMNS,
+  mergeOwnership,
+  type OwnableFieldKey,
+} from "../../field-ownership.ts";
+
 export {
   CONTINGENCY_LATERAL,
   HISTORY_JOIN,
@@ -479,9 +485,13 @@ export interface BarrierUpdatePayload {
 
 // updateBarrier: updates editable metadata and sheet inventory fields.
 // Availability is excluded here (routes through transitionBarrierStatus).
+// Every key sent with a value joins barriers.manual_fields, so the Fracttal
+// sync stops overwriting it; opts.releaseFields removes keys (validated by
+// the caller - unknown entries throw) so they follow the sync again.
 export async function updateBarrier(
   id: number,
   patch: BarrierUpdatePayload,
+  opts: { releaseFields?: string[] } = {},
 ): Promise<WireBarrier | null> {
   const sets: string[] = [];
   const args: unknown[] = [id];
@@ -491,66 +501,164 @@ export async function updateBarrier(
     sets.push(`${col} = $${args.length}`);
   };
 
-  if (patch.tag !== undefined) add("tag", patch.tag.trim());
-  if (patch.locationId !== undefined) add("location_id", patch.locationId);
-  if (patch.typologyId !== undefined) add("typology_id", patch.typologyId);
-  if (patch.categoryId !== undefined) add("category_id", patch.categoryId);
-  if (patch.groupingId !== undefined) add("grouping_id", patch.groupingId);
+  const owned: string[] = [];
+  const own = (key: string, present: boolean) => {
+    if (present) owned.push(key);
+  };
+
+  if (patch.tag !== undefined) {
+    add("tag", patch.tag.trim());
+    own("tag", true);
+  }
+  if (patch.locationId !== undefined) {
+    add("location_id", patch.locationId);
+    own("locationId", true);
+  }
+  if (patch.typologyId !== undefined) {
+    add("typology_id", patch.typologyId);
+    own("typologyId", true);
+  }
+  if (patch.categoryId !== undefined) {
+    add("category_id", patch.categoryId);
+    own("categoryId", true);
+  }
+  if (patch.groupingId !== undefined) {
+    add("grouping_id", patch.groupingId);
+    own("groupingId", true);
+  }
   if (patch.ownerId !== undefined) {
     add(
       "owner_id",
       patch.ownerId == null || patch.ownerId <= 0 ? null : patch.ownerId,
     );
+    own("ownerId", true);
   }
   if (patch.criticalityId !== undefined) {
     add("criticality_id", patch.criticalityId);
+    own("criticalityId", true);
   }
-  if (patch.comments !== undefined) add("comments", patch.comments.trim());
+  if (patch.comments !== undefined) {
+    add("comments", patch.comments.trim());
+    own("comments", true);
+  }
   if (patch.actionPlan !== undefined) {
     add("action_plan", patch.actionPlan.trim());
+    own("actionPlan", true);
   }
-  if (patch.origin !== undefined) add("origin", patch.origin.trim() || null);
+  if (patch.origin !== undefined) {
+    add("origin", patch.origin.trim() || null);
+    own("origin", true);
+  }
   if (patch.installLocal !== undefined) {
     add("install_local", patch.installLocal.trim() || null);
+    own("installLocal", true);
   }
   if (patch.equipTypology !== undefined) {
     add("equip_typology", patch.equipTypology.trim() || null);
+    own("equipTypology", true);
   }
   if (patch.fieldInstalled !== undefined) {
     add("field_installed", patch.fieldInstalled.trim() || null);
+    own("fieldInstalled", true);
   }
   if (patch.fieldOperational !== undefined) {
     add("field_operational", patch.fieldOperational.trim() || null);
+    own("fieldOperational", true);
   }
   if (patch.opStatus !== undefined) {
     add("op_status", patch.opStatus.trim() || null);
+    own("opStatus", true);
   }
   if (patch.hasMaintPlan !== undefined) {
     add("has_maint_plan", patch.hasMaintPlan.trim() || null);
+    own("hasMaintPlan", true);
   }
   if (patch.planFollowed !== undefined) {
     add("plan_followed", patch.planFollowed.trim() || null);
+    own("planFollowed", true);
   }
   if (patch.failureFree !== undefined) {
     add("failure_free", patch.failureFree.trim() || null);
+    own("failureFree", true);
   }
   if (patch.maintStatus !== undefined) {
     add("maint_status", patch.maintStatus.trim() || null);
+    own("maintStatus", true);
   }
   if (patch.hasContingency !== undefined) {
     add("has_contingency", patch.hasContingency.trim() || null);
+    own("hasContingency", true);
   }
   if (patch.contingencyDesc !== undefined) {
     add("contingency_desc", patch.contingencyDesc.trim() || null);
+    own("contingencyDesc", true);
   }
   if (patch.evidenceCode !== undefined) {
     add("evidence_code", patch.evidenceCode.trim() || null);
+    own("evidenceCode", true);
   }
   if (patch.degradationDesc !== undefined) {
     add("degradation_desc", patch.degradationDesc.trim() || null);
+    own("degradationDesc", true);
   }
   if (patch.extraComments !== undefined) {
     add("extra_comments", patch.extraComments.trim() || null);
+    own("extraComments", true);
+  }
+
+  const release = opts.releaseFields ?? [];
+  if (owned.length > 0 || release.length > 0) {
+    // Only newly-different values join manual_fields: the editor submits
+    // every field on save, and a no-change save must not freeze the row.
+    const current = await queryRows<Record<string, unknown>>(
+      `select tag, location_id, typology_id, category_id, grouping_id,
+              owner_id, criticality_id, comments, action_plan, origin,
+              install_local, equip_typology, field_installed,
+              field_operational, op_status, has_maint_plan, plan_followed,
+              failure_free, maint_status, has_contingency, contingency_desc,
+              evidence_code, degradation_desc, extra_comments, manual_fields
+         from barriers where id = $1`,
+      [id],
+    );
+    const cur = current[0];
+    const norm = (v: unknown) =>
+      (typeof v === "string" ? v : v == null ? "" : String(v)).trim();
+    const changed = (key: string): boolean => {
+      if (!cur) return true;
+      switch (key) {
+        case "ownerId":
+          return (patch.ownerId == null || patch.ownerId <= 0
+            ? null
+            : patch.ownerId) !== (cur["owner_id"] as number | null);
+        case "comments":
+        case "actionPlan":
+        case "tag": {
+          const col = key === "comments"
+            ? "comments"
+            : key === "actionPlan"
+            ? "action_plan"
+            : "tag";
+          const raw = patch[key as "comments" | "actionPlan" | "tag"];
+          return (raw ?? "").trim() !== norm(cur[col]);
+        }
+        default: {
+          const col = FIELD_COLUMNS[key as OwnableFieldKey];
+          const raw = patch[key as keyof BarrierUpdatePayload];
+          const next = typeof raw === "number"
+            ? raw
+            : (typeof raw === "string" ? raw.trim() : "") || null;
+          const prev = (cur[col] as number | string | null) ?? null;
+          return (next ?? "") !== (prev ?? "");
+        }
+      }
+    };
+    const next = mergeOwnership(
+      (cur?.["manual_fields"] as string[] | null) ?? [],
+      owned.filter(changed),
+      release,
+    );
+    args.push(next);
+    sets.push(`manual_fields = $${args.length}`);
   }
 
   if (sets.length > 0) {

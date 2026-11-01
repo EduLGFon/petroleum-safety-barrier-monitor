@@ -47,6 +47,8 @@ import { listAlertRules } from "../../../lib/server/sql/alert_rules.ts";
 
 import { getOrCreateAuthor } from "../../../lib/server/sql/authors.ts";
 
+import { isOwnableField } from "../../../lib/field-ownership.ts";
+
 import { listRecipients } from "../../../lib/server/sql/recipients.ts";
 
 import { sqlAlertStore } from "../../../lib/server/sql/alerts.ts";
@@ -71,6 +73,21 @@ function optInt(raw: unknown, name: string): number | undefined {
     throw new Error(`${name} must be a non-negative integer`);
   }
   return raw;
+}
+
+// optReleaseFields: validates the per-field "back to sync" list. Unknown or
+// non-string entries are a 400 (the route maps "must be" to badRequest).
+function optReleaseFields(raw: unknown): string[] | undefined {
+  if (raw === undefined) return undefined;
+  if (!Array.isArray(raw)) throw new Error("releaseFields must be an array");
+  const out = new Set<string>();
+  for (const item of raw) {
+    if (typeof item !== "string" || !isOwnableField(item)) {
+      throw new Error(`releaseFields must be known field names, got ${item}`);
+    }
+    out.add(item);
+  }
+  return [...out];
 }
 
 export const handler = define.handlers({
@@ -206,6 +223,9 @@ export const handler = define.handlers({
       const evidenceCode = optStr(body.evidenceCode, 200);
       const degradationDesc = optStr(body.degradationDesc);
       const extraComments = optStr(body.extraComments);
+      // Per-field "back to sync": released keys leave manual_fields and
+      // follow Fracttal again on the next sweep (values stay until then).
+      const releaseFields = optReleaseFields(body.releaseFields);
 
       // Status change routes through record_status_change for audit/alerts.
       // Like the dedicated status route below, a matching transition is
@@ -255,7 +275,7 @@ export const handler = define.handlers({
         evidenceCode,
         degradationDesc,
         extraComments,
-      });
+      }, { releaseFields });
 
       // Manual contingency overlay (docs/STATUSES.md): Há Contingência?=Sim
       // promotes a stored Degradado/Indisponível to its contingenciado
