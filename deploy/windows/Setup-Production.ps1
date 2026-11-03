@@ -396,7 +396,9 @@ if (-not $caddyWanted) { Write-Host 'Caddy skipped per -SkipCaddy: port 80 stays
 # ── 5. .env (created once, never rotated on re-run) ─────────────────
 Write-Step 'Ensuring .env (created once; existing files are never overwritten)'
 $envFile = Join-Path $InstallDir '.env'
+$envCreated = $false
 if (-not (Test-Path $envFile)) {
+  $envCreated = $true
   if (-not $DbPassword) { $DbPassword = New-RandomPassword 20 }
   Copy-Item (Join-Path $InstallDir '.env.example') $envFile
   $encPass = [uri]::EscapeDataString($DbPassword)
@@ -412,6 +414,26 @@ if (-not (Test-Path $envFile)) {
   Write-Host '.env created from template with generated secrets.'
 } else {
   Write-Host '.env exists: left untouched (rotate secrets manually if needed).'
+}
+if ($envCreated) {
+  # .env is the credential source of truth for the app and both workers, so
+  # the password just written there must also be the role's password. A
+  # pre-existing role keeps its old one otherwise (section 2 leaves existing
+  # roles untouched), and every connection then fails with
+  # "password authentication failed for user ..." while migrations that used
+  # different credentials still succeed.
+  Write-Step "Syncing role $DbUser password with the new .env"
+  $safeDbPass = $DbPassword -replace "'", "''"
+  $env:PGPASSWORD = $PostgresSuperPassword
+  try {
+    & $psql -U postgres -h localhost -p $PgPort -c "ALTER ROLE $DbUser WITH LOGIN PASSWORD '$safeDbPass'" | Out-Null
+    if ($LASTEXITCODE -ne 0) {
+      Write-Need "could not set the password for existing role $DbUser; database logins would fail."
+    }
+    Write-Host "role $DbUser password matches .env."
+  } finally {
+    Remove-Item Env:\PGPASSWORD -ErrorAction SilentlyContinue
+  }
 }
 icacls $envFile /inheritance:r /grant:r 'Administrators:F' 'SYSTEM:F' | Out-Null
 

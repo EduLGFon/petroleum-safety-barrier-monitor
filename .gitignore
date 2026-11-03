@@ -4,6 +4,10 @@ node_modules/
 # Fresh
 _fresh/
 
+# Vite writes this timestamped config clone during `deno task dev`; it is
+# generated build state, not source, and breaks `deno fmt --check` if left.
+vite.config.ts.timestamp-*
+
 # Deno
 .deno/
 

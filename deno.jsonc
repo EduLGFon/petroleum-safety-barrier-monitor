@@ -72,7 +72,8 @@
     "exclude": [
       "**/_fresh/*",
       "node_modules",
-      ".next"
+      ".next",
+      "vite.config.ts.timestamp-*"
     ]
   },
   "exclude": [

@@ -126,12 +126,44 @@ async function checkEnvFile(): Promise<Record<string, string>> {
         push(
           "database-url",
           "ok",
-          `postgres host=${u.hostname} port=${u.port || "5432"}`,
+          `postgres user=${u.username || "(none)"} host=${u.hostname} port=${
+            u.port || "5432"
+          } db=${u.pathname.replace(/^\//, "") || "(none)"}`,
         );
       }
     } catch {
       push("database-url", "fail", "DATABASE_URL is not a parseable URL");
     }
+  }
+  // Precedence trap: `deno task start` passes --env-file=.env, but Deno never
+  // overwrites a variable that is already in the process environment (shell
+  // export, systemd Environment=, NSSM service env, ...). The app then
+  // connects with credentials that are invisible in .env - the usual cause
+  // of "password authentication failed for user X" while migrations (which
+  // may use different credentials) succeed. Reported by identity, never by
+  // password.
+  const shellDbUrl = Deno.env.get("DATABASE_URL");
+  const fileDbUrl = fileVars["DATABASE_URL"];
+  if (shellDbUrl && fileDbUrl && shellDbUrl !== fileDbUrl) {
+    const describe = (raw: string): string => {
+      try {
+        const u = new URL(raw);
+        return `${u.username || "(none)"}@${u.hostname}:${u.port || "5432"}/${
+          u.pathname.replace(/^\//, "")
+        }`;
+      } catch {
+        return "(unparseable)";
+      }
+    };
+    const fromShell = describe(shellDbUrl);
+    const fromFile = describe(fileDbUrl);
+    push(
+      "database-url-override",
+      fromShell === fromFile ? "warn" : "fail",
+      fromShell === fromFile
+        ? `process env password differs from .env (${fromShell}); the process value wins`
+        : `process env overrides .env: using ${fromShell}, .env says ${fromFile}`,
+    );
   }
   if (!get("ADMIN_TOKEN")) {
     push(
@@ -169,6 +201,22 @@ async function checkDatabase(): Promise<void> {
     try {
       await client.queryArray("SELECT 1");
       push("database-ping", "ok", "Postgres reachable, SELECT 1 ok");
+      // Identity check: the URL user and the role the server actually
+      // authenticated as can differ from what operators expect (e.g. a
+      // process-level DATABASE_URL overriding --env-file, or two roles in
+      // use for migrations vs. the app). Printing both makes that visible
+      // before the first request fails with "password authentication failed".
+      const identity = await client.queryObject<
+        { role: string; database: string }
+      >("select current_user as role, current_database() as database");
+      const row = identity.rows[0];
+      if (row) {
+        push(
+          "database-identity",
+          "ok",
+          `authenticated as role=${row.role} db=${row.database}`,
+        );
+      }
     } finally {
       try {
         client.release();

@@ -25,6 +25,19 @@ function createPool(): Pool {
     );
   }
   const url = parseDatabaseUrl(connectionString);
+  if (url !== null) {
+    // Effective identity, once per process. Never the password. When a
+    // process-level DATABASE_URL overrides --env-file, this is the only line
+    // that shows which role the app actually uses - the difference between
+    // "migrations work" and "login fails with password authentication
+    // failed".
+    log.child({ scope: "db" }).info("pool config", {
+      user: decodeUrlPart(url.username),
+      hostname: url.hostname,
+      port: url.port === "" ? 5432 : Number(url.port),
+      database: decodeUrlPart(url.pathname.replace(/^\//, "")),
+    });
+  }
   if (url !== null && !tlsAttemptNeeded(url)) {
     log.child({ scope: "db" }).warn("TLS disabled, using plaintext Postgres", {
       hostname: url.hostname,

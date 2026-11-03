@@ -53,4 +53,12 @@ Append-only architecture decision records. Newest last.
   is split into write/apply/read modules. The UI is now typechecked by
   `deno task check`.
 
+- D26: database credentials are reported by identity, not assumed. `doctor`
+  prints the effective `user@host:port/db` and fails when a process-level
+  `DATABASE_URL` overrides `.env` (Deno's documented env-file precedence),
+  the pool logs one `pool config` line, and the Windows setup script syncs a
+  pre-existing role when it writes a fresh `.env`. This turns the
+  "migrations work but login fails with password authentication failed"
+  class of incident into a named check instead of guesswork.
+
 See git history for full context.
