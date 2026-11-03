@@ -21,10 +21,7 @@ import { mapAsset, type MapContext } from "./map.ts";
 
 import { createFracttalClient } from "./client.ts";
 
-import {
-  assertEquals,
-  assertStrictEquals,
-} from "jsr:@std/assert@^1";
+import { assertEquals, assertStrictEquals } from "jsr:@std/assert@^1";
 
 Deno.test("hasUrgentCorrective gates on urgent or isUrgent planned only", () => {
   assertStrictEquals(
@@ -45,7 +42,10 @@ Deno.test("hasUrgentCorrective gates on urgent or isUrgent planned only", () => 
     }),
     false,
   );
-  assertStrictEquals(hasUrgentCorrective({ urgent: null, planned: null }), false);
+  assertStrictEquals(
+    hasUrgentCorrective({ urgent: null, planned: null }),
+    false,
+  );
 });
 
 Deno.test("failureFree non-urgent planned stays Sim", () => {
@@ -141,7 +141,9 @@ Deno.test("workOrderSlot id_status parity: done/status share one predicate", () 
   assertStrictEquals(isOpenWorkOrderRow(true, 1), false);
   assertStrictEquals(isOpenWorkOrderRow(null, null), false);
   // Slot level: status-only open rows classify; status-4 rows close.
-  const byStatus = workOrderSlot(parseWorkOrder(wo({ done: null, id_status_work_order: 1 })));
+  const byStatus = workOrderSlot(
+    parseWorkOrder(wo({ done: null, id_status_work_order: 1 })),
+  );
   assertStrictEquals(byStatus?.planned !== null, true);
   assertStrictEquals(
     workOrderSlot(parseWorkOrder(wo({ done: false, id_status_work_order: 4 }))),

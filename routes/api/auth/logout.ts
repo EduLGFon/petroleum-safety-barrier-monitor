@@ -4,6 +4,7 @@
 import {
   buildExpiredCookie,
   getSessionTokenFromRequest,
+  isSecureRequest,
 } from "../../../lib/server/auth/session.ts";
 
 import {
@@ -68,7 +69,9 @@ export const handler = define.handlers({
         await deleteSession(tokenHash);
       }
       return ok({ ok: true, ssoLogoutUrl }, requestId, {
-        headers: { "set-cookie": buildExpiredCookie() },
+        headers: {
+          "set-cookie": buildExpiredCookie(isSecureRequest(ctx.req)),
+        },
       });
     } catch (err) {
       return internal("POST /api/auth/logout", err, requestId, "Logout failed");

@@ -6,7 +6,12 @@ import {
   OWNER_CODES,
   TYPOLOGY_CODES,
 } from "../enums.ts";
-import { ACTION_PLANS, COMMENTS, generateHistory, STATUS_DIST } from "./history.ts";
+import {
+  ACTION_PLANS,
+  COMMENTS,
+  generateHistory,
+  STATUS_DIST,
+} from "./history.ts";
 import { LOCATION_DIST_BY_ID, LOCATIONS } from "../constants.ts";
 import type { WireBarrier } from "../wireTypes.ts";
 import { genSheetFields } from "./sheet-fields.ts";

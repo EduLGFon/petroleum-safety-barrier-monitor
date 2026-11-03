@@ -12,5 +12,7 @@ _fresh/
 test/
 _*.md
 scripts/fixtures/*
+# Real user imports (PII) must never land in the repo working tree.
+users.txt
 # SSO secrets
 secrets/

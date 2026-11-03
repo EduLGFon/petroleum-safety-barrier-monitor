@@ -6,7 +6,7 @@ Deno.test("resolveOrderBy whitelists columns, coerces direction", () => {
   assertStrictEquals(resolveOrderBy("tag", "desc"), "b.tag desc");
   assertStrictEquals(
     resolveOrderBy("contingency", "desc"),
-    "cont.contingency_tag desc",
+    "coalesce(cont.contingency_tag, '') desc",
   );
   assertStrictEquals(resolveOrderBy("hacker", "desc"), "b.id desc");
   assertStrictEquals(resolveOrderBy("id", "sideways"), "b.id asc");
@@ -80,7 +80,11 @@ Deno.test("buildWhere ignores an empty row whitelist", () => {
 
 Deno.test("buildWhere escapes LIKE wildcards", () => {
   const { text, args } = buildWhere({ query: "100%_x" });
-  assertEquals(args, ["%100\\%\\_x%", "%100\\%\\_x%"]);
+  assertEquals(args, [
+    "%100\\%\\_x%",
+    "%100\\%\\_x%",
+    "%100\\%\\_x%",
+  ]);
   assert(text.includes("escape '\\'"));
 });
 

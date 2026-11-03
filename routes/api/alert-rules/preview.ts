@@ -110,7 +110,10 @@ export const handler = define.handlers({
         return badRequest("staleDays must be a positive integer", requestId);
       }
       const onlyNoPlan = q.get("onlyNoActionPlan") === "1";
-      const filters: string[] = ["b.deleted_at is null"];
+      const filters: string[] = [
+        "b.deleted_at is null",
+        "coalesce(b.is_active, true)",
+      ];
       const args: unknown[] = [];
       const eq = (col: string, ids: number[] | null) => {
         if (!ids) return;

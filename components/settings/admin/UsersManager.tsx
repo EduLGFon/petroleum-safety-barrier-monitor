@@ -429,6 +429,18 @@ export function UsersManager(
             </button>
           </div>
         </form>
+        <p
+          style={{
+            margin: "10px 0 0",
+            fontSize: "var(--d-small)",
+            color: "var(--text-secondary)",
+            lineHeight: 1.5,
+          }}
+        >
+          Usuários não-admin são criados sem acesso a estações (fail closed).
+          Atribua os grupos em <strong>Grupos</strong>{" "}
+          antes de liberar o acesso.
+        </p>
       </AdminCard>
       {notice && (
         <div

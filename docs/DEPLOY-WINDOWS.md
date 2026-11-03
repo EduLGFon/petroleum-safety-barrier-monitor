@@ -15,6 +15,7 @@ Minimum `.env`:
 
 ```ini
 PUBLIC_API_MODE=http
+DENO_ENV=production
 DATABASE_URL=postgres://barrier:<pw>@localhost:5432/barreiras?sslmode=disable
 ADMIN_TOKEN=<64 hex>
 COMPANY_NAME=...

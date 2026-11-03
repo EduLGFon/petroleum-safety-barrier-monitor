@@ -39,6 +39,8 @@ import {
   normalizeRole,
 } from "../../lib/server/sql/users.ts";
 
+import { replaceUserGroups } from "../../lib/server/sql/access-groups.ts";
+
 import { loadAuthConfig, loadServerConfig } from "../../lib/server/config.ts";
 
 import { define } from "../../utils.ts";
@@ -124,9 +126,22 @@ export const handler = define.handlers({
       role?: unknown;
       authSource?: unknown;
       entraObjectId?: unknown;
+      accessGroupIds?: unknown;
     };
     try {
       const role = normalizeRole(body.role ?? "user");
+      const groupIds = body.accessGroupIds === undefined
+        ? []
+        : Array.isArray(body.accessGroupIds)
+        ? body.accessGroupIds
+        : (() => {
+          throw new Error("accessGroupIds must be an array");
+        })();
+      for (const id of groupIds) {
+        if (typeof id !== "number" || !Number.isSafeInteger(id) || id <= 0) {
+          throw new Error("accessGroupIds must contain positive integers");
+        }
+      }
       const authSource = body.authSource === "entra" ? "entra" : "local";
       if (
         body.authSource !== undefined && body.authSource !== "local" &&
@@ -163,6 +178,11 @@ export const handler = define.handlers({
           authSource: "local",
         });
       }
+      // A non-admin with no group is intentionally zero-access (fail
+      // closed). Persist the explicit memberships chosen at creation.
+      if (user.role !== "admin" && groupIds.length > 0) {
+        await replaceUserGroups(user.id, groupIds as number[]);
+      }
       return created(user, requestId);
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
@@ -177,7 +197,8 @@ export const handler = define.handlers({
       if (
         message.includes("email") || message.includes("name") ||
         message.includes("password") || message.includes("role") ||
-        message.includes("phone") || message.includes("invalid phone")
+        message.includes("phone") || message.includes("invalid phone") ||
+        message.includes("accessGroupIds")
       ) {
         return badRequest(message, requestId);
       }

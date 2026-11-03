@@ -6,6 +6,7 @@
 import type { Urgency } from "../../dashboard/urgent.ts";
 
 export interface TransitionCandidate {
+  id?: number; // barrier_status_history row id (dedup identity)
   barrierId: number;
   transitionDate: string; // YYYY-MM-DD
   statusId: number;
@@ -15,6 +16,7 @@ export interface NewAlertEvent {
   barrierId: number;
   transitionDate: string;
   statusId: number;
+  historyId?: number;
   dedupKey: string;
   payload: AlertPayload;
   kind?: string;
@@ -36,6 +38,9 @@ export interface AlertPayload {
   category?: string;
   ruleId?: number | null;
   immediate?: boolean;
+  // History row that produced this event. Two landings with the same
+  // status on the same day are distinct events and must not dedup away.
+  historyId?: number;
   // Rich detail (optional so rows enqueued before the premium template
   // still render - the template falls back gracefully when absent):
   typology?: string;
@@ -122,13 +127,17 @@ export interface AlertStore {
   ): Promise<Record<number, number>>;
 }
 
-// dedupKey: barrier:date:status, matching the alert_events comment.
+// dedupKey: barrier:date:status[:history]. The history id keeps a second
+// real landing (same barrier/status/day after a recovery) distinct; absent
+// ids keep the old key for back-compat callers.
 export function dedupKey(
   barrierId: number,
   transitionDate: string,
   statusId: number,
+  historyId?: number,
 ): string {
-  return `${barrierId}:${transitionDate}:${statusId}`;
+  const base = `${barrierId}:${transitionDate}:${statusId}`;
+  return historyId === undefined ? base : `${base}:${historyId}`;
 }
 
 // isDead: a dead payload stays unsent until --reprocess clears it.

@@ -22,12 +22,7 @@ import {
   transitionBarrierStatus,
 } from "../../../../lib/server/sql/barriers.ts";
 
-import {
-  postAlert,
-  providerConfigFromEnv,
-} from "../../../../lib/server/alerts/provider.ts";
-
-import { maybeSendProviderImmediate } from "../../../../lib/server/alerts/run-provider.ts";
+import { fanoutStatusChange } from "../../../../lib/server/alerts/status-fanout.ts";
 
 import {
   routeClientKey,
@@ -39,15 +34,7 @@ import {
   readJsonBody,
 } from "../../../../lib/server/validation.ts";
 
-import { getResolverLabels } from "../../../../lib/server/sql/vocabularies.ts";
-
-import { listAlertRules } from "../../../../lib/server/sql/alert_rules.ts";
-
-import { listRecipients } from "../../../../lib/server/sql/recipients.ts";
-
 import { getOrCreateAuthor } from "../../../../lib/server/sql/authors.ts";
-
-import { sqlAlertStore } from "../../../../lib/server/sql/alerts.ts";
 
 import { loadServerConfig } from "../../../../lib/server/config.ts";
 
@@ -113,14 +100,11 @@ export const handler = define.handlers({
     const body = parsed.body as StatusBody;
 
     const { statusId, note } = body;
-    let authorId = body.authorId;
-    if (!Number.isInteger(statusId) || (statusId as number) < 0) {
-      return badRequest(
-        "statusId is a required non-negative integer",
-        requestId,
-      );
-    }
-    if (authorId === undefined && auth.user !== null) {
+    // SECURITY: session callers are always attributed to their own user.
+    // Only token-authenticated ops callers may name an author explicitly;
+    // otherwise an admin could forge the audit trail.
+    let authorId: number | undefined;
+    if (auth.via === "session" && auth.user !== null) {
       try {
         const author = await getOrCreateAuthor(
           auth.user.name || auth.user.email,
@@ -134,10 +118,18 @@ export const handler = define.handlers({
           "Failed to resolve author",
         );
       }
+    } else {
+      authorId = body.authorId;
+    }
+    if (!Number.isInteger(statusId) || (statusId as number) < 0) {
+      return badRequest(
+        "statusId is a required non-negative integer",
+        requestId,
+      );
     }
     if (!Number.isInteger(authorId) || (authorId as number) < 0) {
       return badRequest(
-        "authorId is required (or log in so it derives from your user)",
+        "authorId is required for token callers (session callers derive it)",
         requestId,
       );
     }
@@ -167,90 +159,16 @@ export const handler = define.handlers({
       if (!updated) {
         return notFound("Barrier not found", requestId);
       }
-      // Best-effort provider fan-out (hybrid alerts): the transition
-      // already committed above, so nothing here may fail the response.
-      // Enqueue always; violada posts at once when the provider is
-      // configured. Failures only log; the poll cycle retries.
-      try {
-        const [rules, recipients] = await Promise.all([
-          listAlertRules(false),
-          listRecipients(true),
-        ]);
-        void rules;
-        let provider:
-          | Awaited<ReturnType<typeof providerConfigFromEnv>>
-          | undefined;
-        try {
-          provider = providerConfigFromEnv();
-        } catch {
-          provider = undefined; // no token: enqueue only, cycle sends
-        }
-        let labels:
-          | Awaited<ReturnType<typeof getResolverLabels>>
-          | undefined;
-        try {
-          labels = await getResolverLabels();
-        } catch {
-          labels = undefined;
-        }
-        let statusInfo:
-          | Awaited<
-            import("../../../../lib/server/alerts/detect.ts").StatusInfo
-          >
-          | undefined;
-        try {
-          const { queryRows } = await import(
-            "../../../../lib/server/db.ts"
-          );
-          const rows = await queryRows<
-            { id: number; label: string; ok: boolean }
-          >(
-            `select id, label, is_compliant as ok from availability_statuses`,
-          );
-          const labelById = new Map(rows.map((r) => [r.id, r.label]));
-          const okById = new Map(rows.map((r) => [r.id, r.ok]));
-          statusInfo = {
-            labelOf: (id: number) =>
-              labelById.get(id) ?? `Disponibilidade (${id})`,
-            compliantOf: (id: number) => okById.get(id) ?? false,
-          };
-        } catch {
-          statusInfo = undefined;
-        }
-        const { getBarriersByIds } = await import(
-          "../../../../lib/server/sql/barriers.ts"
-        );
-        const fanout = await maybeSendProviderImmediate({
-          store: sqlAlertStore,
-          loadBarriers: getBarriersByIds,
-          sender: provider
-            ? { post: (payload) => postAlert(provider!, payload) }
-            : undefined,
-          barrier: updated,
-          statusId: statusId as number,
-          transitionDate: updated.statusSince.slice(0, 10),
-          companyId: provider?.companyId ?? 1,
-          appBaseUrl: Deno.env.get("APP_BASE_URL") || undefined,
-          recipients: recipients.map((r) => ({
-            email: r.email,
-            name: r.name,
-            phone: r.phone ?? "",
-          })),
-          logger: forRequest(requestId).line("info"),
-          labels,
-          statusInfo,
-        });
-        reqLog.info("provider fan-out finished", {
-          barrierId,
-          enqueued: fanout.enqueued,
-          posted: fanout.posted,
-        });
-      } catch (err) {
-        reqLog.error("immediate fan-out failed", {
-          barrierId,
-          err,
-        });
-      }
+      // Best-effort provider fan-out: the transition is already committed,
+      // so a slow third party never holds the admin's save open.
+      void fanoutStatusChange({
+        barrier: updated,
+        statusId: statusId as number,
+        historyId: updated.statusHistory.at(-1)?.id,
+        requestId,
+      }).catch((err) => {
+        reqLog.error("immediate fan-out failed", { barrierId, err });
+      });
       return ok(updated, requestId);
     } catch (err) {
       return internal(

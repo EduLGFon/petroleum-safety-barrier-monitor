@@ -70,5 +70,8 @@ EXPOSE 8300
 RUN chown -R deno:deno /app /deno-dir
 USER deno
 
+# Runtime marker: production refuses mock mode and validates env at boot.
+ENV DENO_ENV=production
+
 # Same boot path as local `deno task start` (reads the mounted .env).
 CMD ["task", "start"]

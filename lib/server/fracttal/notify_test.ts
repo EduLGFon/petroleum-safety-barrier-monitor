@@ -1,17 +1,12 @@
-// Unit tests for ops failure notifications (P3) - console always, email
-// optional, and a throwing notifier must never break the fanout.
+// Unit tests for ops failure notifications: console always, and a throwing
+// notifier must never break the fanout.
 import {
   consoleNotifier,
-  failureBody,
   notifyFailureToAll,
-  smtpConfigFromEnv,
-  smtpEmailNotifier,
   type SyncFailureInfo,
 } from "./notify.ts";
 
 import { assertStrictEquals } from "jsr:@std/assert@^1";
-
-import type { SmtpConfig } from "./smtp.ts";
 
 const info: SyncFailureInfo = {
   scope: "fracttal-live:FAL",
@@ -34,94 +29,6 @@ Deno.test("consoleNotifier emits a loud structured line", async () => {
   assertStrictEquals(calls[0]!.includes("[fracttal-live:FAL]"), true);
   assertStrictEquals(calls[0]!.includes('note="upstream error 500"'), true);
   assertStrictEquals(calls[0]!.includes("runId=7"), true);
-});
-
-Deno.test("smtpEmailNotifier sends one email with the failure details", async () => {
-  const sent: Array<{ subject: string; body: string }> = [];
-  const cfg: SmtpConfig = {
-    hostname: "smtp.example.com",
-    port: 587,
-    from: "ops@example.com",
-    to: "team@example.com",
-  };
-  const notifier = smtpEmailNotifier(
-    cfg,
-    (_c, subject, body) => {
-      sent.push({ subject, body });
-      return Promise.resolve();
-    },
-  );
-  await notifier.syncFailed(info);
-  assertStrictEquals(sent.length, 1);
-  assertStrictEquals(
-    sent[0]!.subject,
-    "[Barrier Monitor] Falha na sincronização Fracttal (fracttal-live:FAL)",
-  );
-  assertStrictEquals(
-    sent[0]!.body.includes("escopo:    fracttal-live:FAL"),
-    true,
-  );
-  assertStrictEquals(sent[0]!.body.includes("execução (runId): 7"), true);
-  assertStrictEquals(sent[0]!.body.includes("erro: upstream error 500"), true);
-});
-
-Deno.test("failureBody renders a null runId as not-recorded", () => {
-  const body = failureBody({ ...info, runId: null });
-  assertStrictEquals(body.includes("(não registrada)"), true);
-});
-
-Deno.test("failureBody adds a migration hint for a missing column", () => {
-  const body = failureBody({
-    scope: "alerts",
-    startedAt: "2026-10-01T01:41:07.417Z",
-    note: 'column "description" does not exist',
-    runId: null,
-  });
-  assertStrictEquals(body.includes("deno task db:migrate"), true);
-});
-
-Deno.test("smtpConfigFromEnv is null unless host and recipient are set", () => {
-  const get = (vals: Record<string, string>) => (k: string) => vals[k];
-  assertStrictEquals(
-    smtpConfigFromEnv(get({})),
-    null,
-  );
-  const cfg = smtpConfigFromEnv(
-    get({
-      OPS_SMTP_HOST: "smtp.example.com",
-      OPS_EMAIL_TO: "team@example.com",
-    }),
-  );
-  assertStrictEquals(cfg !== null, true);
-  assertStrictEquals(cfg!.hostname, "smtp.example.com");
-  assertStrictEquals(cfg!.port, 587);
-  assertStrictEquals(cfg!.secure, false);
-
-  const tls = smtpConfigFromEnv(
-    get({
-      OPS_SMTP_HOST: "smtp.example.com",
-      OPS_EMAIL_TO: "team@example.com",
-      OPS_SMTP_PORT: "465",
-    }),
-  );
-  assertStrictEquals(tls!.secure, true);
-});
-
-Deno.test("smtpConfigFromEnv falls back to MAIL_* aliases and user From", () => {
-  const cfg = smtpConfigFromEnv((k) =>
-    (
-      {
-        MAIL_HOST: "smtp.gmail.com",
-        OPS_EMAIL_TO: "team@example.com",
-        MAIL_USER: "you@gmail.com",
-        MAIL_PASS: "sekret",
-      } as Record<string, string>
-    )[k]
-  );
-  assertStrictEquals(cfg!.hostname, "smtp.gmail.com");
-  assertStrictEquals(cfg!.user, "you@gmail.com");
-  assertStrictEquals(cfg!.pass, "sekret");
-  assertStrictEquals(cfg!.from, "you@gmail.com");
 });
 
 Deno.test("notifyFailureToAll fans out and swallows a throwing notifier", async () => {

@@ -23,13 +23,13 @@ docker compose up -d
 
 ## Tables
 
-Core: `locations`, `categories`, `criticality_levels`, `typologies`, `groupings`, `owners`, `availabilities`, `compliances`, `barriers`, `barrier_contingencies`, `barrier_status_history`, `users`, `sessions`, `alert_rules`, `alert_events`, `alert_recipients`, `field_option_sets`, `sync_state`, `sync_barrier_changes`, `throttle_buckets`.
+Core: `locations`, `categories`, `criticality_levels`, `typologies`, `groupings`, `owners`, `loc_descs`, `availability_statuses`, `barriers`, `barrier_contingencies`, `barrier_status_history`, `users`, `sessions`, `auth_flows`, `access_groups`, `access_group_locations`, `user_access_groups`, `alert_rules`, `alert_events`, `alert_recipients`, `field_option_sets`, `sync_state`, `sync_barrier_changes`, `throttle_buckets`.
 
 ## Rules
 
 - `barriers.external_code` is the upsert key for Fracttal sync.
 - `deleted_at` marks soft-deleted rows.
-- `compliance_id` is trigger-derived.
+- `compliance_id` is trigger-derived from `effective_availability_id()`, which applies the manual contingency overlay. Filters, KPI, chart and stale alerts all use the same function.
 - `manual_fields` (text[]) lists barrier columns an admin took over in the
   editor; the Fracttal sync skips those columns and leaves them untouched
   until they are released back to the sync.

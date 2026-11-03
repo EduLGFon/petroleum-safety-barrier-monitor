@@ -32,7 +32,10 @@ import {
 
 import { getUserById, updateUser } from "../../../lib/server/sql/users.ts";
 
-import { buildExpiredCookie } from "../../../lib/server/auth/session.ts";
+import {
+  buildExpiredCookie,
+  isSecureRequest,
+} from "../../../lib/server/auth/session.ts";
 
 import { loadServerConfig } from "../../../lib/server/config.ts";
 
@@ -122,7 +125,9 @@ export const handler = define.handlers({
       );
       if (!updated) return unauthorized("not authenticated", requestId);
       return ok({ ok: true }, requestId, {
-        headers: { "set-cookie": buildExpiredCookie() },
+        headers: {
+          "set-cookie": buildExpiredCookie(isSecureRequest(ctx.req)),
+        },
       });
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);

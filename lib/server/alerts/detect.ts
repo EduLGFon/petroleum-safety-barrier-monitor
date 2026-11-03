@@ -69,6 +69,9 @@ export async function detectUrgentTransitions(
   for (const c of candidates) {
     const wire = barriers.get(c.barrierId);
     if (!wire) continue; // barrier deleted after the transition
+    // Retired/disabled barriers must not alert: upstream disabled the asset,
+    // so its old history is not current operational risk.
+    if (wire.isActive === false) continue;
     const barrier = resolveBarrier(wire, labels);
     // Landing truth, not current state: the barrier may have moved on
     // since (the sync poller reverts manual edits within a minute), so
@@ -123,7 +126,8 @@ export async function detectUrgentTransitions(
       barrierId: c.barrierId,
       transitionDate: c.transitionDate,
       statusId: c.statusId,
-      dedupKey: dedupKey(c.barrierId, c.transitionDate, c.statusId),
+      historyId: c.id,
+      dedupKey: dedupKey(c.barrierId, c.transitionDate, c.statusId, c.id),
       payload: {
         tag: barrier.tag,
         location: barrier.location,
@@ -137,6 +141,7 @@ export async function detectUrgentTransitions(
         category: barrier.category,
         immediate: match.immediate,
         ruleId: match.ruleId,
+        historyId: c.id,
         ...detail,
       },
       urgency,

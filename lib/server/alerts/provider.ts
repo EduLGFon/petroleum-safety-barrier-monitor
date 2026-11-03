@@ -142,14 +142,18 @@ export interface ProviderPayload {
   despachar_agora: boolean;
 }
 
-// buildAlertaId: stable per (barrier, date, status) so retries reuse it.
+// buildAlertaId: stable per (barrier, date, status, history row) so
+// retries reuse it while a second real landing on the same day stays a
+// different provider event.
 export function buildAlertaId(
   barrierId: number,
   transitionDate: string,
   statusId: number,
+  historyId?: number,
 ): string {
   const day = transitionDate.slice(0, 10).replace(/-/g, "");
-  return `BAR-${barrierId}-${day}-${statusId}`.slice(0, 120);
+  const tail = historyId === undefined ? "" : `-${historyId}`;
+  return `BAR-${barrierId}-${day}-${statusId}${tail}`.slice(0, 120);
 }
 
 // buildTitulo: "[$CRITICIDADE] $STATUS $LOCATION $NOME $CODIGO", capped.
@@ -203,6 +207,7 @@ export interface BuildAlertInput {
   transitionDate: string;
   ocorridoEm: string;
   statusId: number;
+  historyId?: number;
   category?: string;
   author?: string;
   note?: string;
@@ -263,6 +268,7 @@ export function buildAlertPayload(
       input.barrierId,
       input.transitionDate,
       input.statusId,
+      input.historyId,
     ),
     company_id: input.companyId,
     situacao: mapping.situacao,
@@ -480,5 +486,32 @@ export async function pingProvider(
     );
   } finally {
     clearTimeout(timer);
+  }
+}
+
+// ocorridoEm: noon in the operations timezone for a transition date, so the
+// provider payload has a stable instant even though history stores a date.
+export function ocorridoEm(transitionDate: string, now: Date): string {
+  const day = transitionDate.slice(0, 10);
+  if (/^\d{4}-\d{2}-\d{2}$/.test(day)) {
+    const candidate = `${day}T12:00:00-03:00`;
+    if (!Number.isNaN(Date.parse(candidate))) return candidate;
+  }
+  return now.toISOString();
+}
+
+// barrierLink: deep link into the dashboard, omitted when APP_BASE_URL is
+// missing or not an allowed HTTPS origin.
+export function barrierLink(
+  appBaseUrl: string | undefined,
+  barrierId: number | null,
+): string | undefined {
+  const raw = (appBaseUrl ?? "").trim().replace(/\/+$/, "");
+  if (!raw || barrierId === null) return undefined;
+  try {
+    const normalized = assertHttpsUrl(raw, "APP_BASE_URL");
+    return `${normalized}/barriers/${barrierId}`;
+  } catch {
+    return undefined;
   }
 }

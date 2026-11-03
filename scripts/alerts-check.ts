@@ -12,8 +12,6 @@ import {
   consoleNotifier,
   notifyFailureToAll,
   type OpsNotifier,
-  smtpConfigFromEnv,
-  smtpEmailNotifier,
 } from "../lib/server/fracttal/notify.ts";
 
 import {
@@ -82,8 +80,6 @@ async function main(): Promise<void> {
   const flags = parseFlags(Deno.args);
   const startedAt = new Date();
   const notifiers: OpsNotifier[] = [consoleNotifier];
-  const opsSmtp = smtpConfigFromEnv();
-  if (opsSmtp) notifiers.push(smtpEmailNotifier(opsSmtp));
   const fail = async (note: string): Promise<never> => {
     await notifyFailureToAll(notifiers, {
       scope: "alerts",

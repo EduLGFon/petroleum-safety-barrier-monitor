@@ -29,7 +29,7 @@ export async function listFieldOptionSets(): Promise<FieldOptionSet[]> {
     const seeded = await queryRows<FieldOptionSet>(
       "select field, options, to_char(updated_at, 'YYYY-MM-DD\"T\"HH24:MI:SS') as updated_at, updated_by from field_option_sets order by field",
     );
-    return seeded;
+    return seeded.map((r) => ({ ...r, options: asStrings(r.options) }));
   }
   return rows.map((r) => ({ ...r, options: asStrings(r.options) }));
 }

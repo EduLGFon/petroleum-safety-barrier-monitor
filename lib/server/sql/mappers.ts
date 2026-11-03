@@ -47,6 +47,7 @@ export interface BarrierRow {
 }
 
 export interface HistoryEntry {
+  id?: number;
   date: string;
   statusId: number;
   authorId: number;
@@ -158,6 +159,7 @@ export const HISTORY_LATERAL = `
   left join lateral (
     select json_agg(
       json_build_object(
+        'id',       bsh.id,
         'date',     to_char(bsh.date, 'YYYY-MM-DD'),
         'statusId', bsh.status_id,
         'authorId', bsh.author_id,
@@ -181,12 +183,25 @@ export const CONTINGENCY_LATERAL = `
   ) cont on true
 `;
 
+// Reference joins used by label-based sorting (parity with the client
+// dashboard, which sorts resolved strings rather than numeric ids).
+const REFERENCE_JOINS = `
+  left join categories ref_cat on ref_cat.id = b.category_id
+  left join typologies ref_typ on ref_typ.id = b.typology_id
+  left join criticality_levels ref_crit on ref_crit.id = b.criticality_id
+  left join owners ref_own on ref_own.id = b.owner_id
+  left join availability_statuses ref_av
+    on ref_av.id = effective_availability_id(b.availability_id, b.has_contingency)
+`;
+
 // List join: contingency only, no history aggregation (see SELECT_LIST_COLUMNS).
 export const LIST_JOIN = `
   ${CONTINGENCY_LATERAL}
+  ${REFERENCE_JOINS}
 `;
 
 export const HISTORY_JOIN = `
   ${HISTORY_LATERAL}
   ${CONTINGENCY_LATERAL}
+  ${REFERENCE_JOINS}
 `;

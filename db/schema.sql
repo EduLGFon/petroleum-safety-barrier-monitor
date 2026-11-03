@@ -234,20 +234,56 @@ create index if not exists idx_barrier_contingencies_contingency
 -- with stable synthetic codes instead of silently duplicating later.
 alter table barriers alter column external_code set not null;
 
+-- ─── Effective availability (single source of truth) ────────────────────────
+-- The display overlay (docs/STATUSES.md): a stored Degradado/Indisponível
+-- with Há Contingência?=Sim reads as its contingenciado state. Defining this
+-- once removes the six hand-copied CASE expressions that used to drift
+-- between filters, KPI, chart, vocabularies and alert queries. Accent folding
+-- mirrors foldText() in lib/server/fracttal/barrier-rules.ts.
+create or replace function is_contingency_flag(value text) returns boolean
+language sql immutable as $$
+  select translate(lower(trim(coalesce(value, ''))),
+    'áàâãäéèêëíìîïóòôõöúùûüç',
+    'aaaaaeeeeiiiiooooouuuuc') = 'sim';
+$$;
+
+create or replace function effective_availability_id(
+  base_id integer,
+  has_contingency text
+) returns integer language sql immutable as $$
+  select case
+    when base_id in (4, 5) and is_contingency_flag(has_contingency)
+      then case when base_id = 4 then 3 else 2 end
+    else base_id
+  end;
+$$;
+
 create or replace function barriers_set_compliance() returns trigger as $$
 begin
-  select case when d.is_compliant then 0 else 1 end
-    into new.compliance_id
-  from availability_statuses d
-  where d.id = new.availability_id;
+  -- compliance_id is materialized from the effective status so every
+  -- consumer that still reads the column (stale alerts, preview) agrees
+  -- with the filter/KPI overlay.
+  new.compliance_id := case
+    when effective_availability_id(new.availability_id, new.has_contingency)
+      in (0, 1, 2, 3) then 0
+    else 1
+  end;
   return new;
 end;
 $$ language plpgsql;
 
 drop trigger if exists trg_barriers_set_compliance on barriers;
 create trigger trg_barriers_set_compliance
-  before insert or update of availability_id on barriers
+  before insert or update of availability_id, has_contingency on barriers
   for each row execute function barriers_set_compliance();
+
+-- Backfill rows written before the trigger included has_contingency.
+update barriers set has_contingency = has_contingency
+where compliance_id <> case
+  when effective_availability_id(availability_id, has_contingency)
+    in (0, 1, 2, 3) then 0
+  else 1
+end;
 
 create index if not exists idx_barriers_location        on barriers(location_id);
 create index if not exists idx_barriers_availability    on barriers(availability_id);

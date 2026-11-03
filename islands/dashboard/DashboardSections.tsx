@@ -223,6 +223,26 @@ export function DashboardSections(
             "opacity .5s var(--ease-out), transform .5s var(--ease-out)",
         }}
       >
+        {!serverMode && (
+          <div
+            role="status"
+            style={{
+              marginBottom: "12px",
+              padding: "10px 14px",
+              borderRadius: "10px",
+              border: "1px solid rgba(234,179,8,.45)",
+              background: "rgba(234,179,8,.12)",
+              color: "#facc15",
+              fontSize: "0.8125rem",
+              fontWeight: 600,
+              letterSpacing: ".02em",
+            }}
+          >
+            DADOS DE DEMONSTRAÇÃO - esta tela não está conectada ao banco de
+            produção.
+          </div>
+        )}
+
         {/* Header with merged connection + sync indicator */}
         <Header
           onOpenSettings={() => setSettingsOpen(true)}
@@ -265,7 +285,11 @@ export function DashboardSections(
           }}
           onSelectCategory={(v) =>
             setFilter({ category: filters.category === v ? "" : v })}
-          activeCategory={filters.category}
+          // Chart click-through is single-select; a multi-select filter has
+          // no single active bar, so pass the empty value.
+          activeCategory={Array.isArray(filters.category)
+            ? ""
+            : filters.category}
           ncCount={ncCount}
           isUrgentActive={isUrgentActive}
           showUrgent={showUrgent}

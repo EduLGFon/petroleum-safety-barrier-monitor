@@ -38,7 +38,11 @@ import { loadAuthConfig } from "../../../lib/server/config.ts";
 import { define } from "../../../utils.ts";
 
 function redirect(location: string, headers?: HeadersInit): Response {
-  return new Response(null, { status: 302, headers: { location, ...headers } });
+  // Headers is iterable, not a plain record: spreading it into an object
+  // literal drops every entry (including Set-Cookie). Copy it instead.
+  const out = new Headers(headers);
+  out.set("location", location);
+  return new Response(null, { status: 302, headers: out });
 }
 
 export const handler = define.handlers({

@@ -547,7 +547,8 @@ export async function listStaleBarriers(
     `select b.id as id, b.category_id as category_id,
             b.status_since::text as since
      from barriers b
-     where b.deleted_at is null and b.compliance_id = 1
+     where b.deleted_at is null and coalesce(b.is_active, true)
+       and b.compliance_id = 1
        and b.status_since <= (current_date - ($1::int * interval '1 day'))`,
     [staleDays],
   );

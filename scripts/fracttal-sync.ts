@@ -17,8 +17,6 @@
 import {
   consoleNotifier,
   notifyFailureToAll,
-  smtpConfigFromEnv,
-  smtpEmailNotifier,
 } from "../lib/server/fracttal/notify.ts";
 
 import {
@@ -253,8 +251,6 @@ async function main(): Promise<void> {
   console.log(`[fracttal-sync] work signals: ${workNote}`);
 
   const notifiers: OpsNotifier[] = [consoleNotifier];
-  const smtp = smtpConfigFromEnv();
-  if (smtp) notifiers.push(smtpEmailNotifier(smtp));
   const startedAt = new Date();
 
   let result: SyncResult;

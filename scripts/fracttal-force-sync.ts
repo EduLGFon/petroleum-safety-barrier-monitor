@@ -12,8 +12,6 @@
 import {
   consoleNotifier,
   notifyFailureToAll,
-  smtpConfigFromEnv,
-  smtpEmailNotifier,
 } from "../lib/server/fracttal/notify.ts";
 
 import {
@@ -144,8 +142,6 @@ async function main(): Promise<void> {
     ratePerMin: flags.ratePerMin,
   });
   const notifiers: OpsNotifier[] = [consoleNotifier];
-  const smtp = smtpConfigFromEnv();
-  if (smtp) notifiers.push(smtpEmailNotifier(smtp));
   const startedAt = new Date();
 
   // Eager work pass: a work-endpoint failure aborts with zero writes

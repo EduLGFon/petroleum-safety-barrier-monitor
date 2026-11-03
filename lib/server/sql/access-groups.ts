@@ -206,8 +206,31 @@ export async function deleteAccessGroup(id: number): Promise<boolean> {
   return rows.length > 0;
 }
 
-// Resolves the station ids a user may read. null means unrestricted (admin
-// or legacy ungrouped); [] means no access.
+// replaceUserGroups: set a user's memberships atomically. Used when creating
+// a user so a fresh account never exists without an explicit scope.
+export async function replaceUserGroups(
+  userId: number,
+  groupIds: number[],
+): Promise<void> {
+  const unique = [...new Set(groupIds)].filter((id) =>
+    Number.isSafeInteger(id) && id > 0
+  );
+  await withTx(async (tx) => {
+    await tx("delete from user_access_groups where user_id = $1", [userId]);
+    if (unique.length === 0) return;
+    const rows = unique.map((_, i) => `($1, $${i + 2})`).join(", ");
+    await tx(
+      `insert into user_access_groups (user_id, group_id) values ${rows}
+       on conflict do nothing`,
+      [userId, ...unique],
+    );
+  });
+}
+
+// Resolves the station ids a user may read. null is reserved for admins
+// (handled by the caller); an ungrouped user gets [] (no access). This is
+// fail-closed: creating a user or deleting every group can never widen a
+// non-admin to every station.
 export async function allowedLocationsForUser(
   userId: number,
 ): Promise<number[] | null> {
@@ -215,7 +238,7 @@ export async function allowedLocationsForUser(
     `select count(*)::text as n from user_access_groups where user_id = $1`,
     [userId],
   );
-  if (Number(membership[0]?.n ?? 0) === 0) return null;
+  if (Number(membership[0]?.n ?? 0) === 0) return [];
   const rows = await queryRows<{ location_id: number }>(
     `select distinct gal.location_id
      from user_access_groups uag

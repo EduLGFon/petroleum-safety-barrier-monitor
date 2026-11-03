@@ -11,13 +11,16 @@
 #   3. Keep TCP 80+443 open; close :8300 to the outside (loopback only).
 
 barreiras.example.com {
-	# Dashboard + API on the same origin (no CORS needed).
-	reverse_proxy 127.0.0.1:8300
+	# Dashboard + API on the same origin (no CORS needed). The app trusts
+	# X-Real-IP only from this loopback proxy, so each client keeps its own
+	# throttle bucket instead of sharing one global bucket.
+	reverse_proxy 127.0.0.1:8300 {
+		header_up X-Real-IP {remote_host}
+	}
 
 	# Same-origin by design: never add Access-Control-Allow-Origin here.
-	# Rate limits key on remote address at the app layer; X-Forwarded-For is
-	# intentionally ignored upstream (forgeable), so all proxied clients
-	# share one throttle bucket - acceptable for an internal dashboard.
+	# X-Forwarded-For stays untrusted; only the loopback proxy's X-Real-IP
+	# is accepted by lib/server/throttle.ts.
 
 	header {
 		# Hardening without breaking Preact hydration or export downloads.

@@ -8,7 +8,11 @@ import {
   loadPrivateKey,
 } from "../lib/server/auth/entra/keys.ts";
 
-import { loadAuthConfig } from "../lib/server/config.ts";
+import {
+  isProductionEnv,
+  loadAuthConfig,
+  parseApiMode,
+} from "../lib/server/config.ts";
 
 import { Pool } from "@db/postgres";
 
@@ -83,12 +87,21 @@ async function checkEnvFile(): Promise<Record<string, string>> {
   }
   // Shell env wins over .env, mirroring `deno serve --env-file=.env` merge.
   const get = (k: string): string | undefined => Deno.env.get(k) ?? fileVars[k];
-  const mode = get("PUBLIC_API_MODE") ?? "mock";
-  push(
-    "api-mode",
-    mode === "mock" || mode === "http" ? "ok" : "fail",
-    `PUBLIC_API_MODE=${mode}`,
-  );
+  const rawMode = get("PUBLIC_API_MODE") ?? "mock";
+  let mode: "mock" | "http" = "mock";
+  try {
+    mode = parseApiMode(rawMode);
+    push("api-mode", "ok", `PUBLIC_API_MODE=${mode}`);
+  } catch (err) {
+    push(
+      "api-mode",
+      "fail",
+      err instanceof Error ? err.message : String(err),
+    );
+  }
+  if (isProductionEnv(get) && mode !== "http") {
+    push("api-mode", "fail", "production requires PUBLIC_API_MODE=http");
+  }
   const dbUrl = get("DATABASE_URL") ?? "";
   if (mode === "http" && !dbUrl) {
     push("database-url", "fail", "PUBLIC_API_MODE=http needs DATABASE_URL");

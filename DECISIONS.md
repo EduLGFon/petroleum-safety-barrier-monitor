@@ -29,4 +29,28 @@ Append-only architecture decision records. Newest last.
   manual edits survive sweeps; `releaseFields` returns them to the sync.
   Adds the `manual_fields text[]` column via idempotent migration.
 
+- D21: station access is fail-closed. A non-admin with no access group sees
+  zero stations; `null` is reserved for admins. User creation accepts
+  `accessGroupIds` so a fresh account can be scoped atomically.
+
+- D22: production configuration is strict. `PUBLIC_API_MODE` must be a known
+  value, production refuses mock mode, boot validates config, and
+  `/api/ready` is the DB-aware readiness probe while `/api/health` stays
+  liveness-only.
+
+- D23: effective availability is defined once in SQL
+  (`effective_availability_id`), used by filters/KPI/chart/vocabularies/
+  contingencies/stale alerts, and mirrored by the compliance trigger. Alert
+  dedup keys include the history row id so a same-day recovery and re-failure
+  is not suppressed.
+
+- D24: barrier PATCH is one transaction (status + metadata + contingency
+  overlay); sync ownership is enforced inside the UPDATE against the current
+  `manual_fields`, closing the long-sweep edit race.
+
+- D25: local SMTP is removed; delivery is the alert provider's job. Fonts are
+  self-hosted under `static/fonts` (OFL) and the legacy 1.5k-line sync module
+  is split into write/apply/read modules. The UI is now typechecked by
+  `deno task check`.
+
 See git history for full context.

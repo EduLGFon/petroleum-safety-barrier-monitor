@@ -8,7 +8,10 @@ import { resolveAllowedLocationIds } from "../lib/server/auth.ts";
 
 import { getVocabularies } from "../lib/server/sql/vocabularies.ts";
 
-import { isDevFracttalRawEnabled } from "../lib/server/config.ts";
+import {
+  isDevFracttalRawEnabled,
+  loadServerConfig,
+} from "../lib/server/config.ts";
 
 import { Dashboard } from "../islands/Dashboard.tsx";
 
@@ -20,14 +23,11 @@ import { define } from "../utils.ts";
 
 import { api } from "../lib/api.ts";
 
-// Reads server env (islands cannot: no Deno in the browser, so mode and base
-// URL cross the island boundary as props instead of env reads).
+// Reads server config through the same strict parser as the API layer
+// (islands cannot read Deno env in the browser, so mode and base URL cross
+// the island boundary as props instead).
 function getApiMode(): "mock" | "http" {
-  try {
-    return Deno.env.get("PUBLIC_API_MODE") === "http" ? "http" : "mock";
-  } catch {
-    return "mock";
-  }
+  return loadServerConfig().mode;
 }
 
 // Home page: gates the session, then server-loads the dashboard seed (list

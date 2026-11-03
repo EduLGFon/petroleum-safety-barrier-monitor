@@ -32,6 +32,8 @@ import {
 
 import { isFieldKey, normalizeOptions } from "../../lib/field-options.ts";
 
+import { readJsonBody } from "../../lib/server/validation.ts";
+
 import { loadServerConfig } from "../../lib/server/config.ts";
 
 import { define } from "../../utils.ts";
@@ -107,12 +109,9 @@ export const handler = define.handlers({
     if (!isFieldKey(field)) {
       return badRequest("Unknown field", requestId);
     }
-    let body: Record<string, unknown>;
-    try {
-      body = await ctx.req.json();
-    } catch {
-      return badRequest("Invalid JSON body", requestId);
-    }
+    const parsed = await readJsonBody(ctx.req, 64 * 1024);
+    if (!parsed.ok) return badRequest("Invalid JSON body", requestId);
+    const body = parsed.body;
     try {
       const options = normalizeOptions(body.options);
       const saved = await upsertFieldOptionSet(field, options, "admin");

@@ -142,7 +142,9 @@ export function GroupsManager({ onCount }: { onCount?: (n: number) => void }) {
     id: number,
     set: (updater: (prev: number[]) => number[]) => void,
   ) {
-    set((prev) => prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]);
+    set((prev) =>
+      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
+    );
   }
 
   // Background reloads keep hero + form on screen; skeleton only on first
@@ -252,7 +254,8 @@ export function GroupsManager({ onCount }: { onCount?: (n: number) => void }) {
                         setDraftLocs((prev) =>
                           locations.every((l) => prev.includes(l.id))
                             ? []
-                            : locations.map((l) => l.id))}
+                            : locations.map((l) => l.id)
+                        )}
                     >
                       Selecionar todos
                     </button>
@@ -304,7 +307,8 @@ export function GroupsManager({ onCount }: { onCount?: (n: number) => void }) {
                         setDraftUsers((prev) =>
                           users.every((u) => prev.includes(u.id))
                             ? []
-                            : users.map((u) => u.id))}
+                            : users.map((u) => u.id)
+                        )}
                     >
                       Selecionar todos
                     </button>

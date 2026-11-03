@@ -42,7 +42,10 @@ export function fmtDate(iso: string): string {
   const year = Number(y);
   const month = Number(m);
   const day = Number(d);
-  if (!Number.isInteger(year) || !Number.isInteger(month) || !Number.isInteger(day)) {
+  if (
+    !Number.isInteger(year) || !Number.isInteger(month) ||
+    !Number.isInteger(day)
+  ) {
     return iso;
   }
   if (month < 1 || month > 12 || day < 1 || day > 31) return iso;

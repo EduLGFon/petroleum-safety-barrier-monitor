@@ -5,7 +5,11 @@
 // plan, notes, open work) plus a deterministic fallback where the upstream
 // contract has no exact column. Both the dump import and the live sync call
 // this module so a rebuild and a poller agree cell by cell.
-import { foldText, hasUrgentCorrective, type StatusEvent } from "./barrier-rules.ts";
+import {
+  foldText,
+  hasUrgentCorrective,
+  type StatusEvent,
+} from "./barrier-rules.ts";
 
 // Generic program reference used when an asset note carries no HAZOP/APR
 // document. It is the manual's own origin column default and the procedure

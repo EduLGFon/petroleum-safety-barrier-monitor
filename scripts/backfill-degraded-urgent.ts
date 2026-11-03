@@ -85,7 +85,7 @@ async function main(): Promise<void> {
       // Same tx demotes the status (sanctioned path) and clears the
       // urgent-gated sheet fields so a demoted row does not keep a stale
       // Degradada description/action/failure flag.
-      await client.queryArray('BEGIN', []);
+      await client.queryArray("BEGIN", []);
       try {
         await client.queryArray(
           "select record_status_change($1, $2, $3, $4)",
@@ -95,9 +95,11 @@ async function main(): Promise<void> {
           `update barriers set degradation_desc = '', action_plan = '', failure_free = 'Sim', op_status = 'Disponível', maint_status = 'Disponível', field_operational = 'Sim', has_contingency = 'Não', contingency_desc = null, evidence_code = null where id = $1`,
           [r.id],
         );
-        await client.queryArray('COMMIT', []);
+        await client.queryArray("COMMIT", []);
       } catch (err) {
-        try { await client.queryArray('ROLLBACK', []); } catch { /* already closed */ }
+        try {
+          await client.queryArray("ROLLBACK", []);
+        } catch { /* already closed */ }
         throw err;
       }
       demoted++;

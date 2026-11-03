@@ -36,7 +36,10 @@ import { deleteExpiredSessions } from "../../../lib/server/sql/sessions.ts";
 
 import { getUserByEntraIdentity } from "../../../lib/server/sql/users.ts";
 
-import { createSession, deleteSession } from "../../../lib/server/sql/sessions.ts";
+import {
+  createSession,
+  deleteSession,
+} from "../../../lib/server/sql/sessions.ts";
 
 import { loadAuthConfig } from "../../../lib/server/config.ts";
 

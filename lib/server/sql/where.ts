@@ -11,14 +11,16 @@ export const SORTABLE: Record<string, string> = {
   id: "b.id",
   tag: "b.tag",
   location: "loc.code",
-  typology: "b.typology_id",
-  criticality: "b.criticality_id",
-  category: "b.category_id",
-  owner: "b.owner_id",
-  availability: "b.availability_id",
+  // Label sorts mirror the client dashboard, which only has resolved
+  // strings. Reference joins live in mappers.ts (LIST_JOIN/HISTORY_JOIN).
+  typology: "coalesce(ref_typ.label, '')",
+  criticality: "coalesce(ref_crit.label, '')",
+  category: "coalesce(ref_cat.label, '')",
+  owner: "coalesce(ref_own.label, '')",
+  availability: "coalesce(ref_av.label, '')",
   compliance:
-    "(case when (case when b.availability_id in (4, 5) and lower(trim(coalesce(b.has_contingency, ''))) = 'sim' then case when b.availability_id = 4 then 3 else 2 end else b.availability_id end) in (0, 1, 2, 3) then 0 else 1 end)",
-  contingency: "cont.contingency_tag",
+    "(case when effective_availability_id(b.availability_id, b.has_contingency) in (0, 1, 2, 3) then 'Conforme' else 'Não Conforme' end)",
+  contingency: "coalesce(cont.contingency_tag, '')",
   statusSince: "b.status_since",
 };
 
@@ -70,7 +72,7 @@ export function buildWhere(
     // stored id. Mirrors effectiveAvailabilityId() in barrier-rules.
     args.push(availIds);
     conds.push(
-      `and (case when b.availability_id in (4, 5) and lower(trim(coalesce(b.has_contingency, ''))) = 'sim' then case when b.availability_id = 4 then 3 else 2 end else b.availability_id end) = any($${args.length})`,
+      `and effective_availability_id(b.availability_id, b.has_contingency) = any($${args.length})`,
     );
   }
   const compIds = Array.isArray(q.complianceId)
@@ -87,7 +89,7 @@ export function buildWhere(
     const hasNonCompliant = compSet.has(1);
     const otherIds = compIds.filter((x) => x !== 0 && x !== 1);
     const effAvail =
-      `(case when b.availability_id in (4, 5) and lower(trim(coalesce(b.has_contingency, ''))) = 'sim' then case when b.availability_id = 4 then 3 else 2 end else b.availability_id end)`;
+      `effective_availability_id(b.availability_id, b.has_contingency)`;
     const branches: string[] = [];
     if (hasCompliant) branches.push(`${effAvail} in (0, 1, 2, 3)`);
     if (hasNonCompliant) branches.push(`${effAvail} in (4, 5)`);
@@ -149,11 +151,14 @@ export function buildWhere(
   }
   if (q.query) {
     const lit = `%${escapeLike(q.query)}%`;
-    args.push(lit, lit);
-    const a = args.length - 1;
-    const b = args.length;
+    args.push(lit, lit, lit);
+    const a = args.length - 2;
+    const b = args.length - 1;
+    const c = args.length;
+    // Match the client dashboard: tag, location code, and category label.
     conds.push(
-      `and (b.tag ilike $${a} escape '\\' or loc.code ilike $${b} escape '\\')`,
+      `and (b.tag ilike $${a} escape '\\' or loc.code ilike $${b} escape '\\' or exists (` +
+        `select 1 from categories sc where sc.id = b.category_id and sc.label ilike $${c} escape '\\'))`,
     );
   }
   // Date bounds are inclusive YYYY-MM-DD on the date column. The explicit

@@ -12,29 +12,6 @@ export interface AuthFlowRecord {
   returnTo: string;
 }
 
-export async function createAuthFlow(input: {
-  stateHash: string;
-  browserHash: string;
-  nonce: string;
-  codeVerifier: string;
-  returnTo: string;
-  expiresAt: Date;
-}): Promise<void> {
-  await queryRows(
-    `insert into auth_flows
-       (state_hash, browser_hash, nonce, code_verifier, return_to, expires_at)
-     values ($1, $2, $3, $4, $5, $6::timestamptz)`,
-    [
-      input.stateHash,
-      input.browserHash,
-      input.nonce,
-      input.codeVerifier,
-      input.returnTo,
-      input.expiresAt.toISOString(),
-    ],
-  );
-}
-
 // consumeAuthFlow: deletes the row by state hash and returns its contents.
 // Deleting first makes the flow one-time even when the browser binding hash
 // does not match. Expired rows are not returned.

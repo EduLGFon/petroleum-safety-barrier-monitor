@@ -86,7 +86,11 @@ export interface SyncIo {
   // repo rewrites finished_at as the heartbeat). Optional so headless fakes
   // keep compiling; runSync best-efforts it on a timer when present.
   heartbeat?(runId: number): Promise<void>;
-  applyPlan(entries: PlanEntry[], runId?: number | null): Promise<PlanCounts>;
+  applyPlan(
+    entries: PlanEntry[],
+    runId?: number | null,
+    onProgress?: (counts: PlanCounts) => void,
+  ): Promise<PlanCounts>;
   finishRun(
     runId: number,
     status: "ok" | "failed",
@@ -516,7 +520,11 @@ export async function runSync(
     if (dryRun) return baseResult;
 
     const executable = plan.entries.filter((e) => e.kind !== "skip");
-    const written = await io.applyPlan(executable, runId);
+    // Track committed chunks so a later failure records what actually
+    // landed instead of reporting zero mutations.
+    const written = await io.applyPlan(executable, runId, (counts) => {
+      baseResult.written = counts;
+    });
     baseResult.written = written;
     await finish(
       written,
@@ -532,11 +540,13 @@ export async function runSync(
     return baseResult;
   } catch (err) {
     const note = err instanceof Error ? err.message : String(err);
-    await finish(
-      { inserts: 0, updates: 0, deletes: 0, skips: 0 },
-      "failed",
-      note,
-    );
+    const partial = baseResult.written ??
+      { inserts: 0, updates: 0, deletes: 0, skips: 0 };
+    const appliedCount = partial.inserts + partial.updates + partial.deletes;
+    const failureNote = appliedCount === 0
+      ? note
+      : `${note} (partial apply: i:${partial.inserts} u:${partial.updates} d:${partial.deletes} s:${partial.skips})`;
+    await finish(partial, "failed", failureNote);
     throw new Error(`[sync] ${note}`);
   }
 }

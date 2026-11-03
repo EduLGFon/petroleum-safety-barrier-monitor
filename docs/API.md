@@ -19,7 +19,7 @@ Wire/domain types: `lib/wireTypes.ts`, `lib/types.ts`, `lib/api/types.ts`, `lib/
 
 ## Main routes
 
-Reads (session cookie or `ADMIN_TOKEN`): `/api/health`, `/api/barriers`, `/api/barriers/ids`, `/api/barriers/:id`, `/api/barriers/:id/contingencies`, `/api/kpi`, `/api/chart`, `/api/vocabularies`, `/api/sync-status`, `/api/sync-runs`, `/api/sync-changes`, `/api/barriers/:id/sync-detail`, `/api/export`, `/api/lookups`, `/api/field-options`. Admin-only reads: `/api/barriers/deleted`, `/api/barriers/:id/fracttal-raw` (`DEV=true`).
+Public probes: `/api/health` (liveness, DB-free) and `/api/ready` (readiness: config plus a DB round-trip). Reads (session cookie or `ADMIN_TOKEN`): `/api/barriers`, `/api/barriers/ids`, `/api/barriers/:id`, `/api/barriers/:id/contingencies`, `/api/kpi`, `/api/chart`, `/api/vocabularies`, `/api/sync-status`, `/api/sync-runs`, `/api/sync-changes`, `/api/barriers/:id/sync-detail`, `/api/export`, `/api/lookups`, `/api/field-options`. Admin-only reads: `/api/barriers/deleted`, `/api/barriers/:id/fracttal-raw` (`DEV=true`).
 
 Writes (admin): status, barrier edit, contingency links, recipients, users, alert rules, field options. Auth: `/api/auth/login`, `/api/auth/logout`, `/api/auth/me`, `/api/auth/password`.
 
@@ -36,8 +36,8 @@ Writes (admin): status, barrier edit, contingency links, recipients, users, aler
 - Soft-deleted rows are visible only to admins through `rowScope`.
 - Errors use `{ error, code, requestId }` plus `x-request-id`.
 - GET JSON responses carry ETags and may return 304.
-- Throttle: 120 req/min reads, 30 req/min writes, 120 req/min exports, 10 req/min password changes per remote IP.
-- `/api/health` is unthrottled and DB-free.
+- Throttle: 120 req/min reads, 30 req/min writes, 120 req/min exports, 10 req/min password changes per client. Behind the bundled Caddy template the app trusts `X-Real-IP` only from the loopback proxy; extra proxies must be listed in `TRUSTED_PROXY_IPS`.
+- `/api/health` is unthrottled and DB-free; `/api/ready` is the orchestrator readiness check.
 
 ## SSO
 

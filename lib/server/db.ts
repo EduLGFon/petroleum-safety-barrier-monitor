@@ -150,6 +150,17 @@ export function isStaleConnection(err: unknown): boolean {
 // attempts). External Postgres kills idle sockets and the lazy pool hands
 // out dead ones; without the reset every poller/app tick would 500 until
 // restart. The retry logs one warn line, not a stack trace.
+// isUndefinedTableError: true for PostgreSQL 42P01. Used by pre-migration
+// fallbacks so a missing optional table is handled while a real outage or
+// query bug is not swallowed into an empty result.
+export function isUndefinedTableError(err: unknown): boolean {
+  if (typeof err !== "object" || err === null) return false;
+  const code = (err as { code?: unknown }).code;
+  if (code === "42P01") return true;
+  const msg = err instanceof Error ? err.message : String(err);
+  return /relation ".*" does not exist/i.test(msg);
+}
+
 // isSelectQuery: true for read-only statements safe to replay on a fresh
 // connection. Only SELECT (and WITH ... SELECT) retries: replaying a
 // half-applied INSERT/UPDATE/DELETE on a new connection is unsafe.

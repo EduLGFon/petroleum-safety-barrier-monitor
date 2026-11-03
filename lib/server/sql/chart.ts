@@ -19,7 +19,7 @@ export async function getChartData(
   // Contingência?=Sim count as compliant, mirroring getKpi and
   // resolveBarrier, so the chart and the KPI cards never disagree.
   const effCompliant =
-    `((case when b.availability_id in (4, 5) and lower(trim(coalesce(b.has_contingency, ''))) = 'sim' then case when b.availability_id = 4 then 3 else 2 end else b.availability_id end) in (0, 1, 2, 3))`;
+    `(effective_availability_id(b.availability_id, b.has_contingency) in (0, 1, 2, 3))`;
   const rows = await queryRows<{
     category_id: string;
     compliant: string;

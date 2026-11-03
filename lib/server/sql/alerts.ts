@@ -64,11 +64,12 @@ export const sqlAlertStore: AlertStore = {
       }::date, $${args.length})`;
     }
     const rows = await queryRows<{
+      id: number;
       barrier_id: number;
       transition_date: string;
       status_id: number;
     }>(
-      `select h.barrier_id, h.date::text as transition_date, h.status_id
+      `select h.id, h.barrier_id, h.date::text as transition_date, h.status_id
        from barrier_status_history h
        where ($1::date is null or h.date >= $1::date)
          and ($2::int[] is null or h.barrier_id = any($2))${cursor}
@@ -78,6 +79,7 @@ export const sqlAlertStore: AlertStore = {
     );
     return rows
       .map((r) => ({
+        id: r.id,
         barrierId: r.barrier_id,
         transitionDate: r.transition_date.slice(0, 10),
         statusId: r.status_id,

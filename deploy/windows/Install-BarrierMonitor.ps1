@@ -65,6 +65,12 @@ if (-not (Test-Path "$InstallDir\deno.jsonc")) {
 if (-not (Test-Path "$InstallDir\.env")) {
   Write-Step 'Creating .env from .env.example (edit it next)'
   Copy-Item "$InstallDir\.env.example" "$InstallDir\.env"
+  # Production defaults: never serve the demo dataset or skip strict boot.
+  $envPath = "$InstallDir\.env"
+  (Get-Content $envPath) `
+    -replace '^PUBLIC_API_MODE=.*$', 'PUBLIC_API_MODE=http' `
+    -replace '^# DENO_ENV=.*$', 'DENO_ENV=production' |
+    Set-Content $envPath -Encoding UTF8
 } else {
   Write-Host '.env already exists, leaving it untouched.'
 }
@@ -97,7 +103,7 @@ if (-not $SkipFirewall) {
 
 Write-Host ''
 Write-Host 'Next steps:' -ForegroundColor Green
-Write-Host '  1. Edit .env (DATABASE_URL, ADMIN_TOKEN, OPS_SMTP_*, COMPANY_NAME).'
+Write-Host '  1. Edit .env (DATABASE_URL, ADMIN_TOKEN, ALERT_PROVIDER_*, COMPANY_NAME).'
 if ($PgPassword) { Write-Host '     (You passed -PgPassword but Postgres user setup stays manual: create role barrier + db barreiras.)' }
 Write-Host '  2. deno run -A --env-file=.env scripts/doctor.ts   # all green'
 Write-Host "  3. Register services: .\deploy\windows\Register-Services.ps1 -InstallDir $InstallDir"

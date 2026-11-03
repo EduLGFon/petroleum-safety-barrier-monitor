@@ -86,8 +86,7 @@ export async function getVocabularies(
   }
 
   const arg = Array.isArray(allowed) ? allowed : null;
-  const eff =
-    `(case when b.availability_id in (4, 5) and lower(trim(coalesce(b.has_contingency, ''))) = 'sim' then case when b.availability_id = 4 then 3 else 2 end else b.availability_id end)`;
+  const eff = `effective_availability_id(b.availability_id, b.has_contingency)`;
   const [locRows, comboRows, catTypRows, authorRows] = await Promise.all([
     queryRows<{ id: number; code: string; name: string; count: string }>(
       `select loc.id as id, loc.code as code,

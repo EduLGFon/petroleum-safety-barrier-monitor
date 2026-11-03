@@ -54,6 +54,11 @@ import type { Fmt } from "../../lib/export/format.ts";
 
 import { hasDateParamError, parseFilterQuery } from "./_params.ts";
 
+import {
+  EXPORT_JSON_BODY_BYTES,
+  readJsonBodyCapped,
+} from "../../lib/server/validation.ts";
+
 import { define } from "../../utils.ts";
 
 import { denyIfCrossSite } from "../../lib/server/csrf.ts";
@@ -84,25 +89,40 @@ function parseIds(raw: unknown): number[] | undefined {
 }
 
 // readBody: the optional JSON payload. A missing or non-JSON body is a valid
-// request (full filtered scope), so GET works unchanged.
-async function readBody(req: Request): Promise<Record<string, unknown>> {
-  try {
-    const parsed = await req.json();
-    return parsed && typeof parsed === "object"
-      ? parsed as Record<string, unknown>
-      : {};
-  } catch {
-    // No body (or not JSON) is a valid request: full scope, part 1.
-    return {};
-  }
+// request (full filtered scope), so GET works unchanged. The cap protects
+// the process from an oversized id array before parsing.
+async function readBody(
+  req: Request,
+): Promise<
+  | { ok: true; body: Record<string, unknown> }
+  | { ok: false; reason: "invalid" | "too-large" }
+> {
+  if (!req.body) return { ok: true, body: {} };
+  return await readJsonBodyCapped(req, EXPORT_JSON_BODY_BYTES);
 }
 
 export const handler = define.handlers({
   async GET(ctx) {
-    return stream(ctx, await readBody(ctx.req), ctx.url.searchParams);
+    const body = await readBody(ctx.req);
+    if (!body.ok && body.reason === "too-large") {
+      return badRequest("Export selection is too large", newRequestId());
+    }
+    return stream(
+      ctx,
+      body.ok ? body.body : {},
+      ctx.url.searchParams,
+    );
   },
   async POST(ctx) {
-    return stream(ctx, await readBody(ctx.req), ctx.url.searchParams);
+    const body = await readBody(ctx.req);
+    if (!body.ok && body.reason === "too-large") {
+      return badRequest("Export selection is too large", newRequestId());
+    }
+    return stream(
+      ctx,
+      body.ok ? body.body : {},
+      ctx.url.searchParams,
+    );
   },
 });
 

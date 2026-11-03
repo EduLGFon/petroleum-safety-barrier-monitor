@@ -55,7 +55,7 @@ const LINK_SELECT = `
     bc.management_change, bc.risk_analysis,
     (c.deleted_at is null and c.is_active
       and c.location_id = b.location_id
-      and a.label = 'Disponível' and a.is_compliant) as eligible
+      and a.id = 0 and a.is_compliant) as eligible
   from barrier_contingencies bc
   join barriers b on b.id = bc.barrier_id
   join barriers c on c.id = bc.contingency_barrier_id
@@ -68,11 +68,14 @@ export async function listBarrierContingencies(
   includeOffScope: boolean,
   allowedLocationIds: number[] | null = null,
 ): Promise<BarrierContingencies> {
-  const allowed = Array.isArray(allowedLocationIds)
-    ? allowedLocationIds
-    : null;
+  const allowed = Array.isArray(allowedLocationIds) ? allowedLocationIds : null;
   if (allowed !== null && allowed.length === 0) {
-    return { outgoing: [], incoming: [], candidates: [], candidatesHaveMore: false };
+    return {
+      outgoing: [],
+      incoming: [],
+      candidates: [],
+      candidatesHaveMore: false,
+    };
   }
   const allowedParam = allowed;
   const [outgoingRows, incomingRows, candidateRows] = await Promise.all([
@@ -148,7 +151,7 @@ export async function addBarrierContingency(
          where b.id = $1 and b.deleted_at is null
            and c.id = $2 and c.id <> b.id
            and c.deleted_at is null and c.is_active
-           and a.label = 'Disponível' and a.is_compliant
+           and a.id = 0 and a.is_compliant
          for update of b, c
        )
        insert into barrier_contingencies

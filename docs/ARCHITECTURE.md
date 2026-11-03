@@ -24,8 +24,9 @@ Key tasks: `check`, `test`, `dev`, `build`, `preview`, `start`, `db:migrate`, `d
 
 - Dependency direction: mock mode uses in-memory data; HTTP mode uses `/api/*`.
 - `lib/server/*` is never imported by islands, components, hooks or context.
-- Status writes go only through `record_status_change()`.
-- Filtering and sorting are centralized in `lib/server/sql/where.ts`.
+- Status writes go only through `record_status_change()`, inside the same transaction as metadata edits.
+- Filtering and sorting are centralized in `lib/server/sql/where.ts`; effective availability lives in the `effective_availability_id()` SQL function.
+- Non-admin users with no access group have zero station access (fail closed).
 - Exports stream from the database in batches.
 - Admin field ownership: `barriers.manual_fields` records per-barrier columns
   an admin took over in the editor; the Fracttal sync skips those columns and

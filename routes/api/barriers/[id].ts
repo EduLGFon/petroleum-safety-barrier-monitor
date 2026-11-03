@@ -32,26 +32,17 @@ import {
   writeThrottle,
 } from "../../../lib/server/throttle.ts";
 
-import {
-  postAlert,
-  providerConfigFromEnv,
-} from "../../../lib/server/alerts/provider.ts";
-
-import { maybeSendProviderImmediate } from "../../../lib/server/alerts/run-provider.ts";
+import { fanoutStatusChange } from "../../../lib/server/alerts/status-fanout.ts";
 
 import { parseIdParam, readJsonBody } from "../../../lib/server/validation.ts";
-
-import { getResolverLabels } from "../../../lib/server/sql/vocabularies.ts";
-
-import { listAlertRules } from "../../../lib/server/sql/alert_rules.ts";
 
 import { getOrCreateAuthor } from "../../../lib/server/sql/authors.ts";
 
 import { isOwnableField } from "../../../lib/field-ownership.ts";
 
-import { listRecipients } from "../../../lib/server/sql/recipients.ts";
+import { isContingencyFlag } from "../../../lib/server/fracttal/barrier-rules.ts";
 
-import { sqlAlertStore } from "../../../lib/server/sql/alerts.ts";
+import { withTx } from "../../../lib/server/db.ts";
 
 import { loadServerConfig } from "../../../lib/server/config.ts";
 
@@ -194,9 +185,6 @@ export const handler = define.handlers({
     const body = parsed.body;
 
     try {
-      const existing = await getBarrierById(barrierId);
-      if (!existing) return notFound("Barrier not found", requestId);
-
       const tag = optStr(body.tag, 200);
       const locationId = optInt(body.locationId, "locationId");
       const typologyId = optInt(body.typologyId, "typologyId");
@@ -227,174 +215,123 @@ export const handler = define.handlers({
       // follow Fracttal again on the next sweep (values stay until then).
       const releaseFields = optReleaseFields(body.releaseFields);
 
-      // Status change routes through record_status_change for audit/alerts.
-      // Like the dedicated status route below, a matching transition is
-      // enqueued (and immediately mailed for immediate rules) - without
-      // this the dashboard editor would write history no alert run ever
-      // sees, since detection only fires on enqueued transitions.
-      let statusChangedTo: number | undefined;
-      if (
-        body.availabilityId !== undefined &&
-        body.availabilityId !== existing.availabilityId
-      ) {
-        const availId = optInt(body.availabilityId, "availabilityId");
-        if (availId !== undefined) {
-          const author = await getOrCreateAuthor(
-            auth.user?.name || auth.user?.email || "admin",
-          );
-          const note = typeof body.statusNote === "string"
-            ? body.statusNote
-            : "Edição de barreira";
-          await transitionBarrierStatus(barrierId, availId, author.id, note);
-          statusChangedTo = availId;
+      // One transaction for the whole edit: status transition, metadata
+      // update, and contingency overlay commit together or not at all. The
+      // row lock inside transitionBarrierStatus/updateBarrier serializes
+      // concurrent edits and the manual_fields read-modify-write.
+      const result = await withTx(async (tx) => {
+        const existing = await getBarrierById(barrierId, { query: tx });
+        if (!existing) {
+          return {
+            existing: null,
+            updated: null,
+            statusChangedTo: undefined as number | undefined,
+          };
         }
-      }
 
-      let updated = await updateBarrier(barrierId, {
-        tag,
-        locationId,
-        typologyId,
-        categoryId,
-        groupingId,
-        ownerId,
-        criticalityId,
-        comments,
-        actionPlan,
-        origin,
-        installLocal,
-        equipTypology,
-        fieldInstalled,
-        fieldOperational,
-        opStatus,
-        hasMaintPlan,
-        planFollowed,
-        failureFree,
-        maintStatus,
-        hasContingency,
-        contingencyDesc,
-        evidenceCode,
-        degradationDesc,
-        extraComments,
-      }, { releaseFields });
-
-      // Manual contingency overlay (docs/STATUSES.md): Há Contingência?=Sim
-      // promotes a stored Degradado/Indisponível to its contingenciado
-      // display state, clearing it demotes back. Only when the request did
-      // not explicitly set availability (an explicit status wins over the
-      // overlay), so a two-field edit in one PATCH never fights itself.
-      if (
-        body.availabilityId === undefined && updated &&
-        hasContingency !== undefined
-      ) {
-        const { isContingencyFlag } = await import(
-          "../../../lib/server/fracttal/barrier-rules.ts"
-        );
-        const flag = isContingencyFlag(updated.hasContingency);
-        let target: number | undefined;
-        if (flag && updated.availabilityId === 4) target = 3;
-        else if (flag && updated.availabilityId === 5) target = 2;
-        else if (!flag && updated.availabilityId === 3) target = 4;
-        else if (!flag && updated.availabilityId === 2) target = 5;
-        if (target !== undefined) {
-          const author = await getOrCreateAuthor(
-            auth.user?.name || auth.user?.email || "admin",
-          );
-          const promoted = await transitionBarrierStatus(
-            barrierId,
-            target,
-            author.id,
-            flag ? "Contingência registrada" : "Contingência removida",
-          );
-          if (promoted) updated = promoted;
-          statusChangedTo = target;
+        // Status change routes through record_status_change for audit/alerts.
+        // A matching transition is enqueued after commit; detection only
+        // fires on enqueued transitions.
+        let statusChangedTo: number | undefined;
+        if (
+          body.availabilityId !== undefined &&
+          body.availabilityId !== existing.availabilityId
+        ) {
+          const availId = optInt(body.availabilityId, "availabilityId");
+          if (availId !== undefined) {
+            const author = await getOrCreateAuthor(
+              auth.user?.name || auth.user?.email || "admin",
+            );
+            const note = typeof body.statusNote === "string"
+              ? body.statusNote
+              : "Edição de barreira";
+            await transitionBarrierStatus(
+              barrierId,
+              availId,
+              author.id,
+              note,
+              tx,
+            );
+            statusChangedTo = availId;
+          }
         }
-      }
 
-      // Best-effort provider fan-out for the status change above: the
-      // transition already committed, so nothing here may fail the
-      // response. Enqueue always; violada posts at once when the provider
-      // is configured. Failures only log; the poll cycle retries.
+        let updated = await updateBarrier(barrierId, {
+          tag,
+          locationId,
+          typologyId,
+          categoryId,
+          groupingId,
+          ownerId,
+          criticalityId,
+          comments,
+          actionPlan,
+          origin,
+          installLocal,
+          equipTypology,
+          fieldInstalled,
+          fieldOperational,
+          opStatus,
+          hasMaintPlan,
+          planFollowed,
+          failureFree,
+          maintStatus,
+          hasContingency,
+          contingencyDesc,
+          evidenceCode,
+          degradationDesc,
+          extraComments,
+        }, { releaseFields, query: tx });
+
+        // Manual contingency overlay (docs/STATUSES.md): Há Contingência?=Sim
+        // promotes a stored Degradado/Indisponível to its contingenciado
+        // display state, clearing it demotes back. Only when the request did
+        // not explicitly set availability (an explicit status wins over the
+        // overlay), so a two-field edit in one PATCH never fights itself.
+        if (
+          body.availabilityId === undefined && updated &&
+          hasContingency !== undefined
+        ) {
+          const flag = isContingencyFlag(updated.hasContingency);
+          let target: number | undefined;
+          if (flag && updated.availabilityId === 4) target = 3;
+          else if (flag && updated.availabilityId === 5) target = 2;
+          else if (!flag && updated.availabilityId === 3) target = 4;
+          else if (!flag && updated.availabilityId === 2) target = 5;
+          if (target !== undefined) {
+            const author = await getOrCreateAuthor(
+              auth.user?.name || auth.user?.email || "admin",
+            );
+            const promoted = await transitionBarrierStatus(
+              barrierId,
+              target,
+              author.id,
+              flag ? "Contingência registrada" : "Contingência removida",
+              tx,
+            );
+            if (promoted) updated = promoted;
+            statusChangedTo = target;
+          }
+        }
+
+        return { existing, updated, statusChangedTo };
+      });
+
+      if (!result.existing) return notFound("Barrier not found", requestId);
+      const { existing, updated, statusChangedTo } = result;
+
+      // Best-effort provider fan-out: the transition is already committed,
+      // so a slow third party never holds the admin's save open.
       if (statusChangedTo !== undefined) {
-        try {
-          // Independent reads in one batch: rules, recipients, labels and
-          // status maps resolve concurrently, not in sequence (~4 round
-          // trips collapse to one wave). Each is best-effort below.
-          const [rulesRes, recipRes, labelsRes, statusRes] = await Promise
-            .allSettled([
-              listAlertRules(false),
-              listRecipients(true),
-              getResolverLabels(),
-              (async () => {
-                const { queryRows } = await import(
-                  "../../../lib/server/db.ts"
-                );
-                return await queryRows<
-                  { id: number; label: string; ok: boolean }
-                >(
-                  `select id, label, is_compliant as ok from availability_statuses`,
-                );
-              })(),
-            ]);
-          const rules = rulesRes.status === "fulfilled" ? rulesRes.value : [];
-          void rules;
-          let provider:
-            | Awaited<ReturnType<typeof providerConfigFromEnv>>
-            | undefined;
-          try {
-            provider = providerConfigFromEnv();
-          } catch {
-            provider = undefined;
-          }
-          const labels = labelsRes.status === "fulfilled"
-            ? labelsRes.value
-            : undefined;
-          let statusInfo:
-            | Awaited<
-              import("../../../lib/server/alerts/detect.ts").StatusInfo
-            >
-            | undefined;
-          try {
-            if (statusRes.status !== "fulfilled") throw new Error("no status");
-            const rows = statusRes.value;
-            const labelById = new Map(rows.map((r) => [r.id, r.label]));
-            const okById = new Map(rows.map((r) => [r.id, r.ok]));
-            statusInfo = {
-              labelOf: (id: number) =>
-                labelById.get(id) ?? `Disponibilidade (${id})`,
-              compliantOf: (id: number) => okById.get(id) ?? false,
-            };
-          } catch {
-            statusInfo = undefined;
-          }
-          const recipients = recipRes.status === "fulfilled"
-            ? recipRes.value
-            : [];
-          const { getBarriersByIds } = await import(
-            "../../../lib/server/sql/barriers.ts"
-          );
-          await maybeSendProviderImmediate({
-            store: sqlAlertStore,
-            loadBarriers: getBarriersByIds,
-            sender: provider
-              ? { post: (payload) => postAlert(provider!, payload) }
-              : undefined,
-            barrier: updated ?? existing,
-            statusId: statusChangedTo,
-            transitionDate: (updated ?? existing).statusSince.slice(0, 10),
-            companyId: provider?.companyId ?? 1,
-            appBaseUrl: Deno.env.get("APP_BASE_URL") || undefined,
-            recipients: recipients.map((r) => ({
-              email: r.email,
-              name: r.name,
-              phone: r.phone ?? "",
-            })),
-            logger: forRequest(requestId).line("info"),
-            labels,
-            statusInfo,
-          });
-        } catch (err) {
+        const barrier = updated ?? existing;
+        void fanoutStatusChange({
+          barrier,
+          statusId: statusChangedTo,
+          historyId: barrier.statusHistory.at(-1)?.id,
+          requestId,
+        }).catch((err) => {
           reqLog.error("immediate fan-out failed", { barrierId, err });
-        }
+        });
       }
 
       return ok(updated ?? existing, requestId);

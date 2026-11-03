@@ -92,6 +92,7 @@ export function generateHistory(
 
   for (let i = 0; i < numEntries - 1; i++) {
     entries.push({
+      id: entries.length + 1,
       date: fmtISO(cursor),
       statusId: prevId,
       authorId: rng.int(0, Object.keys(AUTHOR_CODES).length),
@@ -107,6 +108,7 @@ export function generateHistory(
   const statusSince = fmtISO(since);
 
   entries.push({
+    id: entries.length + 1,
     date: statusSince,
     statusId: currentStatusId,
     authorId: rng.int(0, Object.keys(AUTHOR_CODES).length),

@@ -6,6 +6,7 @@
 #
 # Fresh host (Linux, macOS, Windows with Docker Desktop + WSL2 backend):
 #   cp .env.example .env        # defaults already point host->localhost, containers->db
+#   set PUBLIC_API_MODE=http    # production refuses the mock/demo dataset
 #   docker compose up -d --build # starts db first (health-gated), then app/poller/alerts
 #   docker compose run --rm tools deno run -A scripts/migrate.ts
 #   docker compose run --rm tools deno run -A scripts/seed.ts  # optional demo rows
@@ -92,16 +93,14 @@ services:
       - "127.0.0.1:8300:8300"
     restart: unless-stopped
     healthcheck:
-      # --no-check skips typechecking: isolate boot is ~150ms, not ~1s.
-      # 60s cadence: /api/health is DB-free, and the header dot already
-      # re-checks on visibilitychange + online/offline, so a 30s V8 spawn
-      # per container bought nothing.
+      # Readiness includes the DB round-trip: a broken DATABASE_URL or dead
+      # pool must fail the healthcheck instead of looking healthy.
       test: [
         "CMD",
         "deno",
         "eval",
         "--no-check",
-        "const r = await fetch('http://localhost:8300/api/health'); if (!r.ok) Deno.exit(1);",
+        "const r = await fetch('http://localhost:8300/api/ready'); if (!r.ok) Deno.exit(1);",
       ]
       interval: 60s
       timeout: 10s
@@ -117,7 +116,13 @@ services:
   # Deploy drain: stop -t 180 poller when no fresh `running` row exists.
   poller:
     image: barrier-monitor:latest
-    command: ["run", "-A", "scripts/fracttal-poll.ts"]
+    command: [
+      "run",
+      "--allow-net",
+      "--allow-env",
+      "--allow-read",
+      "scripts/fracttal-poll.ts",
+    ]
     env_file: [.env]
     environment:
       DATABASE_URL: ${DATABASE_URL_DOCKER:-postgres://barrier:barrier@db:5432/barreiras?sslmode=disable}
@@ -138,7 +143,13 @@ services:
   # finish before SIGKILL.
   alerts:
     image: barrier-monitor:latest
-    command: ["run", "-A", "scripts/alerts-poll.ts"]
+    command: [
+      "run",
+      "--allow-net",
+      "--allow-env",
+      "--allow-read",
+      "scripts/alerts-poll.ts",
+    ]
     env_file: [.env]
     environment:
       DATABASE_URL: ${DATABASE_URL_DOCKER:-postgres://barrier:barrier@db:5432/barreiras?sslmode=disable}

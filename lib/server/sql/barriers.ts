@@ -6,12 +6,10 @@ import type {
   BarriersQuery,
   BarriersResponse,
   WireBarrier,
-  WireKpiSnapshot,
 } from "../../wireTypes.ts";
 
 import {
   type BarrierRow,
-  CONTINGENCY_LATERAL,
   HISTORY_JOIN,
   LIST_JOIN,
   SELECT_COLUMNS,
@@ -41,7 +39,7 @@ import { buildWhere, resolveOrderBy, SORTABLE } from "./where.ts";
 
 export type { BarrierRow, HistoryEntry } from "./mappers.ts";
 
-import { queryRows } from "../db.ts";
+import { queryRows, type TxQuery } from "../db.ts";
 
 import { EXPORT_MAX_ROWS } from "../../export/limits.ts";
 
@@ -105,7 +103,7 @@ export async function listBarriers(
 // Admin callers pass includeDeleted to audit soft-deleted rows.
 export async function getBarrierById(
   id: number,
-  opts: { includeDeleted?: boolean } = {},
+  opts: { includeDeleted?: boolean; query?: TxQuery } = {},
 ): Promise<WireBarrier | null> {
   const found = await getBarriersByIds([id], opts);
   return found.get(id) ?? null;
@@ -163,39 +161,14 @@ function cursorPredicate(
   valIdx: number,
   idIdx: number,
 ): string {
-  const cast = sortKey === "statusSince"
-    ? "date"
-    : sortKey === "tag" || sortKey === "location" || sortKey === "contingency"
-    ? "text"
-    : "int";
+  const cast = sortKey === "statusSince" ? "date" : "text";
   if (sortKey === "id") return ""; // handled inline (id-only bind)
   const expr = SORTABLE[sortKey];
   const cmp = dir === "asc" ? ">" : "<";
-  if (sortKey === "contingency") {
-    return dir === "asc"
-      ? `((cont.contingency_tag > $${valIdx}::text) or ` +
-        `(cont.contingency_tag = $${valIdx}::text and b.id > $${idIdx}) or ` +
-        `(cont.contingency_tag is null and ($${valIdx}::text is not null or b.id > $${idIdx})))`
-      : `((cont.contingency_tag < $${valIdx}::text) or ` +
-        `(cont.contingency_tag = $${valIdx}::text and b.id > $${idIdx}) or ` +
-        `(cont.contingency_tag is null and $${valIdx}::text is null and b.id > $${idIdx}) or ` +
-        `($${valIdx}::text is null and cont.contingency_tag is not null))`;
-  }
-  if (sortKey !== "owner") {
-    return `(${expr} ${cmp} $${valIdx}::${cast} or ` +
-      `(${expr} = $${valIdx}::${cast} and b.id > $${idIdx}))`;
-  }
-  // Nullable owner: ASC sorts NULLS LAST, DESC sorts NULLS FIRST. The
-  // DESC null branch both continues within the leading NULLs and crosses
-  // from them into the values below (every non-null row sorts after NULL).
-  return dir === "asc"
-    ? `((b.owner_id > $${valIdx}::int) or ` +
-      `(b.owner_id = $${valIdx}::int and b.id > $${idIdx}) or ` +
-      `(b.owner_id is null and ($${valIdx}::int is not null or b.id > $${idIdx})))`
-    : `((b.owner_id < $${valIdx}::int) or ` +
-      `(b.owner_id = $${valIdx}::int and b.id > $${idIdx}) or ` +
-      `(b.owner_id is null and $${valIdx}::int is null and b.id > $${idIdx}) or ` +
-      `($${valIdx}::int is null and b.owner_id is not null))`;
+  // Every sortable label is coalesced to text in SORTABLE, so no
+  // NULL-aware branch is needed (owner/contingency included).
+  return `(${expr} ${cmp} $${valIdx}::${cast} or ` +
+    `(${expr} = $${valIdx}::${cast} and b.id > $${idIdx}))`;
 }
 
 // listBarrierWindowAfter: keyset version of listBarrierWindow for full
@@ -253,14 +226,15 @@ export async function listBarrierWindowAfter(
 // Full projection (with history): detail, alerts and PATCH paths only.
 export async function getBarriersByIds(
   ids: number[],
-  opts: { includeDeleted?: boolean } = {},
+  opts: { includeDeleted?: boolean; query?: TxQuery } = {},
 ): Promise<Map<number, WireBarrier>> {
   const out = new Map<number, WireBarrier>();
+  const q = opts.query ?? queryRows;
   const unique = [...new Set(ids)].filter((n) => Number.isInteger(n));
   for (let at = 0; at < unique.length; at += 500) {
     const chunk = unique.slice(at, at + 500);
     const placeholders = chunk.map((_, i) => `$${i + 1}`).join(", ");
-    const rows = await queryRows<BarrierRow>(
+    const rows = await q<BarrierRow>(
       `select ${SELECT_COLUMNS} from barriers b
        join locations loc on loc.id = b.location_id
        ${HISTORY_JOIN}
@@ -289,7 +263,7 @@ export async function listBarrierIds(q: BarriersQuery): Promise<number[]> {
   const rows = await queryRows<{ id: number }>(
     `select b.id from barriers b
      join locations loc on loc.id = b.location_id
-     ${CONTINGENCY_LATERAL} ${where.text}
+     ${LIST_JOIN} ${where.text}
      order by ${orderBy} limit $${lim}`,
     [...where.args, EXPORT_MAX_ROWS],
   );
@@ -303,136 +277,6 @@ export async function listBarrierIds(q: BarriersQuery): Promise<number[]> {
 // pass scopeCounts to also receive inactive/deleted totals over the same
 // filter subset ignoring rowScope (band segments); it stays off otherwise
 // so hidden rows never leak into non-admin snapshots.
-export async function getKpi(
-  filter?: number | BarriersQuery,
-  opts: { scopeCounts?: boolean } = {},
-): Promise<WireKpiSnapshot> {
-  const q: BarriersQuery = typeof filter === "number"
-    ? { locationId: filter }
-    : filter ?? {};
-  const where = buildWhere(q);
-  const from =
-    `from barriers b join locations loc on loc.id = b.location_id ${where.text}`;
-  // Scope-wide visibility counts ignore rowScope but keep every other
-  // filter, so the band segments match the table they shortcut to.
-  const scopeWhere = opts.scopeCounts
-    ? buildWhere({ ...q, rowScope: "all" })
-    : null;
-  // Effective availability (docs/STATUSES.md display overlay, mirrors
-  // effectiveAvailabilityId): stored 4/5 with Há Contingência?=Sim read as
-  // 3/2. Fixed counts, buckets and compliance all derive from it so the
-  // server snapshot matches resolveBarrier on the client.
-  const eff =
-    `(case when b.availability_id in (4, 5) and lower(trim(coalesce(b.has_contingency, ''))) = 'sim' then case when b.availability_id = 4 then 3 else 2 end else b.availability_id end)`;
-  const effCompliant = `(${eff} in (0, 1, 2, 3))`;
-  const [rows, bucketRows] = await Promise.all([
-    queryRows<{
-      total: string;
-      available: string;
-      out_of_service: string;
-      contingency_outage: string;
-      degraded_contingency: string;
-      degraded: string;
-      unavailable: string;
-      other: string;
-      compliant: string;
-      non_compliant: string;
-      critical_non_compliant: string;
-      without_action_plan: string;
-    }>(
-      `select
-        count(*)::text as total,
-        count(*) filter (where ${eff} = 0 and coalesce(b.is_active, true) and b.deleted_at is null)::text as available,
-        count(*) filter (where ${eff} = 1 and coalesce(b.is_active, true) and b.deleted_at is null)::text as out_of_service,
-        count(*) filter (where ${eff} = 2 and coalesce(b.is_active, true) and b.deleted_at is null)::text as contingency_outage,
-        count(*) filter (where ${eff} = 3 and coalesce(b.is_active, true) and b.deleted_at is null)::text as degraded_contingency,
-        count(*) filter (where ${eff} = 4 and coalesce(b.is_active, true) and b.deleted_at is null)::text as degraded,
-        count(*) filter (where ${eff} = 5 and coalesce(b.is_active, true) and b.deleted_at is null)::text as unavailable,
-        count(*) filter (where ${eff} not in (0, 1, 2, 3, 4, 5)
-          or not coalesce(b.is_active, true) or b.deleted_at is not null)::text as other,
-        count(*) filter (where ${effCompliant})::text as compliant,
-        count(*) filter (where not ${effCompliant})::text as non_compliant,
-        count(*) filter (where not ${effCompliant} and b.criticality_id in (0, 1))::text as critical_non_compliant,
-        count(*) filter (where b.action_plan is null or b.action_plan = '')::text as without_action_plan
-      from barriers b join locations loc on loc.id = b.location_id ${where.text}`,
-      where.args,
-    ),
-    // One round-trip for all four dynamic buckets: each branch is the
-    // previous GROUP BY verbatim (same filter subset, same fail-closed NC
-    // definition), tagged and concatenated, grouped once outside.
-    // NOTE: ${from} already contains the WHERE clause; the fourth branch
-    // appends AND so its filter subset stays identical to the old query.
-    queryRows<{ grp: string; id: string; count: string }>(
-      `select grp, id, count(*)::text as count from (
-        select 'avail' as grp, ${eff}::text as id
-        ${from} and coalesce(b.is_active, true) and b.deleted_at is null
-        union all
-        select 'conf' as grp, (case when ${effCompliant} then 0 else 1 end)::text as id
-        ${from}
-        union all
-        select 'crit' as grp, b.criticality_id::text as id
-        ${from}
-        union all
-        select 'nccrit' as grp, b.criticality_id::text as id
-        ${from} and not ${effCompliant}
-      ) g group by grp, id`,
-      where.args,
-    ),
-  ]);
-  const dispRows = bucketRows.filter((r) => r.grp === "avail");
-  const confRows = bucketRows.filter((r) => r.grp === "conf");
-  const critRows = bucketRows.filter((r) => r.grp === "crit");
-  const ncCritRows = bucketRows.filter((r) => r.grp === "nccrit");
-
-  // Visibility scope counts (admin band segments only): live-but-disabled
-  // rows plus soft-deleted rows over the unscoped filter subset. A separate
-  // round-trip gated on the flag, so non-admin snapshots never observe
-  // hidden rows.
-  const scopeRows = scopeWhere
-    ? await queryRows<{ inactive: string; deleted: string }>(
-      `select
-         count(*) filter (where b.deleted_at is null and not coalesce(b.is_active, true))::text as inactive,
-         count(*) filter (where b.deleted_at is not null)::text as deleted
-       from barriers b join locations loc on loc.id = b.location_id ${scopeWhere.text}`,
-      scopeWhere.args,
-    )
-    : [];
-
-  const r = rows[0];
-  const total = Number(r?.total ?? 0);
-  const compliant = Number(r?.compliant ?? 0);
-
-  // Collects GROUP BY rows into id-keyed buckets (wire keys stay numeric).
-  const toBucket = (bucketRows: { id: string; count: string }[]) => {
-    const bucket: Record<string, number> = {};
-    for (const row of bucketRows) bucket[row.id] = Number(row.count ?? 0);
-    return bucket;
-  };
-
-  return {
-    total,
-    available: Number(r?.available ?? 0),
-    outOfService: Number(r?.out_of_service ?? 0),
-    contingencyOutage: Number(r?.contingency_outage ?? 0),
-    degradedContingency: Number(r?.degraded_contingency ?? 0),
-    degraded: Number(r?.degraded ?? 0),
-    unavailable: Number(r?.unavailable ?? 0),
-    other: Number(r?.other ?? 0),
-    compliant,
-    nonCompliant: Number(r?.non_compliant ?? 0),
-    criticalNonCompliant: Number(r?.critical_non_compliant ?? 0),
-    withoutActionPlan: Number(r?.without_action_plan ?? 0),
-    pctCompliant: total > 0 ? Math.round((compliant / total) * 1000) / 10 : 0,
-    byAvailability: toBucket(dispRows),
-    byCompliance: toBucket(confRows),
-    byCriticality: toBucket(critRows),
-    ncByCriticality: toBucket(ncCritRows),
-    inactive: Number(scopeRows[0]?.inactive ?? 0),
-    deleted: Number(scopeRows[0]?.deleted ?? 0),
-    syncedAt: new Date().toISOString(),
-  };
-}
-
 // The one write path: calls record_status_change() (see db/schema.sql),
 // which updates availability_id + status_since and appends history.
 // Never UPDATE availability_id directly from application code (the DB
@@ -443,17 +287,22 @@ export async function transitionBarrierStatus(
   statusId: number,
   authorId: number,
   note = "",
+  query?: TxQuery,
 ): Promise<WireBarrier | null> {
-  const current = await getBarrierById(barrierId);
+  const q = query ?? queryRows;
+  // Lock the row so two concurrent transitions cannot both observe the old
+  // status and append duplicate history rows.
+  await q("select id from barriers where id = $1 for update", [barrierId]);
+  const current = await getBarrierById(barrierId, { query: q });
   if (!current) return null;
   if (current.availabilityId === statusId) return current;
-  await queryRows("select record_status_change($1, $2, $3, $4)", [
+  await q("select record_status_change($1, $2, $3, $4)", [
     barrierId,
     statusId,
     authorId,
     note,
   ]);
-  return getBarrierById(barrierId);
+  return getBarrierById(barrierId, { query: q });
 }
 
 export interface BarrierUpdatePayload {
@@ -491,8 +340,9 @@ export interface BarrierUpdatePayload {
 export async function updateBarrier(
   id: number,
   patch: BarrierUpdatePayload,
-  opts: { releaseFields?: string[] } = {},
+  opts: { releaseFields?: string[]; query?: TxQuery } = {},
 ): Promise<WireBarrier | null> {
+  const q = opts.query ?? queryRows;
   const sets: string[] = [];
   const args: unknown[] = [id];
 
@@ -610,14 +460,14 @@ export async function updateBarrier(
   if (owned.length > 0 || release.length > 0) {
     // Only newly-different values join manual_fields: the editor submits
     // every field on save, and a no-change save must not freeze the row.
-    const current = await queryRows<Record<string, unknown>>(
+    const current = await q<Record<string, unknown>>(
       `select tag, location_id, typology_id, category_id, grouping_id,
               owner_id, criticality_id, comments, action_plan, origin,
               install_local, equip_typology, field_installed,
               field_operational, op_status, has_maint_plan, plan_followed,
               failure_free, maint_status, has_contingency, contingency_desc,
               evidence_code, degradation_desc, extra_comments, manual_fields
-         from barriers where id = $1`,
+         from barriers where id = $1 for update`,
       [id],
     );
     const cur = current[0];
@@ -662,12 +512,15 @@ export async function updateBarrier(
   }
 
   if (sets.length > 0) {
-    await queryRows(
+    await q(
       `update barriers set ${
         sets.join(", ")
       } where id = $1 and deleted_at is null`,
       args,
     );
   }
-  return getBarrierById(id);
+  return getBarrierById(id, { query: q });
 }
+
+// KPI aggregation lives in kpi.ts to keep the list/write path smaller.
+export { getKpi } from "./kpi.ts";

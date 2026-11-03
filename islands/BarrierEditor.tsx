@@ -17,15 +17,18 @@ import type { Barrier } from "../lib/types.ts";
 import { AURORA } from "../lib/aurora.ts";
 import { apiFetch } from "../lib/api/http.ts";
 
-interface Lookups {
-  availabilities?: { id: number; label: string }[];
-  categories?: { id: number; label: string }[];
-  locations?: { id: number; code: string; name: string | null }[];
-  criticalities?: { id: number; label: string }[];
-  typologies?: { id: number; label: string }[];
-  groupings?: { id: number; label: string }[];
-  owners?: { id: number; label: string }[];
-}
+import {
+  BarrierEditorCoreFields,
+  type CoreKey,
+  type CoreValues,
+  type Lookups,
+} from "./BarrierEditorCoreFields.tsx";
+
+import {
+  BarrierEditorSheetFields,
+  type SheetKey,
+  type SheetValues,
+} from "./BarrierEditorSheetFields.tsx";
 
 interface Props {
   barrier: Barrier;
@@ -471,6 +474,126 @@ export function BarrierEditor(
     );
   };
 
+  const coreValues: CoreValues = {
+    tag,
+    locationId,
+    typologyId,
+    categoryId,
+    groupingId,
+    ownerId,
+    criticalityId,
+    availabilityId,
+  };
+
+  const setCoreValue = (
+    key: CoreKey,
+    value: string | number | undefined,
+  ) => {
+    const num = typeof value === "number" ? value : undefined;
+    switch (key) {
+      case "tag":
+        setTag(String(value ?? ""));
+        break;
+      case "locationId":
+        setLocationId(num);
+        break;
+      case "typologyId":
+        setTypologyId(num);
+        break;
+      case "categoryId":
+        setCategoryId(num);
+        break;
+      case "groupingId":
+        setGroupingId(num);
+        break;
+      case "ownerId":
+        setOwnerId(num);
+        break;
+      case "criticalityId":
+        setCriticalityId(num);
+        break;
+      case "availabilityId":
+        setAvailabilityId(num);
+        break;
+    }
+  };
+
+  const sheetValues: SheetValues = {
+    origin,
+    installLocal,
+    equipTypology,
+    fieldInstalled,
+    fieldOperational,
+    opStatus,
+    maintStatus,
+    hasMaintPlan,
+    planFollowed,
+    failureFree,
+    hasContingency,
+    contingencyDesc,
+    evidenceCode,
+    degradationDesc,
+    comments,
+    extraComments,
+    actionPlan,
+  };
+
+  const setSheetValue = (key: SheetKey, value: string) => {
+    switch (key) {
+      case "origin":
+        setOrigin(value);
+        break;
+      case "installLocal":
+        setInstallLocal(value);
+        break;
+      case "equipTypology":
+        setEquipTypology(value);
+        break;
+      case "fieldInstalled":
+        setFieldInstalled(value);
+        break;
+      case "fieldOperational":
+        setFieldOperational(value);
+        break;
+      case "opStatus":
+        setOpStatus(value);
+        break;
+      case "maintStatus":
+        setMaintStatus(value);
+        break;
+      case "hasMaintPlan":
+        setHasMaintPlan(value);
+        break;
+      case "planFollowed":
+        setPlanFollowed(value);
+        break;
+      case "failureFree":
+        setFailureFree(value);
+        break;
+      case "hasContingency":
+        setHasContingency(value);
+        break;
+      case "contingencyDesc":
+        setContingencyDesc(value);
+        break;
+      case "evidenceCode":
+        setEvidenceCode(value);
+        break;
+      case "degradationDesc":
+        setDegradationDesc(value);
+        break;
+      case "comments":
+        setComments(value);
+        break;
+      case "extraComments":
+        setExtraComments(value);
+        break;
+      case "actionPlan":
+        setActionPlan(value);
+        break;
+    }
+  };
+
   return (
     <form
       onSubmit={submit}
@@ -531,180 +654,16 @@ export function BarrierEditor(
         <em>Reverter p/ Fracttal</em> para voltar a seguir o sync.
       </div>
 
-      {/* Section: Identification */}
-      <div>
-        <div
-          style={{
-            fontSize: "var(--d-caption)",
-            fontWeight: 800,
-            color: "var(--text-muted)",
-            textTransform: "uppercase",
-            letterSpacing: "0.1em",
-            marginBottom: "var(--d-stack-sm)",
-          }}
-        >
-          Identificação & Classificação
-        </div>
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "1fr 1fr",
-            gap: "var(--d-details-gap)",
-          }}
-        >
-          <div style={{ display: "grid", gap: "var(--d-mini-gap)" }}>
-            {fieldHead("TAG", "tag")}
-            <input
-              type="text"
-              value={tag}
-              onInput={(e) => setTag(e.currentTarget.value)}
-              style={inputStyle}
-              required
-            />
-          </div>
-
-          <div style={{ display: "grid", gap: "var(--d-mini-gap)" }}>
-            {fieldHead("Instalação", "locationId")}
-            <select
-              value={locationId ?? ""}
-              onChange={(e) => setLocationId(Number(e.currentTarget.value))}
-              style={inputStyle}
-            >
-              {lookups?.locations?.map((l) => (
-                <option key={l.id} value={l.id}>
-                  {l.code} {l.name ? `- ${l.name}` : ""}
-                </option>
-              )) ?? <option value="">Carregando…</option>}
-            </select>
-          </div>
-
-          <div style={{ display: "grid", gap: "var(--d-mini-gap)" }}>
-            {fieldHead("Tipologia", "typologyId")}
-            <select
-              value={typologyId ?? ""}
-              onChange={(e) => setTypologyId(Number(e.currentTarget.value))}
-              style={inputStyle}
-            >
-              {lookups?.typologies?.map((t) => (
-                <option key={t.id} value={t.id}>
-                  {t.label}
-                </option>
-              )) ?? <option value="">Carregando…</option>}
-            </select>
-          </div>
-
-          <div style={{ display: "grid", gap: "var(--d-mini-gap)" }}>
-            {fieldHead("Categoria", "categoryId")}
-            <select
-              value={categoryId ?? ""}
-              onChange={(e) => setCategoryId(Number(e.currentTarget.value))}
-              style={inputStyle}
-            >
-              {lookups?.categories?.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.label}
-                </option>
-              )) ?? <option value="">Carregando…</option>}
-            </select>
-          </div>
-
-          <div style={{ display: "grid", gap: "var(--d-mini-gap)" }}>
-            {fieldHead("Agrupamento", "groupingId")}
-            <select
-              value={groupingId ?? ""}
-              onChange={(e) => setGroupingId(Number(e.currentTarget.value))}
-              style={inputStyle}
-            >
-              {lookups?.groupings?.map((g) => (
-                <option key={g.id} value={g.id}>
-                  {g.label}
-                </option>
-              )) ?? <option value="">Carregando…</option>}
-            </select>
-          </div>
-
-          <div style={{ display: "grid", gap: "var(--d-mini-gap)" }}>
-            {fieldHead("Dono", "ownerId")}
-            <select
-              value={ownerId ?? ""}
-              onChange={(e) => {
-                const v = e.currentTarget.value;
-                setOwnerId(v === "" ? undefined : Number(v));
-              }}
-              style={inputStyle}
-            >
-              <option value="">Não informado</option>
-              {lookups?.owners?.map((o) => (
-                <option key={o.id} value={o.id}>
-                  {o.label}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div style={{ display: "grid", gap: "var(--d-mini-gap)" }}>
-            {fieldHead("Criticidade", "criticalityId")}
-            <select
-              value={criticalityId ?? ""}
-              onChange={(e) => setCriticalityId(Number(e.currentTarget.value))}
-              style={inputStyle}
-            >
-              {lookups?.criticalities?.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.label}
-                </option>
-              )) ?? <option value="">Carregando…</option>}
-            </select>
-          </div>
-
-          <div style={{ display: "grid", gap: "var(--d-mini-gap)" }}>
-            {fieldHead("Disponibilidade", undefined, {
-              field: "OS/SS + flags",
-              hint:
-                "Fracttal: ordens e solicitações abertas, data fora de operação e flags do ativo (protegido por autoria: status manual não é revertido)",
-            })}
-            <select
-              value={availabilityId ?? ""}
-              onChange={(e) => setAvailabilityId(Number(e.currentTarget.value))}
-              style={inputStyle}
-            >
-              {lookups?.availabilities?.map((a) => (
-                <option key={a.id} value={a.id}>
-                  {a.label}
-                </option>
-              )) ?? <option value="">Carregando…</option>}
-            </select>
-          </div>
-        </div>
-
-        {availabilityId !== undefined &&
-          lookups?.availabilities?.find((a) => a.id === availabilityId)
-              ?.label !==
-            barrier.availability &&
-          (
-            <div style={{ marginTop: 10 }}>
-              <label
-                style={{
-                  fontSize: "var(--d-caption)",
-                  fontWeight: 700,
-                  color: "var(--accent)",
-                  textTransform: "uppercase",
-                  letterSpacing: "0.1em",
-                }}
-              >
-                Motivo / Nota da Alteração de Status
-              </label>
-              <input
-                type="text"
-                placeholder="Ex: Manutenção preventiva realizada"
-                value={statusNote}
-                onInput={(e) => setStatusNote(e.currentTarget.value)}
-                style={{ ...inputStyle, marginTop: 4 }}
-              />
-            </div>
-          )}
-      </div>
-
+      <BarrierEditorCoreFields
+        values={coreValues}
+        setValue={setCoreValue}
+        lookups={lookups}
+        barrierAvailability={barrier.availability}
+        statusNote={statusNote}
+        setStatusNote={setStatusNote}
+        inputStyle={inputStyle}
+        fieldHead={fieldHead}
+      />
       <hr
         style={{
           border: "none",
@@ -713,287 +672,15 @@ export function BarrierEditor(
         }}
       />
 
-      {/* Section: Inventory record */}
-      <div>
-        <div
-          style={{
-            fontSize: "var(--d-caption)",
-            fontWeight: 800,
-            color: "var(--text-muted)",
-            textTransform: "uppercase",
-            letterSpacing: "0.1em",
-            marginBottom: "var(--d-stack-sm)",
-          }}
-        >
-          Ficha do Inventário
-        </div>
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "1fr 1fr",
-            gap: "var(--d-details-gap)",
-          }}
-        >
-          {renderSelectOrCombo("Origem", "origin", origin, setOrigin)}
-          {renderSelectOrCombo(
-            "Local de Instalação",
-            "installLocal",
-            installLocal,
-            setInstallLocal,
-          )}
-          {renderSelectOrCombo(
-            "Tipologia Equipamento",
-            "equipTypology",
-            equipTypology,
-            setEquipTypology,
-          )}
-          {renderSelectOrCombo(
-            "Elemento em Campo?",
-            "fieldInstalled",
-            fieldInstalled,
-            setFieldInstalled,
-          )}
-          {renderSelectOrCombo(
-            "Elemento Operacional?",
-            "fieldOperational",
-            fieldOperational,
-            setFieldOperational,
-          )}
-          {renderSelectOrCombo(
-            "Status Operacional",
-            "opStatus",
-            opStatus,
-            setOpStatus,
-          )}
-          {renderSelectOrCombo(
-            "Status Manutenção",
-            "maintStatus",
-            maintStatus,
-            setMaintStatus,
-          )}
-        </div>
-      </div>
-
-      <hr
-        style={{
-          border: "none",
-          borderTop: "1px solid var(--border)",
-          margin: 0,
-        }}
+      <BarrierEditorSheetFields
+        values={sheetValues}
+        setValue={setSheetValue}
+        inputStyle={inputStyle}
+        fieldHead={fieldHead}
+        renderSelectOrCombo={renderSelectOrCombo}
+        busy={busy}
+        onCancel={onCancel}
       />
-
-      {/* Section: Maintenance plan */}
-      <div>
-        <div
-          style={{
-            fontSize: "var(--d-caption)",
-            fontWeight: 800,
-            color: "var(--text-muted)",
-            textTransform: "uppercase",
-            letterSpacing: "0.1em",
-            marginBottom: "var(--d-stack-sm)",
-          }}
-        >
-          Plano de Manutenção
-        </div>
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "1fr 1fr",
-            gap: "var(--d-details-gap)",
-          }}
-        >
-          {renderSelectOrCombo(
-            "Possui Plano?",
-            "hasMaintPlan",
-            hasMaintPlan,
-            setHasMaintPlan,
-          )}
-          {renderSelectOrCombo(
-            "Plano Cumprido?",
-            "planFollowed",
-            planFollowed,
-            setPlanFollowed,
-          )}
-          {renderSelectOrCombo(
-            "Sem Falha?",
-            "failureFree",
-            failureFree,
-            setFailureFree,
-          )}
-        </div>
-      </div>
-
-      <hr
-        style={{
-          border: "none",
-          borderTop: "1px solid var(--border)",
-          margin: 0,
-        }}
-      />
-
-      {/* Section: Contingency */}
-      <div>
-        <div
-          style={{
-            fontSize: "var(--d-caption)",
-            fontWeight: 800,
-            color: "var(--text-muted)",
-            textTransform: "uppercase",
-            letterSpacing: "0.1em",
-            marginBottom: "var(--d-stack-sm)",
-          }}
-        >
-          Contingência
-        </div>
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "1fr 1fr",
-            gap: "var(--d-details-gap)",
-            marginBottom: "var(--d-stack-sm)",
-          }}
-        >
-          {renderSelectOrCombo(
-            "Há Contingência?",
-            "hasContingency",
-            hasContingency,
-            setHasContingency,
-          )}
-          <div style={{ display: "grid", gap: "var(--d-mini-gap)" }}>
-            {fieldHead("Código da Evidência", "evidenceCode")}
-            <input
-              type="text"
-              placeholder="Ex: GM-3655.01-2024-T-005"
-              value={evidenceCode}
-              onInput={(e) => setEvidenceCode(e.currentTarget.value)}
-              style={inputStyle}
-            />
-          </div>
-        </div>
-        <div style={{ display: "grid", gap: "var(--d-mini-gap)" }}>
-          {fieldHead("Descrição da Contingência", "contingencyDesc")}
-          <textarea
-            rows={2}
-            placeholder="Detalhes do contingenciamento aplicado..."
-            value={contingencyDesc}
-            onInput={(e) => setContingencyDesc(e.currentTarget.value)}
-            style={{ ...inputStyle, resize: "vertical" }}
-          />
-        </div>
-      </div>
-
-      <hr
-        style={{
-          border: "none",
-          borderTop: "1px solid var(--border)",
-          margin: 0,
-        }}
-      />
-
-      {/* Section: Degradation and comments */}
-      <div style={{ display: "grid", gap: "var(--d-stack-sm)" }}>
-        <div
-          style={{
-            fontSize: "var(--d-caption)",
-            fontWeight: 800,
-            color: "var(--text-muted)",
-            textTransform: "uppercase",
-            letterSpacing: "0.1em",
-          }}
-        >
-          Degradação & Observações
-        </div>
-        <div style={{ display: "grid", gap: "var(--d-mini-gap)" }}>
-          {fieldHead("Descrição da Degradação", "degradationDesc")}
-          <textarea
-            rows={2}
-            placeholder="Descreva eventuais falhas ou degradação..."
-            value={degradationDesc}
-            onInput={(e) => setDegradationDesc(e.currentTarget.value)}
-            style={{ ...inputStyle, resize: "vertical" }}
-          />
-        </div>
-
-        <div style={{ display: "grid", gap: "var(--d-mini-gap)" }}>
-          {fieldHead("Comentários", "comments")}
-          <textarea
-            rows={2}
-            value={comments}
-            onInput={(e) => setComments(e.currentTarget.value)}
-            style={{ ...inputStyle, resize: "vertical" }}
-          />
-        </div>
-
-        <div style={{ display: "grid", gap: "var(--d-mini-gap)" }}>
-          {fieldHead("Comentários 2 (Complementares)", "extraComments")}
-          <textarea
-            rows={2}
-            value={extraComments}
-            onInput={(e) => setExtraComments(e.currentTarget.value)}
-            style={{ ...inputStyle, resize: "vertical" }}
-          />
-        </div>
-
-        <div style={{ display: "grid", gap: "var(--d-mini-gap)" }}>
-          {fieldHead("Plano de Ação", "actionPlan")}
-          <textarea
-            rows={2}
-            placeholder="Ações previstas para restabelecimento..."
-            value={actionPlan}
-            onInput={(e) => setActionPlan(e.currentTarget.value)}
-            style={{ ...inputStyle, resize: "vertical" }}
-          />
-        </div>
-      </div>
-
-      {/* Action buttons */}
-      <div
-        style={{
-          display: "flex",
-          justifyContent: "flex-end",
-          gap: "var(--d-gap)",
-          marginTop: 10,
-          paddingTop: 12,
-          borderTop: "1px solid var(--border)",
-        }}
-      >
-        <button
-          type="button"
-          disabled={busy}
-          onClick={onCancel}
-          style={{
-            padding: "9px 16px",
-            background: "transparent",
-            border: "1px solid var(--border)",
-            borderRadius: "var(--d-input-radius)",
-            color: "var(--text-secondary)",
-            fontSize: "var(--d-body)",
-            fontWeight: 600,
-            cursor: "pointer",
-          }}
-        >
-          Cancelar
-        </button>
-        <button
-          type="submit"
-          disabled={busy}
-          style={{
-            padding: "9px 20px",
-            background: "linear-gradient(90deg,var(--accent),var(--accent-2))",
-            border: "none",
-            borderRadius: "var(--d-input-radius)",
-            color: "#ffffff",
-            fontSize: "var(--d-body)",
-            fontWeight: 700,
-            cursor: busy ? "default" : "pointer",
-            boxShadow: "0 4px 14px var(--glow)",
-            opacity: busy ? 0.7 : 1,
-          }}
-        >
-          {busy ? "Salvando…" : "Salvar alterações"}
-        </button>
-      </div>
     </form>
   );
 }

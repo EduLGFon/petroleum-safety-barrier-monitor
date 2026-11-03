@@ -43,7 +43,7 @@ same commit as code.
   single source for PT display to EN identifier mapping.
 - Framework: Fresh 2 (`jsr:@fresh/core`) + `@fresh/plugin-vite` + Vite 7; UI Preact 10 + `@preact/signals`, JSX precompile, no
   client framework; persistence PostgreSQL via `jsr:@db/postgres` (Deno-native pool, pure SQL, bound params, no ORM); mail via
-  Deno-native SMTP (STARTTLS, implicit TLS, AUTH PLAIN/LOGIN); spreadsheet via `xlsx` (seed workbook only; exports build
+  Alert delivery through the provider API (local SMTP removed); spreadsheet via `xlsx` (seed workbook only; exports build
   CSV/XLSX/PDF directly); DOM harness `linkedom`.
 - Package manager: Deno, import map in `deno.jsonc` (`@/`, `fresh`, `preact`, `@preact/signals`, `@fresh/plugin-vite`, `vite`,
   `@std/path`, `@db/postgres`, `xlsx`, `linkedom`); `deno.lock` committed; npm via `npm:`; `node_modules/` never hand-edited.
@@ -74,8 +74,8 @@ same commit as code.
 - Do not rewrite working code without concrete benefit; no unrelated improvements or speculative refactors; preserve behavior
   unless change intentionally modifies it.
 - Ambiguity: infer from conventions, then section 1 rule.
-- Research upstream CMMS/SMTP/Postgres from code (`lib/server/fracttal/`, `lib/server/alerts/`, `lib/server/sql/`) and official
-  sources before assuming. Verified-upstream items (CMMS envelopes, rate limits, page ceilings, SMTP relay, Postgres semantics)
+- Research upstream CMMS/provider/Postgres from code (`lib/server/fracttal/`, `lib/server/alerts/`, `lib/server/sql/`) and official
+  sources before assuming. Verified-upstream items (CMMS envelopes, rate limits, page ceilings, provider API, Postgres semantics)
   must be checked and recorded in `DECISIONS.md`.
 - Never claim work performed/verified unless it was. Report limitations, failed checks, unresolved issues honestly.
 
@@ -180,7 +180,7 @@ Legal/Regulatory: Comply with laws for users/jurisdictions/data/processing/secto
 emails, barrier authors, comments, action plans, inventory-sheet free text that may identify people. Scope assumption Brazil only.
 Before release elsewhere, new legal analysis (GDPR EU/EEA; US federal/state privacy/consumer/breach rules). One jurisdiction does
 not satisfy another. Consider where users/data located/collected/processed/stored/transferred/accessed (app origin, Postgres,
-upstream CMMS API, SMTP relay, `_fresh/`, `test/` dumps, `localStorage`, downloaded exports). Legal requirements time-sensitive;
+upstream CMMS API, alert provider, `_fresh/`, `test/` dumps, `localStorage`, downloaded exports). Legal requirements time-sensitive;
 research current primary/authoritative sources when task depends on current law/regulation (ANPD guidance, Planalto texts, store
 policies); legal deadlines confirmed from official sources. Prefer official government/regulatory sources. Distinguish legal
 requirements from security best practices/project policies. Never invent legal requirements; agent produces engineering
@@ -193,7 +193,7 @@ Privacy by Design: Data minimization: collect only schema/cache-declared data: `
 `barrier-settings`). No new stored field/log/metric/cache/third-party call touching personal data without ADR + inventory update
 in `docs/ARCHITECTURE.md`/`docs/DATABASE.md`. Protected data (unless established otherwise): emails, names, password hashes,
 session token hashes, recipient lists, barrier authors, comments, action plans, sheet free text, `ADMIN_TOKEN`, upstream
-keys/secrets, SMTP credentials, connection strings. `COMPANY_NAME` and static lookup labels in `lib/enums/` are public config, not
+keys/secrets, provider credentials, connection strings. `COMPANY_NAME` and static lookup labels in `lib/enums/` are public config, not
 personal data. Retention/deletion: sessions expire 12h with opportunistic sweeps on login; password change revokes all sessions
 incl caller; soft-deleted rows keep history auditable only behind admin `rowScope`; alert `dedup_key` unique so reruns enqueue
 nothing new; dead-lettered events park after 5 failed runs until `--reprocess`; exports are downloads, never stored server-side.
@@ -206,8 +206,8 @@ require `admin`; no self-registration (first account via `scripts/create-admin.t
 demoted/deactivated/deleted; self-service password change session-only with no user id; admins may reset any user's password via
 admin-only users route (revokes target sessions). Consider copies in caches/backups/indexes/logs/derived stores/third-party
 services for deletion/retention (status history, `sync_barrier_changes` snapshots, alert payloads with `delivered[]`,
-`localStorage`, downloaded exports, SMTP deliveries, upstream mirrors). International transfers are privacy/security-sensitive
-(upstream CMMS API, SMTP relay may see IPs/content).
+`localStorage`, downloaded exports, provider deliveries, upstream mirrors). International transfers are privacy/security-sensitive
+(upstream CMMS API, alert provider may see IPs/content).
 
 Authentication: Gating: reads need session or `ADMIN_TOKEN`; status writes/record edits/user management/recipient management/rule
 management/field-option writes need `admin`; login only public page; `/` redirects anonymous to `/login?next=...`. Never trust
@@ -236,7 +236,7 @@ demote/deactivate/delete last active admin; exports intersect selection with act
 horizontal/vertical escalation, IDOR, isolation failures. Admin interfaces/privileged APIs require explicit authorization. No
 code-eval route, no self-registration; `scripts/create-admin.ts` provisions accounts. No server-side execution/registration
 without ADR + owner approval. Never expose server files/env/creds/config/source/logs/databases/internal APIs/infra controls via
-unintended paths (no `.env`, `test/` dumps, connection strings, upstream secrets, SMTP passwords, log exfiltration via
+unintended paths (no `.env`, `test/` dumps, connection strings, upstream secrets, provider tokens, log exfiltration via
 API/export/digest/error bodies). Every user-accessible capability needs explicit authorization model.
 
 User/Tenant Isolation: Data isolated: vocabularies/filters/selections/exports/digests/`localStorage` never leak across sessions;
@@ -255,9 +255,9 @@ paths (`db/schema.sql`, `scripts/fixtures/`, `_fresh/`, `test/` local-only). Pre
 read/write/delete/execution. Do not expose source/stack traces/env/secrets/config/infra in user-facing replies; use `{ error,
 code, requestId }` envelope + `x-request-id` (`BAD_REQUEST`, `NOT_FOUND`, `UNAUTHORIZED`, `RATE_LIMITED`, `INTERNAL`); diagnostics
 in protected logs. Internal networks not trusted. Treat external requests/uploads/integrations/third-party services untrusted
-until validated (upstream envelopes/rows strict loud validation, SMTP conversations, capped fetches).
+until validated (upstream envelopes/rows strict loud validation, provider HTTP conversations, capped fetches).
 
-Input/Injection: All external input untrusted: query params, bodies, wire rows, upstream envelopes/rows, SMTP replies, export id
+Input/Injection: All external input untrusted: query params, bodies, wire rows, upstream envelopes/rows, provider replies, export id
 lists, vocab labels. Validate type/format/encoding/size/business constraints (strict int/date/query parsers, page/page-size
 bounds, 200,000-row export ceiling with refusal + real count, 12-256 password policy, 30-column mapping, semicolon CSV with BOM).
 Parameterized queries/safe APIs (pure SQL bound args, never string-built SQL). Protect injection classes; encode output for
@@ -266,7 +266,7 @@ applicable; re-evaluate on new fetch/webhook/upload. Same-origin by design (no C
 app origin. Restrict handled files by type/size/content/storage/execution (bounded anonymized capture reviewed before commit;
 streamed export batches). Never rely solely on client validation/MIME/extensions.
 
-Secrets/Crypto: Never commit passwords/creds/private keys/tokens/certs/cookies/auth state/connection strings/upstream secrets/SMTP
+Secrets/Crypto: Never commit passwords/creds/private keys/tokens/certs/cookies/auth state/connection strings/upstream secrets/provider tokens
 passwords/tenant dumps/secrets. Env/secret files (`.env`, `test/` captures, keystores, SSH keys) outside repo history/samples. Do
 not open/print/summarize; ask owner if needed. Never expose secrets in logs/errors/responses/URLs/client
 bundles/tests/docs/artifacts. Do not pass secrets/personal data to sub-agents. Approved secret management: local untracked `.env`
@@ -274,7 +274,7 @@ bundles/tests/docs/artifacts. Do not pass secrets/personal data to sub-agents. A
 - `.env.example` shape; `dev`/`preview`/`build` read shell exports; `start`/`db:*`/poll loops read `--env-file=.env`; image
   carries no secrets; host `.env` mounts read-only. Use established crypto libs/algorithms; never invent (PBKDF2-SHA256 via
   WebCrypto + SHA-256 token hashes; auth via Postgres sessions). Protect keys separately; encoding/hashing/obfuscation/Base64 are
-  not encryption. Encryption in transit (TLS-only platform APIs; SMTP implicit TLS 465 else STARTTLS; no cleartext creds). Never
+  not encryption. Encryption in transit (TLS-only platform APIs; provider HTTPS only; no cleartext creds). Never
   disable TLS verification/auth/authz/cert validation/security controls for dev convenience.
 
 Logging/Auditing: Log security-relevant events without personal data (request id on every API log line matching response body +
@@ -307,10 +307,10 @@ intersection, per-recipient delivery tracking). Start from `docs/ARCHITECTURE.md
   Secrets/env config outside source (`COMPANY_NAME`, `PUBLIC_API_MODE`/`PUBLIC_API_BASE_URL`,
   `DATABASE_URL`+`DATABASE_URL_DOCKER`+`POSTGRES_*`, `ADMIN_TOKEN`, `FRACTTAL_KEY`/`FRACTTAL_SECRET`/`FRACTTAL_BASE_URL`/
   `FRACTTAL_POLL_SECONDS`/`FRACTTAL_SYNC_*`/`FRACTTAL_RATE_*`/ `FRACTTAL_FETCH_CONCURRENCY`/`FRACTTAL_WORK_OPEN_ONLY`,
-  `OPS_SMTP_*`/`OPS_EMAIL_*`/`MAIL_*` aliases, `ALERTS_POLL_SECONDS`, `APP_BASE_URL`, `CHROME_BIN`). Follow config conventions
+  `ALERT_PROVIDER_*`, `ALERTS_POLL_SECONDS`, `APP_BASE_URL`, `CHROME_BIN`). Follow config conventions
   (`docs/ARCHITECTURE.md` Config, `.env.example` comments, `docs/DATABASE.md` setup). Update `.env.example` when adding required
   config. Never commit local/machine config unless required (no `.env`, `test/` captures, downloaded exports, `ADMIN_TOKEN`,
-  upstream/SMTP secrets). No exposure of dev/staging/internal config to unauthorized users. Tunables in env + `lib/enums/` +
+  upstream/provider secrets). No exposure of dev/staging/internal config to unauthorized users. Tunables in env + `lib/enums/` +
   `lib/constants.ts`, not scattered.
 
 ## 10. Generated Files and Artifacts
@@ -323,7 +323,7 @@ intersection, per-recipient delivery tracking). Start from `docs/ARCHITECTURE.md
   out (`test/`, `_fresh/`, `.env`). Keep temp outputs/debug artifacts/experiments/scratch out of repo root. Store agent helper
   scripts in `scripts/` (upstream sync, alert loops, `browser-smoke.ts`, `chaos-scale.ts`, `test-dom.ts`, `import-sort.ts`,
   `check-migration-order.ts`). Remove temp artifacts when done. Never commit raw message exports, tenant dumps, device logs with
-  identifiers, auth state, cookies, connection strings, upstream secrets, SMTP passwords, or screenshots showing real user data.
+  identifiers, auth state, cookies, connection strings, upstream secrets, provider tokens, or screenshots showing real user data.
 
 ## 11. Testing and Verification
 
@@ -342,7 +342,7 @@ task test`; plus `deno task build` when islands/routes/client-bundled changed; `
 import-order checks. Changes touching auth/permissions/sync/alerts/stickers/media/exports/downloads/networking also require
 cap-budget check (export ceiling, batch sizes, page caps, throttle windows, poll cadences, upstream rate bucket, 10s immediate
 fan-out budget, lazy-load behavior), or explicit statement measurement not possible. Before release: secret scan
-(uncommitted/newly tracked `.env`, `test/` captures, `ADMIN_TOKEN`, upstream keys, SMTP passwords, connection strings, downloaded
+(uncommitted/newly tracked `.env`, `test/` captures, `ADMIN_TOKEN`, upstream keys, provider tokens, connection strings, downloaded
 exports) + permission-matrix recheck in `docs/API.md` + `docs/ARCHITECTURE.md` (API contract) + `docs/DATABASE.md` (Auth). If
 check fails, investigate/fix when in scope. Never hide/ignore/misrepresent failures. If cannot perform, state exactly what not run
 and why. Distinguish targeted/full/CI-only; no CI suite; say targeted file, full-tree check/test, or live smoke. Never claim test
@@ -370,7 +370,7 @@ passed because code appears correct.
 - Station/category ids stable refs as dynamic vocabularies; retiring a row uses soft delete or `is_active=false` behind admin
   `rowScope`, not deleting history.
 - Agents work against local/disposable state only. Never run `db:seed -- --force`, `db:migrate`, `admin:create`, `fracttal:*
-  --apply`, `alerts:check --apply`, live poll loops, or bulk probes against owner's live DB/upstream/SMTP audience, nor touch prod
+  --apply`, `alerts:check --apply`, live poll loops, or bulk probes against owner's live DB/upstream/alert audience, nor touch prod
   `.env`/Postgres auth tables/compose `app` service, without explicit owner authorization in current task. Live capture
   bounded/anonymized/reviewed before commit. Never destructively modify production data without authorization. Rollback is
   `PUBLIC_API_MODE=mock` + previous image; DB untouched.
@@ -378,7 +378,7 @@ passed because code appears correct.
 ## 13. Research and Sub-agents
 
 - Web searches always allowed when improving correctness/quality. Prefer current authoritative primary sources (Deno, Fresh,
-  Preact, Vite, `@db/postgres` + Postgres, upstream CMMS API, SMTP, `xlsx`, `linkedom`, ANPD, Planalto). Do not rely on memory
+  Preact, Vite, `@db/postgres` + Postgres, upstream CMMS API, alert provider, `xlsx`, `linkedom`, ANPD, Planalto). Do not rely on memory
   when current external info materially affects implementation (package APIs, platform limits, quotas, store policies, legal
   deadlines).
 - Sub-agents always allowed; use proactively for independent workstreams/exploration/research/review/testing/context-heavy

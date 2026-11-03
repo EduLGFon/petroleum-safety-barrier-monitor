@@ -13,8 +13,6 @@ import {
   consoleNotifier,
   notifyFailureToAll,
   type OpsNotifier,
-  smtpConfigFromEnv,
-  smtpEmailNotifier,
 } from "../lib/server/fracttal/notify.ts";
 
 import {
@@ -178,8 +176,6 @@ async function cycle(
 
 function main(): void {
   const notifiers: OpsNotifier[] = [consoleNotifier];
-  const opsSmtp = smtpConfigFromEnv();
-  if (opsSmtp) notifiers.push(smtpEmailNotifier(opsSmtp));
   let provider: ProviderConfig | null;
   try {
     provider = providerConfigFromEnv();
@@ -191,7 +187,7 @@ function main(): void {
     `[alerts-poll] every ${seconds}s, provider=${
       provider ? "configured" : "dry-run (no token)"
     } ` +
-      `notifiers=console${opsSmtp ? ",email" : ""}`,
+      `notifiers=console`,
   );
   if (!provider) {
     console.warn(

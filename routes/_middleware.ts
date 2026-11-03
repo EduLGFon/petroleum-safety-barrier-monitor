@@ -10,6 +10,8 @@ import { define } from "../utils.ts";
 function isImmutableAsset(pathname: string): boolean {
   return pathname.startsWith("/_frsh/") ||
     pathname.startsWith("/static/") ||
+    pathname.startsWith("/fonts/") ||
+    pathname === "/boot.js" ||
     pathname === "/favicon.svg" ||
     pathname === "/favicon.ico";
 }
@@ -28,6 +30,65 @@ function isCompressible(contentType: string | null): boolean {
     ct.includes("text/plain");
 }
 
+// applySecurityHeaders: app-level hardening that must survive deployments
+// without the Caddy template. CSP is skipped in dev because Vite HMR needs
+// eval/websocket; production uses the strict policy.
+function applySecurityHeaders(req: Request, res: Response): Response {
+  const headers = new Headers(res.headers);
+  const set = (name: string, value: string) => {
+    if (!headers.has(name)) headers.set(name, value);
+  };
+  set("x-content-type-options", "nosniff");
+  set("x-frame-options", "DENY");
+  set("referrer-policy", "no-referrer");
+  set("permissions-policy", "camera=(), microphone=(), geolocation=()");
+  let dev = false;
+  try {
+    dev = Deno.env.get("DEV") === "true";
+  } catch {
+    // No env access: use the production policy.
+  }
+  if (!dev) {
+    set(
+      "content-security-policy",
+      // Fresh injects the hydration bootstrap inline with a nonce that is
+      // not exposed to middleware; allow inline scripts (user data is
+      // escaped everywhere) while keeping external script origins locked.
+      "default-src 'self'; script-src 'self' 'unsafe-inline'; " +
+        "style-src 'self' 'unsafe-inline'; " +
+        "img-src 'self' data:; font-src 'self'; connect-src 'self'; " +
+        "object-src 'none'; base-uri 'self'; form-action 'self'; " +
+        "frame-ancestors 'none'",
+    );
+  }
+  let https = false;
+  try {
+    https = new URL(req.url).protocol === "https:";
+  } catch {
+    // Fall through to APP_BASE_URL.
+  }
+  if (!https) {
+    try {
+      https = (Deno.env.get("APP_BASE_URL") ?? "").toLowerCase().startsWith(
+        "https://",
+      );
+    } catch {
+      // No env access: leave HSTS off.
+    }
+  }
+  if (https) {
+    set(
+      "strict-transport-security",
+      "max-age=31536000; includeSubDomains",
+    );
+  }
+  return new Response(res.body, {
+    status: res.status,
+    statusText: res.statusText,
+    headers,
+  });
+}
+
 export const handler = define.middleware(async (ctx) => {
   const res = await ctx.next();
   try {
@@ -39,11 +100,14 @@ export const handler = define.middleware(async (ctx) => {
       if (!next.has("cache-control")) {
         next.set("cache-control", "public, max-age=31536000, immutable");
       }
-      return new Response(res.body, {
-        status: res.status,
-        statusText: res.statusText,
-        headers: next,
-      });
+      return applySecurityHeaders(
+        ctx.req,
+        new Response(res.body, {
+          status: res.status,
+          statusText: res.statusText,
+          headers: next,
+        }),
+      );
     }
     // Streaming gzip for compressible GET bodies when accepted.
     if (
@@ -61,14 +125,17 @@ export const handler = define.middleware(async (ctx) => {
         vary ? `${vary}, Accept-Encoding` : "Accept-Encoding",
       );
       const stream = res.body.pipeThrough(new CompressionStream("gzip"));
-      return new Response(stream, {
-        status: res.status,
-        statusText: res.statusText,
-        headers: next,
-      });
+      return applySecurityHeaders(
+        ctx.req,
+        new Response(stream, {
+          status: res.status,
+          statusText: res.statusText,
+          headers: next,
+        }),
+      );
     }
   } catch {
     // Header/body post-processing must never fail a request.
   }
-  return res;
+  return applySecurityHeaders(ctx.req, res);
 });

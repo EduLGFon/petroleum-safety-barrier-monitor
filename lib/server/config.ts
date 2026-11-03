@@ -56,16 +56,42 @@ export interface AuthConfig {
   entra: EntraConfig | null;
 }
 
-// loadServerConfig: validates http-mode boot. DATABASE_URL is required in
-// http mode (the routes query Postgres directly); ADMIN_TOKEN stays optional
-// here because auth.ts fail-closes writes when it is unset.
+// isProductionEnv: explicit deployment marker, deliberately separate from
+// NODE_ENV (Vite sets NODE_ENV=production during a build and a strict check
+// must not run in that phase). Containers set DENO_ENV=production; native
+// installs set APP_ENV=production.
+export function isProductionEnv(get: EnvGetter = defaultEnv): boolean {
+  const raw = (get("DENO_ENV") ?? get("APP_ENV") ?? "").trim().toLowerCase();
+  return raw === "production" || raw === "prod";
+}
+
+// parseApiMode: unknown values are a typo, never an implicit mock. Mock is
+// the documented development default when the variable is absent.
+export function parseApiMode(raw: string | undefined): ApiMode {
+  const value = (raw ?? "").trim().toLowerCase();
+  if (value === "" || value === "mock") return "mock";
+  if (value === "http") return "http";
+  throw new Error(
+    `PUBLIC_API_MODE must be "mock" or "http" (got "${raw}")`,
+  );
+}
+
+// loadServerConfig: validates boot configuration. DATABASE_URL is required
+// in http mode (routes query Postgres directly); ADMIN_TOKEN stays optional
+// here because auth.ts fail-closes writes when it is unset. Production may
+// not run in mock mode: generated demo data must never look live.
 export function loadServerConfig(get: EnvGetter = defaultEnv): ServerConfig {
-  const mode = get("PUBLIC_API_MODE") === "http" ? "http" : "mock";
+  const mode = parseApiMode(get("PUBLIC_API_MODE"));
   const databaseUrl = get("DATABASE_URL");
   if (mode === "http" && !databaseUrl) {
     throw new Error(
       "DATABASE_URL is not set (required with PUBLIC_API_MODE=http). " +
         "Copy .env.example to .env and point it at your Postgres instance.",
+    );
+  }
+  if (isProductionEnv(get) && mode !== "http") {
+    throw new Error(
+      "PUBLIC_API_MODE must be http in production; refusing to serve mock data",
     );
   }
   return { mode, databaseUrl, adminToken: get("ADMIN_TOKEN") };

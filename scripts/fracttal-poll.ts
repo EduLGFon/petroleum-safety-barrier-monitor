@@ -8,7 +8,7 @@
 // in mapAsset. The tenant-global work pass is fetched once per cycle and
 // shared; the next cycle chains after completion, so the request rate is
 // bounded by construction. Failures land in sync_state + notify ops
-// (console, plus OPS_SMTP_* email when configured).
+// (structured console line; delivery belongs to the alert provider).
 //
 //   FRACTTAL_KEY / FRACTTAL_SECRET      required (prod tenant, reviewed)
 //   FRACTTAL_BASE_URL                    optional (default app.fracttal.com/api)
@@ -37,7 +37,7 @@
 //   FRACTTAL_WORK_OPEN_ONLY              0/false: newest window instead of
 //                                        the open-status sweep (default on -
 //                                        verified live, see docs/FRACTTAL.md)
-//   OPS_SMTP_HOST / OPS_SMTP_PORT / OPS_SMTP_USER / OPS_SMTP_PASS
+
 //   OPS_EMAIL_TO / OPS_EMAIL_FROM        emails are optional; without them
 //                                         failures still log via [ops] console
 //                                         and persist as failed sync_state rows
@@ -54,11 +54,7 @@ import {
   type WorkFetch,
 } from "../lib/server/fracttal/live-scope.ts";
 
-import {
-  consoleNotifier,
-  smtpConfigFromEnv,
-  smtpEmailNotifier,
-} from "../lib/server/fracttal/notify.ts";
+import { consoleNotifier } from "../lib/server/fracttal/notify.ts";
 
 import {
   getSyncStatus,
@@ -228,8 +224,6 @@ function main(): void {
   let idToCode = new Map<number, string>();
 
   const notifiers: OpsNotifier[] = [consoleNotifier];
-  const smtp = smtpConfigFromEnv();
-  if (smtp) notifiers.push(smtpEmailNotifier(smtp));
 
   // Cycle: full equipment sweep plus one shared work pass (tenant-global).
   // Open-only mode (default on) sweeps each open ot_status to completion
@@ -351,7 +345,7 @@ function main(): void {
   console.log(
     `[fracttal-poll] target=${target} work=${
       openOnly ? "open sweep" : "newest window"
-    } notifiers=console${smtp ? ",email" : ""}`,
+    } notifiers=console`,
   );
   console.log(
     `[fracttal-poll] sweeping every ${flags.seconds}s ` +

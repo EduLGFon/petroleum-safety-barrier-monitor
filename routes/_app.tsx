@@ -1,44 +1,8 @@
-// deno-lint-ignore-file react-no-danger
 // Root app wrapper - renders outer HTML shell for every Fresh route.
 // This is why it exists: ports Next layout (lang, title, fonts, FOUC guard)
 // without React providers (added back when context is ported to preact).
 import { getCompanyName, withBrand } from "../lib/company.ts";
 import { define } from "../utils.ts";
-
-// Runs before island hydration: restores theme/accent/density/font size to
-// prevent FOUC.
-const INIT = `(function(){try{
-  var s=JSON.parse(localStorage.getItem('barrier-settings')||'{}');
-  var t=s.theme||'dark';
-  document.documentElement.dataset.theme=(t==='light'||t==='dark'||t==='amoled')?t:'dark';
-  if(s.reduceMotion) document.documentElement.classList.add('no-anim');
-  if(s.disableBlur) document.documentElement.classList.add('no-blur');
-  var P={aurora:{p:'#6366f1',s:'#22d3ee',g:'rgba(99,102,241,.35)'},
-         blue:{p:'#3b82f6',s:'#6366f1',g:'rgba(59,130,246,.18)'},
-         green:{p:'#22c55e',s:'#10b981',g:'rgba(34,197,94,.18)'},
-         red:{p:'#ef4444',s:'#f97316',g:'rgba(239,68,68,.18)'},
-         yellow:{p:'#eab308',s:'#f59e0b',g:'rgba(234,179,8,.18)'},
-         brown:{p:'#b45309',s:'#d97706',g:'rgba(180,83,9,.18)'},
-         mono:{p:'#94a3b8',s:'#cbd5e1',g:'rgba(148,163,184,.18)'},
-         purple:{p:'#a855f7',s:'#c084fc',g:'rgba(168,85,247,.18)'}};
-  var c=P[s.accentColor||'aurora'];
-  if(c){var r=document.documentElement;
-    r.style.setProperty('--accent',c.p);
-    r.style.setProperty('--accent-2',c.s);
-    r.style.setProperty('--glow',c.g);}
-  var dn=s.density;
-  dn=(dn==='compact'||dn==='spacious')?dn:'comfortable';
-  document.documentElement.dataset.density=dn;
-  var fs=s.fontSize;
-  fs=(fs==='small'||fs==='standard'||fs==='large'||fs==='xlarge')
-    ?fs:'standard';
-  document.documentElement.dataset.fontSize=fs;
-}catch(e){console.error("[settings-restore]",e);} })();`;
-
-// Font loader: same raw-script rule as INIT. Preact escapes text children
-// inside <script>, which turns quotes into &quot; and breaks the JS parser.
-const FONT_LOADER =
-  `document.getElementById("font-css")?.addEventListener("load",function(){this.media="all"})`;
 
 // App shell: builds branded title and outer html/head for all routes.
 export default define.page(function App({ Component }) {
@@ -57,29 +21,8 @@ export default define.page(function App({ Component }) {
           content={title}
         />
         <link rel="icon" href="/favicon.svg" />
-        {/* Static bootstrap only: never interpolate request data into a raw script. */}
-        <script dangerouslySetInnerHTML={{ __html: INIT }}></script>
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link
-          rel="preconnect"
-          href="https://fonts.gstatic.com"
-          crossOrigin="anonymous"
-        />
-        {
-          /* Non-blocking font load: a render-blocking stylesheet from a
-          third party keeps first paint hostage when that host stalls, so
-          the page paints with system fonts first and swaps when ready.
-          Inter Tight covers UI + display (the stack falls back to Inter
-          only for glyphs Tight lacks); the duplicate full Inter family was
-          dropped (overlapping glyphs, ~4 extra woff2). */
-        }
-        <link
-          id="font-css"
-          href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap"
-          rel="stylesheet"
-          media="print"
-        />
-        <script dangerouslySetInnerHTML={{ __html: FONT_LOADER }}></script>
+        {/* External bootstrap: strict CSP needs no inline-script hashes. */}
+        <script src="/boot.js"></script>
       </head>
       <body>
         <Component />

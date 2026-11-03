@@ -43,9 +43,6 @@ const API_MODE = (getEnv("PUBLIC_API_MODE") ?? "mock") as
   | "http";
 const API_BASE_URL = getEnv("PUBLIC_API_BASE_URL") ?? "";
 
-export const api: BarriersApi = API_MODE === "http" && API_BASE_URL
+export const api: BarriersApi = API_MODE === "http"
   ? httpAdapterFactory(API_BASE_URL)
   : mockAdapter;
-
-/** Always the in-memory mock, regardless of API_MODE - useful for tests/debugging */
-export const mockApi = mockAdapter;

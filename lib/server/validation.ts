@@ -79,6 +79,13 @@ export function normalizeOptionalReference(
   return value;
 }
 
+// Default cap for JSON request bodies. Login is unauthenticated and must
+// never buffer an unbounded body; admin editors need enough room for long
+// comments but not megabytes. Export uses its own larger cap because a
+// 200k-id selection is legitimately large.
+export const DEFAULT_JSON_BODY_BYTES = 256 * 1024;
+export const EXPORT_JSON_BODY_BYTES = 4 * 1024 * 1024;
+
 export async function readJsonBodyCapped(
   req: Request,
   maxBytes: number,
@@ -127,20 +134,14 @@ export async function readJsonBodyCapped(
   return { ok: false, reason: "invalid" };
 }
 
-// readJsonBody: parses a JSON object body. Returns { ok: true, body } for an
-// object payload, { ok: false } for missing/non-JSON/non-object bodies, so
-// routes answer 400 "Invalid JSON body" uniformly. Export-shaped routes with
-// an optional body (GET without one) keep their own tolerant reader.
+// readJsonBody: parses a capped JSON object body. Every route uses this so
+// an unauthenticated or authenticated caller cannot make the process buffer
+// an arbitrarily large payload. Returns { ok: false } for missing/non-JSON/
+// non-object/oversized bodies, keeping the existing 400 contract.
 export async function readJsonBody(
   req: Request,
+  maxBytes = DEFAULT_JSON_BODY_BYTES,
 ): Promise<{ ok: true; body: Record<string, unknown> } | { ok: false }> {
-  try {
-    const parsed = await req.json();
-    if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
-      return { ok: true, body: parsed as Record<string, unknown> };
-    }
-    return { ok: false };
-  } catch {
-    return { ok: false };
-  }
+  const parsed = await readJsonBodyCapped(req, maxBytes);
+  return parsed.ok ? parsed : { ok: false };
 }

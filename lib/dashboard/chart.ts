@@ -92,9 +92,7 @@ export function summarizeCompliance(
     nonCompliant,
     total,
     // Empty scope is 0%, matching computeKpi: no rows means no compliance.
-    pctCompliant: total === 0
-      ? 0
-      : Math.round((compliant / total) * 1000) / 10,
+    pctCompliant: total === 0 ? 0 : Math.round((compliant / total) * 1000) / 10,
     topNC,
   };
 }

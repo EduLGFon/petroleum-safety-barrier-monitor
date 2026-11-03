@@ -2,9 +2,10 @@
 // Replaces the local SMTP digest: delivery, templates and retry belong to
 // the upstream provider. Detection, rules, watermark and dedup stay local.
 import {
-  assertHttpsUrl,
+  barrierLink,
   buildAlertPayload,
   mapLanding,
+  ocorridoEm,
   type ProviderAccept,
   type ProviderPayload,
 } from "./provider.ts";
@@ -192,31 +193,6 @@ async function throttleAllows(
   return true;
 }
 
-function ocorridoEm(transitionDate: string, now: Date): string {
-  const day = transitionDate.slice(0, 10);
-  if (/^\d{4}-\d{2}-\d{2}$/.test(day)) {
-    const candidate = `${day}T12:00:00-03:00`;
-    if (!Number.isNaN(Date.parse(candidate))) return candidate;
-  }
-  return now.toISOString();
-}
-
-function barrierLink(
-  appBaseUrl: string | undefined,
-  barrierId: number | null,
-): string | undefined {
-  const raw = (appBaseUrl ?? "").trim().replace(/\/+$/, "");
-  if (!raw || barrierId === null) return undefined;
-  // Public links must be https (plain http only for loopback dev). An
-  // invalid or non-https base omits the link instead of breaking the cycle.
-  try {
-    const normalized = assertHttpsUrl(raw, "APP_BASE_URL");
-    return `${normalized}/barriers/${barrierId}`;
-  } catch {
-    return undefined;
-  }
-}
-
 function withPostTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
   let timer: ReturnType<typeof setTimeout> | undefined;
   const timeout = new Promise<never>((_, reject) => {
@@ -320,7 +296,7 @@ export async function runProviderCycle(
           !options.onlyBarrierIds.includes(c.id)
         ) continue;
         const wire = wires.get(c.id);
-        if (!wire) continue;
+        if (!wire || wire.isActive === false) continue;
         const urgency = isCriticalRankId(wire.criticalityId)
           ? "critical"
           : "urgent";
@@ -536,6 +512,7 @@ export async function runProviderCycle(
       transitionDate: event.transitionDate,
       ocorridoEm: ocorridoEm(event.transitionDate, at),
       statusId: event.statusId,
+      historyId: event.payload.historyId,
       category: event.payload.category,
       author: event.payload.author,
       note: event.payload.note,
@@ -628,119 +605,5 @@ export async function runProviderCycle(
   return result;
 }
 
-// maybeSendProviderImmediate: enqueue always; POST at once only for the
-// violada landing (messaging-eligible). Failures stay unsent for the cycle.
-export async function maybeSendProviderImmediate(options: {
-  store: AlertStore;
-  loadBarriers: (ids: number[]) => Promise<Map<number, WireBarrier>>;
-  sender?: ProviderSender;
-  barrier: WireBarrier;
-  statusId: number;
-  transitionDate: string;
-  companyId: number;
-  appBaseUrl?: string;
-  recipients: ProviderCycleRecipient[];
-  labels?: ResolverLabels;
-  statusInfo?: StatusInfo;
-  now?: () => Date;
-  logger?: (line: string) => void;
-}): Promise<{ enqueued: number; posted: number }> {
-  const {
-    store,
-    loadBarriers,
-    sender,
-    barrier,
-    statusId,
-    transitionDate,
-    companyId,
-    appBaseUrl,
-    recipients,
-    labels,
-    statusInfo,
-    now = () => new Date(),
-    logger = () => {},
-  } = options;
-  const { dedupKey } = await import("./store.ts");
-  const { extractDetail } = await import("./enrich.ts");
-  const { resolveBarrier } = await import("../../resolve.ts");
-  const resolved = resolveBarrier(barrier, labels);
-  const event = {
-    barrierId: barrier.id,
-    transitionDate,
-    statusId,
-    dedupKey: dedupKey(barrier.id, transitionDate, statusId),
-    payload: {
-      tag: resolved.tag,
-      location: resolved.location,
-      availability: resolved.availability,
-      criticality: resolved.criticality,
-      urgency: resolved.compliance === "Conforme"
-        ? "none" as const
-        : (isCriticalRankId(barrier.criticalityId)
-          ? "critical" as const
-          : "urgent" as const),
-      attempts: 0,
-      lastError: null,
-      deadLetter: false,
-      delivered: [],
-      ...extractDetail(barrier, transitionDate, statusId, labels),
-    },
-  };
-  const enqueued = await store.enqueue([event]);
-  const mapping = mapLanding(statusId);
-  if (!mapping.send || !mapping.despacharAgora || !sender) {
-    return { enqueued, posted: 0 };
-  }
-  const active = recipients.filter((r) => r.email.trim() !== "");
-  if (active.length === 0) return { enqueued, posted: 0 };
-  const at = now();
-  const criticality = resolved.criticality;
-  const status = landingLabel(statusId, statusInfo);
-  const location = labels?.locations?.[barrier.locationId] ??
-    fromLocationId(barrier.locationId);
-  const payload = buildAlertPayload({
-    barrierId: barrier.id,
-    externalCode: barrier.externalCode || barrier.tag,
-    tag: barrier.tag,
-    criticality,
-    statusLabel: status,
-    locationLabel: location,
-    transitionDate,
-    ocorridoEm: ocorridoEm(transitionDate, at),
-    statusId,
-    companyId,
-    link: barrierLink(appBaseUrl, barrier.id),
-    recipients: active,
-  });
-  if (!payload) return { enqueued, posted: 0 };
-  const unsent = await store.listUnsent(200, 0);
-  const pending = unsent.find((e) => e.dedupKey === event.dedupKey);
-  if (!pending) return { enqueued, posted: 0 };
-  try {
-    const res = await sender.post(payload);
-    if (store.markProviderAccepted) {
-      await store.markProviderAccepted(pending.id, {
-        correlationId: res.correlation_id,
-        parcial: res.parcial,
-        eventoId: res.evento_id,
-        idempotencyKey: res.idempotency_key,
-        enfileirados: res.enfileirados,
-        rejeitados: res.rejeitados,
-        avisos: res.avisos,
-      });
-    } else {
-      for (const r of active) {
-        await store.markDelivered(pending.id, r.email, true);
-      }
-    }
-    return { enqueued, posted: 1 };
-  } catch (err) {
-    logger(
-      `[provider-immediate] post failed: ${
-        err instanceof Error ? err.message : String(err)
-      }`,
-    );
-    void loadBarriers;
-    return { enqueued, posted: 0 };
-  }
-}
+// Immediate send lives in immediate.ts; re-exported for callers.
+export { maybeSendProviderImmediate } from "./immediate.ts";

@@ -2,13 +2,13 @@
 
 Web dashboard tracking operational state of safety barriers protecting process equipment in an oil and gas facility. Barriers are imported from the operator's upstream maintenance system (CMMS), normalised into a small Postgres model, and served to a Fresh/Preact dashboard.
 
-Everything is Deno-only: one process serves SSR pages, JSON API, dashboard island, upstream sync loop and alert digest loop. No `package.json`, no `tsconfig.json`, no ORM.
+Everything is Deno-only: one app serves SSR pages, the JSON API and the dashboard island; the upstream sync and alert delivery loops run as separate optional workers. No `package.json`, no `tsconfig.json`, no ORM.
 
 ## Naming and privacy
 
 - The third-party maintenance system is the upstream CMMS. Identifiers are vendor-prefixed.
 - Operator identity comes from `COMPANY_NAME`; empty means unbranded.
-- No credentials, tokens, connection strings, e-mail addresses, station catalogues or tenant data are reproduced here.
+- No credentials, tokens or connection strings are reproduced here. Fixtures/tests are synthetic, and any operator or station names in them are illustrative; do not treat them as a production catalogue.
 
 ## Features
 
@@ -17,20 +17,20 @@ Everything is Deno-only: one process serves SSR pages, JSON API, dashboard islan
 
 ## Stack
 
-| Concern   | Choice                        |
-| --------- | ----------------------------- |
-| Runtime   | Deno 2.9+                     |
-| Framework | Fresh 2 + Vite                |
-| UI        | Preact 10 + signals           |
-| Database  | PostgreSQL via `@db/postgres` |
-| Mail      | Deno-native SMTP              |
-| Tests     | `deno test` + linkedom        |
+| Concern   | Choice                         |
+| --------- | ------------------------------ |
+| Runtime   | Deno 2.9+                      |
+| Framework | Fresh 2 + Vite                 |
+| UI        | Preact 10 + signals            |
+| Database  | PostgreSQL via `@db/postgres`  |
+| Alerts    | Upstream alert provider (HTTP) |
+| Tests     | `deno test` + linkedom         |
 
 ## Quick start
 
 ```bash
 cp .env.example .env
-export $(grep -v '^#' .env | xargs)
+set -a; source .env; set +a
 deno task db:migrate
 deno task db:seed
 deno task admin:create -- --email you@example.com --password 'at-least-12-chars'

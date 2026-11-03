@@ -4,6 +4,7 @@ import {
   checkAdminAuth,
   denyByCredentials,
   denyDataAuth,
+  resolveAllowedLocationIds,
 } from "./auth.ts";
 
 import { assertStrictEquals } from "jsr:@std/assert@^1";
@@ -73,6 +74,33 @@ Deno.test("denyDataAuth branches anonymous 404 vs credentialed 401", async () =>
   assertStrictEquals(authed.status, 401);
   const b = await authed.json() as { error: string };
   assertStrictEquals(b.error, "invalid session");
+});
+
+Deno.test("station scope fails closed for ungrouped non-admins", () => {
+  assertStrictEquals(
+    resolveAllowedLocationIds({
+      role: "user",
+      user: { allowedLocationIds: null },
+    })?.length ?? -1,
+    0,
+  );
+  assertStrictEquals(
+    resolveAllowedLocationIds({
+      role: "user",
+      user: { allowedLocationIds: [] },
+    })?.length ?? -1,
+    0,
+  );
+  // Missing/malformed identity must never widen access.
+  assertStrictEquals(
+    resolveAllowedLocationIds({ role: "user", user: null })?.length ?? -1,
+    0,
+  );
+  // Admins bypass station scoping.
+  assertStrictEquals(
+    resolveAllowedLocationIds({ role: "admin", user: null }),
+    null,
+  );
 });
 
 Deno.test("authStoreUnavailable answers 503 with retry-after", async () => {

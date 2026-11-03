@@ -93,18 +93,63 @@ export const fracttalRawThrottle = createThrottle({
   windowMs: 60_000,
 });
 
+// isLoopbackHost: true for the proxy address used by the documented Caddy
+// deployment and local development.
+export function isLoopbackHost(host: string): boolean {
+  const h = host.trim().toLowerCase();
+  return h === "localhost" || h === "127.0.0.1" || h === "::1" ||
+    h === "[::1]";
+}
+
+// trustedProxyHosts: loopback plus optional comma-separated
+// TRUSTED_PROXY_IPS entries. Only a request arriving from one of these may
+// contribute an edge-injected client address.
+function trustedProxyHosts(): Set<string> {
+  const out = new Set(["127.0.0.1", "::1", "localhost", "[::1]"]);
+  try {
+    const raw = Deno.env.get("TRUSTED_PROXY_IPS") ?? "";
+    for (const item of raw.split(",")) {
+      const host = item.trim().toLowerCase();
+      if (host !== "") out.add(host);
+    }
+  } catch {
+    // No env access (tests): loopback only.
+  }
+  return out;
+}
+
+// isIpLiteral: narrow shape check before trusting an edge header as a
+// bucket key. Hostnames are not accepted.
+export function isIpLiteral(value: string): boolean {
+  const v = value.trim();
+  if (v === "") return false;
+  // IPv4 or IPv6 (including IPv4-mapped forms).
+  return /^[0-9a-fA-F:.]+$/.test(v) && (v.includes(".") || v.includes(":"));
+}
+
 // routeClientKey: extracts the client identity from a Fresh route context
-// without importing Fresh types (unknown in, string out). Falls back to
-// "unknown" when the shape is unexpected - throttled as one shared bucket
-// rather than crashing the request.
+// without importing Fresh types (unknown in, string out). Behind the
+// documented proxy the socket peer is loopback, so an edge-injected
+// X-Real-IP (or the first X-Forwarded-For hop) is used only when the peer
+// is a trusted proxy. Direct clients can never spoof another bucket.
 export function routeClientKey(ctx: unknown): string {
+  let remote = "unknown";
   if (typeof ctx === "object" && ctx !== null && "info" in ctx) {
     const info = (ctx as { info?: unknown }).info;
     if (typeof info === "object" && info !== null && "remoteAddr" in info) {
-      return throttleKey((info as { remoteAddr?: unknown }).remoteAddr);
+      remote = throttleKey((info as { remoteAddr?: unknown }).remoteAddr);
     }
   }
-  return "unknown";
+  if (!trustedProxyHosts().has(remote)) return remote;
+  if (typeof ctx === "object" && ctx !== null && "req" in ctx) {
+    const req = (ctx as { req?: unknown }).req;
+    if (req instanceof Request) {
+      const real = req.headers.get("x-real-ip")?.trim() ??
+        req.headers.get("x-forwarded-for")?.split(",")[0]?.trim();
+      if (real !== undefined && isIpLiteral(real)) return real;
+    }
+  }
+  return remote;
 }
 
 // throttleKey: client identity for a request. Remote address only - never

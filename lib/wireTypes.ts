@@ -6,6 +6,7 @@
 // fully-resolved, human-readable domain objects.
 
 export interface WireStatusHistoryEntry {
+  id?: number; // barrier_status_history row id (alert dedup identity)
   date: string; // ISO date
   statusId: number; // -> availability status via fromAvailabilityId
   authorId: number; // -> author name via fromAuthorId
