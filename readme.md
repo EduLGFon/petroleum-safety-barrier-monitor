@@ -54,6 +54,11 @@ docker compose run --rm tools deno run -A --env-file=.env scripts/migrate.ts
 docker compose up -d
 ```
 
+For local development, `deno task docker:dev` runs the same migration
+automatically before the app, poller and alert loop start. The Postgres volume
+persists across restarts, so code that depends on a new schema function must
+never assume the database was recreated.
+
 ## Upstream data
 
 ```bash

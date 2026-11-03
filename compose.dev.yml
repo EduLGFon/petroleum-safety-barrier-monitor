@@ -13,6 +13,28 @@
 # reads process env, so no --env-file flag is needed inside the container.
 
 services:
+  # Schema migration runs before anything queries the DB. The dev stack
+  # reuses the named `pgdata` volume, so a schema change (new SQL functions,
+  # triggers, columns) would otherwise leave the app/poller querying a stale
+  # database until someone remembered `docker:dev-down -v` or `db:migrate`.
+  # db/schema.sql is idempotent, so applying it on every dev boot is safe.
+  migrate:
+    image: barrier-monitor:dev
+    command: ["run", "-A", "scripts/migrate.ts"]
+    env_file: [.env]
+    environment:
+      DATABASE_URL: ${DATABASE_URL_DOCKER:-postgres://barrier:barrier@db:5432/barreiras?sslmode=disable}
+      DENO_DIR: /deno-dir
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      - ./:/app
+      - /app/node_modules
+      - /app/_fresh
+      - deno-dir:/deno-dir
+    restart: "no"
+
   # Dashboard via vite HMR (default port 5173, listens on 0.0.0.0 in Docker).
   app:
     # Own tag: dev builds `target: base` (no bundle), so sharing prod's
@@ -35,6 +57,9 @@ services:
     environment:
       DENO_DIR: /deno-dir
       DEV: true
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
     ports:
       - "5173:5173"
     healthcheck:
@@ -52,6 +77,9 @@ services:
       - deno-dir:/deno-dir
     environment:
       DENO_DIR: /deno-dir
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
 
   # Alert digest loop, same watch treatment as the poller.
   alerts:
@@ -64,6 +92,9 @@ services:
       - deno-dir:/deno-dir
     environment:
       DENO_DIR: /deno-dir
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
 
 volumes:
   deno-dir:
