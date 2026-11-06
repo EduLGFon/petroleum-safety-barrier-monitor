@@ -6,7 +6,6 @@ import { extrairMensagemErro } from "./ForcePasswordChange.tsx";
 
 import { assertStrictEquals } from "jsr:@std/assert@^1";
 
-
 Deno.test("extrairMensagemErro localizes a string error", () => {
   assertStrictEquals(
     extrairMensagemErro({ error: "current password is incorrect" }, 400),
