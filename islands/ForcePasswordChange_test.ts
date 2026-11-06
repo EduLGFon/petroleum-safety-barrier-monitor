@@ -2,9 +2,10 @@
 // This is why it exists: the envelope is { error: string, code, requestId },
 // not { error: { message } }, so parsing must read the string field and
 // fall back to a localized status message otherwise.
+import { extrairMensagemErro } from "./ForcePasswordChange.tsx";
+
 import { assertStrictEquals } from "jsr:@std/assert@^1";
 
-import { extrairMensagemErro } from "./ForcePasswordChange.tsx";
 
 Deno.test("extrairMensagemErro localizes a string error", () => {
   assertStrictEquals(
