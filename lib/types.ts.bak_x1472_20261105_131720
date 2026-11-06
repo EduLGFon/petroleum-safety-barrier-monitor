@@ -1,0 +1,306 @@
+// Types - canonical domain types shared by UI, utils, hooks, and API layer.
+// Open string unions (Availability, Compliance, Criticality) plus
+// Barrier, KpiSnapshot, FilterState and table types. Central contract so
+// new station values compile without code changes (dynamic-data principle).
+
+// Row visibility scope (admin Situacao filter) lives in the wire contract;
+// re-exported here so UI code imports domain types from one module.
+import type { RowScope } from "./wireTypes.ts";
+export type { RowScope };
+
+export type Theme = "light" | "dark" | "amoled";
+export type AccentColor =
+  | "blue"
+  | "green"
+  | "red"
+  | "yellow"
+  | "brown"
+  | "mono"
+  | "purple";
+
+// Domain vocabularies - open string unions on purpose. The known literals
+// give autocomplete, while `string & {}` keeps new station statuses,
+// categories, owners, etc. compilable without a code change (dynamic-data
+// principle in agents.md). Never narrow these back to closed unions.
+// (The ban-types ignores below are intentional: openness is the design.)
+export type Availability =
+  | "Disponível"
+  | "Fora de Operação"
+  | "Indisponível Contingenciado"
+  | "Degradado Contingenciado"
+  | "Degradado"
+  | "Indisponível"
+  // deno-lint-ignore ban-types
+  | (string & {});
+
+// deno-lint-ignore ban-types
+export type Compliance = "Conforme" | "Não Conforme" | (string & {});
+// deno-lint-ignore ban-types
+export type Criticality = "ESO" | "A" | "B" | "C" | "D" | (string & {});
+
+export interface StatusHistoryEntry {
+  date: string;
+  status: Availability;
+  author: string;
+  note: string;
+  participants?: Array<{ name: string; role: string }>;
+  syncRunId?: number | null;
+}
+
+export interface StatusParticipant {
+  name: string;
+  role: string;
+}
+
+export interface Barrier {
+  id: number;
+  tag: string;
+  typology: string;
+  location: string;
+  locDesc: string;
+  criticality: Criticality;
+  category: string;
+  grouping: string;
+  owner: string;
+  availability: Availability;
+  compliance: Compliance;
+  comments: string;
+  actionPlan: string;
+  statusSince: string;
+  statusHistory: StatusHistoryEntry[];
+  // Upstream enable flag (false = Desativada) and soft-delete stamp
+  // (null = live). The dashboard Situacao filter and row badges read these.
+  // Optional so old payloads keep parsing; absent reads as active/live.
+  isActive?: boolean;
+  deletedAt?: string | null;
+  // Sheet inventory columns. Free text, "" = unset; the Fracttal sync derives
+  // them, admins may take individual fields over (see manualFields).
+  origin: string;
+  externalCode: string;
+  locationName: string;
+  installLocal: string;
+  equipTypology: string;
+  fieldInstalled: string;
+  fieldOperational: string;
+  opStatus: string;
+  hasMaintPlan: string;
+  planFollowed: string;
+  failureFree: string;
+  maintStatus: string;
+  hasContingency: string;
+  contingencyDesc: string;
+  contingency?: string;
+  contingencyTag?: string;
+  evidenceCode: string;
+  degradationDesc: string;
+  extraComments: string;
+  // Admin-owned fields (empty/absent = everything follows the sync).
+  manualFields?: string[];
+}
+
+export interface Location {
+  code: string;
+  name: string;
+  type: string;
+}
+
+export interface KpiSnapshot {
+  total: number;
+  available: number;
+  outOfService: number;
+  contingencyOutage: number;
+  degradedContingency: number;
+  degraded: number;
+  unavailable: number;
+  other: number;
+  compliant: number;
+  nonCompliant: number;
+  // 0-100 with one decimal (81.3), same scale as summarizeCompliance.
+  pctCompliant: number;
+  criticalNonCompliant: number;
+  // Barriers without an action plan (sheet "Possui Plano" signal). The plan
+  // text itself stays on Barrier.actionPlan; this count feeds the KPI card.
+  withoutActionPlan: number;
+  // Dynamic buckets - the fixed fields above are the well-known fast path,
+  // these maps carry EVERY value present in the data (including future ones)
+  // so totals always reconcile and new statuses never go missing. Keyed by
+  // display string (computeKpi and resolveKpi both produce string keys).
+  // Optional for backward compat with old wire snapshots; StatusBand falls
+  // back to fixed fields when absent (known statuses only).
+  byAvailability?: Record<string, number>;
+  byCompliance?: Record<string, number>;
+  byCriticality?: Record<string, number>;
+  // Non-compliant count per criticality rank (same dynamic keys as
+  // byCriticality). Feeds the ESO/A split on the Críticas NC card and the
+  // per-rank NC rates in the criticality panel.
+  ncByCriticality?: Record<string, number>;
+  // Row visibility scope counts over the same filter subset IGNORING
+  // rowScope (admin Situacao band segments). Absent reads as 0.
+  inactive?: number;
+  deleted?: number;
+  // Server time when the snapshot was computed (ISO). Absent in mock mode.
+  syncedAt?: string;
+}
+
+export interface CategoryCompliance {
+  name: string;
+  Conforme: number;
+  "Não Conforme": number;
+}
+
+// Server-provided filter vocabularies (display strings + per-station counts)
+// for server-paginated mode, where the client never holds the full dataset.
+// Locations and categories carry their numeric ids so dynamic resolution can
+// map wire ids to these very labels instead of seed enums (see resolve.ts).
+export interface Vocabularies {
+  locations: { id: number; code: string; name: string; count: number }[];
+  availabilities: string[];
+  compliances: string[];
+  criticalities: string[];
+  categories: { id: number; label: string }[];
+  // Installation typologies carrying numeric ids, like categories above, so
+  // the typology column filters by id instead of seed enums (see resolve.ts).
+  typologies: { id: number; label: string }[];
+  // Status-history authors so wire authorIds beyond the seed enum resolve
+  // to real names client-side (see resolve.ts). Optional so cached/older
+  // payloads still parse; absent means seed-enum fallback.
+  authors?: { id: number; name: string }[];
+}
+
+// Sync pipeline status for the dashboard indicator (served by
+// GET /api/sync-status from sync_state; lastRun is null on a fresh
+// database, and "unknown" covers that case).
+export interface SyncStatus {
+  state: "syncing" | "idle" | "stale" | "unknown";
+  runningSince: string | null;
+  lastRun: {
+    scope: string;
+    status: "ok" | "failed";
+    startedAt: string;
+    finishedAt: string;
+    inserts: number;
+    updates: number;
+    deletes: number;
+    skips: number;
+    note: string;
+  } | null;
+  totals: { barriers: number };
+}
+
+// One barrier touched by a sync run, for the "what changed" card section
+// (served by GET /api/sync-changes from barrier_status_history by the sync
+// author plus recent soft deletes; kind "new" marks first-time imports).
+export interface SyncChange {
+  barrierId: number;
+  tag: string;
+  location: string;
+  kind: "new" | "updated" | "removed";
+  status: string;
+  changedAt: string;
+}
+
+// Sync change list item with before/after status and field names.
+// Served by GET /api/sync-changes?scope=last-run|last-day (paged); the list
+// stays light so the modal never loads all diffs at once.
+export interface SyncChangeItem extends SyncChange {
+  oldStatus: string | null;
+  changedFields: string[];
+  runId: number | null;
+}
+
+// Per-barrier sync detail, loaded on demand when a row expands.
+// oldSnapshot/newSnapshot carry SignatureSource keys plus availabilityId.
+export interface SyncBarrierDetail {
+  barrierId: number;
+  tag: string;
+  location: string;
+  kind: "new" | "updated" | "removed" | "restored";
+  oldAvailabilityId: number | null;
+  newAvailabilityId: number | null;
+  changedFields: string[];
+  oldSnapshot: Record<string, unknown>;
+  newSnapshot: Record<string, unknown>;
+  changedAt: string;
+  runId: number | null;
+}
+
+// One finished sync run for the run picker / scope header.
+export interface SyncRun {
+  id: number;
+  scope: string;
+  status: "ok" | "failed";
+  startedAt: string;
+  finishedAt: string;
+  inserts: number;
+  updates: number;
+  deletes: number;
+  skips: number;
+}
+
+// Grouped counts powering the tab summary (reconciles to total).
+export interface SyncChangeSummary {
+  total: number;
+  byKind: Record<string, number>;
+  byStatus: Record<string, number>;
+  critical: number;
+}
+
+export type SortableColumn = keyof Pick<
+  Barrier,
+  | "id"
+  | "tag"
+  | "location"
+  | "typology"
+  | "criticality"
+  | "category"
+  | "owner"
+  | "availability"
+  | "compliance"
+  | "contingency"
+  | "statusSince"
+>;
+
+export interface FilterState {
+  query: string;
+  // Categorical filters accept either a single value (legacy) or a list of
+  // values (multi-select), so several statuses/categories can be picked at
+  // once. Empty string / empty array both mean "no filter".
+  availability: string | string[];
+  compliance: string | string[];
+  category: string | string[];
+  // Installation typology (Tipologia column filter, "" / [] = all).
+  typology: string | string[];
+  // Sheet GERAL Criticidade (all critical in the managed scope).
+  criticality: string | string[];
+  // Rank gate: true restricts to the critical tiers (ESO/A); false or
+  // absent lists every rank. Defaults true so the full-equipment catalog
+  // still opens on the safety-relevant subset.
+  criticalOnly: boolean;
+  // Action-plan presence: "" (all), "Com plano", "Sem plano".
+  plan: string;
+  since: string;
+  until: string;
+  // Row visibility scope (admin Situacao filter). Default active lists
+  // enabled live rows only; inactive/deleted/all reveal Desativada,
+  // Excluida, or every row. Non-admins are forced to active on restore.
+  rowScope: RowScope;
+  page: number;
+  pageSize: number;
+  sortCol: SortableColumn;
+  sortDir: "asc" | "desc";
+}
+
+// Authenticated session identity crossed from server routes into islands
+// (Header menu). Client-safe subset: no hashes, no expiry internals.
+export interface AuthUser {
+  id: number;
+  email: string;
+  name: string;
+  phone: string;
+  role: "admin" | "user";
+  allowedLocationIds: number[] | null;
+  authSource: "local" | "entra";
+}
+
+// Connection health state shared by the header indicator and sync model.
+export type Conn = "connected" | "reconnecting" | "disconnected";

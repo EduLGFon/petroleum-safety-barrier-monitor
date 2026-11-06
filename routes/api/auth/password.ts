@@ -68,7 +68,11 @@ export const handler = define.handlers({
     }
     let auth;
     try {
-      auth = await requireAuthenticated(ctx.req);
+      // The only caller allowed through the pending-password gate: this
+      // route IS the way out of it.
+      auth = await requireAuthenticated(ctx.req, {
+        allowPendingPasswordChange: true,
+      });
     } catch (err) {
       return authStoreUnavailable(
         "POST /api/auth/password",
@@ -118,9 +122,15 @@ export const handler = define.handlers({
       // transaction as the hash change: a hijacked cookie must not survive.
       // The guard makes a concurrent admin reset/deactivation win instead of
       // being overwritten by this request after it verified the old hash.
+      // Clearing the flag in the SAME update as the hash is what makes the
+      // door open again. Two statements could leave an account with a new
+      // password and the gate still shut if the second one failed.
       const updated = await updateUser(
         row.id,
-        { passwordHash: await hashPassword(next) },
+        {
+          passwordHash: await hashPassword(next),
+          mustChangePassword: false,
+        },
         { expectedPasswordHash: passwordHash, requireActive: true },
       );
       if (!updated) return unauthorized("not authenticated", requestId);

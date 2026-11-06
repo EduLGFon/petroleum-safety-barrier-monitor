@@ -72,7 +72,7 @@ export async function getOidcConfiguration(
     client_id: entra.clientId,
     redirect_uris: [entra.redirectUri],
     response_types: ["code"],
-    scope: "openid profile",
+    scope: "openid profile email",
     token_endpoint_auth_method: entra.credential.type === "key"
       ? "private_key_jwt"
       : "client_secret_post",
@@ -117,7 +117,7 @@ export function buildAuthorizationRequestUrl(
   const entra = config.entra!;
   const url = buildAuthorizationUrl(oidc, {
     redirect_uri: entra.redirectUri,
-    scope: "openid profile",
+    scope: "openid profile email",
     state,
     nonce,
     code_challenge: codeChallenge,

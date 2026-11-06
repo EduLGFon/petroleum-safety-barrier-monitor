@@ -94,3 +94,26 @@ export function validateNewPassword(raw: unknown): string {
   }
   return raw;
 }
+
+// generateTemporaryPassword: a password the system invents for a brand-new
+// account, one per person. Never a shared constant: a single default handed
+// to everybody is one guess away from being everybody's password, and the
+// e-mail addresses here follow a public pattern.
+//
+// The alphabet drops the characters people misread when a password travels
+// by e-mail and gets typed by hand (0/O, 1/l/I). 16 characters out of this
+// 54-symbol set is ~92 bits - far past what a throwaway credential needs,
+// and still short enough to retype.
+const TEMP_ALPHABET = "ABCDEFGHJKMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789";
+
+export function generateTemporaryPassword(length = 16): string {
+  if (length < 12) throw new Error("temporary password must be at least 12");
+  const bytes = new Uint32Array(length);
+  crypto.getRandomValues(bytes);
+  // Rejection-free modulo is fine here: the bias over a 32-bit draw into a
+  // 54-symbol alphabet is far below anything that matters for a credential
+  // that lives until the first sign-in.
+  let out = "";
+  for (const b of bytes) out += TEMP_ALPHABET[b % TEMP_ALPHABET.length];
+  return out;
+}
