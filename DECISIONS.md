@@ -97,3 +97,54 @@ Append-only architecture decision records. Newest last.
   codes resolve against the catalog.
 
 See git history for full context.
+
+- D29: email-based first Entra sign-in bind. Pre-provisioning by object id
+  alone does not scale because the admin knows addresses, not GUIDs. A
+  pending row (`auth_source = 'entra'`, null `entra_oid`, active) binds on
+  the first valid token whose address claim from the validated token matches,
+  via `getPendingEntraUserByEmail` plus `bindEntraIdentity` with an
+  `entra_oid is null` lock and a partial unique index on
+  `(entra_tid, entra_oid)`. The bind trusts the tenant address claim and so
+  requires the account to be explicitly pre-provisioned as Entra; no JIT and
+  no local-account match limit the blast radius. Later sign-ins match by
+  object id only. There is no just-in-time creation: an unknown address is
+  denied. Local accounts are never matched by this path; conversion stays an
+  explicit admin act.
+
+- D30: plaintext temporary password delivery exception and mitigations. The
+  admin create and reset responses return `temporaryPassword` once, and the
+  MSGFLOW account notice carries `senha` once, because the admin needs a
+  handover path when messaging is down. The password is never stored in
+  clear in Postgres, never logged, and provider echo bodies are read only
+  for the envelope `erro`/`mensagem`, the password is scrubbed, and raw
+  bodies are never returned or logged. It has no
+  expiry in this release (`validade_horas` omitted on purpose because the
+  system cannot keep an expiry promise it does not enforce). What limits its
+  use is the forced-change gate: `must_change_password = true` until the
+  person replaces it. MSGFLOW dedupes by account and kind, so a repeated
+  `senha_reset` for the same account may not send a second message; the admin
+  screen still shows the password once, which is the path that always works.
+
+- D31: forced-change gate exceptions and 403 sentinel. A pending local
+  session is authenticated but held: guarded reads and writes answer `403
+  PASSWORD_CHANGE_REQUIRED`, and `GET /` redirects to `/trocar-senha`, so
+  the client shows the change form instead of logging the person out.
+  Exemptions are narrow: `POST /api/auth/password` (the only way out, with
+  session identity and current-password check), `POST /api/auth/logout` and
+  `GET /api/auth/me` (both resolve the raw session and stay usable while
+  pending), `ADMIN_TOKEN` (no user identity to change), and the
+  `/trocar-senha` page itself. Entra accounts
+  never carry the flag because they have no password to change.
+
+- D32: shared-password backfill and per-person import. The legacy import
+  created every local account with one shared default, so one guess covered
+  every address. `scripts/import-users.ts` now draws a distinct password per
+  new user with `generateTemporaryPassword()`, hashes per user, sets the
+  forced-change flag, and writes `email<TAB>password` lines to a 0600 file
+  inside `scripts/fixtures/` (default `_users_credentials.txt`, path and
+  count only on stdout). Existing users keep their password. The one-time
+  `scripts/flag-shared-password-users.ts` backfill reads the legacy secret
+  only from `LEGACY_SHARED_PASSWORD` env or `--password`, dry-runs by
+  default, checks only local active unflagged rows, and prints counts only;
+  `--apply` sets the flag with a session-safe update. Both paths are
+  idempotent.

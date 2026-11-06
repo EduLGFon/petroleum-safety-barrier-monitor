@@ -39,9 +39,33 @@ Writes (admin): status, barrier edit, contingency links, recipients, users, aler
 - Throttle: 120 req/min reads, 30 req/min writes, 120 req/min exports, 10 req/min password changes per client. Behind the bundled Caddy template the app trusts `X-Real-IP` only from the loopback proxy; extra proxies must be listed in `TRUSTED_PROXY_IPS`.
 - `/api/health` is unthrottled and DB-free; `/api/ready` is the orchestrator readiness check.
 
+## Users and passwords
+
+- `POST /api/users` (admin): without `password` the server draws a per-person
+  password, stores only its hash with `must_change_password = true`, and
+  returns `{ ..., temporaryPassword, aviso }` once. With `password` it keeps
+  the old behavior and sets no flag. `aviso` reports the MSGFLOW notice
+  outcome (`{ sent, reason? }`). See D30.
+- `PATCH /api/users/:id` (admin): `resetPassword: true` draws a fresh
+  password, sets `mustChangePassword: true`, revokes sessions, and returns
+  the same once-only `temporaryPassword` plus `aviso`. It cannot be combined
+  with `password`. This is the repair path for shared or leaked passwords.
+  See D30 and D32.
+- `POST /api/auth/password` (session only, allowed while pending): verifies
+  the current password, sets the new one, clears the flag, and revokes every
+  session in the same transaction. Token auth is rejected here. See D31.
+- Pending local sessions get `403 { error, code: "PASSWORD_CHANGE_REQUIRED" }`
+  on every guarded read and write. The UI answers by showing the
+  change-password form. Exempt: `POST /api/auth/password` (the way out),
+  `POST /api/auth/logout` and `GET /api/auth/me` (both resolve the raw
+  session and stay usable while pending), token auth (no user identity), and
+  the `/trocar-senha` page (the single exception). `GET /` redirects pending
+  local users to `/trocar-senha`;
+  Entra accounts never enter this state. See D31.
+
 ## SSO
 
-When `AUTH_SSO_ENABLED=true`, Entra routes are available under `/auth/entra/*`. Entra users are pre-provisioned and cannot use local password login or admin password reset. See `docs/SSO-ENTRA-PLAN.md`.
+When `AUTH_SSO_ENABLED=true`, Entra routes are available under `/auth/entra/*`. Entra users are pre-provisioned by an admin; the first valid sign-in binds by email to the pending row, later sign-ins match by object id. There is no JIT creation: an address nobody enabled gets no access. Entra users cannot use local password login or admin password reset. Converting a local account to Entra preserves id and history and clears the password hash. See `docs/SSO-ENTRA-PLAN.md` and D29.
 
 ## Setup
 
