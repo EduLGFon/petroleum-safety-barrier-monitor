@@ -23,6 +23,7 @@ export interface UserRow {
   name: string;
   phone: string;
   password_hash: string | null;
+  must_change_password: boolean;
   role: UserRole;
   active: boolean;
   created_at: string;
@@ -40,6 +41,9 @@ export interface PublicUser {
   active: boolean;
   created_at: string;
   auth_source: AuthSource;
+  // Surfaced so the admin list can show who has never picked a password of
+  // their own - the people still holding a system-generated one.
+  must_change_password: boolean;
 }
 
 export interface AdminUser extends PublicUser {
@@ -57,6 +61,7 @@ export function toPublicUser(row: UserRow): PublicUser {
     active: row.active,
     created_at: row.created_at,
     auth_source: row.auth_source,
+    must_change_password: row.must_change_password,
   };
 }
 
@@ -81,12 +86,12 @@ export function normalizeAuthSource(raw: unknown): AuthSource {
 }
 
 const PUBLIC_COLUMNS =
-  "id, email, name, coalesce(phone, '') as phone, role, active, created_at::text, auth_source";
+  "id, email, name, coalesce(phone, '') as phone, role, active, created_at::text, auth_source, must_change_password";
 
 const ADMIN_COLUMNS = `${PUBLIC_COLUMNS}, entra_oid`;
 
 const USER_COLUMNS =
-  "id, email, name, coalesce(phone, '') as phone, password_hash, role, active, created_at::text, auth_source, entra_tid, entra_oid";
+  "id, email, name, coalesce(phone, '') as phone, password_hash, role, active, created_at::text, auth_source, entra_tid, entra_oid, must_change_password";
 
 export async function listUsers(): Promise<AdminUser[]> {
   const rows = await queryRows<AdminUser>(
@@ -128,6 +133,56 @@ export async function getUserByEntraIdentity(
   return rows[0] ?? null;
 }
 
+// getPendingEntraUserByEmail: an account an admin enabled for SSO that has
+// not completed its first Entra sign-in yet, so no object id is bound. This
+// is the e-mail hand-off that spares the admin from hunting a GUID: the admin
+// enables SSO for an address, the first valid sign-in for that same address
+// binds the identity, and every later sign-in matches by object id.
+//
+// It is not an authorization by itself: the row must already exist, be
+// active, and be marked auth_source='entra'. A local account is never matched
+// here - converting one is an explicit admin act.
+export async function getPendingEntraUserByEmail(
+  email: string,
+  query: TxQuery = queryRows,
+): Promise<UserRow | null> {
+  const rows = await query<UserRow>(
+    `select ${USER_COLUMNS}
+     from users
+     where auth_source = 'entra' and entra_oid is null and active
+       and lower(email) = lower($1)`,
+    [email],
+  );
+  return rows[0] ?? null;
+}
+
+// bindEntraIdentity: writes tenant + object id onto a pending Entra account.
+// The "entra_oid is null" in the WHERE clause is a lock, not a filter: when
+// two callbacks race on the same account only one of them matches, and the
+// unique index on (entra_tid, entra_oid) refuses binding one object id to a
+// second account. A caller that gets null must deny the sign-in instead of
+// retrying, because null means the row stopped being bindable.
+export async function bindEntraIdentity(
+  userId: number,
+  tenantId: string,
+  objectId: string,
+  query: TxQuery = queryRows,
+): Promise<UserRow | null> {
+  const rows = await query<UserRow>(
+    `update users
+        set entra_tid = $2,
+            entra_oid = $3,
+            updated_at = now()
+      where id = $1
+        and auth_source = 'entra'
+        and entra_oid is null
+        and active
+      returning ${USER_COLUMNS}`,
+    [userId, tenantId, normalizeEntraObjectId(objectId)],
+  );
+  return rows[0] ?? null;
+}
+
 export async function countUsers(): Promise<number> {
   const rows = await queryRows<{ n: string }>(
     `select count(*)::text as n from users`,
@@ -164,12 +219,17 @@ export async function createUser(input: {
   authSource?: AuthSource;
   entraTid?: string | null;
   entraOid?: string | null;
+  // Marks an account created with a system-generated password. It is a
+  // property of how the account was born, so it is set here and not by a
+  // later update: an account that is never flagged is one whose password
+  // the person chose.
+  mustChangePassword?: boolean;
 }): Promise<AdminUser> {
   const authSource = input.authSource ?? "local";
   const rows = await queryRows<AdminUser>(
     `insert into users
-       (email, name, phone, password_hash, role, auth_source, entra_tid, entra_oid)
-     values ($1, $2, $3, $4, $5, $6, $7, $8)
+       (email, name, phone, password_hash, role, auth_source, entra_tid, entra_oid, must_change_password)
+     values ($1, $2, $3, $4, $5, $6, $7, $8, $9)
      returning ${ADMIN_COLUMNS}`,
     [
       normalizeEmail(input.email),
@@ -180,6 +240,7 @@ export async function createUser(input: {
       normalizeAuthSource(authSource),
       input.entraTid ?? null,
       input.entraOid ?? null,
+      input.mustChangePassword === true,
     ],
   );
   const created = rows[0];
@@ -214,6 +275,7 @@ export async function updateUser(
     authSource?: unknown;
     entraTid?: string | null;
     entraOid?: unknown;
+    mustChangePassword?: boolean;
   },
   guard: {
     expectedPasswordHash?: string;
@@ -239,6 +301,10 @@ export async function updateUser(
     if (patch.phone !== undefined) {
       args.push(normalizePhone(patch.phone));
       sets.push(`phone = $${args.length}`);
+    }
+    if (patch.mustChangePassword !== undefined) {
+      args.push(patch.mustChangePassword === true);
+      sets.push(`must_change_password = $${args.length}`);
     }
     if (patch.authSource !== undefined) {
       const nextSource = normalizeAuthSource(patch.authSource);

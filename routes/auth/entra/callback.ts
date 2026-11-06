@@ -34,7 +34,11 @@ import { validateEntraClaims } from "../../../lib/server/auth/entra/claims.ts";
 
 import { deleteExpiredSessions } from "../../../lib/server/sql/sessions.ts";
 
-import { getUserByEntraIdentity } from "../../../lib/server/sql/users.ts";
+import {
+  bindEntraIdentity,
+  getPendingEntraUserByEmail,
+  getUserByEntraIdentity,
+} from "../../../lib/server/sql/users.ts";
 
 import {
   createSession,
@@ -160,10 +164,37 @@ export const handler = define.handlers({
       return redirect(loginError("failed"), cookieHeaders);
     }
 
-    const user = await getUserByEntraIdentity(
+    // Identity resolution runs the same ladder the suite's hub uses, minus
+    // its last rung. First the bound object id, which is what every sign-in
+    // after the first one matches on. Then, only for accounts an admin has
+    // already enabled for SSO and that carry no object id yet, the address
+    // this validated token vouches for - and that match binds the object id
+    // for good, so the e-mail path never runs twice for the same account.
+    //
+    // The rung that is deliberately missing is just-in-time creation: an
+    // address nobody enabled in this app does not get in, however valid its
+    // token. Enabling access stays an explicit act inside the monitor.
+    let user = await getUserByEntraIdentity(
       identity.tenantId,
       identity.objectId,
     ).catch(() => null);
+    if (!user) {
+      for (const email of identity.emails) {
+        const pending = await getPendingEntraUserByEmail(email)
+          .catch(() => null);
+        if (!pending) continue;
+        // A null here means the row stopped being bindable between the read
+        // and the write - another callback won the race, or an admin changed
+        // the account. Deny instead of falling through to the next address:
+        // the account was found, and a second address must not re-decide it.
+        user = await bindEntraIdentity(
+          pending.id,
+          identity.tenantId,
+          identity.objectId,
+        ).catch(() => null);
+        break;
+      }
+    }
     if (!user || !user.active) {
       cookieHeaders.set("set-cookie", clearBindingCookie(secure));
       return redirect(loginError("no_access", flow.returnTo), cookieHeaders);

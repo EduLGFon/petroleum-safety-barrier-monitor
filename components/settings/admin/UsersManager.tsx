@@ -242,6 +242,12 @@ export function UsersManager(
   const [role, setRole] = useState<"admin" | "user">("user");
   const [authSource, setAuthSource] = useState<"local" | "entra">("local");
   const [entraObjectId, setEntraObjectId] = useState("");
+  // Shown once, right after creation: the server returns the generated
+  // password in the creation response and never again. Losing it means an
+  // admin reset, not a lookup.
+  const [senhaTemporaria, setSenhaTemporaria] = useState<
+    { email: string; senha: string } | null
+  >(null);
   const [busy, setBusy] = useState(false);
   const [editFor, setEditFor] = useState<number | null>(null);
   const [notice, setNotice] = useState("");
@@ -265,15 +271,21 @@ export function UsersManager(
   }
 
   async function convertToEntra(user: PublicUser) {
-    const objectId = prompt("Object ID do Microsoft Entra para " + user.email);
-    if (!objectId) return;
+    // No GUID is asked for, and no native dialog is opened. The account is
+    // switched to Microsoft sign-in and stays pending until the person signs
+    // in for the first time with this same address; that sign-in binds the
+    // identity. The trade this makes explicit: from here on the password no
+    // longer works for this account.
     try {
       await adminApi(`/api/users/${user.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ authSource: "entra", entraObjectId: objectId }),
+        body: JSON.stringify({ authSource: "entra" }),
       });
-      setNotice(user.email + " convertido para Entra.");
+      setNotice(
+        user.email +
+          " passa a entrar pela Microsoft. A senha deixa de valer para esta conta.",
+      );
       await refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
@@ -286,7 +298,7 @@ export function UsersManager(
     e.preventDefault();
     setBusy(true);
     try {
-      await adminApi("/api/users", {
+      const criado = await adminApi("/api/users", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -295,9 +307,19 @@ export function UsersManager(
           phone,
           role,
           authSource,
-          ...(authSource === "local" ? { password } : { entraObjectId }),
+          // An empty password field is not an empty password: it is the
+          // admin saying "let the system draw one". Sending "" would be a
+          // validation error instead.
+          ...(authSource === "local"
+            ? (password === "" ? {} : { password })
+            : entraObjectId.trim() === ""
+            ? {}
+            : { entraObjectId: entraObjectId.trim() }),
         }),
       });
+      const devolvida = (criado as { temporaryPassword?: string } | null)
+        ?.temporaryPassword;
+      if (devolvida) setSenhaTemporaria({ email, senha: devolvida });
       setEmail("");
       setName("");
       setPhone("");
@@ -337,6 +359,37 @@ export function UsersManager(
         count={`${users.length} no total`}
       />
       {error && <ErrorBanner message={error} onRetry={() => void refresh()} />}
+      {senhaTemporaria && (
+        <div
+          style={{
+            border: "1px solid var(--warn, #b45309)",
+            borderRadius: 8,
+            padding: "12px 14px",
+            display: "grid",
+            gap: 6,
+          }}
+        >
+          <strong>Senha temporária de {senhaTemporaria.email}</strong>
+          <code
+            style={{ fontSize: 18, letterSpacing: 1, userSelect: "all" }}
+          >
+            {senhaTemporaria.senha}
+          </code>
+          <span style={{ opacity: 0.8 }}>
+            Anote e entregue à pessoa agora: esta senha não é guardada e não
+            aparece de novo. No primeiro acesso ela é obrigada a trocar.
+          </span>
+          <div>
+            <button
+              type="button"
+              onClick={() => setSenhaTemporaria(null)}
+              style={ghostBtn}
+            >
+              Já anotei
+            </button>
+          </div>
+        </div>
+      )}
       <AdminCard>
         <form
           onSubmit={create}
@@ -383,12 +436,11 @@ export function UsersManager(
           </Field>
           {authSource === "local"
             ? (
-              <Field label="Senha (12+)">
+              <Field label="Senha (vazia = o sistema gera)">
                 <input
                   type="password"
-                  required
                   minLength={12}
-                  placeholder="••••••••••••"
+                  placeholder="deixe vazio e o sistema gera uma"
                   value={password}
                   onInput={(e) => setPassword(e.currentTarget.value)}
                   style={inputSt}
@@ -396,11 +448,10 @@ export function UsersManager(
               </Field>
             )
             : (
-              <Field label="Object ID do Entra">
+              <Field label="Object ID do Entra (opcional)">
                 <input
                   type="text"
-                  required
-                  placeholder="00000000-0000-0000-0000-000000000000"
+                  placeholder="deixe vazio: vincula no primeiro acesso"
                   value={entraObjectId}
                   onInput={(e) => setEntraObjectId(e.currentTarget.value)}
                   style={inputSt}

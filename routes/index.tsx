@@ -50,6 +50,19 @@ export default define.page(async function Home(
   // Logged-out visitors go to /login (with a return ticket); only
   // authenticated sessions ever reach the data loads below.
   if (session.state !== "authenticated") return toLogin(url);
+  // An account still carrying the password the system generated never gets
+  // the dashboard. The API guards already deny its data calls with 403, so
+  // without this redirect the person would stare at a shell full of errors.
+  // The gate is here, on the server, and not in the island: a client-side
+  // check is a suggestion, and this one decides access.
+  if (
+    session.user?.authSource === "local" && session.user?.mustChangePassword
+  ) {
+    return new Response(null, {
+      status: 303,
+      headers: { location: "/trocar-senha" },
+    });
+  }
   const apiMode = getApiMode();
   const companyName = getCompanyName();
   const sessionUser = session.user;

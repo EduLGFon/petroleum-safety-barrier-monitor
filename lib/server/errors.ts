@@ -15,6 +15,11 @@ export type ApiErrorCode =
   | "NOT_FOUND"
   | "UNAUTHORIZED"
   | "FORBIDDEN"
+  // Distinct from FORBIDDEN on purpose: the credential is valid and the
+  // person is signed in, they just still carry a system-generated password.
+  // Clients must show the change-password screen, not a permission error and
+  // not a logout.
+  | "PASSWORD_CHANGE_REQUIRED"
   | "RATE_LIMITED"
   | "UNAVAILABLE"
   | "INTERNAL";

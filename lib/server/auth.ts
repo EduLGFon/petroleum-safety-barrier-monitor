@@ -91,19 +91,57 @@ export async function resolveRequestAuth(req: Request): Promise<RequestAuth> {
   return { ok: true, role: user.role, user, via: "session" };
 }
 
+// PASSWORD_CHANGE_REQUIRED: the one message that must NOT read as a dead
+// session. The account is valid and the person is signed in - they simply
+// still carry the password the system generated. Routes deny with 403 and
+// this exact code so the UI shows the change-password form instead of
+// bouncing to login (a 401 here would log the person out forever: they can
+// only fix it while signed in).
+export const PASSWORD_CHANGE_REQUIRED = "password change required";
+
+// pendingPasswordChange: true only for a SESSION whose user still carries a
+// system-generated password. Token auth is exempt on purpose - ADMIN_TOKEN
+// carries no user identity, so there is no password to change, and gating it
+// would break the ops scripts and the smoke.
+//
+// Only a LOCAL account can be held here. An Entra account has no password at
+// all, so it could never clear the flag: holding one would send the person to
+// /trocar-senha forever, with nothing to type. The conversion clears the flag
+// too, but this is the floor - a stale flag on an Entra row must not lock
+// somebody out.
+function pendingPasswordChange(auth: RequestAuth): boolean {
+  return auth.ok && auth.via === "session" &&
+    auth.user?.auth_source === "local" &&
+    auth.user?.mustChangePassword === true;
+}
+
 // requireAdminAuth: guard for writes, user and alert management. Accepts a
 // valid ADMIN_TOKEN or an active admin session; anything else denies.
 export async function requireAdminAuth(req: Request): Promise<RequestAuth> {
   const auth = await resolveRequestAuth(req);
   if (!auth.ok) return auth;
+  if (pendingPasswordChange(auth)) {
+    return { ok: false, message: PASSWORD_CHANGE_REQUIRED };
+  }
   if (auth.role !== "admin") return { ok: false, message: "admin only" };
   return auth;
 }
 
 // requireAuthenticated: guard for lookups needed by admin UI. Accepts a
 // valid ADMIN_TOKEN or any active session (admin or user).
-export async function requireAuthenticated(req: Request): Promise<RequestAuth> {
-  return await resolveRequestAuth(req);
+export async function requireAuthenticated(
+  req: Request,
+  opts: { allowPendingPasswordChange?: boolean } = {},
+): Promise<RequestAuth> {
+  const auth = await resolveRequestAuth(req);
+  // The opt-out exists for exactly one caller: POST /api/auth/password, the
+  // only way out of the pending state. Gating it would lock the door from
+  // the inside - the person could neither use the app nor fix the password.
+  // It is a named flag and not a path check so the exemption is greppable.
+  if (!opts.allowPendingPasswordChange && pendingPasswordChange(auth)) {
+    return { ok: false, message: PASSWORD_CHANGE_REQUIRED };
+  }
+  return auth;
 }
 
 // hasCredentials: true when the caller presented anything (session cookie
@@ -131,6 +169,12 @@ export function denyByCredentials(
     return apiError(404, "NOT_FOUND", "not found", requestId);
   }
   if (message === "admin only") return forbidden(message, requestId);
+  // Not a 401: the credential is alive. 401 would make the client clear the
+  // session and send the person to login, where the same password still
+  // works and the loop repeats.
+  if (message === PASSWORD_CHANGE_REQUIRED) {
+    return apiError(403, "PASSWORD_CHANGE_REQUIRED", message, requestId);
+  }
   return apiError(401, "UNAUTHORIZED", message, requestId);
 }
 
@@ -144,6 +188,9 @@ export type DataAuth =
 // same way instead of re-branching on `anonymous`.
 export function denyDataAuth(dataAuth: DataAuth, requestId: string): Response {
   if (!dataAuth.ok) {
+    if (dataAuth.message === PASSWORD_CHANGE_REQUIRED) {
+      return apiError(403, "PASSWORD_CHANGE_REQUIRED", dataAuth.message, requestId);
+    }
     return dataAuth.anonymous
       ? notFound("not found", requestId)
       : unauthorized(dataAuth.message, requestId);
@@ -171,6 +218,9 @@ export function authStoreUnavailable(
 export async function requireDataAuth(req: Request): Promise<DataAuth> {
   const anonymous = !hasCredentials(req);
   const auth = await resolveRequestAuth(req);
+  if (auth.ok && pendingPasswordChange(auth)) {
+    return { ok: false, anonymous: false, message: PASSWORD_CHANGE_REQUIRED };
+  }
   if (auth.ok) return { ok: true, role: auth.role, user: auth.user };
   return { ok: false, anonymous, message: auth.message };
 }

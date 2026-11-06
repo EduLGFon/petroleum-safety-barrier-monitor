@@ -24,6 +24,7 @@ import {
 } from "../../lib/server/throttle.ts";
 
 import {
+  generateTemporaryPassword,
   hashPassword,
   validateNewPassword,
 } from "../../lib/server/auth/password.ts";
@@ -42,6 +43,8 @@ import {
 import { replaceUserGroups } from "../../lib/server/sql/access-groups.ts";
 
 import { loadAuthConfig, loadServerConfig } from "../../lib/server/config.ts";
+
+import { sendAccountNotice } from "../../lib/server/alerts/account-notice.ts";
 
 import { define } from "../../utils.ts";
 
@@ -150,6 +153,7 @@ export const handler = define.handlers({
         throw new Error("authSource must be local or entra");
       }
       let user;
+      let temporaryPassword: string | null = null;
       if (authSource === "entra") {
         const authConfig = loadAuthConfig();
         if (!authConfig.ssoEnabled || !authConfig.entra) {
@@ -158,17 +162,36 @@ export const handler = define.handlers({
         if (body.password !== undefined) {
           throw new Error("password is not allowed for Entra users");
         }
+        // The object id is optional on purpose. Supplying it binds the
+        // identity up front; omitting it leaves the account pending, and the
+        // first valid Entra sign-in for this same address binds it. Asking an
+        // admin to paste a GUID per person does not scale, and the address is
+        // the thing they actually know.
+        const entraOid = body.entraObjectId === undefined ||
+            body.entraObjectId === null || body.entraObjectId === ""
+          ? null
+          : normalizeEntraObjectId(body.entraObjectId);
         user = await createUser({
           email: body.email as string,
           name: (body.name as string | undefined) ?? "",
           phone: body.phone,
           role,
           authSource: "entra",
-          entraTid: authConfig.entra.tenantId,
-          entraOid: normalizeEntraObjectId(body.entraObjectId),
+          // Tenant travels with the object id: a pending account carries
+          // neither, so the two columns are never half-filled.
+          entraTid: entraOid === null ? null : authConfig.entra.tenantId,
+          entraOid,
         });
       } else {
-        const password = validateNewPassword(body.password);
+        // No password in the body means the admin is not inventing one: the
+        // system draws a different password for this person and marks the
+        // account, so the first sign-in has to replace it. An admin who does
+        // send a password keeps the old behaviour and no mark.
+        const informada = typeof body.password === "string" &&
+          body.password !== "";
+        const password = informada
+          ? validateNewPassword(body.password)
+          : generateTemporaryPassword();
         user = await createUser({
           email: body.email as string,
           name: (body.name as string | undefined) ?? "",
@@ -176,14 +199,40 @@ export const handler = define.handlers({
           passwordHash: await hashPassword(password),
           role,
           authSource: "local",
+          mustChangePassword: !informada,
         });
+        // Returned exactly once, in the creation response, and never stored
+        // in clear anywhere. Until the MSGFLOW message exists this is the
+        // only way the admin can hand the credential over.
+        if (!informada) temporaryPassword = password;
       }
       // A non-admin with no group is intentionally zero-access (fail
       // closed). Persist the explicit memberships chosen at creation.
       if (user.role !== "admin" && groupIds.length > 0) {
         await replaceUserGroups(user.id, groupIds as number[]);
       }
-      return created(user, requestId);
+      // The notice is best effort and comes AFTER the account exists. If
+      // MSGFLOW is down the person is still created and the password is
+      // still on the admin's screen - the path that never depends on
+      // anything else. The outcome rides back so the screen can say whether
+      // the message left, instead of letting the admin assume it did.
+      let aviso: { sent: boolean; reason?: string } | null = null;
+      if (temporaryPassword !== null) {
+        aviso = await sendAccountNotice({
+          accountId: user.id,
+          kind: "senha_criada",
+          password: temporaryPassword,
+          name: user.name || user.email,
+          login: user.email,
+          phone: user.phone,
+        });
+      }
+      return created(
+        temporaryPassword === null
+          ? user
+          : { ...user, temporaryPassword, aviso },
+        requestId,
+      );
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       if (message.includes("duplicate") || message.includes("unique")) {
