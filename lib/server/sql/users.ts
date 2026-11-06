@@ -149,23 +149,50 @@ export async function getPendingEntraUserByEmail(
   const rows = await query<UserRow>(
     `select ${USER_COLUMNS}
      from users
-     where auth_source = 'entra' and entra_oid is null and active
-       and lower(email) = lower($1)`,
-    [email],
+     where auth_source = 'entra'
+       and entra_oid is null
+       and entra_tid is null
+       and active
+       and lower(email) = $1`,
+    [normalizeEmail(email)],
   );
   return rows[0] ?? null;
 }
 
+export interface PendingEntraMatch {
+  id: number;
+  email: string;
+}
+
+// selectPendingEntraMatch: the one pending account the token's address claims
+// agree on, or null when there is none or more than one distinct id. The
+// callback never guesses: a second address pointing at a different account is
+// a reason to deny, not to pick the first match. Two claims that resolve to
+// the same id are still one account (the stored email is what matched).
+export function selectPendingEntraMatch(
+  matches: readonly PendingEntraMatch[],
+): PendingEntraMatch | null {
+  const byId = new Map<number, PendingEntraMatch>();
+  for (const match of matches) {
+    if (!byId.has(match.id)) byId.set(match.id, match);
+  }
+  if (byId.size !== 1) return null;
+  return byId.values().next().value ?? null;
+}
+
 // bindEntraIdentity: writes tenant + object id onto a pending Entra account.
-// The "entra_oid is null" in the WHERE clause is a lock, not a filter: when
-// two callbacks race on the same account only one of them matches, and the
-// unique index on (entra_tid, entra_oid) refuses binding one object id to a
-// second account. A caller that gets null must deny the sign-in instead of
-// retrying, because null means the row stopped being bindable.
+// The null checks in the WHERE clause are a lock, not a filter: when two
+// callbacks race on the same account only one of them matches, and the unique
+// index on (entra_tid, entra_oid) refuses binding one object id to a second
+// account. The address must be the exact one that was looked up, so a row
+// whose email changed between the read and the write is not bound by mistake.
+// A caller that gets null must deny the sign-in instead of retrying, because
+// null means the row stopped being bindable.
 export async function bindEntraIdentity(
   userId: number,
   tenantId: string,
   objectId: string,
+  email: string,
   query: TxQuery = queryRows,
 ): Promise<UserRow | null> {
   const rows = await query<UserRow>(
@@ -176,9 +203,16 @@ export async function bindEntraIdentity(
       where id = $1
         and auth_source = 'entra'
         and entra_oid is null
+        and entra_tid is null
+        and lower(email) = lower($4)
         and active
       returning ${USER_COLUMNS}`,
-    [userId, tenantId, normalizeEntraObjectId(objectId)],
+    [
+      userId,
+      tenantId,
+      normalizeEntraObjectId(objectId),
+      normalizeEmail(email),
+    ],
   );
   return rows[0] ?? null;
 }
@@ -286,6 +320,17 @@ export async function updateUser(
     await lockActiveAdmins(query);
     const current = await getUserById(id, query);
     if (!current) return null;
+    const nextAuthSource = patch.authSource === undefined
+      ? current.auth_source
+      : normalizeAuthSource(patch.authSource);
+    const convertingToEntra = current.auth_source === "local" &&
+      nextAuthSource === "entra";
+    // Converting drops the password so the row can satisfy
+    // users_auth_source_shape. A password in the same call would fight that
+    // conversion in the same SET list, so refuse before the UPDATE runs.
+    if (convertingToEntra && patch.passwordHash !== undefined) {
+      throw new Error("cannot set a password while converting to Entra");
+    }
     const sets: string[] = [];
     const args: unknown[] = [];
     let identityChanged = false;
@@ -302,13 +347,12 @@ export async function updateUser(
       args.push(normalizePhone(patch.phone));
       sets.push(`phone = $${args.length}`);
     }
-    if (patch.mustChangePassword !== undefined) {
+    if (patch.mustChangePassword !== undefined && !convertingToEntra) {
       args.push(patch.mustChangePassword === true);
       sets.push(`must_change_password = $${args.length}`);
     }
     if (patch.authSource !== undefined) {
-      const nextSource = normalizeAuthSource(patch.authSource);
-      if (current.auth_source === "local" && nextSource === "entra") {
+      if (convertingToEntra) {
         if (
           current.role === "admin" && current.active &&
           (await countActiveLocalAdmins(query)) <= 1
@@ -321,12 +365,19 @@ export async function updateUser(
         sets.push(`auth_source = $${args.length}`);
         args.push(null);
         sets.push(`password_hash = $${args.length}`);
-      } else if (current.auth_source === "entra" && nextSource === "local") {
+        // The flag is meaningless on an Entra row (there is no password to
+        // replace) and a stale true would send the person to /trocar-senha
+        // forever, so clear it in this same UPDATE.
+        args.push(false);
+        sets.push(`must_change_password = $${args.length}`);
+      } else if (
+        current.auth_source === "entra" && nextAuthSource === "local"
+      ) {
         throw new Error("conversion back to local is not supported");
-      } else if (nextSource !== current.auth_source) {
+      } else if (nextAuthSource !== current.auth_source) {
         identityChanged = true;
         revokeSessions = true;
-        args.push(nextSource);
+        args.push(nextAuthSource);
         sets.push(`auth_source = $${args.length}`);
       }
     }

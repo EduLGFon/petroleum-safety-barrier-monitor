@@ -4,10 +4,16 @@ import {
   checkAdminAuth,
   denyByCredentials,
   denyDataAuth,
+  PASSWORD_CHANGE_REQUIRED,
+  pendingPasswordChange,
   resolveAllowedLocationIds,
 } from "./auth.ts";
 
 import { assertStrictEquals } from "jsr:@std/assert@^1";
+
+import type { SessionUser } from "./sql/sessions.ts";
+
+import type { RequestAuth } from "./auth.ts";
 
 function req(authHeader?: string): Request {
   return new Request(
@@ -101,6 +107,86 @@ Deno.test("station scope fails closed for ungrouped non-admins", () => {
     resolveAllowedLocationIds({ role: "admin", user: null }),
     null,
   );
+});
+
+function sessionUser(
+  overrides: Partial<SessionUser> = {},
+): SessionUser {
+  return {
+    id: 1,
+    email: "user@example.com",
+    name: "User",
+    phone: "",
+    role: "user",
+    active: true,
+    allowedLocationIds: null,
+    auth_source: "local",
+    auth_method: "password",
+    mustChangePassword: false,
+    ...overrides,
+  };
+}
+
+Deno.test("pendingPasswordChange holds only local session accounts", () => {
+  const local: RequestAuth = {
+    ok: true,
+    role: "user",
+    user: sessionUser({ mustChangePassword: true }),
+    via: "session",
+  };
+  assertStrictEquals(pendingPasswordChange(local), true);
+
+  const localCleared: RequestAuth = {
+    ok: true,
+    role: "user",
+    user: sessionUser({ mustChangePassword: false }),
+    via: "session",
+  };
+  assertStrictEquals(pendingPasswordChange(localCleared), false);
+
+  // A stale flag on an Entra row must never trap the person on a screen with
+  // no password to type.
+  const entra: RequestAuth = {
+    ok: true,
+    role: "user",
+    user: sessionUser({ auth_source: "entra", mustChangePassword: true }),
+    via: "session",
+  };
+  assertStrictEquals(pendingPasswordChange(entra), false);
+
+  // ADMIN_TOKEN carries no identity and stays exempt from the password gate.
+  const token: RequestAuth = {
+    ok: true,
+    role: "admin",
+    user: null,
+    via: "token",
+  };
+  assertStrictEquals(pendingPasswordChange(token), false);
+
+  const denied: RequestAuth = { ok: false, message: "invalid session" };
+  assertStrictEquals(pendingPasswordChange(denied), false);
+});
+
+Deno.test("denyByCredentials answers 403 for a pending password change", async () => {
+  const res = denyByCredentials(
+    req("Bearer wrong"),
+    PASSWORD_CHANGE_REQUIRED,
+    "r-7",
+  );
+  assertStrictEquals(res.status, 403);
+  const body = await res.json() as { error: string; code: string };
+  assertStrictEquals(body.code, "PASSWORD_CHANGE_REQUIRED");
+  assertStrictEquals(body.error, PASSWORD_CHANGE_REQUIRED);
+});
+
+Deno.test("denyDataAuth answers 403 for a pending password change", async () => {
+  const res = denyDataAuth(
+    { ok: false, anonymous: false, message: PASSWORD_CHANGE_REQUIRED },
+    "r-8",
+  );
+  assertStrictEquals(res.status, 403);
+  const body = await res.json() as { error: string; code: string };
+  assertStrictEquals(body.code, "PASSWORD_CHANGE_REQUIRED");
 });
 
 Deno.test("authStoreUnavailable answers 503 with retry-after", async () => {

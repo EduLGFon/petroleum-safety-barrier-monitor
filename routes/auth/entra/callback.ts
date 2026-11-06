@@ -11,6 +11,13 @@ import {
 } from "../../../lib/server/auth/session.ts";
 
 import {
+  bindEntraIdentity,
+  getPendingEntraUserByEmail,
+  getUserByEntraIdentity,
+  selectPendingEntraMatch,
+} from "../../../lib/server/sql/users.ts";
+
+import {
   clearBindingCookie,
   consumeFlow,
   isSecureForConfig,
@@ -28,22 +35,16 @@ import {
   unavailable,
 } from "../../../lib/server/errors.ts";
 
+import {
+  createSession,
+  deleteSession,
+} from "../../../lib/server/sql/sessions.ts";
+
 import { routeClientKey, writeThrottle } from "../../../lib/server/throttle.ts";
 
 import { validateEntraClaims } from "../../../lib/server/auth/entra/claims.ts";
 
 import { deleteExpiredSessions } from "../../../lib/server/sql/sessions.ts";
-
-import {
-  bindEntraIdentity,
-  getPendingEntraUserByEmail,
-  getUserByEntraIdentity,
-} from "../../../lib/server/sql/users.ts";
-
-import {
-  createSession,
-  deleteSession,
-} from "../../../lib/server/sql/sessions.ts";
 
 import { loadAuthConfig } from "../../../lib/server/config.ts";
 
@@ -167,9 +168,16 @@ export const handler = define.handlers({
     // Identity resolution runs the same ladder the suite's hub uses, minus
     // its last rung. First the bound object id, which is what every sign-in
     // after the first one matches on. Then, only for accounts an admin has
-    // already enabled for SSO and that carry no object id yet, the address
-    // this validated token vouches for - and that match binds the object id
-    // for good, so the e-mail path never runs twice for the same account.
+    // already enabled for SSO and that carry no object id yet, the addresses
+    // this validated token vouches for - and a single unambiguous match binds
+    // the object id for good, so the e-mail path never runs twice for the
+    // same account.
+    //
+    // Every address is resolved before anything is written. Two claims that
+    // point at two different pending accounts are ambiguous, and guessing one
+    // would hand this identity an account the token did not clearly own. The
+    // selector keeps only distinct ids: exactly one id binds, zero or more
+    // than one denies.
     //
     // The rung that is deliberately missing is just-in-time creation: an
     // address nobody enabled in this app does not get in, however valid its
@@ -179,20 +187,30 @@ export const handler = define.handlers({
       identity.objectId,
     ).catch(() => null);
     if (!user) {
+      const matches: Array<{ id: number; email: string }> = [];
+      let lookupFailed = false;
       for (const email of identity.emails) {
-        const pending = await getPendingEntraUserByEmail(email)
-          .catch(() => null);
-        if (!pending) continue;
+        try {
+          const pending = await getPendingEntraUserByEmail(email);
+          if (pending) matches.push({ id: pending.id, email });
+        } catch {
+          // A store failure must not shrink the candidate set and make an
+          // ambiguous sign-in look unique: fail closed on the whole rung.
+          lookupFailed = true;
+        }
+      }
+      const match = lookupFailed ? null : selectPendingEntraMatch(matches);
+      if (match) {
         // A null here means the row stopped being bindable between the read
-        // and the write - another callback won the race, or an admin changed
-        // the account. Deny instead of falling through to the next address:
-        // the account was found, and a second address must not re-decide it.
+        // and the write - another callback won the race, an admin changed
+        // the account, or the address changed. Deny instead of retrying:
+        // null means the row is no longer the one that was looked up.
         user = await bindEntraIdentity(
-          pending.id,
+          match.id,
           identity.tenantId,
           identity.objectId,
+          match.email,
         ).catch(() => null);
-        break;
       }
     }
     if (!user || !user.active) {

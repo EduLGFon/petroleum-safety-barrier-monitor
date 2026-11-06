@@ -69,6 +69,10 @@ const SECRET_SUBSTRINGS = [
   "passwd",
   "pass",
   "pwd",
+  // MSGFLOW payloads spell the password as `senha`; the notice path logs
+  // around those payloads and must redact the value if one ever reaches a
+  // log field.
+  "senha",
   "secret",
   "token",
   "authorization",

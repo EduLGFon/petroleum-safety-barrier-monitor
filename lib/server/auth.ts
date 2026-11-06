@@ -109,7 +109,12 @@ export const PASSWORD_CHANGE_REQUIRED = "password change required";
 // /trocar-senha forever, with nothing to type. The conversion clears the flag
 // too, but this is the floor - a stale flag on an Entra row must not lock
 // somebody out.
-function pendingPasswordChange(auth: RequestAuth): boolean {
+//
+// POST /api/auth/logout and GET /api/auth/me deliberately do not call the
+// require* guards: they resolve the raw session and stay usable while the
+// flag is set, so the person can sign out or learn who they are without
+// being trapped on the change-password screen.
+export function pendingPasswordChange(auth: RequestAuth): boolean {
   return auth.ok && auth.via === "session" &&
     auth.user?.auth_source === "local" &&
     auth.user?.mustChangePassword === true;
@@ -189,7 +194,12 @@ export type DataAuth =
 export function denyDataAuth(dataAuth: DataAuth, requestId: string): Response {
   if (!dataAuth.ok) {
     if (dataAuth.message === PASSWORD_CHANGE_REQUIRED) {
-      return apiError(403, "PASSWORD_CHANGE_REQUIRED", dataAuth.message, requestId);
+      return apiError(
+        403,
+        "PASSWORD_CHANGE_REQUIRED",
+        dataAuth.message,
+        requestId,
+      );
     }
     return dataAuth.anonymous
       ? notFound("not found", requestId)

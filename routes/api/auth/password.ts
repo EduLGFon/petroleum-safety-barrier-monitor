@@ -26,24 +26,24 @@ import {
 } from "../../../lib/server/auth/password.ts";
 
 import {
+  buildExpiredCookie,
+  isSecureRequest,
+} from "../../../lib/server/auth/session.ts";
+
+import {
   passwordThrottle,
   routeClientKey,
 } from "../../../lib/server/throttle.ts";
 
 import { getUserById, updateUser } from "../../../lib/server/sql/users.ts";
 
-import {
-  buildExpiredCookie,
-  isSecureRequest,
-} from "../../../lib/server/auth/session.ts";
-
 import { loadServerConfig } from "../../../lib/server/config.ts";
 
 import { readJsonBody } from "../../../lib/server/validation.ts";
 
-import { define } from "../../../utils.ts";
-
 import { denyIfCrossSite } from "../../../lib/server/csrf.ts";
+
+import { define } from "../../../utils.ts";
 
 export const handler = define.handlers({
   // POST { currentPassword, newPassword } - verifies the current password,

@@ -2,16 +2,16 @@
 // This is why it exists: Login => Dashboard, so the session gate runs
 // before any data load. Logged-out visitors redirect to /login with ?next=
 // for a post-login return. No data ever ships to strangers.
-import { requirePageSession, toLogin } from "../lib/server/page-auth.ts";
-
-import { resolveAllowedLocationIds } from "../lib/server/auth.ts";
-
-import { getVocabularies } from "../lib/server/sql/vocabularies.ts";
-
 import {
   isDevFracttalRawEnabled,
   loadServerConfig,
 } from "../lib/server/config.ts";
+
+import { requirePageSession, toLogin } from "../lib/server/page-auth.ts";
+
+import { getVocabularies } from "../lib/server/sql/vocabularies.ts";
+
+import { resolveAllowedLocationIds } from "../lib/server/auth.ts";
 
 import { Dashboard } from "../islands/Dashboard.tsx";
 

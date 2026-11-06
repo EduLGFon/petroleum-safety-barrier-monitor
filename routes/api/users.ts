@@ -12,6 +12,12 @@ import {
 } from "../../lib/server/errors.ts";
 
 import {
+  generateTemporaryPassword,
+  hashPassword,
+  validateNewPassword,
+} from "../../lib/server/auth/password.ts";
+
+import {
   authStoreUnavailable,
   denyByCredentials,
   requireAdminAuth,
@@ -24,12 +30,6 @@ import {
 } from "../../lib/server/throttle.ts";
 
 import {
-  generateTemporaryPassword,
-  hashPassword,
-  validateNewPassword,
-} from "../../lib/server/auth/password.ts";
-
-import {
   normalizeEntraObjectId,
   readJsonBody,
 } from "../../lib/server/validation.ts";
@@ -40,15 +40,15 @@ import {
   normalizeRole,
 } from "../../lib/server/sql/users.ts";
 
-import { replaceUserGroups } from "../../lib/server/sql/access-groups.ts";
-
 import { loadAuthConfig, loadServerConfig } from "../../lib/server/config.ts";
 
 import { sendAccountNotice } from "../../lib/server/alerts/account-notice.ts";
 
-import { define } from "../../utils.ts";
+import { replaceUserGroups } from "../../lib/server/sql/access-groups.ts";
 
 import { denyIfCrossSite } from "../../lib/server/csrf.ts";
+
+import { define } from "../../utils.ts";
 
 // guardAdmin: shared admin gate with the caller's requestId (never a fresh
 // one, so denied responses correlate with the handler's log line). Returns
@@ -183,13 +183,13 @@ export const handler = define.handlers({
           entraOid,
         });
       } else {
-        // No password in the body means the admin is not inventing one: the
-        // system draws a different password for this person and marks the
-        // account, so the first sign-in has to replace it. An admin who does
-        // send a password keeps the old behaviour and no mark.
-        const informada = typeof body.password === "string" &&
-          body.password !== "";
-        const password = informada
+        // undefined or "" means the admin is not inventing a password: the
+        // system draws a different one for this person and marks the account,
+        // so the first sign-in has to replace it. Any other value goes
+        // through the policy and must fail loudly - a number, an object or a
+        // short string must never silently become a generated password.
+        const hasPassword = body.password !== undefined && body.password !== "";
+        const password = hasPassword
           ? validateNewPassword(body.password)
           : generateTemporaryPassword();
         user = await createUser({
@@ -199,12 +199,12 @@ export const handler = define.handlers({
           passwordHash: await hashPassword(password),
           role,
           authSource: "local",
-          mustChangePassword: !informada,
+          mustChangePassword: !hasPassword,
         });
         // Returned exactly once, in the creation response, and never stored
         // in clear anywhere. Until the MSGFLOW message exists this is the
         // only way the admin can hand the credential over.
-        if (!informada) temporaryPassword = password;
+        if (!hasPassword) temporaryPassword = password;
       }
       // A non-admin with no group is intentionally zero-access (fail
       // closed). Persist the explicit memberships chosen at creation.
@@ -218,20 +218,28 @@ export const handler = define.handlers({
       // the message left, instead of letting the admin assume it did.
       let aviso: { sent: boolean; reason?: string } | null = null;
       if (temporaryPassword !== null) {
-        aviso = await sendAccountNotice({
-          accountId: user.id,
-          kind: "senha_criada",
-          password: temporaryPassword,
-          name: user.name || user.email,
-          login: user.email,
-          phone: user.phone,
-        });
+        try {
+          aviso = await sendAccountNotice({
+            accountId: user.id,
+            kind: "senha_criada",
+            password: temporaryPassword,
+            name: user.name || user.email,
+            login: user.email,
+            phone: user.phone,
+          });
+        } catch {
+          // Fail soft: the account exists, the password is on the admin's
+          // screen, and a notice failure must not turn creation into a 500.
+          aviso = { sent: false, reason: "notice failed" };
+        }
       }
+      if (temporaryPassword === null) return created(user, requestId);
+      // The generated password goes back exactly once and must not be stored
+      // by any intermediary cache.
       return created(
-        temporaryPassword === null
-          ? user
-          : { ...user, temporaryPassword, aviso },
+        { ...user, temporaryPassword, aviso },
         requestId,
+        { headers: { "cache-control": "no-store" } },
       );
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
@@ -247,7 +255,8 @@ export const handler = define.handlers({
         message.includes("email") || message.includes("name") ||
         message.includes("password") || message.includes("role") ||
         message.includes("phone") || message.includes("invalid phone") ||
-        message.includes("accessGroupIds")
+        message.includes("accessGroupIds") || message.includes("authSource") ||
+        message.includes("entra") || message.includes("SSO")
       ) {
         return badRequest(message, requestId);
       }
