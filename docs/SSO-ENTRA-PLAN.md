@@ -8,7 +8,10 @@ Implemented behind `AUTH_SSO_ENABLED=false`. Uses the authorization code flow wi
 
 ## Behavior
 
-- Entra users are pre-provisioned by tenant ID + object ID; no JIT creation and no email auto-link.
+- Entra users are pre-provisioned by an admin; there is no JIT creation. The
+  first valid sign-in binds by email to the pending row (same address, null
+  `entra_oid`), and later sign-ins match by `(entra_tid, entra_oid)`. An
+  address nobody enabled gets no access, however valid its token.
 - Local roles stay authoritative; Entra groups/roles are not mapped.
 - IdP tokens are used only inside the callback and then discarded; no access, refresh, or ID token is stored.
 - The app keeps the opaque Postgres session and `barrier_session` cookie.

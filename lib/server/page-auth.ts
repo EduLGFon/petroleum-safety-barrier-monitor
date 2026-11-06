@@ -38,6 +38,7 @@ export async function requirePageSession(req: Request): Promise<PageSession> {
         role: user.role,
         allowedLocationIds: user.allowedLocationIds,
         authSource: user.auth_source,
+        mustChangePassword: user.mustChangePassword === true,
       },
     };
   } catch {

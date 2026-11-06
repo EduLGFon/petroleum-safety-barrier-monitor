@@ -1,17 +1,72 @@
-// Tests for the user import parser, station resolution and audit mode.
+// Tests for the user import parser, station resolution, audit mode,
+// credential file helpers.
 import {
   auditUsers,
+  DEFAULT_CREDENTIALS_FILE,
   DEFAULT_USERS_FILE,
   firstPhone,
+  formatCredentialLine,
+  maskEmail,
   MISSING_STATIONS_SENTINEL,
   parseUsers,
+  resolveCredentialsOutPath,
   resolveStations,
+  safeReason,
 } from "./import-users.ts";
 
-import { assertEquals } from "jsr:@std/assert@^1";
+import { assertEquals, assertThrows } from "jsr:@std/assert@^1";
 
 Deno.test("default users file points at the local roster fixture", () => {
   assertEquals(DEFAULT_USERS_FILE, "scripts/fixtures/_users.txt");
+});
+
+Deno.test("default credentials file stays inside the gitignored fixtures", () => {
+  assertEquals(
+    DEFAULT_CREDENTIALS_FILE,
+    "scripts/fixtures/_users_credentials.txt",
+  );
+});
+
+Deno.test("maskEmail shows the first letter and domain only", () => {
+  assertEquals(maskEmail("ada@example.com"), "a***@example.com");
+  assertEquals(maskEmail("A@Example.com"), "A***@Example.com");
+  assertEquals(maskEmail("no-at"), "***");
+  assertEquals(maskEmail(""), "***");
+});
+
+Deno.test("safeReason masks addresses and caps length", () => {
+  assertEquals(
+    safeReason("MSGFLOW recusou ada@example.com: cota", "ada@example.com"),
+    "MSGFLOW recusou a***@example.com: cota",
+  );
+  assertEquals(safeReason(undefined, "ada@example.com"), "sem motivo");
+  assertEquals(safeReason("x".repeat(200), "ada@example.com").length, 120);
+  assertEquals(
+    safeReason("ok para bob@example.com", "ada@example.com"),
+    "ok para b***@example.com",
+  );
+});
+
+Deno.test("formatCredentialLine joins email and password with a tab", () => {
+  assertEquals(
+    formatCredentialLine("ada@example.com", "s3cret-value"),
+    "ada@example.com\ts3cret-value",
+  );
+});
+
+Deno.test("resolveCredentialsOutPath accepts the default and rejects escapes", () => {
+  assertEquals(
+    resolveCredentialsOutPath(undefined),
+    "scripts/fixtures/_users_credentials.txt",
+  );
+  assertEquals(
+    resolveCredentialsOutPath("scripts/fixtures/custom.txt"),
+    "scripts/fixtures/custom.txt",
+  );
+  assertThrows(() => resolveCredentialsOutPath("/tmp/creds.txt"));
+  assertThrows(() => resolveCredentialsOutPath("scripts/other.txt"));
+  assertThrows(() => resolveCredentialsOutPath("scripts/fixtures/creds.csv"));
+  assertThrows(() => resolveCredentialsOutPath("scripts/fixtures/../x.txt"));
 });
 
 Deno.test("parseUsers reads blocks, stations and the first phone", () => {

@@ -3,6 +3,13 @@
 // and resetting passwords are the core of access management. The last
 // active admin cannot be demoted, deactivated, or deleted.
 import {
+  generateTemporaryPassword,
+  hashPassword,
+  validateNewPassword,
+  verifyPassword,
+} from "../../../lib/server/auth/password.ts";
+
+import {
   badRequest,
   internal,
   newRequestId,
@@ -10,12 +17,6 @@ import {
   ok,
   rateLimited,
 } from "../../../lib/server/errors.ts";
-
-import {
-  hashPassword,
-  validateNewPassword,
-  verifyPassword,
-} from "../../../lib/server/auth/password.ts";
 
 import {
   authStoreUnavailable,
@@ -40,11 +41,13 @@ import {
   loadServerConfig,
 } from "../../../lib/server/config.ts";
 
+import { sendAccountNotice } from "../../../lib/server/alerts/account-notice.ts";
+
 import { routeClientKey, writeThrottle } from "../../../lib/server/throttle.ts";
 
-import { define } from "../../../utils.ts";
-
 import { denyIfCrossSite } from "../../../lib/server/csrf.ts";
+
+import { define } from "../../../utils.ts";
 
 export const handler = define.handlers({
   // PATCH { name?, role?, active?, password? } - partial update.
@@ -86,14 +89,50 @@ export const handler = define.handlers({
       role?: unknown;
       active?: unknown;
       password?: unknown;
+      resetPassword?: unknown;
       authSource?: unknown;
       entraObjectId?: unknown;
     };
     try {
       let passwordHash: string | undefined;
+      // resetPassword: the admin asks the system to draw a new password
+      // instead of inventing one. This is how an account that still carries
+      // a shared or leaked password gets a private one, and it is the only
+      // path that also notifies the person.
+      let generatedPassword: string | null = null;
       let entraTid: string | null | undefined;
       let entraOid: string | null | undefined;
+      if (body.resetPassword === true) {
+        // One intent per call: a drawn password plus an explicit one, or a
+        // password plus an auth-source switch, would produce a conflicting
+        // SET in the same UPDATE. Reject before any write.
+        if (
+          body.password !== undefined || body.authSource !== undefined ||
+          body.entraObjectId !== undefined
+        ) {
+          return badRequest(
+            "resetPassword cannot be combined with password, authSource or entraObjectId",
+            requestId,
+          );
+        }
+        const target = await getUserById(id);
+        if (!target) return notFound("User not found", requestId);
+        if (target.auth_source !== "local") {
+          return badRequest(
+            "Microsoft accounts have no password to reset",
+            requestId,
+          );
+        }
+        generatedPassword = generateTemporaryPassword();
+        passwordHash = await hashPassword(generatedPassword);
+      }
       if (body.password !== undefined) {
+        if (body.authSource !== undefined || body.entraObjectId !== undefined) {
+          return badRequest(
+            "password cannot be combined with authSource or entraObjectId",
+            requestId,
+          );
+        }
         const target = await getUserById(id);
         if (!target) return notFound("User not found", requestId);
         if (target.auth_source !== "local" || target.password_hash === null) {
@@ -129,11 +168,20 @@ export const handler = define.handlers({
           if (!authConfig.ssoEnabled || !authConfig.entra) {
             return badRequest("SSO is not enabled", requestId);
           }
-          if (body.authSource === "entra") {
-            entraTid = authConfig.entra.tenantId;
-          }
-          if (body.entraObjectId !== undefined) {
+          // Converting without an object id is the normal case: the admin
+          // knows the address, not the GUID. The account becomes pending and
+          // the first valid Entra sign-in for that address binds it. Tenant
+          // and object id travel together so the pair is never half-filled -
+          // a row with a tenant and no object id would read as "bound to a
+          // tenant" while matching nothing.
+          const hasObjectId = body.entraObjectId !== undefined &&
+            body.entraObjectId !== null && body.entraObjectId !== "";
+          if (hasObjectId) {
             entraOid = normalizeEntraObjectId(body.entraObjectId);
+            entraTid = authConfig.entra.tenantId;
+          } else if (body.authSource === "entra") {
+            entraTid = null;
+            entraOid = null;
           }
         }
       }
@@ -146,12 +194,37 @@ export const handler = define.handlers({
         role: body.role,
         active: body.active,
         passwordHash,
+        // A drawn password is temporary by definition: the person must
+        // replace it on the next sign-in, same as a brand-new account.
+        ...(generatedPassword !== null ? { mustChangePassword: true } : {}),
         authSource: body.authSource,
         entraTid,
         entraOid,
       });
       if (!updated) return notFound("User not found", requestId);
-      return ok(updated, requestId);
+      if (generatedPassword === null) return ok(updated, requestId);
+      // Same contract as creation: the password rides back once so the admin
+      // can hand it over even if the message failed, and the outcome of the
+      // notice is reported instead of assumed. Fail soft on any unexpected
+      // notice error so a successful reset is not reported as a failure.
+      let aviso: { sent: boolean; reason?: string } | null = null;
+      try {
+        aviso = await sendAccountNotice({
+          accountId: updated.id,
+          kind: "senha_reset",
+          password: generatedPassword,
+          name: updated.name || updated.email,
+          login: updated.email,
+          phone: updated.phone,
+        });
+      } catch {
+        aviso = { sent: false, reason: "notice failed" };
+      }
+      return ok(
+        { ...updated, temporaryPassword: generatedPassword, aviso },
+        requestId,
+        { headers: { "cache-control": "no-store" } },
+      );
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       // A self-demotion/deactivation is still the last-admin guard, but the

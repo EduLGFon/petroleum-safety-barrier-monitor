@@ -66,6 +66,28 @@ Core: `locations`, `categories`, `criticality_levels`, `typologies`, `groupings`
 - Sync runs are recorded in `sync_state`.
 - Exports stream in 5,000-row batches with a 200,000-row ceiling.
 
+## Auth columns
+
+- `users.auth_source`: `local` or `entra`. Entra rows carry a nullable
+  password hash (null once converted or provisioned without a password).
+- `users.must_change_password`: true while the account still carries a
+  system-generated password. The API gate denies with
+  `403 PASSWORD_CHANGE_REQUIRED` until `POST /api/auth/password` clears it.
+  Only local accounts can be held; Entra conversion clears it in the same
+  UPDATE. See D30 and D31.
+- Pending Entra shape: `auth_source = 'entra'` with
+  `(entra_tid, entra_oid) = (null, null)`. The first valid sign-in for the
+  same address binds both columns at once; the pair is never half-filled.
+  Bound rows match by `(entra_tid, entra_oid)` with a partial unique index on
+  Entra rows. Local rows always keep both columns null. See D29.
+- The legacy shared-password cleanup (`scripts/flag-shared-password-users.ts`)
+  only sets `must_change_password = true` on local active rows whose hash
+  still matches the legacy secret. It revokes no sessions and prints counts
+  only. The cleanup file (`db/cleanup-unused-auth.sql`) still drops
+  `last_login_at` and `password_resets`, but its `must_change_password` DROP
+  was removed and must never be reactivated; current schema keeps the column
+  above. See D32.
+
 ## Verification
 
 `deno task check` includes the migration-order guard. Schema changes must be re-runnable and update `docs/ARCHITECTURE.md` in the same commit.

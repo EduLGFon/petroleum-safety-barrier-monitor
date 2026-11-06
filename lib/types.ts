@@ -300,6 +300,9 @@ export interface AuthUser {
   role: "admin" | "user";
   allowedLocationIds: number[] | null;
   authSource: "local" | "entra";
+  // Set while the account still carries the password the system generated.
+  // Pages read it to send the person to /trocar-senha before anything else.
+  mustChangePassword: boolean;
 }
 
 // Connection health state shared by the header indicator and sync model.

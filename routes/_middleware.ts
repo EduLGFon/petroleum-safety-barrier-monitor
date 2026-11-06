@@ -4,7 +4,9 @@
 // every 25-100-row JSON page (plus CSV exports) rode the wire uncompressed.
 // The middleware post-processes responses only: document routes pass
 // through untouched, API JSON/CSV gains Content-Encoding when the client
-// accepts it, and immutable assets gain a year-long TTL.
+// accepts it, immutable assets gain a year-long TTL, and the auth pages
+// (/login, /trocar-senha) are marked no-store because they can carry a
+// person's address or an SSO hand-off.
 import { define } from "../utils.ts";
 
 function isImmutableAsset(pathname: string): boolean {
@@ -14,6 +16,13 @@ function isImmutableAsset(pathname: string): boolean {
     pathname === "/boot.js" ||
     pathname === "/favicon.svg" ||
     pathname === "/favicon.ico";
+}
+
+// isAuthPage: pages that can carry a user's address or SSO state in the
+// response. Fresh page components cannot attach headers themselves, so the
+// middleware marks these responses private and uncacheable here.
+function isAuthPage(pathname: string): boolean {
+  return pathname === "/login" || pathname === "/trocar-senha";
 }
 
 function isCompressible(contentType: string | null): boolean {
@@ -128,6 +137,20 @@ export const handler = define.middleware(async (ctx) => {
       return applySecurityHeaders(
         ctx.req,
         new Response(stream, {
+          status: res.status,
+          statusText: res.statusText,
+          headers: next,
+        }),
+      );
+    }
+    // Auth pages may render a user's email or an SSO hand-off. They are never
+    // shared-cacheable, and a handler that already chose a policy keeps it.
+    if (isAuthPage(url.pathname) && !res.headers.has("cache-control")) {
+      const next = new Headers(res.headers);
+      next.set("cache-control", "no-store, private");
+      return applySecurityHeaders(
+        ctx.req,
+        new Response(res.body, {
           status: res.status,
           statusText: res.statusText,
           headers: next,

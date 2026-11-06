@@ -639,7 +639,7 @@ from users u cross join access_groups g
 where u.role = 'user' and g.name = 'Acesso geral'
 on conflict do nothing;
 
--- ─── User authentication extensions + sessions ────────────────────────────
+-- User authentication extensions and sessions.
 create index if not exists idx_users_role on users(role);
 
 alter table users add column if not exists auth_source text not null default 'local';
@@ -647,10 +647,25 @@ alter table users add column if not exists entra_tid text;
 alter table users add column if not exists entra_oid text;
 alter table users alter column password_hash drop not null;
 
+-- Temporary password marker. A true value means the account still uses the
+-- password the system generated: the person can sign in, but every guarded
+-- route answers 403 until the password is replaced. The column existed once
+-- and was dropped by db/cleanup-unused-auth.sql while the feature was
+-- incomplete; that drop was removed so a later migration cannot delete the
+-- column silently again.
+alter table users add column if not exists must_change_password boolean not null default false;
+
 alter table users drop constraint if exists users_auth_source_valid;
 alter table users add constraint users_auth_source_valid
   check (auth_source in ('local', 'entra'));
 
+-- An Entra account may exist before its first sign-in. The admin enables SSO
+-- for an address; the first valid sign-in for that same address binds the
+-- object id (see getPendingEntraUserByEmail / bindEntraIdentity). The pair
+-- (entra_tid, entra_oid) may therefore be absent, but never half-filled: a
+-- tenant without an object id would read as bound while matching nothing.
+-- password_hash stays null for every Entra account, which makes password
+-- login impossible for them: one sign-in method or the other, never both.
 alter table users drop constraint if exists users_auth_source_shape;
 alter table users add constraint users_auth_source_shape check (
   (auth_source = 'local'
@@ -660,8 +675,8 @@ alter table users add constraint users_auth_source_shape check (
   or
   (auth_source = 'entra'
     and password_hash is null
-    and entra_tid is not null
-    and entra_oid is not null)
+    and ((entra_tid is null and entra_oid is null)
+      or (entra_tid is not null and entra_oid is not null)))
 );
 
 create unique index if not exists idx_users_entra_identity

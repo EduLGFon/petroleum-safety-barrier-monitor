@@ -17,6 +17,11 @@ export interface SessionUser {
   allowedLocationIds: number[] | null;
   auth_source: "local" | "entra";
   auth_method: "password" | "entra";
+  // True while the account still carries the password the system
+  // generated for it. The guards read this to hold the session at the
+  // door: the person is authenticated, but every route except the
+  // password change answers 403 until a new password is set.
+  mustChangePassword: boolean;
 }
 
 // createSession: stores a hashed token with an expiry for a user.
@@ -49,7 +54,8 @@ export async function getSessionUser(
 ): Promise<SessionUser | null> {
   const rows = await queryRows<Omit<SessionUser, "allowedLocationIds">>(
     `select u.id, u.email, u.name, coalesce(u.phone, '') as phone, u.role, u.active,
-            u.auth_source, s.auth_method
+            u.auth_source, s.auth_method,
+            u.must_change_password as "mustChangePassword"
      from sessions s join users u on u.id = s.user_id
      where s.token_hash = $1 and s.expires_at > now() and u.active`,
     [tokenHash],

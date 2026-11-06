@@ -1,22 +1,37 @@
-// Import users from a users.txt file into the monitor.
+// Import users from a roster file into the monitor.
 // Blocks are blank-line separated and contain, in order: name, email
 // (optional "|admin" suffix), stations split by "/", phone. "Todas" means
 // every station in the locations catalog. When the phone field carries more
 // than one number ("a / b"), only the first one is kept.
 //
-// Existing users are updated (name, phone and role; passwords are kept) and
-// every non-admin is scoped to the access group matching its station set. A
-// group is created only when no existing group has exactly those stations.
-// New local users get the default password below.
+// Existing users are updated (name, phone and role; passwords are kept and
+// never reset here) and every non-admin is scoped to the access group
+// matching its station set. A group is created only when no existing group
+// has exactly those stations. Each new local user gets a distinct password
+// from generateTemporaryPassword(), hashed per user, with
+// mustChangePassword set so the forced-change gate holds the account until
+// the person picks a password of their own.
+//
+// Generated passwords are never printed to stdout. They are written to a
+// credentials file, one "email<TAB>password" line per new user, created with
+// mode 0600. The default path is scripts/fixtures/_users_credentials.txt
+// (gitignored PII); pass --credentials-out <path> to override. The path must
+// stay inside scripts/fixtures/ and end in .txt. Only the file path and the
+// new-user count are printed. When the file cannot be written after users
+// were created, the script prints a loud error with the count (never the
+// passwords) and exits non-zero; the admin then uses the reset path in the
+// admin users screen to hand out fresh passwords.
 //
 // --dry-run (alias --check) audits the roster read-only: it resolves station
 // tokens against the locations catalog and reports only unknown tokens and
-// users, never names, emails or phones. It writes nothing and exits 1 when
-// any station token is unknown.
+// user numbers, never names, emails or phones. It writes nothing and exits 1
+// when any station token is unknown.
 //
 // Run with:
 //   deno run -A --env-file=.env scripts/import-users.ts
 //   deno run -A --env-file=.env scripts/import-users.ts --dry-run
+//   deno run -A --env-file=.env scripts/import-users.ts --file roster.txt
+//   deno run -A --env-file=.env scripts/import-users.ts --credentials-out scripts/fixtures/_users_credentials.txt
 //   (defaults to scripts/fixtures/_users.txt; pass --file to override)
 import {
   createAccessGroup,
@@ -32,19 +47,23 @@ import {
 } from "../lib/server/sql/users.ts";
 
 import {
+  generateTemporaryPassword,
   hashPassword,
-  validateNewPassword,
 } from "../lib/server/auth/password.ts";
 
 import { normalizePhone } from "../lib/server/validation.ts";
 
 import { queryRows } from "../lib/server/db.ts";
 
-const DEFAULT_PASSWORD = "123456789012";
-
 // Default local roster file. It is gitignored because it contains PII;
 // pass --file to override.
 export const DEFAULT_USERS_FILE = "scripts/fixtures/_users.txt";
+
+// Default credentials output. It is gitignored via scripts/fixtures/*
+// because it contains plaintext passwords; pass --credentials-out to
+// override within the same directory.
+export const DEFAULT_CREDENTIALS_FILE =
+  "scripts/fixtures/_users_credentials.txt";
 
 // Sentinel used by the audit when a block has no stations field at all.
 export const MISSING_STATIONS_SENTINEL = "(missing stations)";
@@ -88,6 +107,71 @@ function flag(name: string): string | undefined {
 
 function hasFlag(...names: string[]): boolean {
   return names.some((name) => Deno.args.includes(name));
+}
+
+// formatCredentialLine: one credentials-file line for a new user. The tab
+// keeps the address parseable even when it carries no spaces, and the line
+// holds nothing else so a later handover stays mechanical.
+export function formatCredentialLine(
+  email: string,
+  password: string,
+): string {
+  return `${email}\t${password}`;
+}
+
+// maskEmail: user emails are protected data, so logs and stdout never carry
+// the full address. The first letter plus the domain still matches a row
+// against the roster. Matching and payloads stay exact; only output is
+// masked.
+export function maskEmail(email: string): string {
+  const at = email.lastIndexOf("@");
+  if (at <= 0) return "***";
+  return `${email.slice(0, 1)}***@${email.slice(at + 1)}`;
+}
+
+// safeReason: provider and error text can echo an address, so stdout must
+// never print a reason verbatim. Masks every email-looking token (exact
+// account address first, case-insensitive, then any other address shape)
+// and caps the printed length. Pure and side-effect free.
+export function safeReason(
+  reason: string | null | undefined,
+  email: string,
+  maxLen = 120,
+): string {
+  let out = (reason ?? "sem motivo").trim();
+  if (out === "") out = "sem motivo";
+  const target = email.trim();
+  if (target !== "" && target.includes("@")) {
+    const escaped = target.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    out = out.replace(new RegExp(escaped, "gi"), maskEmail(target));
+  }
+  out = out.replace(
+    /[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/g,
+    (m) => maskEmail(m),
+  );
+  if (out.length > maxLen) out = out.slice(0, maxLen);
+  return out;
+}
+
+// resolveCredentialsOutPath: validates the credentials output path. It must
+// stay inside scripts/fixtures/ and end in .txt so generated passwords never
+// land next to source or in an unexpected directory. Throws on violation.
+export function resolveCredentialsOutPath(
+  raw: string | undefined,
+): string {
+  const candidate = (raw ?? DEFAULT_CREDENTIALS_FILE).trim();
+  if (candidate === "") throw new Error("credentials-out path is empty");
+  if (!candidate.endsWith(".txt")) {
+    throw new Error("credentials-out path must end in .txt");
+  }
+  const normalized = candidate.replace(/\\/g, "/").replace(/^\.\//, "");
+  if (normalized.includes("..")) {
+    throw new Error("credentials-out path must stay inside scripts/fixtures/");
+  }
+  if (!normalized.startsWith("scripts/fixtures/")) {
+    throw new Error("credentials-out path must stay inside scripts/fixtures/");
+  }
+  return normalized;
 }
 
 // firstPhone: the fixture/export sometimes stores two numbers separated by
@@ -235,8 +319,37 @@ function uniqueGroupName(base: string, used: Set<string>): string {
   return `${base} (${n})`;
 }
 
+function printUsage(): void {
+  console.log(
+    [
+      "usage: scripts/import-users.ts [--file <path>] [--dry-run|--check] [--credentials-out <path>] [--help]",
+      "  --file <path>             roster input (default scripts/fixtures/_users.txt)",
+      "  --dry-run, --check        audit station tokens read-only, write nothing",
+      "  --credentials-out <path>  new-user passwords file (default scripts/fixtures/_users_credentials.txt)",
+      "                            must stay inside scripts/fixtures/ and end in .txt",
+      "  --help                    show this help",
+    ].join("\n"),
+  );
+}
+
 if (import.meta.main) {
+  if (hasFlag("--help", "-h")) {
+    printUsage();
+    Deno.exit(0);
+  }
   const file = flag("--file") ?? DEFAULT_USERS_FILE;
+  let credentialsOut: string;
+  try {
+    credentialsOut = resolveCredentialsOutPath(
+      flag("--credentials-out"),
+    );
+  } catch (err) {
+    console.error(
+      `invalid --credentials-out:`,
+      err instanceof Error ? err.message : err,
+    );
+    Deno.exit(1);
+  }
   let text: string;
   try {
     text = await Deno.readTextFile(file);
@@ -281,12 +394,11 @@ if (import.meta.main) {
   } else {
     const groups = await listAccessGroups();
     const usedNames = new Set(groups.map((g) => g.name));
-    const passwordHash = await hashPassword(
-      validateNewPassword(DEFAULT_PASSWORD),
-    );
 
     let ok = 0;
     let createdGroups = 0;
+    let createdUsers = 0;
+    const credentials: string[] = [];
     for (const [index, u] of users.entries()) {
       try {
         if (!u.email) throw new Error("missing email");
@@ -312,14 +424,22 @@ if (import.meta.main) {
           userId = updated.id;
           console.log(`updated user #${index + 1} (${updated.role})`);
         } else {
+          // One distinct password per person: the hash is per-user and the
+          // account stays gated until the person replaces it.
+          const password = generateTemporaryPassword();
           const created = await createUser({
             email: normalizeEmail(u.email),
             name: u.name,
             phone: u.phone,
-            passwordHash,
+            passwordHash: await hashPassword(password),
             role,
+            mustChangePassword: true,
           });
           userId = created.id;
+          createdUsers++;
+          credentials.push(
+            formatCredentialLine(normalizeEmail(u.email), password),
+          );
           console.log(`imported user #${index + 1} (${created.role})`);
         }
 
@@ -357,6 +477,47 @@ if (import.meta.main) {
           err instanceof Error ? err.message : err,
         );
       }
+    }
+
+    if (createdUsers > 0) {
+      try {
+        const dir = credentialsOut.slice(
+          0,
+          Math.max(0, credentialsOut.lastIndexOf("/")),
+        );
+        if (dir !== "") await Deno.mkdir(dir, { recursive: true });
+        await Deno.writeTextFile(
+          credentialsOut,
+          credentials.join("\n") + "\n",
+          { mode: 0o600 },
+        );
+      } catch (err) {
+        console.error(
+          `CRITICAL: created ${createdUsers} user(s) but could not write ${credentialsOut}:`,
+          err instanceof Error ? err.message : err,
+          "\nPasswords were not stored anywhere. Use the admin reset path to issue fresh passwords.",
+        );
+        Deno.exit(1);
+      }
+      try {
+        await Deno.chmod(credentialsOut, 0o600);
+      } catch (err) {
+        if (Deno.build.os === "windows") {
+          // No POSIX permission bits; the create mode above is best effort.
+        } else {
+          console.error(
+            `CRITICAL: wrote ${credentialsOut} with ${createdUsers} new password(s) but could not tighten permissions to 0600:`,
+            err instanceof Error ? err.message : err,
+            "\nThe passwords ARE in the file with potentially broad permissions. Restrict the file now (chmod 0600) or delete it and use the admin reset path to issue fresh passwords.",
+          );
+          Deno.exit(1);
+        }
+      }
+      console.log(
+        `credentials: ${createdUsers} new password(s) in ${credentialsOut}`,
+      );
+    } else {
+      console.log(`credentials: 0 new password(s), nothing written`);
     }
 
     console.log(

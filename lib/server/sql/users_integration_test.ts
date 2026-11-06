@@ -1,10 +1,22 @@
 // Users password-reset integration - exercises the real SQL behind the
 // admin-only PATCH /api/users/:id path. Skipped without DATABASE_URL.
-import { createUser, deleteUser, getUserById, updateUser } from "./users.ts";
+import {
+  bindEntraIdentity,
+  createUser,
+  deleteUser,
+  getPendingEntraUserByEmail,
+  getUserById,
+  selectPendingEntraMatch,
+  updateUser,
+} from "./users.ts";
+
+import {
+  assertEquals,
+  assertRejects,
+  assertStrictEquals,
+} from "jsr:@std/assert@^1";
 
 import { hashPassword, verifyPassword } from "../auth/password.ts";
-
-import { assertStrictEquals } from "jsr:@std/assert@^1";
 
 import { createSession } from "./sessions.ts";
 
@@ -170,6 +182,167 @@ Deno.test("conditional password update rejects a stale hash", async () => {
       ),
       false,
     );
+  } finally {
+    if (userId !== undefined) await deleteUser(userId);
+  }
+});
+
+Deno.test("selectPendingEntraMatch refuses an ambiguous claim set", () => {
+  assertEquals(selectPendingEntraMatch([]), null);
+  assertEquals(
+    selectPendingEntraMatch([{ id: 7, email: "a@example.com" }]),
+    { id: 7, email: "a@example.com" },
+  );
+  // Two claims that resolve to the same account are still one account.
+  assertEquals(
+    selectPendingEntraMatch([
+      { id: 7, email: "a@example.com" },
+      { id: 7, email: "alias@example.com" },
+    ]),
+    { id: 7, email: "a@example.com" },
+  );
+  // Two addresses pointing at two accounts must never pick a winner.
+  assertEquals(
+    selectPendingEntraMatch([
+      { id: 7, email: "a@example.com" },
+      { id: 8, email: "b@example.com" },
+    ]),
+    null,
+  );
+});
+
+Deno.test("bindEntraIdentity is atomic and email-bound", async () => {
+  if (!Deno.env.get("DATABASE_URL")) {
+    console.log("skip: DATABASE_URL unset - needs a real Postgres");
+    return;
+  }
+  const email = `entra-bind-${Date.now()}@example.com`;
+  const tenantId = "11111111-1111-1111-1111-111111111111";
+  const objectId = crypto.randomUUID();
+  let userId: number | undefined;
+  try {
+    const created = await createUser({
+      email,
+      name: "Bind Test",
+      role: "user",
+      authSource: "entra",
+    });
+    userId = created.id;
+    assertStrictEquals(created.entra_oid, null);
+
+    const pending = await getPendingEntraUserByEmail(email.toUpperCase());
+    assertStrictEquals(pending?.id, created.id);
+
+    // Wrong address loses: the row must not be bound by a claim it did not
+    // match.
+    const wrong = await bindEntraIdentity(
+      created.id,
+      tenantId,
+      objectId,
+      "other@example.com",
+    );
+    assertStrictEquals(wrong, null);
+    assertStrictEquals((await getUserById(created.id))?.entra_oid, null);
+
+    const bound = await bindEntraIdentity(
+      created.id,
+      tenantId,
+      objectId,
+      email,
+    );
+    assertStrictEquals(bound?.entra_tid, tenantId);
+    assertStrictEquals(bound?.entra_oid, objectId);
+    // A second racer loses instead of overwriting the binding.
+    const second = await bindEntraIdentity(
+      created.id,
+      tenantId,
+      crypto.randomUUID(),
+      email,
+    );
+    assertStrictEquals(second, null);
+    assertStrictEquals(await getPendingEntraUserByEmail(email), null);
+  } finally {
+    if (userId !== undefined) await deleteUser(userId);
+  }
+});
+
+Deno.test("a drawn password sets the pending flag and clears with the hash", async () => {
+  if (!Deno.env.get("DATABASE_URL")) {
+    console.log("skip: DATABASE_URL unset - needs a real Postgres");
+    return;
+  }
+  const email = `pwtemp-${Date.now()}@example.com`;
+  let userId: number | undefined;
+  try {
+    const created = await createUser({
+      email,
+      name: "Temp Password Test",
+      passwordHash: await hashPassword("temp-password-1234"),
+      role: "user",
+      mustChangePassword: true,
+    });
+    userId = created.id;
+    assertStrictEquals(created.must_change_password, true);
+
+    const newHash = await hashPassword("chosen-password-5678");
+    const updated = await updateUser(userId, {
+      passwordHash: newHash,
+      mustChangePassword: false,
+    });
+    assertStrictEquals(updated?.must_change_password, false);
+    const after = await getUserById(userId);
+    assertStrictEquals(
+      await verifyPassword("chosen-password-5678", after!.password_hash!),
+      true,
+    );
+  } finally {
+    if (userId !== undefined) await deleteUser(userId);
+  }
+});
+
+Deno.test("converting to Entra clears the flag and refuses a password", async () => {
+  if (!Deno.env.get("DATABASE_URL")) {
+    console.log("skip: DATABASE_URL unset - needs a real Postgres");
+    return;
+  }
+  const email = `entra-convert-${Date.now()}@example.com`;
+  let userId: number | undefined;
+  try {
+    const created = await createUser({
+      email,
+      name: "Convert Test",
+      passwordHash: await hashPassword("convert-password-1234"),
+      role: "user",
+      mustChangePassword: true,
+    });
+    userId = created.id;
+
+    const conflictHash = await hashPassword("conflict-password-9012");
+    await assertRejects(
+      () =>
+        updateUser(userId!, {
+          authSource: "entra",
+          passwordHash: conflictHash,
+        }),
+      Error,
+      "cannot set a password while converting to Entra",
+    );
+    // The rejected call wrote nothing: the account is still a local one.
+    const stillLocal = await getUserById(userId);
+    assertStrictEquals(stillLocal?.auth_source, "local");
+    assertStrictEquals(stillLocal?.must_change_password, true);
+
+    const converted = await updateUser(userId, {
+      authSource: "entra",
+      entraTid: null,
+      entraOid: null,
+    });
+    assertStrictEquals(converted?.auth_source, "entra");
+    assertStrictEquals(converted?.must_change_password, false);
+    const after = await getUserById(userId);
+    assertStrictEquals(after?.password_hash, null);
+    assertStrictEquals(after?.entra_tid, null);
+    assertStrictEquals(after?.entra_oid, null);
   } finally {
     if (userId !== undefined) await deleteUser(userId);
   }

@@ -15,6 +15,11 @@ export type ApiErrorCode =
   | "NOT_FOUND"
   | "UNAUTHORIZED"
   | "FORBIDDEN"
+  // Distinct from FORBIDDEN on purpose: the credential is valid and the
+  // person is signed in, they just still carry a system-generated password.
+  // Clients must show the change-password screen, not a permission error and
+  // not a logout.
+  | "PASSWORD_CHANGE_REQUIRED"
   | "RATE_LIMITED"
   | "UNAVAILABLE"
   | "INTERNAL";
@@ -45,8 +50,14 @@ export function ok(
 }
 
 // created: 201 success for POST creates, with the correlation header.
-export function created(data: unknown, requestId: string): Response {
-  return ok(data, requestId, { status: 201 });
+// Callers that return a one-time secret (a generated password) pass
+// Cache-Control: no-store through init so no cache keeps the body.
+export function created(
+  data: unknown,
+  requestId: string,
+  init: ResponseInit = {},
+): Response {
+  return ok(data, requestId, { ...init, status: 201 });
 }
 
 // etagOf: strong validator over the exact response bytes (same
