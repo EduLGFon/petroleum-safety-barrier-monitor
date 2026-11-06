@@ -9,8 +9,14 @@
 // group is created only when no existing group has exactly those stations.
 // New local users get the default password below.
 //
+// --dry-run (alias --check) audits the roster read-only: it resolves station
+// tokens against the locations catalog and reports only unknown tokens and
+// users, never names, emails or phones. It writes nothing and exits 1 when
+// any station token is unknown.
+//
 // Run with:
 //   deno run -A --env-file=.env scripts/import-users.ts
+//   deno run -A --env-file=.env scripts/import-users.ts --dry-run
 //   (defaults to scripts/fixtures/_users.txt; pass --file to override)
 import {
   createAccessGroup,
@@ -40,6 +46,9 @@ const DEFAULT_PASSWORD = "123456789012";
 // pass --file to override.
 export const DEFAULT_USERS_FILE = "scripts/fixtures/_users.txt";
 
+// Sentinel used by the audit when a block has no stations field at all.
+export const MISSING_STATIONS_SENTINEL = "(missing stations)";
+
 export interface ImportedUser {
   name: string;
   email: string;
@@ -59,10 +68,26 @@ export interface ResolvedStations {
   missing: string[];
 }
 
+export interface AuditUserRow {
+  index: number;
+  missing: string[];
+}
+
+export interface AuditResult {
+  total: number;
+  usersWithMissing: number;
+  missingTokens: string[];
+  rows: AuditUserRow[];
+}
+
 function flag(name: string): string | undefined {
   const idx = Deno.args.indexOf(name);
   if (idx < 0 || idx + 1 >= Deno.args.length) return undefined;
   return Deno.args[idx + 1];
+}
+
+function hasFlag(...names: string[]): boolean {
+  return names.some((name) => Deno.args.includes(name));
 }
 
 // firstPhone: the fixture/export sometimes stores two numbers separated by
@@ -172,6 +197,33 @@ export function resolveStations(
   };
 }
 
+// auditUsers: pure read-only roster check. Rows keep only the 1-based user
+// index and unknown tokens so the audit can be printed without personal data.
+export function auditUsers(
+  users: ImportedUser[],
+  locations: LocationRow[],
+): AuditResult {
+  const rows: AuditUserRow[] = [];
+  const distinct = new Set<string>();
+  let usersWithMissing = 0;
+
+  for (const [index, user] of users.entries()) {
+    const missing = user.stations.trim() === ""
+      ? [MISSING_STATIONS_SENTINEL]
+      : resolveStations(user.stations, locations).missing;
+    if (missing.length > 0) usersWithMissing++;
+    for (const token of missing) distinct.add(token);
+    rows.push({ index: index + 1, missing });
+  }
+
+  return {
+    total: users.length,
+    usersWithMissing,
+    missingTokens: [...distinct].sort(),
+    rows,
+  };
+}
+
 function locationSetKey(ids: number[]): string {
   return [...ids].sort((a, b) => a - b).join(",");
 }
@@ -213,86 +265,103 @@ if (import.meta.main) {
     Deno.exit(1);
   }
 
-  const groups = await listAccessGroups();
-  const usedNames = new Set(groups.map((g) => g.name));
-  const passwordHash = await hashPassword(
-    validateNewPassword(DEFAULT_PASSWORD),
-  );
-
-  let ok = 0;
-  let createdGroups = 0;
-  for (const u of users) {
-    try {
-      if (!u.email) throw new Error("missing email");
-      if (!u.stations) throw new Error("missing stations");
-      const resolved = resolveStations(u.stations, locations);
-      if (resolved.missing.length > 0) {
-        throw new Error(
-          `unknown station(s): ${resolved.missing.join(", ")} ` +
-            "(import/sync the locations catalog first)",
-        );
-      }
-
-      const role = u.admin ? "admin" : "user";
-      const existing = await getUserByEmail(normalizeEmail(u.email));
-      let userId: number;
-      if (existing) {
-        const updated = await updateUser(existing.id, {
-          name: u.name,
-          phone: u.phone,
-          role,
-        });
-        if (!updated) throw new Error("user disappeared during update");
-        userId = updated.id;
-        console.log(`updated ${updated.email} (${updated.role})`);
-      } else {
-        const created = await createUser({
-          email: normalizeEmail(u.email),
-          name: u.name,
-          phone: u.phone,
-          passwordHash,
-          role,
-        });
-        userId = created.id;
-        console.log(`imported ${created.email} (${created.role})`);
-      }
-
-      // Admins bypass station scoping, so they do not need a group.
-      if (role === "admin") {
-        ok++;
-        continue;
-      }
-
-      const setKey = locationSetKey(resolved.ids);
-      let group = groups.find((g) => locationSetKey(g.locationIds) === setKey);
-      if (!group) {
-        const baseName = resolved.labels.join("/") || "Sem estações";
-        const name = uniqueGroupName(baseName, usedNames);
-        group = await createAccessGroup({
-          name,
-          description: `Estações: ${resolved.labels.join("/")}.`,
-          locationIds: resolved.ids,
-        });
-        groups.push(group);
-        usedNames.add(name);
-        createdGroups++;
-        console.log(
-          `created group ${group.name} (${resolved.labels.join("/")})`,
-        );
-      }
-
-      await replaceUserGroups(userId, [group.id]);
-      ok++;
-    } catch (err) {
-      console.error(
-        `failed ${u.email}:`,
-        err instanceof Error ? err.message : err,
+  if (hasFlag("--dry-run", "--check")) {
+    const audit = auditUsers(users, locations);
+    for (const row of audit.rows) {
+      if (row.missing.length === 0) continue;
+      console.log(
+        `user #${row.index}: unknown station(s): ${row.missing.join(", ")}`,
       );
     }
-  }
+    console.log(
+      `audit: ${audit.total} users, ${audit.usersWithMissing} with unknown ` +
+        `stations, ${audit.missingTokens.length} distinct unknown token(s)`,
+    );
+    Deno.exitCode = audit.usersWithMissing > 0 ? 1 : 0;
+  } else {
+    const groups = await listAccessGroups();
+    const usedNames = new Set(groups.map((g) => g.name));
+    const passwordHash = await hashPassword(
+      validateNewPassword(DEFAULT_PASSWORD),
+    );
 
-  console.log(
-    `done: ${ok}/${users.length} users, ${createdGroups} group(s) created`,
-  );
-  if (ok !== users.length) Deno.exitCode = 1;
+    let ok = 0;
+    let createdGroups = 0;
+    for (const [index, u] of users.entries()) {
+      try {
+        if (!u.email) throw new Error("missing email");
+        if (!u.stations) throw new Error("missing stations");
+        const resolved = resolveStations(u.stations, locations);
+        if (resolved.missing.length > 0) {
+          throw new Error(
+            `unknown station(s): ${resolved.missing.join(", ")} ` +
+              "(import/sync the locations catalog first)",
+          );
+        }
+
+        const role = u.admin ? "admin" : "user";
+        const existing = await getUserByEmail(normalizeEmail(u.email));
+        let userId: number;
+        if (existing) {
+          const updated = await updateUser(existing.id, {
+            name: u.name,
+            phone: u.phone,
+            role,
+          });
+          if (!updated) throw new Error("user disappeared during update");
+          userId = updated.id;
+          console.log(`updated user #${index + 1} (${updated.role})`);
+        } else {
+          const created = await createUser({
+            email: normalizeEmail(u.email),
+            name: u.name,
+            phone: u.phone,
+            passwordHash,
+            role,
+          });
+          userId = created.id;
+          console.log(`imported user #${index + 1} (${created.role})`);
+        }
+
+        // Admins bypass station scoping, so they do not need a group.
+        if (role === "admin") {
+          ok++;
+          continue;
+        }
+
+        const setKey = locationSetKey(resolved.ids);
+        let group = groups.find((g) =>
+          locationSetKey(g.locationIds) === setKey
+        );
+        if (!group) {
+          const baseName = resolved.labels.join("/") || "Sem estações";
+          const name = uniqueGroupName(baseName, usedNames);
+          group = await createAccessGroup({
+            name,
+            description: `Estações: ${resolved.labels.join("/")}.`,
+            locationIds: resolved.ids,
+          });
+          groups.push(group);
+          usedNames.add(name);
+          createdGroups++;
+          console.log(
+            `created group ${group.name} (${resolved.labels.join("/")})`,
+          );
+        }
+
+        await replaceUserGroups(userId, [group.id]);
+        ok++;
+      } catch (err) {
+        console.error(
+          `failed user #${index + 1}:`,
+          err instanceof Error ? err.message : err,
+        );
+      }
+    }
+
+    console.log(
+      `done: ${ok}/${users.length} users, ${createdGroups} group(s) created`,
+    );
+    if (ok !== users.length) Deno.exitCode = 1;
+  }
 }

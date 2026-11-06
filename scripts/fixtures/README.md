@@ -14,7 +14,7 @@ Replays, never prod: every sync/alert test and dry-run reads these files. A revi
 | `FAL-EQ-004`     | skip: outside barrier scope (`'Typo Isolada'`)         |
 | `X9-UNKNOWN-LOC` | skip: unknown location `'ZZZ'`                         |
 
-`_users.txt` is the default input for `scripts/import-users.ts` (task `import:users`). It is gitignored because it contains PII: it must be supplied locally and never committed. Any other roster can be passed via `--file <path>`.
+`_users.txt` is the default input for `scripts/import-users.ts` (task `import:users`). It is gitignored because it contains PII: it must be supplied locally and never committed. Any other roster can be passed via `--file <path>`. Run `deno task import:users:check` (or `deno run -A --env-file=.env scripts/import-users.ts --dry-run`) to audit unknown station tokens read-only before importing; it prints user numbers only, never names, emails or phones.
 
 ## fracttal-work-sample.json (synthetic, `meta.synthetic: true`)
 

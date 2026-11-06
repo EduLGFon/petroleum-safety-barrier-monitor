@@ -30,6 +30,7 @@
     "docker:force-sync": "deno task docker deno run -A --env-file=.env scripts/fracttal-force-sync.ts",
     "docker:adcre": "deno task docker deno run -A scripts/create-admin.ts",
     "import:users": "deno run -A --env-file=.env scripts/import-users.ts",
+    "import:users:check": "deno run -A --env-file=.env scripts/import-users.ts --dry-run",
     "fracttal:import": "deno run -A --env-file=.env scripts/fracttal-import.ts",
     "fracttal:sync": "deno run -A --env-file=.env scripts/fracttal-sync.ts",
     "fracttal:force-sync": "deno run -A --env-file=.env scripts/fracttal-force-sync.ts",

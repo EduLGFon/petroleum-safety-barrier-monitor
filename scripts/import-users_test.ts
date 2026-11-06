@@ -1,7 +1,9 @@
-// Tests for the user import parser and station resolution.
+// Tests for the user import parser, station resolution and audit mode.
 import {
+  auditUsers,
   DEFAULT_USERS_FILE,
   firstPhone,
+  MISSING_STATIONS_SENTINEL,
   parseUsers,
   resolveStations,
 } from "./import-users.ts";
@@ -114,4 +116,88 @@ Deno.test("resolveStations maps codes and TODAS to location ids", () => {
     labels: ["FAL"],
     missing: ["UNKNOWN"],
   });
+});
+
+function fixtureUser(stations: string) {
+  return {
+    name: "Fixture User",
+    email: "fixture@example.test",
+    stations,
+    phone: "5527900000000",
+    admin: false,
+  };
+}
+
+Deno.test("auditUsers reports zero missing when every station resolves", () => {
+  const locations = [
+    { id: 1, code: "FAL" },
+    { id: 2, code: "CNC" },
+  ];
+  const users = [fixtureUser("FAL/CNC"), fixtureUser("Todas")];
+
+  const audit = auditUsers(users, locations);
+
+  assertEquals(audit.total, 2);
+  assertEquals(audit.usersWithMissing, 0);
+  assertEquals(audit.missingTokens, []);
+  assertEquals(audit.rows, [
+    { index: 1, missing: [] },
+    { index: 2, missing: [] },
+  ]);
+});
+
+Deno.test("auditUsers reports the user row and distinct unknown token", () => {
+  const audit = auditUsers(
+    [fixtureUser("FAL/ZZZ")],
+    [{ id: 1, code: "FAL" }],
+  );
+
+  assertEquals(audit.total, 1);
+  assertEquals(audit.usersWithMissing, 1);
+  assertEquals(audit.missingTokens, ["ZZZ"]);
+  assertEquals(audit.rows, [{ index: 1, missing: ["ZZZ"] }]);
+});
+
+Deno.test("auditUsers dedupes shared unknown tokens and counts users", () => {
+  const users = [
+    fixtureUser("FAL/ZZZ"),
+    fixtureUser("ZZZ/CNC"),
+    fixtureUser("FAL"),
+  ];
+
+  const audit = auditUsers(users, [{ id: 1, code: "FAL" }]);
+
+  assertEquals(audit.total, 3);
+  assertEquals(audit.usersWithMissing, 2);
+  assertEquals(audit.missingTokens, ["CNC", "ZZZ"]);
+  assertEquals(audit.rows, [
+    { index: 1, missing: ["ZZZ"] },
+    { index: 2, missing: ["ZZZ", "CNC"] },
+    { index: 3, missing: [] },
+  ]);
+});
+
+Deno.test("auditUsers reports a sentinel for empty stations", () => {
+  const audit = auditUsers([fixtureUser("")], [{ id: 1, code: "FAL" }]);
+
+  assertEquals(audit.usersWithMissing, 1);
+  assertEquals(audit.missingTokens, [MISSING_STATIONS_SENTINEL]);
+  assertEquals(audit.rows, [
+    { index: 1, missing: [MISSING_STATIONS_SENTINEL] },
+  ]);
+});
+
+Deno.test("auditUsers output excludes names, emails and phones", () => {
+  const name = "Ada Fixture";
+  const email = "ada.fixture@example.test";
+  const phone = "5527988887777";
+  const audit = auditUsers(
+    [{ name, email, stations: "FAL/UNKNOWN", phone, admin: false }],
+    [{ id: 1, code: "FAL" }],
+  );
+
+  const report = JSON.stringify(audit);
+  assertEquals(report.includes(name), false);
+  assertEquals(report.includes(email), false);
+  assertEquals(report.includes(phone), false);
 });
