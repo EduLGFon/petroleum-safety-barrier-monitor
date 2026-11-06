@@ -17,11 +17,11 @@ import {
   StatusBadge,
 } from "./AdminPrimitives.tsx";
 
+import { useAdminResource } from "../../../hooks/useAdminResource.ts";
+
 import { adminApi } from "../../../lib/api/admin-client.ts";
 
 import { useState } from "preact/hooks";
-
-import { useAdminResource } from "../../../hooks/useAdminResource.ts";
 
 interface PublicUser {
   id: number;
@@ -32,6 +32,40 @@ interface PublicUser {
   active: boolean;
   auth_source?: "local" | "entra";
   entra_oid?: string | null;
+  must_change_password: boolean;
+}
+
+// AvisoEntrega: outcome of the best-effort account notice sent through
+// MSGFLOW when a temporary password is drawn. Shown so the admin knows
+// whether the message left; only sent/reason reach the screen, never the
+// raw provider body (it could carry the password).
+interface AvisoEntrega {
+  sent: boolean;
+  reason?: string;
+}
+
+// Create/reset responses: the backend returns the drawn password exactly
+// once, in the mutation response, plus the notice outcome.
+interface CriacaoResposta extends PublicUser {
+  temporaryPassword?: string;
+  aviso?: AvisoEntrega | null;
+}
+
+interface RedefinicaoResposta extends PublicUser {
+  temporaryPassword: string;
+  aviso: AvisoEntrega;
+}
+
+// mensagemAviso: one line telling the admin whether the MSGFLOW notice left.
+// Returns null when there is no outcome to report. Keeps the exact lowercase
+// markers "aviso enviado" and "aviso não enviado" the admin scans for.
+export function mensagemAviso(
+  aviso: AvisoEntrega | null | undefined,
+): string | null {
+  if (!aviso) return null;
+  if (aviso.sent) return "aviso enviado por MSGFLOW.";
+  const motivo = aviso.reason ? `: ${aviso.reason}` : ".";
+  return `aviso não enviado${motivo}`;
 }
 
 // EditUserForm: admin edit of all user fields (name, email, password, phone).
@@ -242,11 +276,18 @@ export function UsersManager(
   const [role, setRole] = useState<"admin" | "user">("user");
   const [authSource, setAuthSource] = useState<"local" | "entra">("local");
   const [entraObjectId, setEntraObjectId] = useState("");
-  // Shown once, right after creation: the server returns the generated
-  // password in the creation response and never again. Losing it means an
-  // admin reset, not a lookup.
+  // Shown once, right after creation or reset: the server returns the
+  // generated password in the mutation response and never again. Losing it
+  // means an admin reset, not a lookup. The notice outcome rides along so
+  // the admin knows whether MSGFLOW delivered it. Cleared on dismiss and
+  // whenever another flow starts, never persisted anywhere.
   const [senhaTemporaria, setSenhaTemporaria] = useState<
-    { email: string; senha: string } | null
+    {
+      email: string;
+      senha: string;
+      aviso: AvisoEntrega | null;
+      origem: "criacao" | "redefinicao";
+    } | null
   >(null);
   const [busy, setBusy] = useState(false);
   const [editFor, setEditFor] = useState<number | null>(null);
@@ -292,11 +333,45 @@ export function UsersManager(
     }
   }
 
+  async function resetPassword(user: PublicUser) {
+    if (user.auth_source === "entra") return;
+    if (
+      !confirm(
+        `Redefinir a senha de ${user.email}? A senha atual deixa de valer e uma temporária é gerada.`,
+      )
+    ) return;
+    if (patchBusy !== null) return;
+    // A new flow replaces any shown password instead of stacking secrets.
+    setSenhaTemporaria(null);
+    setPatchBusy(user.id);
+    try {
+      const resposta = await adminApi(`/api/users/${user.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ resetPassword: true }),
+      }) as RedefinicaoResposta;
+      setSenhaTemporaria({
+        email: resposta.email,
+        senha: resposta.temporaryPassword,
+        aviso: resposta.aviso ?? null,
+        origem: "redefinicao",
+      });
+      setNotice(`Senha de ${resposta.email} redefinida.`);
+      await refresh();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setPatchBusy(null);
+    }
+  }
+
   // Initial load handled by useAdminResource.
 
   async function create(e: Event) {
     e.preventDefault();
     setBusy(true);
+    // A new flow replaces any shown password instead of stacking secrets.
+    setSenhaTemporaria(null);
     try {
       const criado = await adminApi("/api/users", {
         method: "POST",
@@ -316,10 +391,16 @@ export function UsersManager(
             ? {}
             : { entraObjectId: entraObjectId.trim() }),
         }),
-      });
-      const devolvida = (criado as { temporaryPassword?: string } | null)
-        ?.temporaryPassword;
-      if (devolvida) setSenhaTemporaria({ email, senha: devolvida });
+      }) as CriacaoResposta;
+      const devolvida = criado.temporaryPassword;
+      if (devolvida) {
+        setSenhaTemporaria({
+          email: criado.email,
+          senha: devolvida,
+          aviso: criado.aviso ?? null,
+          origem: "criacao",
+        });
+      }
       setEmail("");
       setName("");
       setPhone("");
@@ -376,9 +457,18 @@ export function UsersManager(
             {senhaTemporaria.senha}
           </code>
           <span style={{ opacity: 0.8 }}>
-            Anote e entregue à pessoa agora: esta senha não é guardada e não
-            aparece de novo. No primeiro acesso ela é obrigada a trocar.
+            {senhaTemporaria.origem === "redefinicao"
+              ? "Anote e entregue à pessoa agora: a senha antiga deixou de valer e esta não aparece de novo. No primeiro acesso ela é obrigada a trocar."
+              : "Anote e entregue à pessoa agora: esta senha não é guardada e não aparece de novo. No primeiro acesso ela é obrigada a trocar."}
           </span>
+          {mensagemAviso(senhaTemporaria.aviso) && (
+            <span style={{ opacity: 0.8 }}>
+              {mensagemAviso(senhaTemporaria.aviso)}
+              {senhaTemporaria.aviso && !senhaTemporaria.aviso.sent
+                ? " Entregue a senha por outro canal."
+                : ""}
+            </span>
+          )}
           <div>
             <button
               type="button"
@@ -426,8 +516,11 @@ export function UsersManager(
           <Field label="Tipo de conta">
             <select
               value={authSource}
-              onChange={(e) =>
-                setAuthSource(e.currentTarget.value as "local" | "entra")}
+              onChange={(e) => {
+                setAuthSource(e.currentTarget.value as "local" | "entra");
+                // Switching flows must not keep a previous secret on screen.
+                setSenhaTemporaria(null);
+              }}
               style={inputSt}
             >
               <option value="local">Senha local</option>
@@ -567,6 +660,11 @@ export function UsersManager(
                   >
                     {u.auth_source === "entra" ? "Entra" : "Local"}
                   </StatusBadge>
+                  {u.must_change_password === true && (
+                    <StatusBadge tone="danger">
+                      senha temporária
+                    </StatusBadge>
+                  )}
                   <span
                     style={{
                       display: "flex",
@@ -603,6 +701,16 @@ export function UsersManager(
                         ? "Desativar"
                         : "Ativar"}
                     </button>
+                    {u.auth_source !== "entra" && (
+                      <button
+                        type="button"
+                        disabled={patchBusy === u.id}
+                        onClick={() => void resetPassword(u)}
+                        style={ghostBtn}
+                      >
+                        {patchBusy === u.id ? "Aguarde…" : "Redefinir senha"}
+                      </button>
+                    )}
                     {u.auth_source !== "entra" && (
                       <button
                         type="button"
