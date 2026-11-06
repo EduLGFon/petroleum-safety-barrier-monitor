@@ -14,6 +14,8 @@ Replays, never prod: every sync/alert test and dry-run reads these files. A revi
 | `FAL-EQ-004`     | skip: outside barrier scope (`'Typo Isolada'`)         |
 | `X9-UNKNOWN-LOC` | skip: unknown location `'ZZZ'`                         |
 
+`_users.txt` is the default input for `scripts/import-users.ts` (task `import:users`). It is gitignored because it contains PII: it must be supplied locally and never committed. Any other roster can be passed via `--file <path>`.
+
 ## fracttal-work-sample.json (synthetic, `meta.synthetic: true`)
 
 Work rows in live `/work_orders` + `/work_requests` shape for the status pass (`--work-fixture`, replayed by `work_test.ts`):

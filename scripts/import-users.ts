@@ -10,7 +10,8 @@
 // New local users get the default password below.
 //
 // Run with:
-//   deno run -A --env-file=.env scripts/import-users.ts [--file users.txt]
+//   deno run -A --env-file=.env scripts/import-users.ts
+//   (defaults to scripts/fixtures/_users.txt; pass --file to override)
 import {
   createAccessGroup,
   listAccessGroups,
@@ -34,6 +35,10 @@ import { normalizePhone } from "../lib/server/validation.ts";
 import { queryRows } from "../lib/server/db.ts";
 
 const DEFAULT_PASSWORD = "123456789012";
+
+// Default local roster file. It is gitignored because it contains PII;
+// pass --file to override.
+export const DEFAULT_USERS_FILE = "scripts/fixtures/_users.txt";
 
 export interface ImportedUser {
   name: string;
@@ -179,7 +184,7 @@ function uniqueGroupName(base: string, used: Set<string>): string {
 }
 
 if (import.meta.main) {
-  const file = flag("--file") ?? "users.txt";
+  const file = flag("--file") ?? DEFAULT_USERS_FILE;
   let text: string;
   try {
     text = await Deno.readTextFile(file);
@@ -187,6 +192,7 @@ if (import.meta.main) {
     console.error(
       `cannot read ${file}:`,
       err instanceof Error ? err.message : err,
+      "\ncreate scripts/fixtures/_users.txt locally (see scripts/fixtures/README.md) or pass --file <path>",
     );
     Deno.exit(1);
   }

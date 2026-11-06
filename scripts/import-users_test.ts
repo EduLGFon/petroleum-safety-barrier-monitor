@@ -1,7 +1,16 @@
 // Tests for the user import parser and station resolution.
-import { firstPhone, parseUsers, resolveStations } from "./import-users.ts";
+import {
+  DEFAULT_USERS_FILE,
+  firstPhone,
+  parseUsers,
+  resolveStations,
+} from "./import-users.ts";
 
 import { assertEquals } from "jsr:@std/assert@^1";
+
+Deno.test("default users file points at the local roster fixture", () => {
+  assertEquals(DEFAULT_USERS_FILE, "scripts/fixtures/_users.txt");
+});
 
 Deno.test("parseUsers reads blocks, stations and the first phone", () => {
   const text = [
@@ -72,7 +81,7 @@ Deno.test("parseUsers keeps the next user when a phone is omitted", () => {
 });
 
 Deno.test("firstPhone keeps only the first number and ignores NA", () => {
-  assertEquals(firstPhone("27 996490272 / 27 995184989"), "5527996490272");
+  assertEquals(firstPhone("27 90000-0000 / 27 91111-1111"), "5527900000000");
   assertEquals(firstPhone("NA"), "");
   assertEquals(firstPhone(""), "");
 });
