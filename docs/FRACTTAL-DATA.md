@@ -23,7 +23,7 @@ Source dump lives under `test/` (git-ignored). Committed fixtures are in `script
 ## Imported catalog (full equipment scope)
 
 - Barriers: 18,271 equipment rows (one documented transmitter mislabel excluded).
-- Locations: 40 stations (38 L3 codes plus the SM8 and CO aliases).
+- Locations: 41 stations (39 L3-derived codes plus the SM8 and CO aliases). The two upstream facilities sharing the L3 segment `Cj Unidade de Teste Móvel` split into CJ-UTM-N (Área Norte, 46 equipment rows; the old `CJ UNIDADE DE TESTE MÓVEL` location row is renamed in place by db/schema.sql) and CJ-UTM-C (Área Centro, 5 equipment rows); run `deno task db:migrate` before the next sync (DECISIONS.md#D28).
 - Categories: 528 labels.
 - Criticality: ESO > A > B > C > D, derived from TAG suffix plus ESO flag.
 - Availability counts after import: Disponivel 3,521; Degradado 1.

@@ -76,4 +76,24 @@ Append-only architecture decision records. Newest last.
   and stays under JCT; SM-1 stays under SM. The catalog grows from 38 to 40
   station codes; SM drops from 2,445 to 801 rows and JCT from 150 to 120.
 
+- D28: mobile test unit split into CJ-UTM-N and CJ-UTM-C. A read-only live
+  sweep on 2026-11-06 found two distinct upstream facilities sharing the
+  folded L3 segment `Cj Unidade de Teste Móvel`, separated only by the L2
+  area: `// Seacrest Petróleo/ Área Centro/ Cj Unidade de Teste Móvel/ ...`
+  (upstream facility code CJ-UND-TST-MOV-CENTRO, 5 equipment rows) and
+  `// Seacrest Petróleo/ Área Norte/ Cj Unidade de Teste Móvel/ ...`
+  (CJ-UND-TST-MOV-NORTE, 46 equipment rows). Both collapsed to station code
+  `CJ UNIDADE DE TESTE MÓVEL` (51 rows); no operator roster entry or access
+  group references that code, so no access group changes. The shared parser
+  reads the L2 area when the L3 segment folds to that value: Área Centro ->
+  CJ-UTM-C / CJ-UTM-C / "Unidade Móvel", Área Norte -> CJ-UTM-N / CJ-UTM-N /
+  "Unidade Móvel"; any other area keeps the existing L3 parse, and the old
+  CO/SM8 aliases plus the Base Seacrest override stay untouched.
+  db/schema.sql renames the old `CJ UNIDADE DE TESTE MÓVEL` locations row to
+  CJ-UTM-N in place (guarded, idempotent, re-runnable) so barriers and
+  access groups referencing that location id stay valid; CENTRO joins as a
+  new row, growing the catalog from 40 to 41 station codes.
+  `deno task db:migrate` must run before the next sync so the parser's new
+  codes resolve against the catalog.
+
 See git history for full context.

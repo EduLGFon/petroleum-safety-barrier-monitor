@@ -41,7 +41,11 @@ import {
   typologyIdOf,
 } from "./barrier-rules.ts";
 
-import { assertEquals, assertStrictEquals } from "jsr:@std/assert@^1";
+import {
+  assertEquals,
+  assertNotEquals,
+  assertStrictEquals,
+} from "jsr:@std/assert@^1";
 
 Deno.test("foldText lowercases and strips accents", () => {
   assertStrictEquals(foldText("Válvula de GÁS"), "valvula de gas");
@@ -146,6 +150,41 @@ Deno.test("stationCodeOf keeps normal L3 and transformer rows under JCT", () => 
   // The CO-03 transformer sits under 7-JCT-5-ES and is not the well
   // pattern, so it stays in JCT.
   assertStrictEquals(stationCodeOf(JCT_TRAFO_PARENT), "JCT");
+});
+
+Deno.test("stationCodeOf splits the mobile test unit by L2 area", () => {
+  const centro =
+    "// Seacrest Petróleo/ Área Centro/ Cj Unidade de Teste Móvel/ UT-MOV-C/ Equipamento";
+  const norte =
+    "// Seacrest Petróleo/ Área Norte/ Cj Unidade de Teste Móvel/ UT-MOV-N/ Equipamento";
+  assertStrictEquals(stationCodeOf(centro), "CJ-UTM-C");
+  assertStrictEquals(stationNameOf(centro), "CJ-UTM-C");
+  assertStrictEquals(stationCodeOf(norte), "CJ-UTM-N");
+  assertStrictEquals(stationNameOf(norte), "CJ-UTM-N");
+  // The old overflow code is never returned for either chain.
+  assertNotEquals(stationCodeOf(centro), "CJ UNIDADE DE TESTE MÓVEL");
+  assertNotEquals(stationCodeOf(norte), "CJ UNIDADE DE TESTE MÓVEL");
+  // The old overflow code goes back to no chain; the mixed-case ids above
+  // parse on the folded L3 segment, so case fixes land without a change.
+  const foldedCentro = "// SEACREST/ AREA CENTRO/ CJ UNIDADE DE TESTE MOVEL/ X";
+  assertStrictEquals(stationCodeOf(foldedCentro), "CJ-UTM-C");
+  // An unseen area keeps the existing L3 parse untouched.
+  assertStrictEquals(
+    stationCodeOf(
+      "// Seacrest Petróleo/ Área Sul/ Cj Unidade de Teste Móvel/ X",
+    ),
+    "CJ UNIDADE DE TESTE MÓVEL",
+  );
+});
+
+Deno.test("locationTypeOf classifies both mobile test unit codes", () => {
+  assertStrictEquals(locationTypeOf("CJ-UTM-N"), "Unidade Móvel");
+  assertStrictEquals(locationTypeOf("CJ-UTM-C"), "Unidade Móvel");
+  // The old overflow code keeps its classification for pre-migrate reads.
+  assertStrictEquals(
+    locationTypeOf("CJ UNIDADE DE TESTE MÓVEL"),
+    "Unidade Móvel",
+  );
 });
 
 Deno.test("toDisplayName keeps pt-BR particles lowercase", () => {

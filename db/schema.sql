@@ -47,6 +47,19 @@ create table if not exists locations (
 -- them on the next migrate without a version table.
 alter table locations add column if not exists name text;
 
+-- Mobile test unit split (DECISIONS.md#D28): the old overflow row for the
+-- shared L3 segment "Cj Unidade de Teste Móvel" now covers only the Área
+-- Norte facility, so it is renamed in place to CJ-UTM-N. Reusing the row
+-- keeps every barrier and access-group reference to its location id valid;
+-- the Área Centro facility is a new row (CJ-UTM-C) that the next sync
+-- creates. Guarded so the file stays re-runnable. `deno task db:migrate`
+-- must run before the next sync, or the sync will keep speaking the old
+-- code while the parser already emits the new one.
+update locations
+   set code = 'CJ-UTM-N', name = 'CJ-UTM-N', type = 'Unidade Móvel'
+ where code = 'CJ UNIDADE DE TESTE MÓVEL'
+   and not exists (select 1 from locations where code = 'CJ-UTM-N');
+
 create table if not exists availability_statuses (
   id           integer primary key,
   label        text    not null unique,

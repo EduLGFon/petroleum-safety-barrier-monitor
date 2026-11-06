@@ -171,18 +171,57 @@ function stationAliasFor(
 
 // stationCodeOf extracts the station code from an equipment parent chain
 // ("// Seacrest Petroleo/ Area Norte/ SAO MATEUS - SM/ ..."). Alias segments
-// below L3 win first (SM8, CO); otherwise the L3 trailing " - CODE" token is
-// used, with STATION_OVERRIDES applied. Validated against the live catalog.
+// below L3 win first (SM8, CO); the shared L3 mobile-test-unit segment
+// splits by L2 area (CJ-UTM-N/CJ-UTM-C, see DECISIONS.md#D28); otherwise
+// the L3 trailing " - CODE" token is used, with STATION_OVERRIDES applied.
+// Validated against the live catalog.
 export function stationCodeOf(
   parentDescription: string | null | undefined,
 ): string {
   const alias = stationAliasFor(parentDescription);
   if (alias !== null) return alias.code;
+  const mobile = mobileTestUnitOf(parentDescription);
+  if (mobile !== null) return mobile.code;
   const seg = l2Segment(parentDescription);
   const override = STATION_OVERRIDES[foldText(seg)];
   if (override !== undefined) return override;
   const match = seg.match(/\s*-\s*([A-Z0-9][A-Z0-9-]*)\s*$/);
   return (match ? match[1] : seg).toUpperCase();
+}
+
+// MOBILE_TEST_UNITS: the two upstream facilities sharing the folded L3
+// segment "cj unidade de teste movel" are distinct operator stations,
+// separated only by the L2 area segment (upstream facility codes
+// CJ-UND-TST-MOV-CENTRO and CJ-UND-TST-MOV-NORTE; live sweep 2026-11-06,
+// see DECISIONS.md#D28). The rule is a pure table so stationCodeOf,
+// stationNameOf and locationTypeOf can never disagree.
+interface MobileTestUnitStation {
+  code: string;
+  name: string;
+  type: string;
+}
+
+const MOBILE_TEST_UNITS: Readonly<
+  Record<"area centro" | "area norte", MobileTestUnitStation>
+> = {
+  "area centro": { code: "CJ-UTM-C", name: "CJ-UTM-C", type: "Unidade Móvel" },
+  "area norte": { code: "CJ-UTM-N", name: "CJ-UTM-N", type: "Unidade Móvel" },
+};
+
+// mobileTestUnitOf resolves the shared "Cj Unidade de Teste Móvel" L3
+// segment by the L2 area: "Area Centro" -> CJ-UTM-C, "Area Norte" ->
+// CJ-UTM-N. Any other area (or a chain too short to carry both segments)
+// returns null and the ordinary L3 parse applies unchanged.
+function mobileTestUnitOf(
+  parentDescription: string | null | undefined,
+): MobileTestUnitStation | null {
+  const parts = parentSegments(parentDescription);
+  if (parts.length < 3) return null;
+  if (foldText(parts[2]!) !== "cj unidade de teste movel") return null;
+  const area = foldText(parts[1]!);
+  if (area === "area centro") return MOBILE_TEST_UNITS["area centro"];
+  if (area === "area norte") return MOBILE_TEST_UNITS["area norte"];
+  return null;
 }
 
 // parentSegments splits the slash-separated parent chain, trimming and
@@ -231,14 +270,17 @@ export function toDisplayName(raw: string): string {
 // stationNameOf derives the display name from the L2 segment: the text
 // before " - CODE", title-cased ("FAZENDA ALEGRE - FAL" gives
 // "Fazenda Alegre"). Alias segments return their explicit name first; CO
-// returns null so the UI falls back to the code. Null also covers segments
-// without a dash-code tail (the code is already the display text) and
-// override segments (they borrow their station's canonical name).
+// returns null so the UI falls back to the code, and the mobile test units
+// return their fixed names so parser and catalog agree (D28). Null also
+// covers segments without a dash-code tail (the code is already the display
+// text) and override segments (they borrow their station's canonical name).
 export function stationNameOf(
   parentDescription: string | null | undefined,
 ): string | null {
   const alias = stationAliasFor(parentDescription);
   if (alias !== null) return alias.name;
+  const mobile = mobileTestUnitOf(parentDescription);
+  if (mobile !== null) return mobile.name;
   const seg = l2Segment(parentDescription);
   if (seg === "" || STATION_OVERRIDES[foldText(seg)] !== undefined) {
     return null;
@@ -269,12 +311,18 @@ export function typologyIdOf(
 
 // locationTypeOf classifies a station code for the locations table. Labels
 // are PT display values matching the existing lookup rows; alias codes carry
-// their type in STATION_ALIASES (SM8 is a collector station, CO a field).
+// their type in STATION_ALIASES (SM8 is a collector station, CO a field)
+// and the mobile test unit codes in MOBILE_TEST_UNITS (both share
+// "Unidade Móvel", see DECISIONS.md#D28).
 export function locationTypeOf(stationCode: string): string {
   const alias = STATION_ALIASES.find((candidate) =>
     candidate.code === stationCode
   );
   if (alias !== undefined) return alias.type;
+  const mobile = Object.values(MOBILE_TEST_UNITS).find((u) =>
+    u.code === stationCode
+  );
+  if (mobile !== undefined) return mobile.type;
   if (stationCode.includes("DUTO")) return "Duto de Transferência";
   if (/MOVEL|MÓVEL|TESTE/.test(stationCode)) return "Unidade Móvel";
   return "Instalação";

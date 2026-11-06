@@ -447,6 +447,58 @@ Deno.test("catalogNeeds reports the SM8 and CO alias stations", () => {
   assertStrictEquals(co?.type, "Campo");
 });
 
+Deno.test("catalogNeeds reports both mobile test unit stations", () => {
+  const needs = catalogNeeds([
+    asset({
+      code: "UTM-C-1",
+      parent_description:
+        "// Seacrest Petróleo/ Área Centro/ Cj Unidade de Teste Móvel/ UT-MOV-C/ Equipamento",
+    }),
+    asset({
+      code: "UTM-N-1",
+      parent_description:
+        "// Seacrest Petróleo/ Área Norte/ Cj Unidade de Teste Móvel/ UT-MOV-N/ Equipamento",
+    }),
+  ]);
+  assertEquals(
+    needs.locations.map((l) => l.code).sort(),
+    ["CJ-UTM-C", "CJ-UTM-N"],
+  );
+  const c = needs.locations.find((l) => l.code === "CJ-UTM-C");
+  assertStrictEquals(c?.name, "CJ-UTM-C");
+  assertStrictEquals(c?.type, "Unidade Móvel");
+  const n = needs.locations.find((l) => l.code === "CJ-UTM-N");
+  assertStrictEquals(n?.name, "CJ-UTM-N");
+  assertStrictEquals(n?.type, "Unidade Móvel");
+});
+
+Deno.test("mapAsset maps mobile test unit rows through MapContext", () => {
+  const utmCtx: MapContext = {
+    ...ctx,
+    locationIds: { ...ctx.locationIds, "CJ-UTM-C": 12, "CJ-UTM-N": 13 },
+  };
+  const centro = mapAsset(
+    asset({
+      code: "UTM-C-1",
+      parent_description:
+        "// Seacrest Petróleo/ Área Centro/ Cj Unidade de Teste Móvel/ UT-MOV-C/ Equipamento",
+    }),
+    utmCtx,
+  );
+  if (!centro.ok) throw new Error("expected ok");
+  assertStrictEquals(centro.input.locationId, 12);
+  const norte = mapAsset(
+    asset({
+      code: "UTM-N-1",
+      parent_description:
+        "// Seacrest Petróleo/ Área Norte/ Cj Unidade de Teste Móvel/ UT-MOV-N/ Equipamento",
+    }),
+    utmCtx,
+  );
+  if (!norte.ok) throw new Error("expected ok");
+  assertStrictEquals(norte.input.locationId, 13);
+});
+
 Deno.test("catalogNeeds falls back to location_code and skips unmappable rows", () => {
   const needs = catalogNeeds([
     asset({ code: "", groups_description: "Disjuntor" }),
