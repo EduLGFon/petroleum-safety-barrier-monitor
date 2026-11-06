@@ -1,0 +1,25 @@
+# External-DB override — use instead of the bundled `db` service.
+# Usage:
+#   docker compose -f compose.yml -f compose.external.yml up -d --force-recreate app poller alerts
+# Why it exists: app/poller/alerts/tools all have `depends_on: db` in
+# compose.yml, so `up app` would still start the bundled Postgres and steal
+# 127.0.0.1:5432 from your host-side external DB. This file clears that
+# dependency and lets containers reach the host via host.docker.internal
+# (Linux needs the explicit host-gateway mapping below).
+services:
+  app:
+    depends_on: !reset []
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+  poller:
+    depends_on: !reset []
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+  alerts:
+    depends_on: !reset []
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+  tools:
+    depends_on: !reset []
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
