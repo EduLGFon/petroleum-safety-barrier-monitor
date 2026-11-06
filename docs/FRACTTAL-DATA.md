@@ -18,12 +18,12 @@ Source dump lives under `test/` (git-ignored). Committed fixtures are in `script
 
 ## Hierarchy
 
-`items` parent chain is slash-separated: L1 polo, L2 area, L3 station, L4 system, L5+ asset. Station codes are parsed from L2. L1 concession polos are Area Norte/Centro/Sul; these are physical, not the seed location rows.
+`items` parent chain is slash-separated: L1 polo, L2 area, L3 station, L4 system, L5+ asset. Station codes are parsed from the L3 segment's trailing " - CODE" token. Two operator stations sit below L3: SM8 is the "ESTAÇÃO COLETORA SÃO MATEUS - SM-8" facility under SÃO MATEUS - SM, and CO is the 3-CO-N-ES well cluster under JACUTINGA - JCT (the CO-03 transformer under 7-JCT-5-ES stays under JCT). The L2 concession areas are Area Norte/Centro/Sul; these are physical, not the seed location rows.
 
 ## Imported catalog (full equipment scope)
 
 - Barriers: 18,271 equipment rows (one documented transmitter mislabel excluded).
-- Locations: 38 stations.
+- Locations: 40 stations (38 L3 codes plus the SM8 and CO aliases).
 - Categories: 528 labels.
 - Criticality: ESO > A > B > C > D, derived from TAG suffix plus ESO flag.
 - Availability counts after import: Disponivel 3,521; Degradado 1.

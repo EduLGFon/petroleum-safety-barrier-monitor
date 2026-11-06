@@ -111,6 +111,43 @@ Deno.test("stationNameOf derives the display name from the L2 prefix", () => {
   assertStrictEquals(stationNameOf(null), null);
 });
 
+const SM8_PARENT =
+  "// Seacrest Petróleo/ Área Norte/ SÃO MATEUS - SM/ ESTAÇÕES COLETORAS - SM/ ESTAÇÃO COLETORA SÃO MATEUS - SM-8/ POÇOS";
+const SM1_PARENT =
+  "// Seacrest Petróleo/ Área Norte/ SÃO MATEUS - SM/ ESTAÇÕES COLETORAS - SM/ ESTAÇÃO COLETORA SÃO MATEUS - SM-1/ POÇOS";
+const SM_PARENT = "// Seacrest Petróleo/ Área Norte/ SÃO MATEUS - SM/ POÇOS";
+const JCT_WELL_PARENT =
+  "// Seacrest Petróleo/ Área Norte/ JACUTINGA - JCT/ CCS/ POÇOS - JCT/ 7-JCT-5-ES/ POÇO";
+const JCT_TRAFO_PARENT =
+  "// Seacrest Petróleo/ Área Norte/ JACUTINGA - JCT/ SE/ 7-JCT-5-ES/ CO-03/ TRAFO";
+
+Deno.test("stationCodeOf resolves the SM8 facility alias", () => {
+  assertStrictEquals(stationCodeOf(SM8_PARENT), "SM8");
+  assertStrictEquals(stationNameOf(SM8_PARENT), "São Mateus 8");
+  // SM-1 stays under the parent SM station: only the exact SM-8 facility
+  // segment aliases.
+  assertStrictEquals(stationCodeOf(SM1_PARENT), "SM");
+});
+
+Deno.test("stationCodeOf resolves the CO well cluster alias", () => {
+  for (const segment of ["3-CO-2-ES", "3-CO-3-ES", "3-CO-4-ES"]) {
+    const parent =
+      `// Seacrest Petróleo/ Área Norte/ JACUTINGA - JCT/ CCS/ POÇOS - JCT/ ${segment}/ POÇO`;
+    assertStrictEquals(stationCodeOf(parent), "CO");
+    assertStrictEquals(stationNameOf(parent), null);
+  }
+});
+
+Deno.test("stationCodeOf keeps normal L3 and transformer rows under JCT", () => {
+  assertStrictEquals(stationCodeOf(SM_PARENT), "SM");
+  assertStrictEquals(stationNameOf(SM_PARENT), "São Mateus");
+  assertStrictEquals(stationCodeOf(JCT_WELL_PARENT), "JCT");
+  assertStrictEquals(stationNameOf(JCT_WELL_PARENT), "Jacutinga");
+  // The CO-03 transformer sits under 7-JCT-5-ES and is not the well
+  // pattern, so it stays in JCT.
+  assertStrictEquals(stationCodeOf(JCT_TRAFO_PARENT), "JCT");
+});
+
 Deno.test("toDisplayName keeps pt-BR particles lowercase", () => {
   assertStrictEquals(toDisplayName("LAGOA SURUACA"), "Lagoa Suruaca");
   assertStrictEquals(toDisplayName("RIO SÃO MATEUS"), "Rio São Mateus");
@@ -142,6 +179,8 @@ Deno.test("locationTypeOf classifies station codes", () => {
     "Unidade Móvel",
   );
   assertStrictEquals(locationTypeOf("FAL"), "Instalação");
+  assertStrictEquals(locationTypeOf("SM8"), "Estação Coletora");
+  assertStrictEquals(locationTypeOf("CO"), "Campo");
 });
 
 Deno.test("tagFor prefers description over code", () => {

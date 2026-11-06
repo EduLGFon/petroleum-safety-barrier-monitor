@@ -61,4 +61,19 @@ Append-only architecture decision records. Newest last.
   "migrations work but login fails with password authentication failed"
   class of incident into a named check instead of guesswork.
 
+- D27: station catalog aliases for SM8 and CO. A read-only live equipment
+  sweep on 2026-11-06 (18,174 rows, 38 L3 station codes) showed the operator
+  user list references 30 station tokens; only CO and SM8 did not resolve.
+  SM8 is not L3: "ESTAÇÃO COLETORA SÃO MATEUS - SM-8" (L4/L5 under the SÃO
+  MATEUS - SM / ESTAÇÕES COLETORAS - SM branch) carries 1,644 equipment rows
+  and mapped to SM. CO is not L3 either: the 3-CO-2-ES, 3-CO-3-ES and
+  3-CO-4-ES well clusters under JACUTINGA - JCT / CCS / POÇOS - JCT carry 30
+  equipment rows and mapped to JCT. The shared parser now scans segments from
+  L3 onward for two explicit aliases: folded exact "estacao coletora sao
+  mateus - sm-8" -> SM8 / "São Mateus 8" / "Estação Coletora"; folded
+  /^3-co-[0-9]+-es$/ -> CO / null name (UI falls back to the code) / "Campo".
+  The 7-JCT-5-ES transformer segment "CO-03" does not match the well pattern
+  and stays under JCT; SM-1 stays under SM. The catalog grows from 38 to 40
+  station codes; SM drops from 2,445 to 801 rows and JCT from 150 to 120.
+
 See git history for full context.

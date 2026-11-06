@@ -110,6 +110,31 @@ Deno.test("mapAsset prefers the parent-derived station over location_code", () =
   assertStrictEquals(mapped.input.locationId, 1);
 });
 
+Deno.test("mapAsset resolves alias stations through MapContext", () => {
+  const aliasCtx: MapContext = {
+    ...ctx,
+    locationIds: { ...ctx.locationIds, SM8: 8, CO: 9 },
+  };
+  const sm8 = mapAsset(
+    asset({
+      parent_description:
+        "// Seacrest Petróleo/ Área Norte/ SÃO MATEUS - SM/ ESTAÇÕES COLETORAS - SM/ ESTAÇÃO COLETORA SÃO MATEUS - SM-8/ Unidade",
+    }),
+    aliasCtx,
+  );
+  if (!sm8.ok) throw new Error("expected ok");
+  assertStrictEquals(sm8.input.locationId, 8);
+  const co = mapAsset(
+    asset({
+      parent_description:
+        "// Seacrest Petróleo/ Área Norte/ JACUTINGA - JCT/ CCS/ POÇOS - JCT/ 3-CO-2-ES/ Poço",
+    }),
+    aliasCtx,
+  );
+  if (!co.ok) throw new Error("expected ok");
+  assertStrictEquals(co.input.locationId, 9);
+});
+
 const expectSkip = (mapped: MappedRow, fragment: string) => {
   assertStrictEquals(mapped.ok, false);
   if (mapped.ok) throw new Error("unreachable");
@@ -398,6 +423,28 @@ Deno.test("catalogNeeds collects distinct categories and parent-derived stations
   const sm = needs.locations.find((l) => l.code === "SM");
   assertStrictEquals(sm?.name, "Sao Mateus");
   assertStrictEquals(sm?.type, "Instalação");
+});
+
+Deno.test("catalogNeeds reports the SM8 and CO alias stations", () => {
+  const needs = catalogNeeds([
+    asset({
+      code: "SM8-1",
+      parent_description:
+        "// Seacrest Petróleo/ Área Norte/ SÃO MATEUS - SM/ ESTAÇÕES COLETORAS - SM/ ESTAÇÃO COLETORA SÃO MATEUS - SM-8/ Unidade",
+    }),
+    asset({
+      code: "CO-1",
+      parent_description:
+        "// Seacrest Petróleo/ Área Norte/ JACUTINGA - JCT/ CCS/ POÇOS - JCT/ 3-CO-2-ES/ Poço",
+    }),
+  ]);
+  assertEquals(needs.locations.map((l) => l.code).sort(), ["CO", "SM8"]);
+  const sm8 = needs.locations.find((l) => l.code === "SM8");
+  assertStrictEquals(sm8?.name, "São Mateus 8");
+  assertStrictEquals(sm8?.type, "Estação Coletora");
+  const co = needs.locations.find((l) => l.code === "CO");
+  assertStrictEquals(co?.name, null);
+  assertStrictEquals(co?.type, "Campo");
 });
 
 Deno.test("catalogNeeds falls back to location_code and skips unmappable rows", () => {

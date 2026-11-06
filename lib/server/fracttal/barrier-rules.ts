@@ -121,13 +121,63 @@ export const STATION_OVERRIDES: Readonly<Record<string, string>> = {
   "base seacrest - sao mateus-es": "SM",
 };
 
-// stationCodeOf extracts the L2 station slug from an equipment parent chain
-// ("// Seacrest Petroleo/ Area Norte/ SAO MATEUS - SM/ ...") by taking the
-// trailing " - CODE" token. Validated against the full equipment file: this
-// rule reproduces the 39 distinct station codes.
+// STATION_ALIASES promotes station-like segments that sit below L3 to their
+// own operator stations (live evidence 2026-11-06, see DECISIONS.md#D27).
+// SM8 is the "ESTAÇÃO COLETORA SÃO MATEUS - SM-8" facility under SÃO MATEUS
+// - SM; CO is the 3-CO-N-ES well cluster under JACUTINGA - JCT. The
+// transformer segment "CO-03" under 7-JCT-5-ES must not match the CO pattern
+// and stays under JCT. segment holds a folded exact string or an anchored
+// folded regex; a null name means the UI falls back to the code.
+export interface StationAlias {
+  segment: string | RegExp;
+  code: string;
+  name: string | null;
+  type: string;
+}
+
+export const STATION_ALIASES: readonly StationAlias[] = [
+  {
+    segment: "estacao coletora sao mateus - sm-8",
+    code: "SM8",
+    name: "São Mateus 8",
+    type: "Estação Coletora",
+  },
+  {
+    segment: /^3-co-[0-9]+-es$/,
+    code: "CO",
+    name: null,
+    type: "Campo",
+  },
+];
+
+// stationAliasFor scans the parent chain from the L3 segment onward: SM8
+// sits below L3 and the CO wells sit under JACUTINGA - JCT; scanning every
+// segment from the station segment onward lets an alias win at any depth
+// without changing normal L3 results.
+function stationAliasFor(
+  parentDescription: string | null | undefined,
+): StationAlias | null {
+  for (const segment of parentSegments(parentDescription).slice(2)) {
+    const folded = foldText(segment);
+    const alias = STATION_ALIASES.find((candidate) =>
+      typeof candidate.segment === "string"
+        ? folded === candidate.segment
+        : candidate.segment.test(folded)
+    );
+    if (alias !== undefined) return alias;
+  }
+  return null;
+}
+
+// stationCodeOf extracts the station code from an equipment parent chain
+// ("// Seacrest Petroleo/ Area Norte/ SAO MATEUS - SM/ ..."). Alias segments
+// below L3 win first (SM8, CO); otherwise the L3 trailing " - CODE" token is
+// used, with STATION_OVERRIDES applied. Validated against the live catalog.
 export function stationCodeOf(
   parentDescription: string | null | undefined,
 ): string {
+  const alias = stationAliasFor(parentDescription);
+  if (alias !== null) return alias.code;
   const seg = l2Segment(parentDescription);
   const override = STATION_OVERRIDES[foldText(seg)];
   if (override !== undefined) return override;
@@ -135,12 +185,22 @@ export function stationCodeOf(
   return (match ? match[1] : seg).toUpperCase();
 }
 
+// parentSegments splits the slash-separated parent chain, trimming and
+// dropping empty segments (leading "//" produces none). Shared so the alias
+// scan and the L3 parse read the same segments.
+function parentSegments(
+  parentDescription: string | null | undefined,
+): string[] {
+  return (parentDescription ?? "").split("/").map((p) => p.trim()).filter(
+    (p) => p !== "",
+  );
+}
+
 // l2Segment pulls the field-level (third) segment out of an equipment
 // parent chain; shared by the code and name derivations so they can never
 // disagree on which segment they read.
 function l2Segment(parentDescription: string | null | undefined): string {
-  const parts = (parentDescription ?? "").split("/").map((p) => p.trim())
-    .filter((p) => p !== "");
+  const parts = parentSegments(parentDescription);
   return parts.length > 2 ? parts[2]! : (parts[parts.length - 1] ?? "");
 }
 
@@ -170,12 +230,15 @@ export function toDisplayName(raw: string): string {
 
 // stationNameOf derives the display name from the L2 segment: the text
 // before " - CODE", title-cased ("FAZENDA ALEGRE - FAL" gives
-// "Fazenda Alegre"). Null when there is no dash-code tail (the code itself
-// is already the display text then) and for override segments (they borrow
-// their station's canonical name and must never set it).
+// "Fazenda Alegre"). Alias segments return their explicit name first; CO
+// returns null so the UI falls back to the code. Null also covers segments
+// without a dash-code tail (the code is already the display text) and
+// override segments (they borrow their station's canonical name).
 export function stationNameOf(
   parentDescription: string | null | undefined,
 ): string | null {
+  const alias = stationAliasFor(parentDescription);
+  if (alias !== null) return alias.name;
   const seg = l2Segment(parentDescription);
   if (seg === "" || STATION_OVERRIDES[foldText(seg)] !== undefined) {
     return null;
@@ -205,8 +268,13 @@ export function typologyIdOf(
 }
 
 // locationTypeOf classifies a station code for the locations table. Labels
-// are PT display values matching the existing lookup rows.
+// are PT display values matching the existing lookup rows; alias codes carry
+// their type in STATION_ALIASES (SM8 is a collector station, CO a field).
 export function locationTypeOf(stationCode: string): string {
+  const alias = STATION_ALIASES.find((candidate) =>
+    candidate.code === stationCode
+  );
+  if (alias !== undefined) return alias.type;
   if (stationCode.includes("DUTO")) return "Duto de Transferência";
   if (/MOVEL|MÓVEL|TESTE/.test(stationCode)) return "Unidade Móvel";
   return "Instalação";
