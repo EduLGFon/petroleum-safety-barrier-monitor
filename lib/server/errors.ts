@@ -50,8 +50,14 @@ export function ok(
 }
 
 // created: 201 success for POST creates, with the correlation header.
-export function created(data: unknown, requestId: string): Response {
-  return ok(data, requestId, { status: 201 });
+// Callers that return a one-time secret (a generated password) pass
+// Cache-Control: no-store through init so no cache keeps the body.
+export function created(
+  data: unknown,
+  requestId: string,
+  init: ResponseInit = {},
+): Response {
+  return ok(data, requestId, { ...init, status: 201 });
 }
 
 // etagOf: strong validator over the exact response bytes (same

@@ -3,6 +3,13 @@
 // and resetting passwords are the core of access management. The last
 // active admin cannot be demoted, deactivated, or deleted.
 import {
+  generateTemporaryPassword,
+  hashPassword,
+  validateNewPassword,
+  verifyPassword,
+} from "../../../lib/server/auth/password.ts";
+
+import {
   badRequest,
   internal,
   newRequestId,
@@ -10,13 +17,6 @@ import {
   ok,
   rateLimited,
 } from "../../../lib/server/errors.ts";
-
-import {
-  generateTemporaryPassword,
-  hashPassword,
-  validateNewPassword,
-  verifyPassword,
-} from "../../../lib/server/auth/password.ts";
 
 import {
   authStoreUnavailable,
@@ -41,13 +41,13 @@ import {
   loadServerConfig,
 } from "../../../lib/server/config.ts";
 
-import { routeClientKey, writeThrottle } from "../../../lib/server/throttle.ts";
-
 import { sendAccountNotice } from "../../../lib/server/alerts/account-notice.ts";
 
-import { define } from "../../../utils.ts";
+import { routeClientKey, writeThrottle } from "../../../lib/server/throttle.ts";
 
 import { denyIfCrossSite } from "../../../lib/server/csrf.ts";
+
+import { define } from "../../../utils.ts";
 
 export const handler = define.handlers({
   // PATCH { name?, role?, active?, password? } - partial update.
@@ -99,28 +99,40 @@ export const handler = define.handlers({
       // instead of inventing one. This is how an account that still carries
       // a shared or leaked password gets a private one, and it is the only
       // path that also notifies the person.
-      let senhaSorteada: string | null = null;
+      let generatedPassword: string | null = null;
       let entraTid: string | null | undefined;
       let entraOid: string | null | undefined;
       if (body.resetPassword === true) {
-        if (body.password !== undefined) {
+        // One intent per call: a drawn password plus an explicit one, or a
+        // password plus an auth-source switch, would produce a conflicting
+        // SET in the same UPDATE. Reject before any write.
+        if (
+          body.password !== undefined || body.authSource !== undefined ||
+          body.entraObjectId !== undefined
+        ) {
           return badRequest(
-            "resetPassword e password nao andam juntos: ou o sistema sorteia, ou voce informa",
+            "resetPassword cannot be combined with password, authSource or entraObjectId",
             requestId,
           );
         }
-        const alvo = await getUserById(id);
-        if (!alvo) return notFound("User not found", requestId);
-        if (alvo.auth_source !== "local") {
+        const target = await getUserById(id);
+        if (!target) return notFound("User not found", requestId);
+        if (target.auth_source !== "local") {
           return badRequest(
-            "conta Microsoft nao tem senha para redefinir",
+            "Microsoft accounts have no password to reset",
             requestId,
           );
         }
-        senhaSorteada = generateTemporaryPassword();
-        passwordHash = await hashPassword(senhaSorteada);
+        generatedPassword = generateTemporaryPassword();
+        passwordHash = await hashPassword(generatedPassword);
       }
       if (body.password !== undefined) {
+        if (body.authSource !== undefined || body.entraObjectId !== undefined) {
+          return badRequest(
+            "password cannot be combined with authSource or entraObjectId",
+            requestId,
+          );
+        }
         const target = await getUserById(id);
         if (!target) return notFound("User not found", requestId);
         if (target.auth_source !== "local" || target.password_hash === null) {
@@ -184,27 +196,34 @@ export const handler = define.handlers({
         passwordHash,
         // A drawn password is temporary by definition: the person must
         // replace it on the next sign-in, same as a brand-new account.
-        ...(senhaSorteada !== null ? { mustChangePassword: true } : {}),
+        ...(generatedPassword !== null ? { mustChangePassword: true } : {}),
         authSource: body.authSource,
         entraTid,
         entraOid,
       });
       if (!updated) return notFound("User not found", requestId);
-      if (senhaSorteada === null) return ok(updated, requestId);
+      if (generatedPassword === null) return ok(updated, requestId);
       // Same contract as creation: the password rides back once so the admin
       // can hand it over even if the message failed, and the outcome of the
-      // notice is reported instead of assumed.
-      const aviso = await sendAccountNotice({
-        accountId: updated.id,
-        kind: "senha_reset",
-        password: senhaSorteada,
-        name: updated.name || updated.email,
-        login: updated.email,
-        phone: updated.phone,
-      });
+      // notice is reported instead of assumed. Fail soft on any unexpected
+      // notice error so a successful reset is not reported as a failure.
+      let aviso: { sent: boolean; reason?: string } | null = null;
+      try {
+        aviso = await sendAccountNotice({
+          accountId: updated.id,
+          kind: "senha_reset",
+          password: generatedPassword,
+          name: updated.name || updated.email,
+          login: updated.email,
+          phone: updated.phone,
+        });
+      } catch {
+        aviso = { sent: false, reason: "notice failed" };
+      }
       return ok(
-        { ...updated, temporaryPassword: senhaSorteada, aviso },
+        { ...updated, temporaryPassword: generatedPassword, aviso },
         requestId,
+        { headers: { "cache-control": "no-store" } },
       );
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
