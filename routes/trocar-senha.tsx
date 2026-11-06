@@ -2,11 +2,19 @@
 // carries the password the system generated.
 // This is why it exists: the gate lives in the API guards, so a pending
 // account gets 403 everywhere. This page is the single exception, and the
-// redirect below keeps it from becoming a second, optional way in - whoever
+// redirect below keeps it from becoming a second, optional way in: whoever
 // is not pending is sent back to the dashboard.
+//
+// Cache-Control note: Fresh 2 define.page returns JSX directly on the
+// success path, so there is no Response object to attach headers to without
+// leaving the page-component pattern this repo uses everywhere. The no-store
+// policy for this page lives in routes/_middleware.ts, which applies
+// Cache-Control: no-store, private to /login and /trocar-senha.
 import { requirePageSession, toLogin } from "../lib/server/page-auth.ts";
 
 import { ForcePasswordChange } from "../islands/ForcePasswordChange.tsx";
+
+import { LoginShell } from "../components/login/LoginShell.tsx";
 
 import { getCompanyName } from "../lib/company.ts";
 
@@ -24,14 +32,7 @@ export default define.page(async function TrocarSenha(
     return new Response(null, { status: 303, headers: { location: "/" } });
   }
   return (
-    <main
-      style={{
-        minHeight: "100vh",
-        display: "grid",
-        placeItems: "center",
-        padding: "var(--d-shell, 24px)",
-      }}
-    >
+    <LoginShell>
       <section
         style={{
           width: "min(420px, 100%)",
@@ -50,6 +51,6 @@ export default define.page(async function TrocarSenha(
         </header>
         <ForcePasswordChange email={user.email} />
       </section>
-    </main>
+    </LoginShell>
   );
 });

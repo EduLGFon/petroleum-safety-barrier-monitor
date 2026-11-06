@@ -5,8 +5,26 @@
 // own the person would see a dashboard made of errors and no way out.
 //
 // The form posts to the same self-service endpoint the Conta tab uses, so
-// there is one password-change path in the app, not two.
+// there is one password-change path in the app, not two. Passwords stay in
+// local component state only: never in storage, never in logs.
+import { toPtError } from "../lib/api/error-pt.ts";
+
+import { apiFetch } from "../lib/api/http.ts";
+
 import { useState } from "preact/hooks";
+
+// extrairMensagemErro: reads the { error: string, code, requestId } envelope
+// the API returns. A string error maps through toPtError; anything else falls
+// back to a localized status message. Never touches error.message objects.
+export function extrairMensagemErro(corpo: unknown, status: number): string {
+  if (typeof corpo === "object" && corpo !== null) {
+    const erro = (corpo as { error?: unknown }).error;
+    if (typeof erro === "string" && erro.trim() !== "") {
+      return toPtError(erro);
+    }
+  }
+  return `Falha ao trocar a senha (${status}).`;
+}
 
 export function ForcePasswordChange({ email }: { email: string }) {
   const [atual, setAtual] = useState("");
@@ -25,21 +43,23 @@ export function ForcePasswordChange({ email }: { email: string }) {
     }
     setOcupado(true);
     try {
-      const res = await fetch("/api/auth/password", {
+      const res = await apiFetch("/api/auth/password", {
         method: "POST",
+        credentials: "same-origin",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ currentPassword: atual, newPassword: nova }),
       });
       if (!res.ok) {
         const corpo = await res.json().catch(() => null);
-        throw new Error(
-          (corpo as { error?: { message?: string } } | null)?.error?.message ??
-            `Falha ao trocar a senha (${res.status}).`,
-        );
+        throw new Error(extrairMensagemErro(corpo, res.status));
       }
       // The endpoint revokes every session, this one included, and expires
-      // the cookie. Sending the person to /login is not a courtesy - it is
-      // the only place they can go now, and with the new password.
+      // the cookie. Sending the person to /login is not a courtesy: it is
+      // the only place they can go now, and with the new password. Clear the
+      // fields first so no password lingers in component state.
+      setAtual("");
+      setNova("");
+      setConfirma("");
       setPronto(true);
       globalThis.setTimeout(() => {
         globalThis.location.href = "/login";
@@ -64,8 +84,8 @@ export function ForcePasswordChange({ email }: { email: string }) {
   if (pronto) {
     return (
       <p>
-        Senha trocada. Entre de novo com a senha nova — levando você para a
-        tela de acesso…
+        Senha trocada. Entre de novo com a senha nova. Levando você para a tela
+        de acesso…
       </p>
     );
   }
@@ -73,8 +93,8 @@ export function ForcePasswordChange({ email }: { email: string }) {
   return (
     <form onSubmit={enviar} style={{ display: "grid", gap: 12 }}>
       <p style={{ margin: 0, opacity: 0.85 }}>
-        A senha de <strong>{email}</strong> foi gerada pelo sistema. Escolha
-        uma só sua para continuar.
+        A senha de <strong>{email}</strong>{" "}
+        foi gerada pelo sistema. Escolha uma só sua para continuar.
       </p>
       {erro && (
         <div
@@ -93,7 +113,7 @@ export function ForcePasswordChange({ email }: { email: string }) {
         <input
           type="password"
           required
-          autocomplete="current-password"
+          autoComplete="current-password"
           value={atual}
           onInput={(e) => setAtual(e.currentTarget.value)}
           style={campo}
@@ -105,7 +125,7 @@ export function ForcePasswordChange({ email }: { email: string }) {
           type="password"
           required
           minLength={12}
-          autocomplete="new-password"
+          autoComplete="new-password"
           value={nova}
           onInput={(e) => setNova(e.currentTarget.value)}
           style={campo}
@@ -117,7 +137,7 @@ export function ForcePasswordChange({ email }: { email: string }) {
           type="password"
           required
           minLength={12}
-          autocomplete="new-password"
+          autoComplete="new-password"
           value={confirma}
           onInput={(e) => setConfirma(e.currentTarget.value)}
           style={campo}
