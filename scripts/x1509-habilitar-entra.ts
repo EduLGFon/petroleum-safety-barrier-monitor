@@ -1,25 +1,27 @@
-// x.1.5.1509 - habilita a entrada pela Microsoft, em lote.
+// x1509 enable Entra - converts local accounts to Microsoft sign-in in batch.
+// This script exists because imported accounts were born local and all with
+// the same password. Converting to Entra kills that password at once - the
+// column becomes NULL, there is no password left to guess - and it creates
+// no new secret in its place. Whoever signs in does so with the corporate
+// account the person already has.
 //
-// Por que existe: as contas importadas nasceram locais e todas com a MESMA
-// senha. Converter para Entra mata essa senha de uma vez - a coluna vira
-// NULL, nao existe mais senha a adivinhar - e nao cria segredo novo nenhum
-// no lugar. Quem entra, entra pela conta corporativa que a pessoa ja tem.
-//
-// O que ele NAO faz: nao cria conta, nao manda e-mail, nao toca em admin.
-// Avisar as pessoas e o outro script (x1509-avisar-convite.ts), de proposito:
-// converter e reversivel por UPDATE, mandar e-mail nao.
+// What it does NOT do: it creates no account, sends no mail, touches no
+// admin. Notifying people is the other script (x1509-avisar-convite.ts) on
+// purpose: converting is reversible with one UPDATE, sending mail is not.
 //
 //   deno run -A --env-file=.env scripts/x1509-habilitar-entra.ts
 //   deno run -A --env-file=.env scripts/x1509-habilitar-entra.ts --apply
 //   deno run -A --env-file=.env scripts/x1509-habilitar-entra.ts --entra entra_users.json --apply
 //
-// Sem --apply ele so mostra o que faria. Com --entra <arquivo.json> ele
-// confere cada e-mail contra a lista de contas do tenant e PULA quem nao
-// casar: conta convertida fica sem senha, entao converter alguem que nao
-// tem conta Microsoft e tranca-lo para fora.
-import { queryRows } from "../lib/server/db.ts";
+// Without --apply it only shows what it would do. With --entra <file.json>
+// it checks each mail against the tenant account list and skips whoever does
+// not match: a converted account has no password, so converting someone with
+// no Microsoft account would lock them out.
+import { maskEmail, safeReason } from "./import-users.ts";
 
 import { updateUser } from "../lib/server/sql/users.ts";
+
+import { queryRows } from "../lib/server/db.ts";
 
 interface Candidato {
   id: number;
@@ -33,19 +35,27 @@ function flag(nome: string): string | undefined {
   return Deno.args[i + 1];
 }
 
-// emailsDoTenant: aceita tanto a saida crua do Graph (array de objetos com
-// userPrincipalName/mail) quanto uma lista simples de enderecos, porque o
-// arquivo pode vir de onde for. Tudo minusculo: o casamento e exato.
-function emailsDoTenant(bruto: unknown): Set<string> {
+// Output masking comes from the shared import helper; matching stays
+// exact.
+
+// tenantEmails: accepts both the raw Graph output (array of objects with
+// userPrincipalName/mail) and a plain list of addresses, because the file can
+// come from anywhere. All lowercase: the match is exact.
+function tenantEmails(bruto: unknown): Set<string> {
   const out = new Set<string>();
   const add = (v: unknown) => {
-    if (typeof v === "string" && v.includes("@")) out.add(v.trim().toLowerCase());
+    if (typeof v === "string" && v.includes("@")) {
+      out.add(v.trim().toLowerCase());
+    }
   };
   const lista = Array.isArray(bruto)
     ? bruto
     : (bruto as { value?: unknown[] })?.value ?? [];
   for (const item of lista as unknown[]) {
-    if (typeof item === "string") { add(item); continue; }
+    if (typeof item === "string") {
+      add(item);
+      continue;
+    }
     const o = item as Record<string, unknown>;
     add(o.userPrincipalName);
     add(o.mail);
@@ -58,53 +68,67 @@ const arquivoEntra = flag("--entra");
 
 let noTenant: Set<string> | null = null;
 if (arquivoEntra) {
-  noTenant = emailsDoTenant(JSON.parse(await Deno.readTextFile(arquivoEntra)));
-  console.log("contas no tenant lidas de " + arquivoEntra + ": " + noTenant.size);
+  noTenant = tenantEmails(JSON.parse(await Deno.readTextFile(arquivoEntra)));
+  console.log(
+    "contas no tenant lidas de " + arquivoEntra + ": " + noTenant.size,
+  );
 }
 
 const candidatos = await queryRows<Candidato>(
   `select id, email, coalesce(nullif(name, ''), email) as name
      from users
-    where auth_source = 'local' and role = 'user' and active
-    order by email`,
+     where auth_source = 'local' and role = 'user' and active
+     order by email`,
 );
 console.log("contas locais nao-admin: " + candidatos.length);
 console.log(aplicar ? "modo: APLICANDO" : "modo: ENSAIO (nada e gravado)");
 console.log("");
 
 let convertidos = 0;
-const pulados: Array<{ email: string; porque: string }> = [];
+const pulados: Array<{ id: number; email: string; porque: string }> = [];
 
 for (const c of candidatos) {
   const email = c.email.toLowerCase();
   if (noTenant && !noTenant.has(email)) {
-    pulados.push({ email: c.email, porque: "sem conta no tenant com este e-mail" });
-    console.log("  PULA     " + c.email + "  (nao achei no tenant)");
+    pulados.push({
+      id: c.id,
+      email: c.email,
+      porque: "sem conta no tenant com este e-mail",
+    });
+    console.log(
+      "  PULA     user #" + c.id + " " + maskEmail(c.email) +
+        "  (nao achei no tenant)",
+    );
     continue;
   }
   if (!aplicar) {
     convertidos++;
-    console.log("  (ensaio) " + c.email);
+    console.log("  (ensaio) user #" + c.id + " " + maskEmail(c.email));
     continue;
   }
   try {
-    // O mesmo caminho do botao "Converter para Entra" da tela: zera a senha,
-    // revoga as sessoes e deixa a conta pendente de primeiro acesso.
+    // The same path as the "Convert to Entra" button in the UI: it clears
+    // the password, revokes sessions and leaves the account pending first
+    // sign-in.
     //
-    // mustChangePassword volta a false no MESMO update: a conta nao tem mais
-    // senha, e a marca mandaria a pessoa para /trocar-senha, onde nao ha nada
-    // para trocar. Seria um laco sem saida.
+    // mustChangePassword returns to false in the same UPDATE: the account
+    // has no password anymore, and the flag would send the person to
+    // /trocar-senha, where there is nothing to change. That would be a loop
+    // with no exit.
     const r = await updateUser(c.id, {
       authSource: "entra",
       mustChangePassword: false,
     });
     if (!r) throw new Error("conta sumiu durante a conversao");
     convertidos++;
-    console.log("  OK       " + c.email);
+    console.log("  OK       user #" + c.id + " " + maskEmail(c.email));
   } catch (err) {
     const motivo = err instanceof Error ? err.message : String(err);
-    pulados.push({ email: c.email, porque: motivo });
-    console.log("  FALHOU   " + c.email + "  -> " + motivo);
+    pulados.push({ id: c.id, email: c.email, porque: motivo });
+    console.log(
+      "  FALHOU   user #" + c.id + " " + maskEmail(c.email) + "  -> " +
+        safeReason(motivo, c.email),
+    );
   }
 }
 
@@ -112,7 +136,12 @@ console.log("");
 console.log("convertidos: " + convertidos + " de " + candidatos.length);
 if (pulados.length > 0) {
   console.log("pulados: " + pulados.length);
-  for (const p of pulados) console.log("   " + p.email + "  -> " + p.porque);
+  for (const p of pulados) {
+    console.log(
+      "   user #" + p.id + " " + maskEmail(p.email) + "  -> " +
+        safeReason(p.porque, p.email, 300),
+    );
+  }
 }
 
 const depois = await queryRows<{ auth_source: string; n: string }>(
