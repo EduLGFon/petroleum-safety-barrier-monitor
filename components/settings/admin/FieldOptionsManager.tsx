@@ -12,20 +12,38 @@ import {
   SkeletonRows,
   StatusBadge,
 } from "./AdminPrimitives.tsx";
+
 import {
   FIELD_KEYS,
   FIELD_LABELS,
   type FieldKey,
   SEED_DEFAULTS,
 } from "../../../lib/field-options.ts";
+
+import {
+  AdminBulkButton,
+  AdminSearchInput,
+  AdminSelectionBar,
+} from "./AdminListControls.tsx";
+
+import { useAdminList } from "../../../hooks/useAdminList.ts";
+
 import { adminApi } from "../../../lib/api/admin-client.ts";
+
 import { useEffect, useRef, useState } from "preact/hooks";
+
+import { Pagination } from "../../table/Pagination.tsx";
 
 interface SetItem {
   field: string;
   options: string[];
   updated_at: string;
 }
+
+// Stable identity helpers for the option list so useAdminList does not
+// rebuild its filtered/selected state on every render.
+const optionId = (opt: string): string => opt;
+const optionText = (opt: string): string => opt;
 
 // FieldOptionsManager: select field, view/edit option pills, restore defaults.
 export function FieldOptionsManager(
@@ -65,6 +83,12 @@ export function FieldOptionsManager(
 
   const currentOpts = data[selected] ?? SEED_DEFAULTS[selected] ?? [];
 
+  const list = useAdminList<string, string>({
+    items: currentOpts,
+    getId: optionId,
+    getSearchText: optionText,
+  });
+
   function save(next: string[]) {
     const field = selected;
     const task = saveQueueRef.current.then(async () => {
@@ -97,8 +121,15 @@ export function FieldOptionsManager(
     void save([...currentOpts, v]);
   }
 
-  function removeOption(idx: number) {
-    const next = currentOpts.filter((_, i) => i !== idx);
+  function removeOption(opt: string) {
+    const next = currentOpts.filter((o) => o !== opt);
+    void save(next);
+  }
+
+  function removeSelected() {
+    const selectedSet = list.selectedIds;
+    const next = currentOpts.filter((opt) => !selectedSet.has(opt));
+    list.clearAll();
     void save(next);
   }
 
@@ -138,6 +169,7 @@ export function FieldOptionsManager(
               setSelected(e.currentTarget.value as FieldKey);
               setSuccess("");
               setError("");
+              list.setQuery("");
             }}
             style={{ ...inputSt, cursor: "pointer" }}
           >
@@ -183,20 +215,32 @@ export function FieldOptionsManager(
                   Restaurar padrão
                 </button>
               </div>
-              <div
-                style={{
-                  display: "flex",
-                  flexWrap: "wrap",
-                  gap: 6,
-                  maxHeight: 180,
-                  overflowY: "auto",
-                  padding: 4,
-                  background: "var(--bg-surface)",
-                  borderRadius: "var(--d-chip-radius)",
-                  border: "1px solid var(--border)",
-                }}
+              <AdminSearchInput
+                value={list.query}
+                onChange={list.setQuery}
+                placeholder="Buscar opções..."
+                disabled={busy}
+              />
+              <AdminSelectionBar
+                pageIds={list.pageIds}
+                selectedIds={list.selectedIds}
+                total={list.total}
+                onSelectPage={list.selectPage}
+                onSelectAll={list.selectAll}
+                onClearAll={list.clearAll}
               >
-                {currentOpts.length === 0 && (
+                {list.selectedCount > 0 && (
+                  <AdminBulkButton
+                    tone="danger"
+                    disabled={busy}
+                    onClick={removeSelected}
+                  >
+                    Remover selecionadas ({list.selectedCount})
+                  </AdminBulkButton>
+                )}
+              </AdminSelectionBar>
+              {currentOpts.length === 0
+                ? (
                   <span
                     style={{
                       fontSize: "var(--d-small)",
@@ -207,42 +251,85 @@ export function FieldOptionsManager(
                   >
                     Nenhuma opção configurada (campo livre).
                   </span>
-                )}
-                {currentOpts.map((opt, i) => (
+                )
+                : list.total === 0
+                ? (
                   <span
-                    key={opt}
                     style={{
-                      display: "inline-flex",
-                      alignItems: "center",
-                      gap: 6,
-                      padding: "3px 8px",
-                      background: "var(--bg-elevated)",
-                      border: "1px solid var(--border)",
-                      borderRadius: 6,
                       fontSize: "var(--d-small)",
-                      color: "var(--text-primary)",
+                      color: "var(--text-muted)",
+                      padding: 6,
+                      fontStyle: "italic",
                     }}
                   >
-                    <span>{opt}</span>
-                    <button
-                      type="button"
-                      disabled={busy}
-                      onClick={() => removeOption(i)}
-                      style={{
-                        background: "none",
-                        border: "none",
-                        color: "var(--text-muted)",
-                        cursor: "pointer",
-                        padding: 0,
-                        fontSize: "var(--d-body)",
-                        lineHeight: 1,
-                      }}
-                    >
-                      ×
-                    </button>
+                    Nenhuma opção encontrada.
                   </span>
-                ))}
-              </div>
+                )
+                : (
+                  <div style={{ display: "grid", gap: 6 }}>
+                    {list.pageItems.map((opt) => (
+                      <div
+                        key={opt}
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 8,
+                          padding: "6px 8px",
+                          background: "var(--bg-surface)",
+                          border: "1px solid var(--border)",
+                          borderRadius: "var(--d-chip-radius)",
+                        }}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={list.selectedIds.has(opt)}
+                          onChange={() => list.toggle(opt)}
+                          disabled={busy}
+                          aria-label={`Selecionar ${opt}`}
+                        />
+                        <span
+                          style={{
+                            flex: 1,
+                            fontSize: "var(--d-small)",
+                            color: "var(--text-primary)",
+                            overflow: "hidden",
+                            textOverflow: "ellipsis",
+                            whiteSpace: "nowrap",
+                          }}
+                        >
+                          {opt}
+                        </span>
+                        <button
+                          type="button"
+                          disabled={busy}
+                          onClick={() => removeOption(opt)}
+                          style={{
+                            background: "none",
+                            border: "none",
+                            color: "var(--text-muted)",
+                            cursor: "pointer",
+                            padding: 0,
+                            fontSize: "var(--d-body)",
+                            lineHeight: 1,
+                          }}
+                          title="Remover opção"
+                        >
+                          ×
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              {list.total > 0 && (
+                <Pagination
+                  page={list.page}
+                  totalPages={list.totalPages}
+                  total={list.total}
+                  pageSize={list.pageSize}
+                  onChange={list.setPage}
+                  onPageSize={list.setPageSize}
+                />
+              )}
               <form
                 onSubmit={addOption}
                 style={{ display: "flex", gap: 6, marginTop: 4 }}
