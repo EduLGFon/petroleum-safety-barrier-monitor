@@ -147,18 +147,16 @@ Deno.test("applyFilters splits on action-plan presence", () => {
   assertStrictEquals(applyFilters(rows, defaultFilters()).length, 2);
 });
 
-Deno.test("sanitizeFilterPatch keeps plan values, drops unknown ones", () => {
-  assertEquals(sanitizeFilterPatch({ plan: "Sem plano" }), {
-    plan: "Sem plano",
-  });
-  assertEquals(sanitizeFilterPatch({ plan: "Talvez" }), {});
-});
-
-Deno.test("sanitizeFilterPatch keeps known row scopes, drops unknown ones", () => {
-  assertEquals(sanitizeFilterPatch({ rowScope: "deleted" }), {
-    rowScope: "deleted",
-  });
-  assertEquals(sanitizeFilterPatch({ rowScope: "lixeira" }), {});
+Deno.test("sanitizeFilterPatch keeps known plan and row-scope values", () => {
+  const cases: Array<[Record<string, unknown>, Record<string, unknown>]> = [
+    [{ plan: "Sem plano" }, { plan: "Sem plano" }],
+    [{ plan: "Talvez" }, {}],
+    [{ rowScope: "deleted" }, { rowScope: "deleted" }],
+    [{ rowScope: "lixeira" }, {}],
+  ];
+  for (const [patch, expected] of cases) {
+    assertEquals(sanitizeFilterPatch(patch), expected);
+  }
 });
 
 Deno.test("applyFilters scopes disabled and soft-deleted rows", () => {
@@ -202,20 +200,28 @@ Deno.test("sanitizeFilterPatch lets an explicit rank win over the gate", () => {
   );
 });
 
-Deno.test("applyFilters matches criticality exactly", () => {
+Deno.test("applyFilters matches criticality and typology exactly", () => {
   const rows = [
-    barrier({ id: 1, criticality: "ESO" }),
-    barrier({ id: 2, criticality: "B" }),
+    barrier({ id: 1, criticality: "ESO", typology: "Campo" }),
+    barrier({
+      id: 2,
+      criticality: "B",
+      typology: "Estação Coletora",
+    }),
   ];
-  const all = { ...defaultFilters(), criticalOnly: false };
   assertStrictEquals(
-    applyFilters(rows, { ...all, criticality: "ESO" }).length,
+    applyFilters(rows, { ...defaultFilters(), criticality: "ESO" }).length,
     1,
   );
   assertStrictEquals(
-    applyFilters(rows, { ...all, criticality: "B" }).length,
+    applyFilters(rows, { ...defaultFilters(), criticality: "B" }).length,
     1,
   );
+  assertStrictEquals(
+    applyFilters(rows, { ...defaultFilters(), typology: "Campo" }).length,
+    1,
+  );
+  assertStrictEquals(applyFilters(rows, defaultFilters()).length, 2);
 });
 
 Deno.test("applyFilters gates non-critical ranks when criticalOnly", () => {
@@ -259,18 +265,6 @@ Deno.test("restoredFilters migrates the implicit gate out of v1 state", () => {
     restoredFilters({ criticalOnly: true }, NaN).criticalOnly,
     false,
   );
-});
-
-Deno.test("applyFilters matches typology exactly", () => {
-  const rows = [
-    barrier({ id: 1, typology: "Campo" }),
-    barrier({ id: 2, typology: "Estação Coletora" }),
-  ];
-  assertStrictEquals(
-    applyFilters(rows, { ...defaultFilters(), typology: "Campo" }).length,
-    1,
-  );
-  assertStrictEquals(applyFilters(rows, defaultFilters()).length, 2);
 });
 
 Deno.test("sanitizeFilterPatch keeps typology text, drops non-strings", () => {

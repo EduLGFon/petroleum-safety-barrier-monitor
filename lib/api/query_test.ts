@@ -18,19 +18,6 @@ Deno.test("toWireQuery encodes known values to ids", () => {
   });
 });
 
-Deno.test("toWireQuery skips ALL location and unknown values", () => {
-  const warnings: string[] = [];
-  const orig = console.warn;
-  console.warn = (m: string) => warnings.push(m);
-  try {
-    const q = toWireQuery({ location: "ALL", category: "Nope" });
-    assertEquals(q, {});
-    assertStrictEquals(warnings.length, 1);
-  } finally {
-    console.warn = orig;
-  }
-});
-
 Deno.test("toWireQuery keeps valid ISO dates, drops malformed", () => {
   const q = toWireQuery({ since: "2026-01-01", until: "tomorrow" });
   assertEquals(q, { since: "2026-01-01" });
@@ -56,7 +43,11 @@ function collectWarnings(fn: () => void): string[] {
   return warnings;
 }
 
-Deno.test("toWireQuery warns and skips each unknown vocabulary value", () => {
+Deno.test("toWireQuery skips ALL and warns on each unknown vocabulary value", () => {
+  const allWarnings = collectWarnings(() => {
+    assertEquals(toWireQuery({ location: "ALL" }), {});
+  });
+  assertStrictEquals(allWarnings.length, 0);
   const warnings = collectWarnings(() => {
     const q = toWireQuery({
       location: "MARS",
@@ -166,20 +157,21 @@ Deno.test("toWireQuery passes known row scopes, warns on unknown", () => {
   assertStrictEquals(warnings.length, 1);
 });
 
-Deno.test("toWireQuery uses dynamic id overrides for typology", () => {
-  const q = toWireQuery(
-    { typology: "Duto Novo" },
-    { typologyIds: { "Duto Novo": 41 } },
+Deno.test("toWireQuery uses dynamic id overrides for each vocabulary", () => {
+  assertEquals(
+    toWireQuery(
+      { typology: "Duto Novo" },
+      { typologyIds: { "Duto Novo": 41 } },
+    ),
+    { typologyId: 41 },
   );
-  assertEquals(q, { typologyId: 41 });
-});
-
-Deno.test("toWireQuery uses dynamic id overrides for location and category", () => {
-  const q = toWireQuery(
-    { location: "SM", category: "Válvula XV" },
-    { locationIds: { SM: 21 }, categoryIds: { "Válvula XV": 33 } },
+  assertEquals(
+    toWireQuery(
+      { location: "SM", category: "Válvula XV" },
+      { locationIds: { SM: 21 }, categoryIds: { "Válvula XV": 33 } },
+    ),
+    { locationId: 21, categoryId: 33 },
   );
-  assertEquals(q, { locationId: 21, categoryId: 33 });
 });
 
 Deno.test("toWireQuery falls back to static enums when overrides omit the value", () => {

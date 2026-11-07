@@ -236,25 +236,23 @@ Deno.test("resolveBarriers preserves order and stays empty for empty input", () 
   assertStrictEquals(resolveBarriers([]).length, 0);
 });
 
-Deno.test("resolveBarrier prefers dynamic labels over seed enums", () => {
-  const b = resolveBarrier(
+Deno.test("resolveBarrier prefers dynamic labels and falls back to seeds", () => {
+  const dynamic = resolveBarrier(
     wireBarrier({ locationId: 99, categoryId: 50 }),
     {
       locations: { 99: "SM" },
       categories: { 50: "Válvula XV" },
     },
   );
-  assertStrictEquals(b.location, "SM");
-  assertStrictEquals(b.category, "Válvula XV");
-});
+  assertStrictEquals(dynamic.location, "SM");
+  assertStrictEquals(dynamic.category, "Válvula XV");
 
-Deno.test("resolveBarrier falls back to seed enums for ids without dynamic labels", () => {
-  const b = resolveBarrier(
+  const seeded = resolveBarrier(
     wireBarrier({ locationId: 1, categoryId: 0 }),
     { locations: { 99: "SM" } },
   );
-  assertStrictEquals(b.location, "FAL");
-  assertStrictEquals(b.category, "Válvula de Alívio de Pressão");
+  assertStrictEquals(seeded.location, "FAL");
+  assertStrictEquals(seeded.category, "Válvula de Alívio de Pressão");
 });
 
 Deno.test("resolveChartData uses dynamic category labels when provided", () => {

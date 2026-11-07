@@ -80,29 +80,27 @@ Deno.test("useFilterState sanitizes garbage filter patches on restore", async ()
   assertStrictEquals(f.filters.sortDir, "asc");
 });
 
-Deno.test("useFilterState drops the implicit gate from a v1 blob", async () => {
-  // v1 shipped criticalOnly: true as a default, so restoring it verbatim would
-  // pin the table to the critical tiers for every returning user.
-  const storage = memoryStorage({
+Deno.test("useFilterState restores a gate per the persisted version", async () => {
+  // v1 shipped criticalOnly: true, so restoring it verbatim would pin the
+  // table to the critical tiers for every returning user.
+  const v1 = memoryStorage({
     [STORE_KEY]: JSON.stringify({
       filters: { criticalOnly: true, query: "psv" },
     }),
   });
-  const hh = await renderHook(useFilterState, { storage });
-  const f = hh.get();
-  assertStrictEquals(f.filters.criticalOnly, false);
-  assertStrictEquals(f.filters.query, "psv");
-});
+  const v1h = await renderHook(useFilterState, { storage: v1 });
+  assertStrictEquals(v1h.get().filters.criticalOnly, false);
+  assertStrictEquals(v1h.get().filters.query, "psv");
 
-Deno.test("useFilterState keeps a gate the current version persisted", async () => {
-  const storage = memoryStorage({
+  // Current version: an explicit gate is a real choice and survives.
+  const current = memoryStorage({
     [STORE_KEY]: JSON.stringify({
       defaultsVersion: FILTER_DEFAULTS_VERSION,
       filters: { criticalOnly: true },
     }),
   });
-  const hh = await renderHook(useFilterState, { storage });
-  assertStrictEquals(hh.get().filters.criticalOnly, true);
+  const currentH = await renderHook(useFilterState, { storage: current });
+  assertStrictEquals(currentH.get().filters.criticalOnly, true);
 });
 
 Deno.test("useFilterState setFilter resets page except on page-only patches", async () => {
