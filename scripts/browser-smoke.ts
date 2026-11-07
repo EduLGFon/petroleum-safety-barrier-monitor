@@ -3,12 +3,12 @@
 // settings, sorting, selection, modal, chart tooltip) that SSR checks cannot
 // catch, and fails loudly on console errors or failed interaction checks.
 // Run with: deno run -A scripts/browser-smoke.ts [url] [mode]
-//   url  - app origin (default http://localhost:5173/)
+//   url  - app origin (default http://localhost:8300/)
 //   mode - "mock" (default), "http-ok" (live API render + page-only export
 //          notice) or "http-err" (ServerErrorCard + retry re-fires the fetch)
 // Requires a chrome-headless-shell binary for this platform (see CHROME_BIN
 // below); the profile is wiped per run so persisted state can't leak in.
-const BASE = Deno.args[0] ?? "http://localhost:5173/";
+const BASE = Deno.args[0] ?? "http://localhost:8300/";
 const MODE = Deno.args[1] ?? "mock";
 const PROFILE = "/tmp/opencode/chrome-profile";
 const CHROME_BIN =

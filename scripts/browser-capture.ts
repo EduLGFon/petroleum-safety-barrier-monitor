@@ -94,7 +94,7 @@ function assertChromeBin(raw: string): string {
 const BASE = assertLoopbackUrl(
   (() => {
     const first = Deno.args[0];
-    if (!first || first.startsWith("--")) return "http://localhost:5173/";
+    if (!first || first.startsWith("--")) return "http://localhost:8300/";
     return first;
   })(),
 );

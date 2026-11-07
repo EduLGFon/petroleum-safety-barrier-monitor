@@ -5,6 +5,8 @@ import { defineConfig } from "vite";
 
 export default defineConfig({
   plugins: [fresh()],
+  server: { port: 8300, strictPort: true },
+  preview: { port: 8300, strictPort: true },
   // Skip per-chunk gzip-size computation: identical output, faster build
   // (matters twice: local `deno task build` and `RUN deno task build`).
   build: { reportCompressedSize: false },

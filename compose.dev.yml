@@ -8,7 +8,7 @@
 #
 # Usage:
 #   docker compose -f compose.yml -f compose.dev.yml up --build
-#   (or `deno task docker:dev`; dashboard at http://localhost:5173)
+#   (or `deno task docker:dev`; dashboard at http://localhost:8300)
 # Env still comes from the host .env via env_file (same as prod); `dev`
 # reads process env, so no --env-file flag is needed inside the container.
 
@@ -35,7 +35,7 @@ services:
       - deno-dir:/deno-dir
     restart: "no"
 
-  # Dashboard via vite HMR (default port 5173, listens on 0.0.0.0 in Docker).
+  # Dashboard via vite HMR (port 8300, listens on 0.0.0.0 in Docker).
   app:
     # Own tag: dev builds `target: base` (no bundle), so sharing prod's
     # `barrier-monitor:latest` would clobber the production image on every
@@ -48,7 +48,7 @@ services:
       # then hidden by the mount. Prod (`compose.yml` alone) still builds
       # the default `prod` stage with the bundle baked in.
       target: base
-    command: ["task", "dev", "--host", "--port", "5173"]
+    command: ["task", "dev", "--host", "--port", "8300"]
     volumes:
       - ./:/app
       - /app/node_modules
@@ -61,7 +61,7 @@ services:
       migrate:
         condition: service_completed_successfully
     ports:
-      - "5173:5173"
+      - "8300:8300"
     healthcheck:
       disable: true
 
