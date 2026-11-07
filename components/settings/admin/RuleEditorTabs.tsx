@@ -1,12 +1,8 @@
 // Rule editor tab bodies - scope and anti-noise fields.
 // Split out of RulesManager so each tab can be reviewed on its own.
 import { Field, inputSt } from "./AdminPrimitives.tsx";
-import {
-  CheckGrid,
-  numCoercionError,
-  toggleId,
-  WEEKDAYS,
-} from "./rules-helpers.tsx";
+import { SearchMultiSelect } from "../SearchMultiSelect.tsx";
+import { numCoercionError, toggleId, WEEKDAYS } from "./rules-helpers.tsx";
 import type { Draft, Lookups } from "./rules-helpers.tsx";
 
 interface TabProps {
@@ -16,14 +12,27 @@ interface TabProps {
 }
 
 export function RuleScopeFields({ form, update, lookups }: TabProps) {
+  const categories = lookups?.categories ?? [];
+  const statuses = lookups?.availabilities ?? [];
+  const locations = (lookups?.locations ?? []).map((l) => ({
+    id: l.id,
+    label: l.name ? `${l.code} · ${l.name}` : l.code,
+  }));
+  const criticalities = lookups?.criticalities ?? [];
+  const typologies = lookups?.typologies ?? [];
+  const groupings = lookups?.groupings ?? [];
+  const owners = lookups?.owners ?? [];
+
   return (
     <div style={{ display: "grid", gap: 12 }}>
       <Field label="Categorias (vazio = todas)">
-        <CheckGrid
-          options={lookups?.categories ?? []}
+        <SearchMultiSelect<number>
+          label="Categorias"
+          options={categories}
           selected={form.categoryIds}
-          onToggle={(id) =>
-            update({ categoryIds: toggleId(form.categoryIds, id) })}
+          onChange={(ids) => update({ categoryIds: ids })}
+          placeholder="Todas as categorias"
+          emptyText="Nenhuma categoria carregada."
         />
       </Field>
       <div
@@ -34,19 +43,23 @@ export function RuleScopeFields({ form, update, lookups }: TabProps) {
         }}
       >
         <Field label="Dispara ao chegar em (vazio = qualquer NC)">
-          <CheckGrid
-            options={lookups?.availabilities ?? []}
+          <SearchMultiSelect<number>
+            label="Status de destino"
+            options={statuses}
             selected={form.toStatusIds}
-            onToggle={(id) =>
-              update({ toStatusIds: toggleId(form.toStatusIds, id) })}
+            onChange={(ids) => update({ toStatusIds: ids })}
+            placeholder="Qualquer NC"
+            emptyText="Nenhum status carregado."
           />
         </Field>
         <Field label="Somente vindo de (origem, vazio = qualquer)">
-          <CheckGrid
-            options={lookups?.availabilities ?? []}
+          <SearchMultiSelect<number>
+            label="Status de origem"
+            options={statuses}
             selected={form.fromStatusIds}
-            onToggle={(id) =>
-              update({ fromStatusIds: toggleId(form.fromStatusIds, id) })}
+            onChange={(ids) => update({ fromStatusIds: ids })}
+            placeholder="Qualquer origem"
+            emptyText="Nenhum status carregado."
           />
         </Field>
       </div>
@@ -58,22 +71,23 @@ export function RuleScopeFields({ form, update, lookups }: TabProps) {
         }}
       >
         <Field label="Locais (vazio = todos)">
-          <CheckGrid
-            options={(lookups?.locations ?? []).map((l) => ({
-              id: l.id,
-              label: l.name ? `${l.code} · ${l.name}` : l.code,
-            }))}
+          <SearchMultiSelect<number>
+            label="Locais"
+            options={locations}
             selected={form.locationIds}
-            onToggle={(id) =>
-              update({ locationIds: toggleId(form.locationIds, id) })}
+            onChange={(ids) => update({ locationIds: ids })}
+            placeholder="Todos os locais"
+            emptyText="Nenhum local carregado."
           />
         </Field>
         <Field label="Criticidades (vazio = todas)">
-          <CheckGrid
-            options={lookups?.criticalities ?? []}
+          <SearchMultiSelect<number>
+            label="Criticidades"
+            options={criticalities}
             selected={form.criticalityIds}
-            onToggle={(id) =>
-              update({ criticalityIds: toggleId(form.criticalityIds, id) })}
+            onChange={(ids) => update({ criticalityIds: ids })}
+            placeholder="Todas as criticidades"
+            emptyText="Nenhuma criticidade carregada."
           />
         </Field>
       </div>
@@ -85,26 +99,33 @@ export function RuleScopeFields({ form, update, lookups }: TabProps) {
         }}
       >
         <Field label="Tipologias (vazio = todas)">
-          <CheckGrid
-            options={lookups?.typologies ?? []}
+          <SearchMultiSelect<number>
+            label="Tipologias"
+            options={typologies}
             selected={form.typologyIds}
-            onToggle={(id) =>
-              update({ typologyIds: toggleId(form.typologyIds, id) })}
+            onChange={(ids) => update({ typologyIds: ids })}
+            placeholder="Todas as tipologias"
+            emptyText="Nenhuma tipologia carregada."
           />
         </Field>
         <Field label="Agrupamentos (vazio = todos)">
-          <CheckGrid
-            options={lookups?.groupings ?? []}
+          <SearchMultiSelect<number>
+            label="Agrupamentos"
+            options={groupings}
             selected={form.groupingIds}
-            onToggle={(id) =>
-              update({ groupingIds: toggleId(form.groupingIds, id) })}
+            onChange={(ids) => update({ groupingIds: ids })}
+            placeholder="Todos os agrupamentos"
+            emptyText="Nenhum agrupamento carregado."
           />
         </Field>
         <Field label="Responsáveis (vazio = todos)">
-          <CheckGrid
-            options={lookups?.owners ?? []}
+          <SearchMultiSelect<number>
+            label="Responsáveis"
+            options={owners}
             selected={form.ownerIds}
-            onToggle={(id) => update({ ownerIds: toggleId(form.ownerIds, id) })}
+            onChange={(ids) => update({ ownerIds: ids })}
+            placeholder="Todos os responsáveis"
+            emptyText="Nenhum responsável carregado."
           />
         </Field>
       </div>
@@ -170,7 +191,6 @@ export function RuleScopeFields({ form, update, lookups }: TabProps) {
 }
 
 export function RuleTimingFields({ form, update }: TabProps) {
-  // Field-level numeric feedback: "12a" no longer vanishes to null.
   const fieldErr = (raw: string): string | null => numCoercionError(raw);
   const errStyle = {
     fontSize: "var(--d-small)",

@@ -4,7 +4,7 @@
 // immediate vs digest, plus multi-select scopes, urgency, anti-noise
 // windows and priority). The detector reads active rows; the routes guard
 // writes behind admin auth.
-import { queryRows } from "../db.ts";
+import { queryRows, withTx } from "../db.ts";
 
 export type RuleUrgency = "any" | "urgent" | "critical";
 
@@ -557,4 +557,87 @@ export async function listStaleBarriers(
     categoryId: r.category_id,
     statusSince: r.since.slice(0, 10),
   }));
+}
+
+// ---- Batch operations (admin rules page) ----
+
+export const MAX_ALERT_RULE_BATCH_IDS = 500;
+
+export type AlertRuleBatchAction = "activate" | "deactivate" | "delete";
+
+export function normalizeAlertRuleBatchAction(
+  raw: unknown,
+): AlertRuleBatchAction {
+  if (raw === "activate" || raw === "deactivate" || raw === "delete") {
+    return raw;
+  }
+  throw new Error("action must be one of activate, deactivate, delete");
+}
+
+export function normalizeAlertRuleBatchIds(raw: unknown): number[] {
+  if (!Array.isArray(raw)) throw new Error("ids must be an array");
+  if (raw.length === 0) throw new Error("ids must not be empty");
+  if (raw.length > MAX_ALERT_RULE_BATCH_IDS) {
+    throw new Error(
+      `ids must contain at most ${MAX_ALERT_RULE_BATCH_IDS} items`,
+    );
+  }
+  const seen = new Set<number>();
+  for (const v of raw) {
+    if (typeof v !== "number" || !Number.isInteger(v) || v <= 0) {
+      throw new Error("ids must be positive integers");
+    }
+    seen.add(v);
+  }
+  return [...seen].sort((a, b) => a - b);
+}
+
+export async function batchUpdateAlertRulesActive(
+  ids: number[],
+  active: boolean,
+): Promise<number> {
+  const norm = normalizeAlertRuleBatchIds(ids);
+  return await withTx(async (query) => {
+    const rows = await query<{ id: number }>(
+      `update alert_rules set active = $2
+       where id = any ($1::int[])
+       returning id`,
+      [norm, active],
+    );
+    return rows.length;
+  });
+}
+
+export async function batchActivateAlertRules(ids: number[]): Promise<number> {
+  return await batchUpdateAlertRulesActive(ids, true);
+}
+
+export async function batchDeactivateAlertRules(
+  ids: number[],
+): Promise<number> {
+  return await batchUpdateAlertRulesActive(ids, false);
+}
+
+export async function batchDeleteAlertRules(ids: number[]): Promise<number> {
+  const norm = normalizeAlertRuleBatchIds(ids);
+  return await withTx(async (query) => {
+    const rows = await query<{ id: number }>(
+      `delete from alert_rules where id = any ($1::int[]) returning id`,
+      [norm],
+    );
+    return rows.length;
+  });
+}
+
+export async function batchAlertRules(
+  action: unknown,
+  ids: unknown,
+): Promise<number> {
+  const a = normalizeAlertRuleBatchAction(action);
+  const normIds = normalizeAlertRuleBatchIds(ids);
+  if (a === "activate") return await batchUpdateAlertRulesActive(normIds, true);
+  if (a === "deactivate") {
+    return await batchUpdateAlertRulesActive(normIds, false);
+  }
+  return await batchDeleteAlertRules(normIds);
 }
