@@ -67,6 +67,35 @@ Writes (admin): status, barrier edit, contingency links, recipients, users, aler
 
 When `AUTH_SSO_ENABLED=true`, Entra routes are available under `/auth/entra/*`. Entra users are pre-provisioned by an admin; the first valid sign-in binds by email to the pending row, later sign-ins match by object id. There is no JIT creation: an address nobody enabled gets no access. Entra users cannot use local password login or admin password reset. Converting a local account to Entra preserves id and history and clears the password hash. See `docs/SSO-ENTRA-PLAN.md` and D29.
 
+## Batch and bulk routes
+
+Admin-only batch routes used by the settings workspace. Each applies all ids
+in one transaction, validates a documented maximum id count, and returns
+`{ affected }`.
+
+- `POST /api/users/batch` (admin): `{ action, ids }`. Actions:
+  `activate`, `deactivate`, `promote`, `demote`, `revokeSessions`
+  (PT/EN aliases accepted). Max 500 unique positive ids. Locks active
+  admins, preserves the last active admin and last active local admin
+  guards, revokes sessions on active-state changes. The UI redirects to
+  `/login` when the current user is in a deactivate or revoke set.
+- `POST /api/access-groups/batch` (admin): `{ action, ids, userIds? |
+  locationIds? }` with aliases (`groupIds`, `users`, `stations`, ...).
+  Actions: `delete`, `addUsers`, `removeUsers`, `addLocations`,
+  `removeLocations`. Max 200 group ids and 500 related ids; the cross
+  product is capped at 20,000. Uses `withTx`; cascade deletes; missing
+  groups return 400.
+- `POST /api/recipients/batch` (admin): `{ action, ids?, userIds? }`.
+  Actions: `activate`, `deactivate`, `delete`, `addUsers`. Max 500 ids.
+  `addUsers` inserts from `users` with
+  `on conflict (email) do update set ... , active = true`.
+- `POST /api/alert-rules/batch` (admin): `{ action, ids }`. Actions:
+  `activate`, `deactivate`, `delete`. Max 500 ids, atomic.
+- `PUT /api/field-options?field=<key>` (admin, existing route): replaces
+  one field's option list with `{ options: string[] }`. Used by the
+  options page for bulk removal (send the remaining array), add-option, and
+  restore-defaults. Caps: 200 options, 200 chars each.
+
 ## Setup
 
 1. Start Postgres and run `deno task db:migrate` (and optionally `db:seed`).

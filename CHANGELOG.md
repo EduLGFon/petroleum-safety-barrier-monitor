@@ -1,5 +1,19 @@
 # Changelog
 
+## 2026-11-07
+
+- Settings: centered workspace now covers admin paging, bulk selection, and
+  batch actions for users, groups, recipients, alert rules, and field
+  options.
+- Settings: new sync page inside the workspace reusing the sync changes list
+  and last-run metadata; header greeting switched to `Olá, {name}`.
+- API: additive admin-only batch routes `POST /api/users/batch`,
+  `POST /api/access-groups/batch`, `POST /api/recipients/batch`,
+  `POST /api/alert-rules/batch`, and bulk use of
+  `PUT /api/field-options?field=...`.
+- Docs: architecture, API, decisions, and README updated for the settings
+  batch work (D34).
+
 ## 2026-11-06
 
 - Auth: Entra pre-provisioning with email bind on first sign-in and no JIT

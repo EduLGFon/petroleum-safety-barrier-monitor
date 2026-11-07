@@ -13,6 +13,7 @@ Everything is Deno-only: one app serves SSR pages, the JSON API and the dashboar
 ## Features
 
 - Dashboard: KPI grid, availability status band, compliance chart, filterable table, barrier modal, exports, health indicator, settings panel.
+- Settings: centered workspace with admin paging, bulk actions, batch endpoints, and a sync page.
 - Platform: mock or Postgres-backed data, session login with two roles, upstream sync, alert pipeline, Docker Compose and Windows Server paths.
 
 ## Stack

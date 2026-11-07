@@ -72,3 +72,79 @@ Key tasks: `check`, `test`, `dev`, `build`, `preview`, `start`, `db:migrate`, `d
 Postgres holds lookups, barriers, contingency links, status history, users, sessions, auth flows, access groups, alert rules/events/recipients, sync state and field options. Location and category ids are dynamic vocabularies served by the server. Soft deletes use `deleted_at`. Contingency links are local and independent of sync.
 
 See `docs/API.md` and `docs/DATABASE.md`.
+
+## Admin settings workspace
+
+The settings side panel is a floating, screen-centered workspace modal: about
+1180px wide, 88dvh tall, blurred backdrop, a fixed vertical page rail, and a
+right content column with its own vertical scroll. It collapses to one column
+on small screens and never scrolls horizontally. Navigation groups are
+Preferências (Aparência, Filtros), Conta, Administração (Usuários, Grupos,
+Destinatários, Regras, Opções), and Sistema (Sincronização). The admin
+managers stay one lazy chunk and keep the fail-closed admin gate
+(`sessionUser.role === "admin"`).
+
+Shared primitives used by the admin pages:
+
+- `components/settings/SearchMultiSelect.tsx`: portalled searchable chips field
+  with select-all/clear and keyboard support (z-index 1300).
+- `components/settings/admin/AdminFormDialog.tsx`: portalled sticky-header
+  create/edit shell (z-index 1250).
+- `components/settings/admin/AdminListControls.tsx`: `AdminSearchInput`,
+  `AdminSelectionBar`, `AdminBulkButton`.
+- `hooks/useAdminList.ts`: client-side search, 25/50/100 paging, page and
+  select-all/clear selection, selection pruning. Pure helpers:
+  `filterByQuery`, `pageSlice`, `toggleKey`, `pruneKeys`.
+- `components/table/Pagination.tsx`: reused pager.
+- Workspace CSS classes live in `static/styles.css`.
+
+Header identity shows `Olá, {name || "Usuário"}` (email stays in `title`).
+Admins get a restrained animated gradient/halo/shimmer plus crown/sparkle;
+non-admins get the standard fade/hover/pulse. Reduced motion is respected
+across all themes.
+
+## Paging
+
+Admin lists use `useAdminList` with page sizes 25/50/100 and client-side
+search over the loaded rows. Selection is pruned when rows disappear after a
+reload, and search resets to page one with an empty selection. The barrier
+table keeps its own server paging and the `TableStatusRow` select-page /
+select-all-across-filters controls.
+
+## Batch endpoints
+
+Bulk admin actions use one admin-only POST per resource instead of N
+single-row requests:
+
+- `POST /api/users/batch`: `{ action, ids }`, max 500 unique positive ids.
+  Actions: `activate`, `deactivate`, `promote`, `demote`,
+  `revokeSessions` (PT/EN aliases accepted). One transaction, locks active
+  admins, preserves the last active admin and last active local admin guards,
+  revokes sessions on active-state changes, returns `{ affected }`. The UI
+  redirects to `/login` when the current user is in a deactivate or revoke
+  set.
+- `POST /api/access-groups/batch`: `{ action, ids, userIds|locationIds }`,
+  max 200 group ids and 500 related ids, cross product capped at 20,000.
+  Actions: `delete`, `addUsers`, `removeUsers`, `addLocations`,
+  `removeLocations`. Uses `withTx`; cascade deletes; missing groups return
+  400; returns `{ affected }`.
+- `POST /api/recipients/batch`: `{ action, ids?, userIds? }`, max 500 ids.
+  Actions: `activate`, `deactivate`, `delete`, `addUsers`. `addUsers`
+  inserts from `users` with `on conflict (email) do update set ...,
+  active = true`. Returns `{ affected }`.
+- `POST /api/alert-rules/batch`: `{ action, ids }`, max 500 ids, atomic.
+  Actions: `activate`, `deactivate`, `delete`. Returns `{ affected }`.
+- Field options keep the existing `PUT /api/field-options?field=...` with the
+  remaining array for bulk removal, plus add-option and restore-defaults.
+  Saves stay serialized through the existing queue.
+
+## Sync page
+
+Synchronization history lives as the "Sincronização" page inside the settings
+workspace instead of a modal. `SyncSection` reuses `SyncChangesList`, the
+same last-run metadata, the technical note, and the "Última sync" /
+"Últimas 24h" tabs. `SettingsPanel` accepts optional `syncStatus`, `conn`,
+`apiBaseUrl`, and `onOpenBarrier` props. `DashboardSections` tracks the
+landing section; the hover-card shortcut opens settings on `sync`, and opening
+a barrier from sync rows closes settings first. The old `SyncDetailsModal`
+and its lazy import were removed.
