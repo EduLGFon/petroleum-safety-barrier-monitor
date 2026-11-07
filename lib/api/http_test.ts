@@ -41,39 +41,27 @@ Deno.test("fetchJson maps 401 and 404 to AuthExpiredError", async () => {
   }
 });
 
-Deno.test("empty base URL keeps requests relative (same-origin)", async () => {
-  const api = httpAdapterFactory("");
-  const urls: string[] = [];
-  const prev = globalThis.fetch;
-  globalThis.fetch = ((input: unknown) => {
-    urls.push(String(input));
-    return Promise.resolve(
-      new Response(JSON.stringify({ total: 0 }), { status: 200 }),
-    );
-  }) as typeof fetch;
-  try {
-    await api.getKpi({});
-    assertEquals(urls, ["/api/kpi?"]);
-  } finally {
-    globalThis.fetch = prev;
-  }
-});
-
-Deno.test("explicit base URL keeps requests absolute (separate API origin)", async () => {
-  const api = httpAdapterFactory("https://api.example.com");
-  const urls: string[] = [];
-  const prev = globalThis.fetch;
-  globalThis.fetch = ((input: unknown) => {
-    urls.push(String(input));
-    return Promise.resolve(
-      new Response(JSON.stringify({ total: 0 }), { status: 200 }),
-    );
-  }) as typeof fetch;
-  try {
-    await api.getKpi({});
-    assertEquals(urls, ["https://api.example.com/api/kpi?"]);
-  } finally {
-    globalThis.fetch = prev;
+Deno.test("base URL controls relative vs absolute request targets", async () => {
+  const cases = [
+    ["", "/api/kpi?"],
+    ["https://api.example.com", "https://api.example.com/api/kpi?"],
+  ] as const;
+  for (const [baseUrl, expected] of cases) {
+    const api = httpAdapterFactory(baseUrl);
+    const urls: string[] = [];
+    const prev = globalThis.fetch;
+    globalThis.fetch = ((input: unknown) => {
+      urls.push(String(input));
+      return Promise.resolve(
+        new Response(JSON.stringify({ total: 0 }), { status: 200 }),
+      );
+    }) as typeof fetch;
+    try {
+      await api.getKpi({});
+      assertEquals(urls, [expected]);
+    } finally {
+      globalThis.fetch = prev;
+    }
   }
 });
 

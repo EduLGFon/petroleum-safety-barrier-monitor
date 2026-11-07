@@ -32,13 +32,10 @@ Deno.test("humanDuration renders non-finite as dash", () => {
   assertStrictEquals(humanDuration(Infinity), "-");
 });
 
-Deno.test("daysSince clamps invalid and future dates to zero", () => {
+Deno.test("daysSince clamps invalid/future dates and measures real spans", () => {
   assertStrictEquals(daysSince("garbage"), 0);
   assertStrictEquals(daysSince("2999-01-01"), 0);
   assert(daysSince("2026-06-21") >= 1);
-});
-
-Deno.test("daysSince measures against today, not a frozen reference", () => {
   // Old dates must yield their real span (the frozen-date bug collapsed
   // every recent status to 0 days -> "1 dia").
   assert(daysSince("2020-01-01") > 365);

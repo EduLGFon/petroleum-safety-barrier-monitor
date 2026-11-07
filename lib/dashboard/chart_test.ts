@@ -111,17 +111,17 @@ Deno.test("prepareChart folds the tail into Outras with conserved totals", () =>
   assertStrictEquals(p.hiddenTotal, 10);
 });
 
-Deno.test("prepareChart has no Outras when rows fit the limit", () => {
-  const p = prepareChart([row("A", 3, 1)], { limit: 10 });
-  assertStrictEquals(p.rows.length, 1);
-  assertStrictEquals(p.hidden, 0);
-});
+Deno.test("prepareChart leaves every row when they fit or limit is 0", () => {
+  const fit = prepareChart([row("A", 3, 1)], { limit: 10 });
+  assertStrictEquals(fit.rows.length, 1);
+  assertStrictEquals(fit.hidden, 0);
 
-Deno.test("prepareChart limit 0 means expanded (no Outras)", () => {
-  const data = [row("A", 5, 0), row("B", 4, 0), row("C", 3, 0)];
-  const p = prepareChart(data, { limit: 0 });
-  assertStrictEquals(p.rows.length, 3);
-  assertStrictEquals(p.hidden, 0);
+  const expanded = prepareChart(
+    [row("A", 5, 0), row("B", 4, 0), row("C", 3, 0)],
+    { limit: 0 },
+  );
+  assertStrictEquals(expanded.rows.length, 3);
+  assertStrictEquals(expanded.hidden, 0);
 });
 
 Deno.test("prepareChart filters by query case-insensitively", () => {
@@ -174,14 +174,13 @@ Deno.test("summarizeCompliance of empty list is 0% with no top", () => {
 });
 
 Deno.test("splitColumns chunks evenly preserving order", () => {
-  assertEquals(splitColumns([1, 2, 3, 4], 2), [[1, 2], [3, 4]]);
-});
-
-Deno.test("splitColumns gives the extra row to the first column", () => {
-  assertEquals(splitColumns([1, 2, 3, 4, 5], 2), [[1, 2, 3], [4, 5]]);
-});
-
-Deno.test("splitColumns handles empty and single-column cases", () => {
-  assertEquals(splitColumns([], 2), []);
-  assertEquals(splitColumns([1, 2], 1), [[1, 2]]);
+  const cases: Array<[number[], number, number[][]]> = [
+    [[1, 2, 3, 4], 2, [[1, 2], [3, 4]]],
+    [[1, 2, 3, 4, 5], 2, [[1, 2, 3], [4, 5]]],
+    [[], 2, []],
+    [[1, 2], 1, [[1, 2]]],
+  ];
+  for (const [items, columns, expected] of cases) {
+    assertEquals(splitColumns(items, columns), expected);
+  }
 });
