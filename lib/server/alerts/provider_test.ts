@@ -10,15 +10,12 @@ import {
 import { assertStrictEquals } from "jsr:@std/assert@^1";
 import { assert } from "jsr:@std/assert@^1";
 
-Deno.test("mapLanding routes uncontained unavailable to immediate messaging", () => {
-  const m = mapLanding(5);
-  assertStrictEquals(m.situacao, "violada");
-  assertStrictEquals(m.despacharAgora, true);
-  assertStrictEquals(m.withMessaging, true);
-  assertStrictEquals(m.send, true);
-});
-
-Deno.test("mapLanding keeps degraded and contained on email queue", () => {
+Deno.test("mapLanding maps each status to its delivery policy", () => {
+  const immediate = mapLanding(5);
+  assertStrictEquals(immediate.situacao, "violada");
+  assertStrictEquals(immediate.despacharAgora, true);
+  assertStrictEquals(immediate.withMessaging, true);
+  assertStrictEquals(immediate.send, true);
   for (const id of [4, 2, 3]) {
     const m = mapLanding(id);
     assertStrictEquals(m.situacao, "degradada");
@@ -26,9 +23,6 @@ Deno.test("mapLanding keeps degraded and contained on email queue", () => {
     assertStrictEquals(m.withMessaging, false);
     assertStrictEquals(m.send, true);
   }
-});
-
-Deno.test("mapLanding suppresses planned stop, maps available to recovery", () => {
   assertStrictEquals(mapLanding(1).send, false);
   assertStrictEquals(mapLanding(0).situacao, "normalizada");
 });

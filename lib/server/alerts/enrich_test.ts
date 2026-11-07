@@ -42,30 +42,7 @@ function wire(over: Partial<WireBarrier> = {}): WireBarrier {
 
 import { assertStrictEquals } from "jsr:@std/assert@^1";
 
-Deno.test("extractDetail attributes the matching transition author", () => {
-  const detail = extractDetail(
-    wire({
-      statusHistory: [
-        { date: "2026-09-10", statusId: 0, authorId: 10, note: "" },
-        {
-          date: "2026-09-13",
-          statusId: 5,
-          authorId: 11,
-          note: "vazamento observado",
-        },
-      ],
-    }),
-    "2026-09-13",
-    5,
-    { authors: { 11: "Eduardo" } },
-  );
-  assertStrictEquals(detail.author, "Eduardo");
-  assertStrictEquals(detail.note, "vazamento observado");
-  assertStrictEquals(detail.actionPlan, "trocar gaxeta");
-  assertStrictEquals(detail.locationName, "Terminal Norte");
-});
-
-Deno.test("extractDetail exposes the before side and source", () => {
+Deno.test("extractDetail attributes the author and exposes the before side", () => {
   const detail = extractDetail(
     wire({
       statusHistory: [
@@ -82,6 +59,10 @@ Deno.test("extractDetail exposes the before side and source", () => {
     5,
     { authors: { 11: "Eduardo" } },
   );
+  assertStrictEquals(detail.author, "Eduardo");
+  assertStrictEquals(detail.note, "vazamento observado");
+  assertStrictEquals(detail.actionPlan, "trocar gaxeta");
+  assertStrictEquals(detail.locationName, "Terminal Norte");
   assertStrictEquals(detail.oldAvailability, "Disponível");
   assertStrictEquals(detail.oldCompliance, "Conforme");
   assertStrictEquals(detail.previousDate, "2026-09-10");

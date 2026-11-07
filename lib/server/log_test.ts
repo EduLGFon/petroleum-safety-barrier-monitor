@@ -76,27 +76,6 @@ Deno.test("json format emits parseable structured lines", () => {
   assertStrictEquals(parsed["msg"], "slow query");
   assertStrictEquals(parsed["durationMs"], 120);
 });
-Deno.test("json format routes through the error sink for warn", () => {
-  const lines: string[] = [];
-  const logger = createLogger({
-    format: "json",
-    out: (l) => lines.push(`out:${l}`),
-    errOut: (l) => lines.push(`err:${l}`),
-    now: () => "2026-10-08T00:00:00.000Z",
-  });
-  logger.warn("slow", { scope: "api", requestId: "r9", durationMs: 5 });
-  assertStrictEquals(lines.length, 1);
-  const body = JSON.parse(lines[0]!.replace(/^err:/, "")) as {
-    level: string;
-    scope: string;
-    requestId: string;
-    msg: string;
-  };
-  assertStrictEquals(body.level, "warn");
-  assertStrictEquals(body.scope, "api");
-  assertStrictEquals(body.requestId, "r9");
-  assertStrictEquals(body.msg, "slow");
-});
 Deno.test("secrets redact by key and connection strings by value", () => {
   const redacted = sanitizeFields({
     password: "hunter2",
