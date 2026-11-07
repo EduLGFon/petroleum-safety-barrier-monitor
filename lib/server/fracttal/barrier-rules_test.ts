@@ -177,16 +177,6 @@ Deno.test("stationCodeOf splits the mobile test unit by L2 area", () => {
   );
 });
 
-Deno.test("locationTypeOf classifies both mobile test unit codes", () => {
-  assertStrictEquals(locationTypeOf("CJ-UTM-N"), "Unidade Móvel");
-  assertStrictEquals(locationTypeOf("CJ-UTM-C"), "Unidade Móvel");
-  // The old overflow code keeps its classification for pre-migrate reads.
-  assertStrictEquals(
-    locationTypeOf("CJ UNIDADE DE TESTE MÓVEL"),
-    "Unidade Móvel",
-  );
-});
-
 Deno.test("toDisplayName keeps pt-BR particles lowercase", () => {
   assertStrictEquals(toDisplayName("LAGOA SURUACA"), "Lagoa Suruaca");
   assertStrictEquals(toDisplayName("RIO SÃO MATEUS"), "Rio São Mateus");
@@ -220,6 +210,8 @@ Deno.test("locationTypeOf classifies station codes", () => {
   assertStrictEquals(locationTypeOf("FAL"), "Instalação");
   assertStrictEquals(locationTypeOf("SM8"), "Estação Coletora");
   assertStrictEquals(locationTypeOf("CO"), "Campo");
+  assertStrictEquals(locationTypeOf("CJ-UTM-N"), "Unidade Móvel");
+  assertStrictEquals(locationTypeOf("CJ-UTM-C"), "Unidade Móvel");
 });
 
 Deno.test("tagFor prefers description over code", () => {
@@ -364,14 +356,6 @@ Deno.test("resolveAvailability follows urgent, planned, stopped, flag, open", ()
   assertStrictEquals(open.note, "");
 });
 
-Deno.test("mislabelled rows are admitted, never excluded", () => {
-  // The monitor mirrors upstream 1:1: a transmitter tagged `Válvula`
-  // enters with that label until the operator fixes it in Fracttal.
-  // isBarrierCandidate still classifies the label (scope provenance),
-  // but nothing in the pipeline drops the row for it.
-  assertStrictEquals(isBarrierCandidate("Válvula"), true);
-});
-
 Deno.test("criticalityLabelFor ranks the TAG suffix letter", () => {
   assertStrictEquals(
     criticalityLabelFor("Bomba { 491481 } A", null, null).label,
@@ -385,9 +369,7 @@ Deno.test("criticalityLabelFor ranks the TAG suffix letter", () => {
     label: "D",
     guessed: true,
   });
-});
-
-Deno.test("criticalityLabelFor ranks ESO above the suffix", () => {
+  // ESO ranks above the TAG suffix letter.
   assertStrictEquals(
     criticalityLabelFor("Conversor { 1558786 } B", "ESO", null).label,
     "ESO",

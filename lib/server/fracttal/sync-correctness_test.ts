@@ -156,6 +156,9 @@ Deno.test("workOrderSlot id_status parity: done/status share one predicate", () 
 });
 
 Deno.test("workOrderSlot planned with HIGH priority carries isUrgent", () => {
+  // default (no priority) carries no urgent flag
+  const def = workOrderSlot(parseWorkOrder(wo()));
+  assertStrictEquals(def?.planned?.isUrgent, false);
   const slot = workOrderSlot(
     parseWorkOrder(wo({ priorities_description: "HIGH" })),
   );

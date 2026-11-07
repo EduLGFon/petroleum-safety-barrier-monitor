@@ -105,12 +105,18 @@ Deno.test("planReconcile skips unchanged rows", () => {
 });
 
 Deno.test("planReconcile updates on signature change", () => {
-  const local = [localRow()];
-  const plan = planReconcile([baseInput({ tag: "FAL-EQ-001-v2" })], local);
-  const entry = plan.entries[0];
-  assertStrictEquals(entry.kind, "update");
-  if (entry.kind !== "update") throw new Error("unreachable");
-  assertStrictEquals(entry.statusChanged, false);
+  const cases = [
+    { label: "tag change", input: baseInput({ tag: "FAL-EQ-001-v2" }) },
+    { label: "active flag flip", input: baseInput({ isActive: false }) },
+  ];
+  for (const c of cases) {
+    const local = [localRow()];
+    const plan = planReconcile([c.input], local);
+    const entry = plan.entries[0];
+    assertStrictEquals(entry.kind, "update", c.label);
+    if (entry.kind !== "update") throw new Error("unreachable");
+    assertStrictEquals(entry.statusChanged, false, c.label);
+  }
 });
 
 Deno.test("planReconcile skips when only owned fields differ", () => {
@@ -148,22 +154,23 @@ Deno.test("planReconcile flags statusChanged when availability flips", () => {
   assertStrictEquals(entry.statusChanged, true);
 });
 
-Deno.test("planReconcile restores a deleted row reappearing upstream", () => {
-  const local = [localRow({ deletedAt: "2026-09-01T00:00:00Z" })];
-  const plan = planReconcile([baseInput()], local);
-  const entry = plan.entries[0];
-  assertStrictEquals(entry.kind, "restore");
-  if (entry.kind !== "restore") throw new Error("unreachable");
-  assertStrictEquals(entry.statusChanged, false);
-});
-
-Deno.test("planReconcile restores with statusChanged on a deleted status flip", () => {
-  const local = [localRow({ deletedAt: "2026-09-01T00:00:00Z" })];
-  const plan = planReconcile([baseInput({ availabilityId: 5 })], local);
-  const entry = plan.entries[0];
-  assertStrictEquals(entry.kind, "restore");
-  if (entry.kind !== "restore") throw new Error("unreachable");
-  assertStrictEquals(entry.statusChanged, true);
+Deno.test("planReconcile restores deleted rows reappearing upstream", () => {
+  const cases = [
+    { label: "unchanged status", input: baseInput(), statusChanged: false },
+    {
+      label: "deleted status flip",
+      input: baseInput({ availabilityId: 5 }),
+      statusChanged: true,
+    },
+  ];
+  for (const c of cases) {
+    const local = [localRow({ deletedAt: "2026-09-01T00:00:00Z" })];
+    const plan = planReconcile([c.input], local);
+    const entry = plan.entries[0];
+    assertStrictEquals(entry.kind, "restore", c.label);
+    if (entry.kind !== "restore") throw new Error("unreachable");
+    assertStrictEquals(entry.statusChanged, c.statusChanged, c.label);
+  }
 });
 
 Deno.test("planReconcile soft-deletes only non-deleted scoped locals", () => {
@@ -202,15 +209,6 @@ Deno.test("countPlan totals a mixed plan", () => {
   assertStrictEquals(plan.counts.updates, 0);
   assertStrictEquals(plan.counts.deletes, 1);
   assertStrictEquals(plan.counts.skips, 1);
-});
-
-Deno.test("planReconcile updates on an upstream active flag flip", () => {
-  const local = [localRow()];
-  const plan = planReconcile([baseInput({ isActive: false })], local);
-  const entry = plan.entries[0];
-  assertStrictEquals(entry.kind, "update");
-  if (entry.kind !== "update") throw new Error("unreachable");
-  assertStrictEquals(entry.statusChanged, false);
 });
 
 // ---- runSync with an injected fake io ----

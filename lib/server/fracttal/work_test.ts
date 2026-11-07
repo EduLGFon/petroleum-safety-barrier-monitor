@@ -109,15 +109,6 @@ Deno.test("workRequestSlot gates on closed status and type", () => {
   );
 });
 
-Deno.test("workOrderSlot marks planned urgent only from priority", () => {
-  const planned = workOrderSlot(parseWorkOrder(order()));
-  assertStrictEquals(planned?.planned?.isUrgent, false);
-  const high = workOrderSlot(
-    parseWorkOrder(order({ priorities_description: "HIGH" })),
-  );
-  assertStrictEquals(high?.planned?.isUrgent, true);
-});
-
 Deno.test("buildWorkEvents merges per code keeping the first event", () => {
   const { events, malformed } = buildWorkEvents(
     [

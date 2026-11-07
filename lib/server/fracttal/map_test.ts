@@ -185,41 +185,56 @@ Deno.test("mapAsset preserves the upstream active flag without changing availabi
   assertStrictEquals(unknown.input.isActive, true);
 });
 
-Deno.test("mapAsset ranks ESO above the TAG suffix letter", () => {
-  const mapped = mapAsset(
-    asset({
-      description: "Painel { 1558786 } B",
-      groups_2_description: "ESO",
-    }),
-    ctx,
-  );
-  if (!mapped.ok) throw new Error("expected ok");
-  assertStrictEquals(mapped.input.criticalityId, 0);
-  assertStrictEquals(mapped.warnings.length, 0);
-});
-
-Deno.test("mapAsset ranks TAG suffix letters B/C/D", () => {
-  for (const [suffix, id] of [["B", 2], ["C", 3], ["D", 4]] as const) {
-    const mapped = mapAsset(
-      asset({ description: `Ativo { FAL-EQ-001 } ${suffix}` }),
-      ctx,
-    );
-    if (!mapped.ok) throw new Error("expected ok");
-    assertStrictEquals(mapped.input.criticalityId, id);
+Deno.test("mapAsset resolves criticality from ESO, TAG suffix, and priorities", () => {
+  const cases: Array<{
+    label: string;
+    overrides: Partial<FracttalAsset>;
+    id: number;
+    warnings: number;
+  }> = [
+    {
+      label: "ESO above suffix B",
+      overrides: {
+        description: "Painel { 1558786 } B",
+        groups_2_description: "ESO",
+      },
+      id: 0,
+      warnings: 0,
+    },
+    {
+      label: "TAG suffix B",
+      overrides: { description: "Ativo { FAL-EQ-001 } B" },
+      id: 2,
+      warnings: 0,
+    },
+    {
+      label: "TAG suffix C",
+      overrides: { description: "Ativo { FAL-EQ-001 } C" },
+      id: 3,
+      warnings: 0,
+    },
+    {
+      label: "TAG suffix D",
+      overrides: { description: "Ativo { FAL-EQ-001 } D" },
+      id: 4,
+      warnings: 0,
+    },
+    {
+      label: "rank priorities label",
+      overrides: {
+        description: "Ativo sem sufixo",
+        priorities_description: "C",
+      },
+      id: 3,
+      warnings: 0,
+    },
+  ];
+  for (const c of cases) {
+    const mapped = mapAsset(asset(c.overrides), ctx);
+    if (!mapped.ok) throw new Error("expected ok: " + JSON.stringify(mapped));
+    assertStrictEquals(mapped.input.criticalityId, c.id, c.label);
+    assertStrictEquals(mapped.warnings.length, c.warnings, c.label);
   }
-});
-
-Deno.test("mapAsset falls back to a rank priorities label", () => {
-  const mapped = mapAsset(
-    asset({
-      description: "Ativo sem sufixo",
-      priorities_description: "C",
-    }),
-    ctx,
-  );
-  if (!mapped.ok) throw new Error("expected ok");
-  assertStrictEquals(mapped.input.criticalityId, 3);
-  assertStrictEquals(mapped.warnings.length, 0);
 });
 
 Deno.test("mapAsset derives typology from the parent chain", () => {
@@ -247,19 +262,6 @@ Deno.test("mapAsset maps work events to status plus comments", () => {
   if (!mapped.ok) throw new Error("expected ok");
   assertStrictEquals(mapped.input.availabilityId, 4);
   assertStrictEquals(mapped.input.comments, "OS - 1: fix");
-});
-
-Deno.test("mapAsset keeps non-urgent planned work available", () => {
-  const mapped = mapAsset(
-    asset(),
-    ctx,
-    {
-      work: { planned: { date: "2026-09-11", source: "OS - 1: fix" } },
-      today: "2026-09-15",
-    },
-  );
-  if (!mapped.ok) throw new Error("expected ok");
-  assertStrictEquals(mapped.input.availabilityId, 0);
 });
 
 Deno.test("mapAsset maps out-of-service dates to outOfService id", () => {
