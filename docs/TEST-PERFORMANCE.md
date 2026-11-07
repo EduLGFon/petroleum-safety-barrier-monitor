@@ -45,7 +45,7 @@ Permissions are unchanged.
 
 | Run    | Command                                    | Wall clock | Tests      | Files |
 | ------ | ------------------------------------------ | ---------- | ---------- | ----- |
-| Before | `deno test` (serial, type-checked)         | 320.76s    | 710 passed | 95    |
+| Before | `deno task test` (serial, type-checked)    | 320.76s    | 710 passed | 95    |
 | After  | `deno task test` (`--parallel --no-check`) | 7.75s      | 672 passed | 94    |
 
 The final JUnit report records 7.290s of test-suite time and 672 test cases
@@ -177,5 +177,4 @@ deno task check
 
 The ranking can be extracted from the JUnit XML by sorting the `time`
 attributes on `<testcase>` elements; aggregate by `classname` for the file
-table.<|end|><|start|> assistant to=shell<|channel|>analysis <|constrain|>xml<|message|><rfl:parameter name="command">
-cd /home/edubot/.local/share/opencode/worktree/13047a/test-perf-doc && grep -n "710\|8.579\|8.147\|17.357\|95 files\|18.26" docs/TEST-PERFORMANCE.md
+table.
