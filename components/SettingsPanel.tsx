@@ -21,6 +21,8 @@ import { SettingsContentHeader, SettingsNav } from "./settings/PanelChrome.tsx";
 
 import { AppearanceSection } from "./settings/AppearanceSection.tsx";
 
+import type { AuthUser, SyncStatus, Theme } from "../lib/types.ts";
+
 export type { SettingsSection } from "./settings/PanelChrome.tsx";
 
 import { AccountSection } from "./settings/AccountSection.tsx";
@@ -31,9 +33,11 @@ import { lockBody, unlockBody } from "../lib/body-lock.ts";
 
 import { useEffect, useRef, useState } from "preact/hooks";
 
+import { SyncSection } from "./settings/SyncSection.tsx";
+
 import { useFocusTrap } from "../hooks/useFocusTrap.ts";
 
-import type { AuthUser, Theme } from "../lib/types.ts";
+import type { Conn } from "../hooks/useConnection.ts";
 
 import { lazy, Suspense } from "preact/compat";
 
@@ -58,6 +62,10 @@ interface Props {
   criticalities?: string[];
   categories?: string[];
   typologies?: string[];
+  syncStatus?: SyncStatus | null;
+  conn?: Conn;
+  apiBaseUrl?: string;
+  onOpenBarrier?: (barrierId: number) => void;
 }
 
 interface PageMeta {
@@ -128,41 +136,6 @@ function allowedSection(
   return true;
 }
 
-// SyncPlaceholder: simple landing card until the sync history unit lands.
-function SyncPlaceholder() {
-  return (
-    <div
-      className="animate-settings-in"
-      style={{ padding: "var(--d-panel-body)" }}
-    >
-      <div
-        style={{
-          display: "grid",
-          gap: 6,
-          maxWidth: 620,
-          padding: "var(--d-row-pad)",
-          background: "var(--bg-elevated)",
-          border: "1.5px solid var(--border)",
-          borderRadius: "var(--d-row-radius)",
-        }}
-      >
-        <strong style={{ color: "var(--text-primary)" }}>
-          Sincronização
-        </strong>
-        <span
-          style={{
-            fontSize: "var(--d-small)",
-            color: "var(--text-muted)",
-            lineHeight: 1.55,
-          }}
-        >
-          O histórico de sincronização aparece aqui.
-        </span>
-      </div>
-    </div>
-  );
-}
-
 // AdminLoading: chunk fallback while the admin page group loads.
 function AdminLoading() {
   return (
@@ -192,6 +165,10 @@ export function SettingsPanel(
     criticalities,
     categories,
     typologies,
+    syncStatus = null,
+    conn,
+    apiBaseUrl = "",
+    onOpenBarrier,
   }: Props,
 ) {
   const {
@@ -413,7 +390,14 @@ export function SettingsPanel(
                 </Suspense>
               )}
 
-              {activeSection === "sync" && sessionUser && <SyncPlaceholder />}
+              {activeSection === "sync" && sessionUser && (
+                <SyncSection
+                  sync={syncStatus ?? null}
+                  conn={conn}
+                  baseUrl={apiBaseUrl}
+                  onOpenBarrier={onOpenBarrier}
+                />
+              )}
             </div>
           </section>
         </aside>

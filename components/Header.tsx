@@ -11,30 +11,26 @@ import {
 
 import { type Conn, useConnection } from "../hooks/useConnection.ts";
 
-// SyncDetailsModal (252-line dialog + changes list) loads on first open:
-// every dashboard load skips it until the sync bulb is clicked.
-import { lazy, Suspense } from "preact/compat";
-const SyncDetailsModal = lazy(() =>
-  import("./header/SyncDetailsModal.tsx").then((m) => ({
-    default: m.SyncDetailsModal,
-  }))
-);
-
 import type { AuthUser, SyncStatus } from "../lib/types.ts";
+
+import type { SettingsSection } from "./SettingsPanel.tsx";
 
 import { SyncHoverCard } from "./header/SyncHoverCard.tsx";
 
 import { useEffect, useRef, useState } from "preact/hooks";
 
 import { AURORA, AURORA_TYPE } from "../lib/aurora.ts";
-import { apiFetch } from "../lib/api/http.ts";
 
 import { HealthDot } from "./header/HealthDot.tsx";
 
+import { greetingName } from "../lib/greeting.ts";
+
 import { SyncLine } from "./header/SyncLine.tsx";
 
+import { apiFetch } from "../lib/api/http.ts";
+
 interface Props {
-  onOpenSettings: () => void;
+  onOpenSettings: (section?: SettingsSection) => void;
   companyName?: string;
   // Base URL of the API origin. Empty = same origin as the page, so the
   // health probe defaults to the relative "/api/health".
@@ -45,8 +41,6 @@ interface Props {
   // Live sync status for the merged indicator (HTTP mode only). Null hides
   // the subtitle line and hover card; the dot falls back to connection only.
   syncStatus?: SyncStatus | null;
-  // Opens one barrier in the dashboard modal (from sync detail rows).
-  onOpenBarrier?: (barrierId: number) => void;
 }
 
 type ConnState = Conn;
@@ -102,7 +96,6 @@ export function Header(
     apiBaseUrl = "",
     sessionUser = null,
     syncStatus = null,
-    onOpenBarrier,
   }: Props,
 ) {
   const healthUrl = apiBaseUrl
@@ -110,7 +103,6 @@ export function Header(
     : "/api/health";
   const conn = useConnection(healthUrl);
   const [syncOpen, setSyncOpen] = useState(false);
-  const [detailsOpen, setDetailsOpen] = useState(false);
   // Hover intent: a short close delay forgives cursor slips off the title
   // or card edges, so reaching the details button never races the dismiss.
   const closeTimer = useRef<number | undefined>(undefined);
@@ -129,10 +121,11 @@ export function Header(
     cancelClose();
     closeTimer.current = globalThis.setTimeout(() => setSyncOpen(false), 200);
   };
-  // Opening the dialog dismisses the hover card so the two never stack.
-  const openDetails = (): void => {
+  // Opening settings on the sync page dismisses the hover card so the two
+  // never stack.
+  const openSettingsSync = (): void => {
     setSyncOpen(false);
-    setDetailsOpen(true);
+    onOpenSettings("sync");
   };
   const kind = toHealthKind(syncStatus, conn);
   const instantIso = syncStatus?.runningSince ??
@@ -219,14 +212,16 @@ export function Header(
             <SyncHoverCard
               sync={syncStatus}
               conn={conn}
-              onOpenDetails={openDetails}
+              onOpenDetails={openSettingsSync}
             />
           )}
         </div>
         <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
           {sessionUser && (
             <span
-              className="glass-pill"
+              className={sessionUser.role === "admin"
+                ? "glass-pill header-identity header-identity--admin"
+                : "glass-pill header-identity"}
               title={sessionUser.email}
               style={{
                 display: "flex",
@@ -243,14 +238,27 @@ export function Header(
               }}
             >
               <span
+                className={sessionUser.role === "admin"
+                  ? "header-identity-name header-identity-name--admin"
+                  : "header-identity-name"}
                 style={{
                   overflow: "hidden",
                   textOverflow: "ellipsis",
                   whiteSpace: "nowrap",
                 }}
               >
-                {sessionUser.email}
+                {greetingName(sessionUser.name)}
               </span>
+              {sessionUser.role === "admin" && (
+                <span
+                  className="header-admin-crown"
+                  aria-hidden="true"
+                  title="Administrador"
+                  style={{ flexShrink: 0, lineHeight: 1 }}
+                >
+                  👑
+                </span>
+              )}
               <span
                 style={{
                   fontSize: "var(--d-caption)",
@@ -287,7 +295,7 @@ export function Header(
           )}
           <button
             type="button"
-            onClick={onOpenSettings}
+            onClick={() => onOpenSettings()}
             className="glass-pill lift"
             title="Configurações"
             aria-label="Configurações"
@@ -308,17 +316,6 @@ export function Header(
           </button>
         </div>
       </header>
-      {detailsOpen && syncStatus !== null && (
-        <Suspense fallback={null}>
-          <SyncDetailsModal
-            sync={syncStatus}
-            conn={conn}
-            baseUrl={apiBaseUrl}
-            onClose={() => setDetailsOpen(false)}
-            onOpenBarrier={onOpenBarrier}
-          />
-        </Suspense>
-      )}
     </>
   );
 }
