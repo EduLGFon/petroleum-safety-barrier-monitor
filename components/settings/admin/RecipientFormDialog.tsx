@@ -90,7 +90,7 @@ export function RecipientFormDialog(
 
   const options = users.map((u) => ({
     id: u.id,
-    label: u.name ? `${u.name} — ${u.email}` : u.email,
+    label: u.name ? `${u.name} - ${u.email}` : u.email,
     hint: u.phone || undefined,
   }));
 
