@@ -1,9 +1,10 @@
-// SettingsPanel - slide-over dialog for appearance, filters, account, admin.
+// SettingsPanel - centered settings workspace for appearance, filters,
+// account, admin pages, and the sync placeholder.
 // This is why it exists: centralizes theme / accent / density / font size /
 // reduce-motion plus startup filter defaults from SettingsContext, with a
-// Conta tab (own profile plus self-service password change) for every
-// authenticated user and an admin-only tab (users, recipients, alert rules)
-// for administrators.
+// Conta page for every authenticated user and an admin-only page group for
+// administrators. The admin managers stay lazy: non-admin users and
+// non-admin pages never parse that chunk.
 import {
   type AccentColor,
   type Density,
@@ -11,22 +12,20 @@ import {
   useSettings,
 } from "../context/SettingsContext.tsx";
 
-import { FilterIcon, ShieldIcon, SunIcon, UserIcon } from "./ui/Icons.tsx";
+import type {
+  AdminSectionKey,
+  SettingsSection,
+} from "./settings/PanelChrome.tsx";
+
+import { SettingsContentHeader, SettingsNav } from "./settings/PanelChrome.tsx";
 
 import { AppearanceSection } from "./settings/AppearanceSection.tsx";
+
+export type { SettingsSection } from "./settings/PanelChrome.tsx";
 
 import { AccountSection } from "./settings/AccountSection.tsx";
 
 import { FiltersSection } from "./settings/FiltersSection.tsx";
-
-// AdminSection (Rules/Users/Recipients managers, ~5k lines) loads on first
-// admin-tab open: non-admins and non-admin tabs never parse it.
-import { lazy, Suspense } from "preact/compat";
-const AdminSection = lazy(() =>
-  import("./settings/AdminSection.tsx").then((m) => ({
-    default: m.AdminSection,
-  }))
-);
 
 import { lockBody, unlockBody } from "../lib/body-lock.ts";
 
@@ -34,14 +33,23 @@ import { useEffect, useRef, useState } from "preact/hooks";
 
 import { useFocusTrap } from "../hooks/useFocusTrap.ts";
 
-import { PanelHeader } from "./settings/PanelChrome.tsx";
-
 import type { AuthUser, Theme } from "../lib/types.ts";
+
+import { lazy, Suspense } from "preact/compat";
+
+const AdminSection = lazy(() =>
+  import("./settings/AdminSection.tsx").then((m) => ({
+    default: m.AdminSection,
+  }))
+);
 
 interface Props {
   open: boolean;
   onClose: () => void;
   sessionUser?: AuthUser | null;
+  // Optional landing page applied whenever `open` flips true. The later sync
+  // shortcut uses it without changing the rest of the public props.
+  initialSection?: SettingsSection;
   // Live vocabularies for the filters section; absent means "unknown yet"
   // and the section offers only "Todas" instead of stale seeds.
   locations?: { code: string; name: string; type: string }[];
@@ -52,12 +60,132 @@ interface Props {
   typologies?: string[];
 }
 
-// SettingsPanel: slide-over dialog hosting appearance, filters, and admin sections.
+interface PageMeta {
+  title: string;
+  description: string;
+}
+
+// PAGE_META: content header copy for every page in the workspace.
+const PAGE_META: Record<SettingsSection, PageMeta> = {
+  appearance: {
+    title: "Aparência",
+    description: "Temas, cores e conforto visual do monitor.",
+  },
+  filters: {
+    title: "Filtros",
+    description: "Valores iniciais aplicados ao abrir o monitor.",
+  },
+  account: {
+    title: "Conta",
+    description: "Seus dados de acesso e a troca de senha.",
+  },
+  users: {
+    title: "Usuários",
+    description: "Acessos, perfis e status das contas.",
+  },
+  groups: {
+    title: "Grupos",
+    description: "Restrições de acesso por estação.",
+  },
+  recipients: {
+    title: "Destinatários",
+    description: "Quem recebe os alertas por e-mail.",
+  },
+  rules: {
+    title: "Regras",
+    description: "Quando e como os alertas são disparados.",
+  },
+  options: {
+    title: "Opções",
+    description: "Respostas padrão dos campos da ficha.",
+  },
+  sync: {
+    title: "Sincronização",
+    description: "Histórico das execuções com o CMMS.",
+  },
+};
+
+const ADMIN_KEYS: AdminSectionKey[] = [
+  "users",
+  "groups",
+  "recipients",
+  "rules",
+  "options",
+];
+
+function isAdminSection(section: SettingsSection): section is AdminSectionKey {
+  return ADMIN_KEYS.includes(section as AdminSectionKey);
+}
+
+// allowedSection: hard gate for the shell; AdminSection repeats the role
+// check on its own so a future caller cannot bypass it.
+function allowedSection(
+  section: SettingsSection,
+  sessionUser?: AuthUser | null,
+): boolean {
+  if (isAdminSection(section)) return sessionUser?.role === "admin";
+  if (section === "account" || section === "sync") return !!sessionUser;
+  return true;
+}
+
+// SyncPlaceholder: simple landing card until the sync history unit lands.
+function SyncPlaceholder() {
+  return (
+    <div
+      className="animate-settings-in"
+      style={{ padding: "var(--d-panel-body)" }}
+    >
+      <div
+        style={{
+          display: "grid",
+          gap: 6,
+          maxWidth: 620,
+          padding: "var(--d-row-pad)",
+          background: "var(--bg-elevated)",
+          border: "1.5px solid var(--border)",
+          borderRadius: "var(--d-row-radius)",
+        }}
+      >
+        <strong style={{ color: "var(--text-primary)" }}>
+          Sincronização
+        </strong>
+        <span
+          style={{
+            fontSize: "var(--d-small)",
+            color: "var(--text-muted)",
+            lineHeight: 1.55,
+          }}
+        >
+          O histórico de sincronização aparece aqui.
+        </span>
+      </div>
+    </div>
+  );
+}
+
+// AdminLoading: chunk fallback while the admin page group loads.
+function AdminLoading() {
+  return (
+    <div
+      className="animate-fade-in"
+      style={{
+        padding: "var(--d-panel-body)",
+        color: "var(--text-muted)",
+        fontSize: "var(--d-small)",
+      }}
+    >
+      Carregando administração…
+    </div>
+  );
+}
+
+// SettingsPanel: floating workspace with vertical page navigation.
 export function SettingsPanel(
   {
     open,
     onClose,
     sessionUser = null,
+    initialSection,
     locations,
     availabilities,
     compliances,
@@ -78,27 +206,70 @@ export function SettingsPanel(
     setReduceMotion,
     setDisableBlur,
   } = useSettings();
-  const [section, setSection] = useState<
-    "appearance" | "filters" | "account" | "admin"
-  >(
-    "appearance",
+  const [section, setSection] = useState<SettingsSection>(
+    initialSection ?? "appearance",
   );
+  const [adminCounts, setAdminCounts] = useState<
+    Partial<Record<AdminSectionKey, number | null>>
+  >({});
   const [activeTheme, setActiveTheme] = useState<Theme | null>(null);
   const [activeAccent, setActiveAccent] = useState<AccentColor | null>(null);
   const [activeDensity, setActiveDensity] = useState<Density | null>(null);
   const [activeFontSize, setActiveFontSize] = useState<FontSize | null>(null);
 
+  // initialSection selects the landing page on every false -> true open.
+  const wasOpen = useRef(open);
+  useEffect(() => {
+    if (open && !wasOpen.current && initialSection) {
+      setSection(initialSection);
+    }
+    wasOpen.current = open;
+  }, [open, initialSection]);
+
+  // Render guard: a role or session change can invalidate the stored page
+  // without touching the state itself. The fallback is always public.
+  const activeSection = allowedSection(section, sessionUser)
+    ? section
+    : "appearance";
+
+  // Nested portalled dialogs and menus own Tab while they are open. Disable
+  // the shell trap so it cannot pull focus back out of the inner overlay;
+  // both primitives mark their portal root with a data attribute.
+  const [nestedOverlay, setNestedOverlay] = useState(false);
   useEffect(() => {
     if (!open) return;
-    const h = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
+    const sync = () => {
+      const next = !!document.querySelector(
+        "[data-admin-form-dialog],[data-search-multi-panel]",
+      );
+      setNestedOverlay((current) => current === next ? current : next);
     };
-    document.addEventListener("keydown", h);
-    return () => document.removeEventListener("keydown", h);
+    sync();
+    const observer = new MutationObserver(sync);
+    observer.observe(document.body, { childList: true });
+    return () => observer.disconnect();
+  }, [open]);
+
+  useEffect(() => {
+    if (!open) return;
+    const handler = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      const target = e.target as HTMLElement | null;
+      // Nested dialogs own Escape; this guard also covers portalled menus
+      // whose events reach document before the inner handler can stop them.
+      if (
+        target?.closest?.(
+          "[data-admin-form-dialog],[data-search-multi-panel]",
+        )
+      ) return;
+      onClose();
+    };
+    document.addEventListener("keydown", handler);
+    return () => document.removeEventListener("keydown", handler);
   }, [open, onClose]);
 
   // Shared counter with BarrierModal: scroll resumes only after the last
-  // overlay closes, so closing the panel cannot unlock scroll under the modal.
+  // overlay closes, so closing the workspace cannot unlock scroll under it.
   useEffect(() => {
     if (open) {
       lockBody();
@@ -131,7 +302,13 @@ export function SettingsPanel(
     setTimeout(() => setActiveFontSize(null), 350);
   };
 
-  // Focus management: remember the trigger on open, focus the panel, restore
+  const handleAdminCount = (key: AdminSectionKey, count: number) => {
+    setAdminCounts((current) =>
+      current[key] === count ? current : { ...current, [key]: count }
+    );
+  };
+
+  // Focus management: remember the trigger on open, focus the dialog, restore
   // the trigger on close so keyboard users land back where they started.
   const panelRef = useRef<HTMLElement | null>(null);
   const restoreFocusRef = useRef<HTMLElement | null>(null);
@@ -145,184 +322,102 @@ export function SettingsPanel(
       restoreFocusRef.current = null;
     }
   }, [open]);
-  useFocusTrap(panelRef, open);
+  useFocusTrap(panelRef, open && !nestedOverlay);
+
+  const meta = PAGE_META[activeSection];
 
   return (
     <>
-      {/* Backdrop */}
       <div
+        className="settings-backdrop"
+        data-open={open ? "true" : "false"}
         inert={!open}
         aria-hidden="true"
         onClick={onClose}
-        style={{
-          position: "fixed",
-          inset: 0,
-          zIndex: 1000,
-          // Hidden (not just transparent) when closed: a fullscreen
-          // backdrop-filter snapshots the page even at opacity 0.
-          // Visibility flips after the fade so close still fades out.
-          visibility: open ? "visible" : "hidden",
-          contain: "strict",
-          background: "rgba(0,0,0,.5)",
-          backdropFilter: "blur(4px)",
-          WebkitBackdropFilter: "blur(4px)",
-          opacity: open ? 1 : 0,
-          pointerEvents: open ? "auto" : "none",
-          transition: open
-            ? "opacity .28s var(--ease-std)"
-            : "opacity .28s var(--ease-std), visibility 0s .28s",
-        }}
       />
 
-      {/* Panel */}
-      <aside
+      <div
+        className="settings-workspace"
+        data-open={open ? "true" : "false"}
         inert={!open}
-        role="dialog"
-        aria-label="Configurações"
         aria-hidden={!open}
-        tabIndex={-1}
-        ref={panelRef}
-        style={{
-          position: "fixed",
-          top: 0,
-          right: 0,
-          height: "100dvh",
-          width: section === "admin" ? "min(560px, 96vw)" : "var(--d-panel-w)",
-          maxWidth: "96vw",
-          background: "var(--bg-surface)",
-          borderLeft: "1px solid var(--border)",
-          // 12px over the near-opaque surface reads identical to 20px at a
-          // fraction of the kernel cost; contained + promoted so the slide
-          // runs on the compositor without re-rasterizing the page.
-          backdropFilter: "blur(12px)",
-          WebkitBackdropFilter: "blur(12px)",
-          contain: "paint",
-          zIndex: 1001,
-          display: "flex",
-          flexDirection: "column",
-          overflowY: "auto",
-          transform: open ? "translateX(0) translateZ(0)" : "translateX(100%)",
-          willChange: open ? "transform" : "auto",
-          transition: "transform .32s var(--ease-out)",
-          boxShadow: open ? "var(--shadow-lg)" : "none",
-        }}
       >
-        {/* Header */}
-        <PanelHeader onClose={onClose} />
-
-        {/* Tabs */}
-        <div
-          style={{
-            display: "flex",
-            borderBottom: "1px solid var(--border)",
-            background: "var(--bg-elevated)",
-            flexShrink: 0,
-          }}
+        <aside
+          ref={panelRef}
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="settings-page-title"
+          tabIndex={-1}
+          className="settings-dialog"
         >
-          {[
-            { key: "appearance", label: "Aparência", Icon: SunIcon },
-            {
-              key: "filters",
-              label: "Filtros",
-              Icon: FilterIcon,
-            },
-            ...(sessionUser
-              ? [{ key: "account", label: "Conta", Icon: UserIcon }]
-              : []),
-            ...(sessionUser?.role === "admin"
-              ? [{ key: "admin", label: "Administração", Icon: ShieldIcon }]
-              : []),
-          ].map((
-            { key, label, Icon },
-          ) => (
-            <button
-              type="button"
-              key={key}
-              onClick={() =>
-                setSection(
-                  key as "appearance" | "filters" | "account" | "admin",
-                )}
-              style={{
-                flex: 1,
-                display: "flex",
-                flexDirection: "column",
-                alignItems: "center",
-                gap: "var(--d-gap-2xs)",
-                padding: "var(--d-panel-tab)",
-                fontSize: "var(--d-caption)",
-                fontWeight: 600,
-                border: "none",
-                cursor: "pointer",
-                background: "transparent",
-                color: section === key ? "var(--accent)" : "var(--text-muted)",
-                borderBottom: section === key
-                  ? "2px solid var(--accent)"
-                  : "2px solid transparent",
-                transition: "all .2s",
-                marginBottom: -1,
-              }}
-            >
-              <Icon
-                size={14}
-                color={section === key ? "var(--accent)" : "var(--text-muted)"}
-                strokeWidth={2}
-              />
-              {label}
-            </button>
-          ))}
-        </div>
-
-        {/* ── APPEARANCE ── */}
-        {section === "appearance" && (
-          <AppearanceSection
-            settings={settings}
-            activeTheme={activeTheme}
-            activeDensity={activeDensity}
-            activeFontSize={activeFontSize}
-            activeAccent={activeAccent}
-            onTheme={handleTheme}
-            onDensity={handleDensity}
-            onFontSize={handleFontSize}
-            onAccent={handleAccent}
-            onReduceMotion={setReduceMotion}
-            onDisableBlur={setDisableBlur}
+          <SettingsNav
+            section={activeSection}
+            onSelect={(next) => {
+              if (allowedSection(next, sessionUser)) setSection(next);
+            }}
+            sessionUser={sessionUser}
+            counts={adminCounts}
           />
-        )}
 
-        {/* ── FILTERS ── */}
-        {section === "filters" && (
-          <FiltersSection
-            settings={settings}
-            setDefaults={setDefaults}
-            setDefaultLoc={setDefaultLoc}
-            resetDefaults={resetFilterDefaults}
-            locations={locations}
-            availabilities={availabilities}
-            compliances={compliances}
-            criticalities={criticalities}
-            categories={categories}
-            typologies={typologies}
-          />
-        )}
+          <section className="settings-content">
+            <SettingsContentHeader
+              title={meta.title}
+              description={meta.description}
+              onClose={onClose}
+            />
 
-        {/* ── ACCOUNT ── */}
-        {section === "account" && sessionUser && (
-          <AccountSection sessionUser={sessionUser} />
-        )}
+            <div className="settings-content-scroll">
+              {activeSection === "appearance" && (
+                <AppearanceSection
+                  settings={settings}
+                  activeTheme={activeTheme}
+                  activeDensity={activeDensity}
+                  activeFontSize={activeFontSize}
+                  activeAccent={activeAccent}
+                  onTheme={handleTheme}
+                  onDensity={handleDensity}
+                  onFontSize={handleFontSize}
+                  onAccent={handleAccent}
+                  onReduceMotion={setReduceMotion}
+                  onDisableBlur={setDisableBlur}
+                />
+              )}
 
-        {/* ── ADMIN ── */}
-        {section === "admin" && sessionUser?.role === "admin" && (
-          <Suspense
-            fallback={
-              <div style={{ padding: 24, color: "var(--text-muted)" }}>
-                Carregando administração…
-              </div>
-            }
-          >
-            <AdminSection sessionUser={sessionUser} />
-          </Suspense>
-        )}
-      </aside>
+              {activeSection === "filters" && (
+                <FiltersSection
+                  settings={settings}
+                  setDefaults={setDefaults}
+                  setDefaultLoc={setDefaultLoc}
+                  resetDefaults={resetFilterDefaults}
+                  locations={locations}
+                  availabilities={availabilities}
+                  compliances={compliances}
+                  criticalities={criticalities}
+                  categories={categories}
+                  typologies={typologies}
+                />
+              )}
+
+              {activeSection === "account" && sessionUser && (
+                <AccountSection sessionUser={sessionUser} />
+              )}
+
+              {isAdminSection(activeSection) &&
+                sessionUser?.role === "admin" && (
+                <Suspense fallback={<AdminLoading />}>
+                  <AdminSection
+                    section={activeSection}
+                    sessionUser={sessionUser}
+                    onCount={handleAdminCount}
+                  />
+                </Suspense>
+              )}
+
+              {activeSection === "sync" && sessionUser && <SyncPlaceholder />}
+            </div>
+          </section>
+        </aside>
+      </div>
     </>
   );
 }

@@ -1,13 +1,14 @@
-// AdminSection - admin-only tab content inside the settings sidepanel.
-// This is why it exists: the old /admin console moves into the drawer so
-// admins manage users, recipients, and rules without leaving the monitor.
-import { BellIcon, MailIcon, SlidersIcon, UsersIcon } from "../ui/Icons.tsx";
-
+// AdminSection - admin page dispatcher inside the settings workspace.
+// This is why it exists: the vertical nav selects one admin page at a time;
+// this module keeps the fail-closed role gate and lazy-loads the five
+// managers as one chunk while rendering only the active one.
 import { FieldOptionsManager } from "./admin/FieldOptionsManager.tsx";
 
 import { RecipientsManager } from "./admin/RecipientsManager.tsx";
 
 import { GroupsManager } from "./admin/GroupsManager.tsx";
+
+import type { AdminSectionKey } from "./PanelChrome.tsx";
 
 import { RulesManager } from "./admin/RulesManager.tsx";
 
@@ -15,40 +16,14 @@ import { UsersManager } from "./admin/UsersManager.tsx";
 
 import type { AuthUser } from "../../lib/types.ts";
 
-import type { ComponentType } from "preact";
-
-import { useState } from "preact/hooks";
-
-type Sub = "users" | "groups" | "recipients" | "rules" | "options";
-
-interface SubDef {
-  key: Sub;
-  label: string;
-  Icon: ComponentType<{ size?: number; color?: string; strokeWidth?: number }>;
+interface Props {
+  section: AdminSectionKey;
+  sessionUser?: AuthUser | null;
+  onCount?: (section: AdminSectionKey, count: number) => void;
 }
 
-// SUBS: admin sub-nav definitions with icons.
-const SUBS: SubDef[] = [
-  { key: "users", label: "Usuários", Icon: UsersIcon },
-  { key: "groups", label: "Grupos", Icon: UsersIcon },
-  { key: "recipients", label: "Destinatários", Icon: MailIcon },
-  { key: "rules", label: "Regras", Icon: BellIcon },
-  { key: "options", label: "Opções", Icon: SlidersIcon },
-];
-
-// AdminSection: fail-closed sub-nav shell; lazy-mounts one manager at a time.
-export function AdminSection(
-  { sessionUser }: { sessionUser?: AuthUser | null },
-) {
-  const [sub, setSub] = useState<Sub>("users");
-  const [counts, setCounts] = useState<Record<Sub, number | null>>({
-    users: null,
-    groups: null,
-    recipients: null,
-    rules: null,
-    options: null,
-  });
-
+// AdminSection: fail-closed dispatcher; only the active manager is mounted.
+export function AdminSection({ section, sessionUser, onCount }: Props) {
   if (sessionUser?.role !== "admin") {
     return (
       <div
@@ -89,105 +64,28 @@ export function AdminSection(
       className="animate-settings-in"
       style={{
         padding: "var(--d-panel-body)",
-        display: "flex",
-        flexDirection: "column",
+        display: "grid",
         gap: "var(--d-panel-gap)",
+        minWidth: 0,
       }}
     >
-      <div
-        role="tablist"
-        aria-label="Administração"
-        style={{
-          display: "flex",
-          gap: 6,
-          padding: 4,
-          background: "var(--bg-elevated)",
-          border: "1.5px solid var(--border)",
-          borderRadius: "var(--d-row-radius)",
-          overflowX: "auto",
-        }}
-      >
-        {SUBS.map(({ key, label, Icon }) => {
-          const active = sub === key;
-          const n = counts[key];
-          return (
-            <button
-              key={key}
-              type="button"
-              role="tab"
-              aria-selected={active}
-              onClick={() => setSub(key)}
-              style={{
-                flex: 1,
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                gap: 6,
-                padding: "8px 10px",
-                fontSize: "var(--d-small)",
-                fontWeight: 700,
-                whiteSpace: "nowrap",
-                border: "none",
-                borderRadius: "var(--d-chip-radius)",
-                cursor: "pointer",
-                background: active
-                  ? "linear-gradient(90deg,var(--accent),var(--accent-2))"
-                  : "transparent",
-                color: active ? "#fff" : "var(--text-muted)",
-                boxShadow: active ? "0 4px 14px var(--glow)" : "none",
-                transition: "all .2s var(--ease-std)",
-              }}
-            >
-              <Icon
-                size={14}
-                color={active ? "#fff" : "var(--text-muted)"}
-                strokeWidth={2.2}
-              />
-              {label}
-              {n != null && (
-                <span
-                  className="tnum"
-                  style={{
-                    fontSize: "var(--d-caption)",
-                    fontWeight: 800,
-                    background: active
-                      ? "rgba(255,255,255,.22)"
-                      : "var(--bg-hover)",
-                    color: active ? "#fff" : "var(--text-secondary)",
-                    borderRadius: 99,
-                    padding: "1px 7px",
-                  }}
-                >
-                  {n}
-                </span>
-              )}
-            </button>
-          );
-        })}
-      </div>
-      {sub === "users" && (
+      {section === "users" && (
         <UsersManager
-          currentUserId={sessionUser?.id}
-          onCount={(n) => setCounts((c) => ({ ...c, users: n }))}
+          currentUserId={sessionUser.id}
+          onCount={(n) => onCount?.("users", n)}
         />
       )}
-      {sub === "groups" && (
-        <GroupsManager
-          onCount={(n) => setCounts((c) => ({ ...c, groups: n }))}
-        />
+      {section === "groups" && (
+        <GroupsManager onCount={(n) => onCount?.("groups", n)} />
       )}
-      {sub === "recipients" && (
-        <RecipientsManager
-          onCount={(n) => setCounts((c) => ({ ...c, recipients: n }))}
-        />
+      {section === "recipients" && (
+        <RecipientsManager onCount={(n) => onCount?.("recipients", n)} />
       )}
-      {sub === "rules" && (
-        <RulesManager onCount={(n) => setCounts((c) => ({ ...c, rules: n }))} />
+      {section === "rules" && (
+        <RulesManager onCount={(n) => onCount?.("rules", n)} />
       )}
-      {sub === "options" && (
-        <FieldOptionsManager
-          onCount={(n) => setCounts((c) => ({ ...c, options: n }))}
-        />
+      {section === "options" && (
+        <FieldOptionsManager onCount={(n) => onCount?.("options", n)} />
       )}
     </div>
   );
