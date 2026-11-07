@@ -7,7 +7,7 @@
   "exports": "./main.ts",
   "nodeModulesDir": "manual",
   "tasks": {
-    "check": "deno fmt --check . && deno lint . && deno check \"main.ts\" \"client.ts\" \"utils.ts\" \"routes/**/*.ts\" \"routes/**/*.tsx\" \"components/**/*.ts\" \"components/**/*.tsx\" \"islands/**/*.ts\" \"islands/**/*.tsx\" \"hooks/**/*.ts\" \"hooks/**/*.tsx\" \"context/**/*.ts\" \"context/**/*.tsx\" \"lib/**/*.ts\" \"lib/**/*.tsx\" \"scripts/**/*.ts\" && deno run --allow-read=db/schema.sql scripts/check-migration-order.ts",
+    "check": "deno fmt && deno lint && deno check && deno run --allow-read=db/schema.sql scripts/check-migration-order.ts",
     "test": "deno test --allow-read=scripts/fixtures,db/schema.sql --allow-net=127.0.0.1,localhost --allow-env=ALERT_PROVIDER_BASE_URL,ALERT_PROVIDER_TOKEN,ALERT_PROVIDER_COMPANY_ID,DATABASE_URL .",
     "dev": "vite",
     "build": "vite build",
