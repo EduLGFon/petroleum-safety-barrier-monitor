@@ -37,7 +37,7 @@ deno task admin:create -- --email you@example.com --password 'at-least-12-chars'
 deno task dev
 ```
 
-Visit `http://localhost:5173/login`.
+Visit `http://localhost:8300/login`.
 
 ## Production
 
