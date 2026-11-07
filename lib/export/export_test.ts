@@ -5,52 +5,14 @@ import { browserTimeZone, escHtml, resolveTimeZone, ts } from "./html.ts";
 
 import { kpiStats, summaryRows } from "./summary.ts";
 
-import type { Barrier } from "../types.ts";
-
 import { csvCell } from "./csv.ts";
 
 import { row } from "./rows.ts";
 
-function mk(over: Partial<Barrier> = {}): Barrier {
-  return {
-    id: 1,
-    tag: "PSV-001",
-    typology: "Estação Coletora",
-    location: "FAL",
-    locDesc: "FAL - Olinda",
-    criticality: "D",
-    category: "Válvula de Alívio de Pressão",
-    grouping: "Sistemas de Alívio",
-    owner: "Equipe de Manutenção",
-    availability: "Disponível",
-    compliance: "Conforme",
-    comments: "",
-    actionPlan: "",
-    statusSince: "2026-01-01",
-    statusHistory: [],
-    origin: "",
-    externalCode: "",
-    locationName: "",
-    installLocal: "",
-    equipTypology: "",
-    fieldInstalled: "",
-    fieldOperational: "",
-    opStatus: "",
-    hasMaintPlan: "",
-    planFollowed: "",
-    failureFree: "",
-    maintStatus: "",
-    hasContingency: "",
-    contingencyDesc: "",
-    evidenceCode: "",
-    degradationDesc: "",
-    extraComments: "",
-    ...over,
-  };
-}
+import { mkBarrier } from "./fixture.ts";
 
 Deno.test("row maps a bare barrier to 30 columns", () => {
-  const r = row(mk());
+  const r = row(mkBarrier());
   assertStrictEquals(r.length, 30);
   assertStrictEquals(r[0], "1");
   assertStrictEquals(r[1], "PSV-001");
@@ -60,7 +22,7 @@ Deno.test("row maps a bare barrier to 30 columns", () => {
 });
 
 Deno.test("row appends sheet inventory columns in sheet order", () => {
-  const r = row(mk({
+  const r = row(mkBarrier({
     origin: "HAZOP: RL-1",
     externalCode: "1014224",
     locationName: "Fazenda Alegre",
@@ -100,22 +62,19 @@ Deno.test("row appends sheet inventory columns in sheet order", () => {
   ]);
 });
 
-Deno.test("row renders empty who-equals for Conforme rows despite statusSince", () => {
-  const r = row(mk({ statusSince: "2020-01-01" }));
-  assertStrictEquals(r[9], "");
-});
+Deno.test("row renders who-equals only for NC rows with a start date", () => {
+  const conforme = row(mkBarrier({ statusSince: "2020-01-01" }));
+  assertStrictEquals(conforme[9], "");
 
-Deno.test("row renders NC duration + desde only when statusSince exists", () => {
-  const nc = mk({
+  const nc = mkBarrier({
     compliance: "Não Conforme",
     availability: "Indisponível",
     statusSince: "2020-01-01",
   });
-  const r = row(nc);
-  assertEquals(r[9], "6 anos (desde 01/01/2020)");
+  assertEquals(row(nc)[9], "6 anos (desde 01/01/2020)");
 
   const bare = row(
-    mk({
+    mkBarrier({
       statusSince: "",
       compliance: "Não Conforme",
       availability: "Indisponível",
@@ -125,27 +84,23 @@ Deno.test("row renders NC duration + desde only when statusSince exists", () => 
 });
 
 Deno.test("row treats any non-Conforme as NC and falls back empty dono", () => {
-  const novel = row(mk({ compliance: "Em análise" })); // fail-closed
+  const novel = row(mkBarrier({ compliance: "Em análise" })); // fail-closed
   assertStrictEquals(novel[10], "Em análise");
-  const none = row(mk({ owner: "" }));
+  const none = row(mkBarrier({ owner: "" }));
   assertStrictEquals(none[7], "Não informado");
 });
 
-Deno.test("kpiStats yields zeros for empty input", () => {
-  const s = kpiStats([]);
-  assertEquals(s, {
+Deno.test("kpiStats formats empty and mixed selections", () => {
+  assertEquals(kpiStats([]), {
     total: "0",
     compliant: "0",
     nonCompliant: "0",
     pct: "0%",
     critical: "0",
   });
-});
-
-Deno.test("kpiStats formats one Conforme and one critical NC", () => {
   const s = kpiStats([
-    mk(),
-    mk({
+    mkBarrier(),
+    mkBarrier({
       id: 2,
       compliance: "Não Conforme",
       availability: "Indisponível",
@@ -161,9 +116,13 @@ Deno.test("kpiStats formats one Conforme and one critical NC", () => {
 
 Deno.test("summaryRows keeps novel statuses and reconciles totals", () => {
   const s = summaryRows([
-    mk(),
-    mk({ id: 2, availability: "Degradado", compliance: "Não Conforme" }),
-    mk({ id: 3, availability: "Novo Estado", compliance: "Não Conforme" }),
+    mkBarrier(),
+    mkBarrier({ id: 2, availability: "Degradado", compliance: "Não Conforme" }),
+    mkBarrier({
+      id: 3,
+      availability: "Novo Estado",
+      compliance: "Não Conforme",
+    }),
   ]);
   const labels = s.map(([k]) => k);
   assertEquals(labels[0], "Total");

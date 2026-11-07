@@ -60,6 +60,11 @@ Deno.test("xlsxBytes builds a workbook any reader can open", async () => {
     "Barreiras",
     "Resumo",
   ]);
+  // Empty selection still opens with a header and a zeroed KPI strip.
+  const emptyGrid = gridOf(await xlsxOf([]), "Barreiras");
+  assertStrictEquals(emptyGrid.length, 6);
+  assertEquals(emptyGrid[5], EXPORT_HEADERS);
+  assertStrictEquals(emptyGrid[4]![0], "0");
 });
 
 Deno.test("the data sheet keeps the brand block over the header row", async () => {
@@ -104,13 +109,6 @@ Deno.test("xlsxBytes spans every batch", async () => {
   assertStrictEquals(grid.length, 6 + 1_200);
   assertStrictEquals(grid[1_205]![1], "PSV-1200");
   assertStrictEquals(grid[1_205]![0], 1_200);
-});
-
-Deno.test("xlsxBytes of an empty selection still opens with a header", async () => {
-  const grid = gridOf(await xlsxOf([]), "Barreiras");
-  assertStrictEquals(grid.length, 6);
-  assertEquals(grid[5], EXPORT_HEADERS);
-  assertStrictEquals(grid[4]![0], "0");
 });
 
 Deno.test("the summary sheet reconciles with the rows", async () => {
