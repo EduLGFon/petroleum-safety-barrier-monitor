@@ -503,3 +503,167 @@ export async function deleteUser(id: number): Promise<boolean> {
     return rows.length > 0;
   });
 }
+
+// --- Bulk helpers (pure + transactional) ----------------------------
+
+// normalizeUserBatchIds: validates and dedupes the id list for a batch
+// action. Caps at 500 distinct positive integers; rejects anything that is
+// not a safe positive integer.
+export function normalizeUserBatchIds(raw: unknown): number[] {
+  if (!Array.isArray(raw)) throw new Error("ids must be an array");
+  const ids: number[] = [];
+  for (const item of raw) {
+    if (typeof item !== "number" || !Number.isSafeInteger(item) || item <= 0) {
+      throw new Error("ids must be positive integers");
+    }
+    ids.push(item);
+  }
+  const unique = Array.from(new Set(ids));
+  if (unique.length === 0) throw new Error("ids must not be empty");
+  if (unique.length > 500) {
+    throw new Error("ids must not exceed 500");
+  }
+  return unique;
+}
+
+export const parseUserBatchIds = normalizeUserBatchIds;
+export const validateUserBatchIds = normalizeUserBatchIds;
+export const normalizeUserIds = normalizeUserBatchIds;
+
+// normalizeUserBatchAction: canonicalizes the action name. Accepts a few
+// PT/EN aliases so the wire contract stays forgiving without inventing new
+// actions.
+export function normalizeUserBatchAction(raw: unknown): string {
+  if (typeof raw !== "string" || raw.trim() === "") {
+    throw new Error("action must be a string");
+  }
+  const key = raw.trim().toLowerCase().replace(/[\s_-]+/g, "");
+  const map: Record<string, string> = {
+    activate: "activate",
+    ativar: "activate",
+    enable: "activate",
+    active: "activate",
+    deactivate: "deactivate",
+    desativar: "deactivate",
+    disable: "deactivate",
+    inactive: "deactivate",
+    promote: "promote",
+    promover: "promote",
+    demote: "demote",
+    rebaixar: "demote",
+    revoke: "revokeSessions",
+    revokesessions: "revokeSessions",
+    revogar: "revokeSessions",
+    revogarsessoes: "revokeSessions",
+    revogarssessions: "revokeSessions",
+  };
+  const canonical = map[key];
+  if (!canonical) throw new Error("invalid action");
+  return canonical;
+}
+
+export const parseUserBatchAction = normalizeUserBatchAction;
+export const validateUserBatchAction = normalizeUserBatchAction;
+
+// batchUsers: one transaction. Locks active admins, preserves the
+// last-active-admin and last-active-local-admin guards, revokes sessions on
+// active-state changes, returns { affected }.
+export async function batchUsers(
+  ...args: unknown[]
+): Promise<{ affected: number }> {
+  let idsRaw: unknown;
+  let actionRaw: unknown;
+  if (Array.isArray(args[0])) {
+    idsRaw = args[0];
+    actionRaw = args[1];
+  } else if (args[0] && typeof args[0] === "object") {
+    const obj = args[0] as Record<string, unknown>;
+    idsRaw = obj.ids;
+    actionRaw = obj.action ?? obj.type ?? obj.op;
+  } else if (typeof args[0] === "string") {
+    actionRaw = args[0];
+    idsRaw = args[1];
+  } else {
+    idsRaw = args[0];
+    actionRaw = args[1];
+  }
+  const ids = normalizeUserBatchIds(idsRaw);
+  const action = normalizeUserBatchAction(actionRaw);
+
+  return await withTx(async (query) => {
+    await lockActiveAdmins(query);
+    const rows = ids.length
+      ? await query<
+        { id: number; active: boolean; role: string; auth_source: string }
+      >(
+        `select id, active, role, auth_source from users where id = any($1)`,
+        [ids],
+      )
+      : [];
+    const byId = new Map(rows.map((r) => [r.id, r]));
+    let affected = 0;
+    const changedActive: number[] = [];
+
+    for (const id of ids) {
+      const current = byId.get(id);
+      if (!current) continue;
+      if (action === "activate") {
+        if (current.active) continue;
+        await query(`update users set active = true where id = $1`, [id]);
+        affected += 1;
+        changedActive.push(id);
+      } else if (action === "deactivate") {
+        if (!current.active) continue;
+        if (current.role === "admin") {
+          if ((await countActiveAdmins(query)) <= 1) {
+            throw new Error("cannot deactivate the last active admin");
+          }
+          if (
+            current.auth_source === "local" &&
+            (await countActiveLocalAdmins(query)) <= 1
+          ) {
+            throw new Error("cannot deactivate the last active local admin");
+          }
+        }
+        await query(`update users set active = false where id = $1`, [id]);
+        affected += 1;
+        changedActive.push(id);
+      } else if (action === "promote") {
+        if (current.role === "admin") continue;
+        await query(`update users set role = 'admin' where id = $1`, [id]);
+        affected += 1;
+      } else if (action === "demote") {
+        if (current.role !== "admin") continue;
+        if (current.active) {
+          if ((await countActiveAdmins(query)) <= 1) {
+            throw new Error("cannot demote the last active admin");
+          }
+          if (
+            current.auth_source === "local" &&
+            (await countActiveLocalAdmins(query)) <= 1
+          ) {
+            throw new Error("cannot demote the last active local admin");
+          }
+        }
+        await query(`update users set role = 'user' where id = $1`, [id]);
+        affected += 1;
+      } else if (action === "revokeSessions") {
+        await query(`delete from sessions where user_id = $1`, [id]);
+        affected += 1;
+      }
+    }
+
+    if (changedActive.length > 0) {
+      await query(`delete from sessions where user_id = any($1)`, [
+        changedActive,
+      ]);
+    }
+    return { affected };
+  });
+}
+
+export const batchUpdateUsers = batchUsers;
+export const applyUserBatch = batchUsers;
+export const runUserBatch = batchUsers;
+export const updateUserBatch = batchUsers;
+export const usersBatch = batchUsers;

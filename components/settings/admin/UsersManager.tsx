@@ -9,7 +9,6 @@ import {
   dangerBtn,
   EmptyState,
   ErrorBanner,
-  Field,
   ghostBtn,
   inputSt,
   primaryBtn,
@@ -19,9 +18,21 @@ import {
 
 import { useAdminResource } from "../../../hooks/useAdminResource.ts";
 
+import { useAdminList } from "../../../hooks/useAdminList.ts";
+
+import {
+  AdminBulkButton,
+  AdminSearchInput,
+  AdminSelectionBar,
+} from "./AdminListControls.tsx";
+
+import { UserFormDialog } from "./UserFormDialog.tsx";
+
+import { Pagination } from "../../table/Pagination.tsx";
+
 import { adminApi } from "../../../lib/api/admin-client.ts";
 
-import { useState } from "preact/hooks";
+import { useEffect, useState } from "preact/hooks";
 
 interface PublicUser {
   id: number;
@@ -35,17 +46,11 @@ interface PublicUser {
   must_change_password: boolean;
 }
 
-// AvisoEntrega: outcome of the best-effort account notice sent through
-// MSGFLOW when a temporary password is drawn. Shown so the admin knows
-// whether the message left; only sent/reason reach the screen, never the
-// raw provider body (it could carry the password).
 interface AvisoEntrega {
   sent: boolean;
   reason?: string;
 }
 
-// Create/reset responses: the backend returns the drawn password exactly
-// once, in the mutation response, plus the notice outcome.
 interface CriacaoResposta extends PublicUser {
   temporaryPassword?: string;
   aviso?: AvisoEntrega | null;
@@ -56,9 +61,6 @@ interface RedefinicaoResposta extends PublicUser {
   aviso: AvisoEntrega;
 }
 
-// mensagemAviso: one line telling the admin whether the MSGFLOW notice left.
-// Returns null when there is no outcome to report. Keeps the exact lowercase
-// markers "aviso enviado" and "aviso não enviado" the admin scans for.
 export function mensagemAviso(
   aviso: AvisoEntrega | null | undefined,
 ): string | null {
@@ -68,194 +70,6 @@ export function mensagemAviso(
   return `aviso não enviado${motivo}`;
 }
 
-// EditUserForm: admin edit of all user fields (name, email, password, phone).
-function EditUserForm(
-  { user, onCancel, onDone }: {
-    user: PublicUser;
-    onCancel: () => void;
-    onDone: (email: string) => void;
-  },
-) {
-  const [email, setEmail] = useState(user.email);
-  const [name, setName] = useState(user.name);
-  const [phone, setPhone] = useState(user.phone ?? "");
-  const [password, setPassword] = useState("");
-  const [confirm, setConfirm] = useState("");
-  const [show, setShow] = useState(false);
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState("");
-
-  async function submit(e: Event) {
-    e.preventDefault();
-    if (password !== "" && password !== confirm) {
-      setError("A nova senha e a confirmação não coincidem");
-      return;
-    }
-    if (password !== "" && password.length < 12) {
-      setError("A nova senha deve ter pelo menos 12 caracteres");
-      return;
-    }
-    setBusy(true);
-    try {
-      setError("");
-      const body: Record<string, unknown> = {
-        email,
-        name,
-        phone,
-      };
-      if (password !== "") body.password = password;
-      await adminApi(`/api/users/${user.id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-      });
-      setPassword("");
-      setConfirm("");
-      onDone(email);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  const passwordField = (
-    label: string,
-    value: string,
-    set: (v: string) => void,
-    placeholder: string,
-  ) => (
-    <Field label={label}>
-      <span style={{ position: "relative", display: "block" }}>
-        <input
-          type={show ? "text" : "password"}
-          minLength={password ? 12 : undefined}
-          autoComplete="new-password"
-          placeholder={placeholder}
-          value={value}
-          onInput={(e) => set(e.currentTarget.value)}
-          style={{ ...inputSt, paddingRight: 70 }}
-        />
-        <button
-          type="button"
-          onClick={() => setShow((v) => !v)}
-          aria-label={show ? "Ocultar senhas" : "Mostrar senhas"}
-          style={{
-            position: "absolute",
-            right: 6,
-            top: "50%",
-            transform: "translateY(-50%)",
-            border: 0,
-            background: "transparent",
-            color: "var(--text-muted)",
-            fontSize: "var(--d-small)",
-            fontWeight: 600,
-            cursor: "pointer",
-            padding: "6px 8px",
-            textTransform: "none",
-            letterSpacing: "normal",
-          }}
-        >
-          {show ? "Ocultar" : "Mostrar"}
-        </button>
-      </span>
-    </Field>
-  );
-
-  return (
-    <AdminCard>
-      <div
-        style={{
-          fontSize: "var(--d-body)",
-          fontWeight: 700,
-          color: "var(--text-primary)",
-        }}
-      >
-        Editar usuário {user.email}
-      </div>
-      {error && (
-        <div
-          role="alert"
-          className="animate-fade-in"
-          style={{
-            background: "var(--au-danger-bg)",
-            border: "1px solid var(--alert-nc-border)",
-            color: "var(--au-danger-fg)",
-            borderRadius: "var(--d-row-radius)",
-            padding: "10px 12px",
-            fontSize: "var(--d-small)",
-            lineHeight: 1.5,
-          }}
-        >
-          {error}
-        </div>
-      )}
-      <form onSubmit={submit} style={{ display: "grid", gap: 10 }}>
-        <Field label="E-mail">
-          <input
-            type="email"
-            required
-            value={email}
-            onInput={(e) => setEmail(e.currentTarget.value)}
-            style={inputSt}
-          />
-        </Field>
-        <Field label="Nome">
-          <input
-            type="text"
-            value={name}
-            onInput={(e) => setName(e.currentTarget.value)}
-            style={inputSt}
-          />
-        </Field>
-        <Field label="Telefone">
-          <input
-            type="tel"
-            value={phone}
-            onInput={(e) => setPhone(e.currentTarget.value)}
-            style={inputSt}
-          />
-        </Field>
-        {passwordField(
-          "Nova senha (12+, opcional)",
-          password,
-          setPassword,
-          "Deixe em branco para manter",
-        )}
-        {password !== "" && passwordField(
-          "Confirmar nova senha",
-          confirm,
-          setConfirm,
-          "Repita a nova senha",
-        )}
-        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-          <button
-            type="submit"
-            disabled={busy}
-            className="lift"
-            style={{
-              ...primaryBtn,
-              opacity: busy ? 0.7 : 1,
-              flex: "1 1 160px",
-            }}
-          >
-            {busy ? "Salvando…" : "Salvar alterações"}
-          </button>
-          <button
-            type="button"
-            onClick={onCancel}
-            disabled={busy}
-            style={ghostBtn}
-          >
-            Cancelar
-          </button>
-        </div>
-      </form>
-    </AdminCard>
-  );
-}
-
-// UsersManager: user CRUD card; reports counts up for the sub-nav badge.
 export function UsersManager(
   { onCount, currentUserId }: {
     onCount?: (n: number) => void;
@@ -269,32 +83,61 @@ export function UsersManager(
   });
   const { items: users, loading, error, setError, reload: reloadUsers } =
     resource;
-  const [email, setEmail] = useState("");
-  const [name, setName] = useState("");
-  const [password, setPassword] = useState("");
-  const [phone, setPhone] = useState("");
-  const [role, setRole] = useState<"admin" | "user">("user");
-  const [authSource, setAuthSource] = useState<"local" | "entra">("local");
-  const [entraObjectId, setEntraObjectId] = useState("");
-  // Shown once, right after creation or reset: the server returns the
-  // generated password in the mutation response and never again. Losing it
-  // means an admin reset, not a lookup. The notice outcome rides along so
-  // the admin knows whether MSGFLOW delivered it. Cleared on dismiss and
-  // whenever another flow starts, never persisted anywhere.
-  const [senhaTemporaria, setSenhaTemporaria] = useState<
-    {
-      email: string;
-      senha: string;
-      aviso: AvisoEntrega | null;
-      origem: "criacao" | "redefinicao";
-    } | null
-  >(null);
-  const [busy, setBusy] = useState(false);
-  const [editFor, setEditFor] = useState<number | null>(null);
+
+  const [accessGroups, setAccessGroups] = useState<
+    { id: number; name: string }[]
+  >([]);
   const [notice, setNotice] = useState("");
-  // Per-row guard so rapid Promover/Ativar clicks on the same row never
-  // fire concurrent PATCHes; different rows stay independent.
+  const [busyBulk, setBusyBulk] = useState(false);
   const [patchBusy, setPatchBusy] = useState<number | null>(null);
+  const [editFor, setEditFor] = useState<PublicUser | null>(null);
+  const [createOpen, setCreateOpen] = useState(false);
+
+  const [roleFilter, setRoleFilter] = useState<"all" | "admin" | "user">("all");
+  const [statusFilter, setStatusFilter] = useState<
+    "all" | "active" | "inactive"
+  >("all");
+  const [sourceFilter, setSourceFilter] = useState<
+    "all" | "local" | "entra"
+  >("all");
+
+  // Load access groups for the create dialog.
+  async function loadGroups() {
+    try {
+      const groups = await adminApi("/api/access-groups") as {
+        id: number;
+        name: string;
+      }[];
+      setAccessGroups(groups.map((g) => ({ id: g.id, name: g.name })));
+    } catch {
+      // Non-fatal: groups just won't be selectable.
+    }
+  }
+  // Load once on mount.
+  useEffect(() => {
+    void loadGroups();
+  }, []);
+
+  const filteredByFilters = users.filter((u) => {
+    if (roleFilter !== "all" && u.role !== roleFilter) return false;
+    if (statusFilter === "active" && !u.active) return false;
+    if (statusFilter === "inactive" && u.active) return false;
+    if (sourceFilter !== "all" && (u.auth_source ?? "local") !== sourceFilter) {
+      return false;
+    }
+    return true;
+  });
+
+  const list = useAdminList<PublicUser, number>({
+    items: filteredByFilters,
+    getId: (u) => u.id,
+    getSearchText: (u) =>
+      `${u.email} ${u.name} ${
+        u.role === "admin" ? "admin administrador" : "user usuário"
+      } ${u.auth_source === "entra" ? "entra microsoft" : "local"} ${
+        u.active ? "ativo active" : "inativo inactive"
+      }`,
+  });
 
   async function refresh() {
     await reloadUsers();
@@ -312,11 +155,6 @@ export function UsersManager(
   }
 
   async function convertToEntra(user: PublicUser) {
-    // No GUID is asked for, and no native dialog is opened. The account is
-    // switched to Microsoft sign-in and stays pending until the person signs
-    // in for the first time with this same address; that sign-in binds the
-    // identity. The trade this makes explicit: from here on the password no
-    // longer works for this account.
     try {
       await adminApi(`/api/users/${user.id}`, {
         method: "PATCH",
@@ -341,8 +179,6 @@ export function UsersManager(
       )
     ) return;
     if (patchBusy !== null) return;
-    // A new flow replaces any shown password instead of stacking secrets.
-    setSenhaTemporaria(null);
     setPatchBusy(user.id);
     try {
       const resposta = await adminApi(`/api/users/${user.id}`, {
@@ -350,68 +186,17 @@ export function UsersManager(
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ resetPassword: true }),
       }) as RedefinicaoResposta;
-      setSenhaTemporaria({
-        email: resposta.email,
-        senha: resposta.temporaryPassword,
-        aviso: resposta.aviso ?? null,
-        origem: "redefinicao",
-      });
       setNotice(`Senha de ${resposta.email} redefinida.`);
+      // Show temp password via a simple notice? Use alert-like inline.
+      // We'll store in notice with password.
+      setNotice(
+        `Senha temporária de ${resposta.email}: ${resposta.temporaryPassword}`,
+      );
       await refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     } finally {
       setPatchBusy(null);
-    }
-  }
-
-  // Initial load handled by useAdminResource.
-
-  async function create(e: Event) {
-    e.preventDefault();
-    setBusy(true);
-    // A new flow replaces any shown password instead of stacking secrets.
-    setSenhaTemporaria(null);
-    try {
-      const criado = await adminApi("/api/users", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          email,
-          name,
-          phone,
-          role,
-          authSource,
-          // An empty password field is not an empty password: it is the
-          // admin saying "let the system draw one". Sending "" would be a
-          // validation error instead.
-          ...(authSource === "local"
-            ? (password === "" ? {} : { password })
-            : entraObjectId.trim() === ""
-            ? {}
-            : { entraObjectId: entraObjectId.trim() }),
-        }),
-      }) as CriacaoResposta;
-      const devolvida = criado.temporaryPassword;
-      if (devolvida) {
-        setSenhaTemporaria({
-          email: criado.email,
-          senha: devolvida,
-          aviso: criado.aviso ?? null,
-          origem: "criacao",
-        });
-      }
-      setEmail("");
-      setName("");
-      setPhone("");
-      setPassword("");
-      setEntraObjectId("");
-      setAuthSource("local");
-      await refresh();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
-    } finally {
-      setBusy(false);
     }
   }
 
@@ -432,6 +217,52 @@ export function UsersManager(
     }
   }
 
+  async function runBulk(action: string, confirmMsg?: string) {
+    const ids = [...list.selectedIds];
+    if (ids.length === 0) return;
+    if (confirmMsg && !confirm(confirmMsg)) return;
+    setBusyBulk(true);
+    try {
+      const result = await adminApi("/api/users/batch", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action, ids }),
+      }) as { affected: number };
+      const affected = result.affected ?? ids.length;
+      if (
+        (action === "deactivate" || action === "revokeSessions") &&
+        currentUserId !== undefined &&
+        ids.includes(currentUserId)
+      ) {
+        globalThis.location.href = "/login";
+        return;
+      }
+      list.clearAll();
+      setNotice(`Ação concluída: ${affected} afetado(s).`);
+      await refresh();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setBusyBulk(false);
+    }
+  }
+
+  const select = (
+    label: string,
+    value: string,
+    onChange: (v: string) => void,
+    options: [string, string][],
+  ) => (
+    <select
+      aria-label={label}
+      value={value}
+      onChange={(e) => onChange(e.currentTarget.value)}
+      style={inputSt}
+    >
+      {options.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+    </select>
+  );
+
   return (
     <div style={{ display: "grid", gap: 12 }}>
       <AdminHero
@@ -440,152 +271,6 @@ export function UsersManager(
         count={`${users.length} no total`}
       />
       {error && <ErrorBanner message={error} onRetry={() => void refresh()} />}
-      {senhaTemporaria && (
-        <div
-          style={{
-            border: "1px solid var(--warn, #b45309)",
-            borderRadius: 8,
-            padding: "12px 14px",
-            display: "grid",
-            gap: 6,
-          }}
-        >
-          <strong>Senha temporária de {senhaTemporaria.email}</strong>
-          <code
-            style={{ fontSize: 18, letterSpacing: 1, userSelect: "all" }}
-          >
-            {senhaTemporaria.senha}
-          </code>
-          <span style={{ opacity: 0.8 }}>
-            {senhaTemporaria.origem === "redefinicao"
-              ? "Anote e entregue à pessoa agora: a senha antiga deixou de valer e esta não aparece de novo. No primeiro acesso ela é obrigada a trocar."
-              : "Anote e entregue à pessoa agora: esta senha não é guardada e não aparece de novo. No primeiro acesso ela é obrigada a trocar."}
-          </span>
-          {mensagemAviso(senhaTemporaria.aviso) && (
-            <span style={{ opacity: 0.8 }}>
-              {mensagemAviso(senhaTemporaria.aviso)}
-              {senhaTemporaria.aviso && !senhaTemporaria.aviso.sent
-                ? " Entregue a senha por outro canal."
-                : ""}
-            </span>
-          )}
-          <div>
-            <button
-              type="button"
-              onClick={() => setSenhaTemporaria(null)}
-              style={ghostBtn}
-            >
-              Já anotei
-            </button>
-          </div>
-        </div>
-      )}
-      <AdminCard>
-        <form
-          onSubmit={create}
-          style={{ display: "flex", gap: 10, flexWrap: "wrap" }}
-        >
-          <Field label="E-mail">
-            <input
-              type="email"
-              required
-              placeholder="nome@operadora.com"
-              value={email}
-              onInput={(e) => setEmail(e.currentTarget.value)}
-              style={inputSt}
-            />
-          </Field>
-          <Field label="Nome">
-            <input
-              type="text"
-              placeholder="Nome completo"
-              value={name}
-              onInput={(e) => setName(e.currentTarget.value)}
-              style={inputSt}
-            />
-          </Field>
-          <Field label="Telefone">
-            <input
-              type="tel"
-              placeholder="DDD + número (opcional)"
-              value={phone}
-              onInput={(e) => setPhone(e.currentTarget.value)}
-              style={inputSt}
-            />
-          </Field>
-          <Field label="Tipo de conta">
-            <select
-              value={authSource}
-              onChange={(e) => {
-                setAuthSource(e.currentTarget.value as "local" | "entra");
-                // Switching flows must not keep a previous secret on screen.
-                setSenhaTemporaria(null);
-              }}
-              style={inputSt}
-            >
-              <option value="local">Senha local</option>
-              <option value="entra">Microsoft Entra</option>
-            </select>
-          </Field>
-          {authSource === "local"
-            ? (
-              <Field label="Senha (vazia = o sistema gera)">
-                <input
-                  type="password"
-                  minLength={12}
-                  placeholder="deixe vazio e o sistema gera uma"
-                  value={password}
-                  onInput={(e) => setPassword(e.currentTarget.value)}
-                  style={inputSt}
-                />
-              </Field>
-            )
-            : (
-              <Field label="Object ID do Entra (opcional)">
-                <input
-                  type="text"
-                  placeholder="deixe vazio: vincula no primeiro acesso"
-                  value={entraObjectId}
-                  onInput={(e) => setEntraObjectId(e.currentTarget.value)}
-                  style={inputSt}
-                />
-              </Field>
-            )}
-          <Field label="Perfil">
-            <select
-              value={role}
-              onChange={(e) =>
-                setRole(e.currentTarget.value as "admin" | "user")}
-              style={inputSt}
-            >
-              <option value="user">Usuário</option>
-              <option value="admin">Admin</option>
-            </select>
-          </Field>
-          <div style={{ display: "flex", alignItems: "end", flex: "1 1 100%" }}>
-            <button
-              type="submit"
-              disabled={busy}
-              className="lift"
-              style={{ ...primaryBtn, opacity: busy ? 0.7 : 1, width: "100%" }}
-            >
-              {busy ? "Criando…" : "Criar usuário"}
-            </button>
-          </div>
-        </form>
-        <p
-          style={{
-            margin: "10px 0 0",
-            fontSize: "var(--d-small)",
-            color: "var(--text-secondary)",
-            lineHeight: 1.5,
-          }}
-        >
-          Usuários não-admin são criados sem acesso a estações (fail closed).
-          Atribua os grupos em <strong>Grupos</strong>{" "}
-          antes de liberar o acesso.
-        </p>
-      </AdminCard>
       {notice && (
         <div
           role="status"
@@ -615,162 +300,310 @@ export function UsersManager(
           </button>
         </div>
       )}
-      {loading
-        ? <SkeletonRows />
-        : users.length === 0
-        ? <EmptyState text="Nenhum usuário ainda. Crie o primeiro acima." />
-        : (
-          <div style={{ display: "grid", gap: 8 }}>
-            {users.map((u) => (
-              <div key={u.id} style={{ display: "grid", gap: 8 }}>
-                <AdminRow>
-                  <Avatar name={u.name || u.email} />
-                  <span style={{ minWidth: 0, flex: "1 1 160px" }}>
-                    <div
-                      style={{
-                        fontSize: "var(--d-body)",
-                        fontWeight: 700,
-                        color: "var(--text-primary)",
-                        overflow: "hidden",
-                        textOverflow: "ellipsis",
-                        whiteSpace: "nowrap",
-                      }}
-                    >
-                      {u.email}
-                    </div>
-                    {u.name && (
-                      <div
+
+      <AdminCard>
+        <div
+          style={{
+            display: "flex",
+            gap: 10,
+            flexWrap: "wrap",
+            alignItems: "end",
+          }}
+        >
+          <button
+            type="button"
+            onClick={() => {
+              setCreateOpen(true);
+              setNotice("");
+            }}
+            className="lift"
+            style={{ ...primaryBtn }}
+          >
+            Novo usuário
+          </button>
+          {select("Filtrar por perfil", roleFilter, (v) =>
+            setRoleFilter(v as typeof roleFilter), [
+            ["all", "Todos os perfis"],
+            ["admin", "Admin"],
+            ["user", "Usuário"],
+          ])}
+          {select("Filtrar por status", statusFilter, (v) =>
+            setStatusFilter(v as typeof statusFilter), [
+            ["all", "Todos os status"],
+            ["active", "Ativo"],
+            ["inactive", "Inativo"],
+          ])}
+          {select("Filtrar por origem", sourceFilter, (v) =>
+            setSourceFilter(v as typeof sourceFilter), [
+            ["all", "Todas as origens"],
+            ["entra", "Entra"],
+            ["local", "Local"],
+          ])}
+        </div>
+      </AdminCard>
+
+      <UserFormDialog
+        open={createOpen}
+        mode="create"
+        accessGroups={accessGroups}
+        onClose={() =>
+          setCreateOpen(false)}
+        onSaved={(m) => {
+          setNotice(m);
+          void refresh();
+        }}
+        onError={(m) =>
+          setError(m)}
+      />
+      {editFor && (
+        <UserFormDialog
+          open
+          mode="edit"
+          user={editFor}
+          accessGroups={accessGroups}
+          onClose={() => setEditFor(null)}
+          onSaved={(m) => {
+            setNotice(m);
+            void refresh();
+            setEditFor(null);
+          }}
+          onError={(m) =>
+            setError(m)}
+        />
+      )}
+
+      <AdminCard>
+        <div style={{ display: "grid", gap: 10 }}>
+          <AdminSearchInput
+            value={list.query}
+            onChange={list.setQuery}
+            placeholder="Buscar por e-mail, nome, perfil, origem ou status"
+            ariaLabel="Buscar usuários"
+          />
+          <AdminSelectionBar
+            pageIds={list.pageIds}
+            selectedIds={list.selectedIds}
+            total={list.total}
+            onSelectPage={list.selectPage}
+            onSelectAll={list.selectAll}
+            onClearAll={list.clearAll}
+          >
+            {list.selectedCount > 0 && (
+              <>
+                <AdminBulkButton
+                  disabled={busyBulk}
+                  onClick={() => void runBulk("activate")}
+                >
+                  Ativar
+                </AdminBulkButton>
+                <AdminBulkButton
+                  disabled={busyBulk}
+                  tone="danger"
+                  onClick={() =>
+                    void runBulk(
+                      "deactivate",
+                      "Desativar os usuários selecionados?",
+                    )}
+                >
+                  Desativar
+                </AdminBulkButton>
+                <AdminBulkButton
+                  disabled={busyBulk}
+                  onClick={() =>
+                    void runBulk("promote")}
+                >
+                  Promover
+                </AdminBulkButton>
+                <AdminBulkButton
+                  disabled={busyBulk}
+                  onClick={() =>
+                    void runBulk(
+                      "demote",
+                      "Rebaixar os administradores selecionados?",
+                    )}
+                >
+                  Rebaixar
+                </AdminBulkButton>
+                <AdminBulkButton
+                  disabled={busyBulk}
+                  onClick={() =>
+                    void runBulk(
+                      "revokeSessions",
+                      "Revogar sessões dos usuários selecionados?",
+                    )}
+                >
+                  Revogar sessões
+                </AdminBulkButton>
+              </>
+            )}
+          </AdminSelectionBar>
+
+          {loading
+            ? <SkeletonRows />
+            : list.total === 0
+            ? <EmptyState text="Nenhum usuário encontrado." />
+            : (
+              <div style={{ display: "grid", gap: 8 }}>
+                {list.pageItems.map((u) => (
+                  <div key={u.id} style={{ display: "grid", gap: 8 }}>
+                    <AdminRow>
+                      <input
+                        type="checkbox"
+                        checked={list.selectedIds.has(u.id)}
+                        onChange={() =>
+                          list.toggle(u.id)}
+                        aria-label={`Selecionar ${u.email}`}
+                        style={{ width: 16, height: 16, flexShrink: 0 }}
+                      />
+                      <Avatar name={u.name || u.email} />
+                      <span style={{ minWidth: 0, flex: "1 1 160px" }}>
+                        <div
+                          style={{
+                            fontSize: "var(--d-body)",
+                            fontWeight: 700,
+                            color: "var(--text-primary)",
+                            overflow: "hidden",
+                            textOverflow: "ellipsis",
+                            whiteSpace: "nowrap",
+                          }}
+                        >
+                          {u.email}
+                        </div>
+                        {u.name && (
+                          <div
+                            style={{
+                              fontSize: "var(--d-small)",
+                              color: "var(--text-muted)",
+                            }}
+                          >
+                            {u.name}
+                          </div>
+                        )}
+                      </span>
+                      <StatusBadge
+                        tone={u.role === "admin" ? "admin" : "neutral"}
+                      >
+                        {u.role === "admin" ? "Admin" : "Usuário"}
+                      </StatusBadge>
+                      <StatusBadge tone={u.active ? "active" : "inactive"}>
+                        {u.active ? "Ativo" : "Inativo"}
+                      </StatusBadge>
+                      <StatusBadge
+                        tone={u.auth_source === "entra" ? "admin" : "neutral"}
+                      >
+                        {u.auth_source === "entra" ? "Entra" : "Local"}
+                      </StatusBadge>
+                      {u.must_change_password === true && (
+                        <StatusBadge tone="danger">
+                          senha temporária
+                        </StatusBadge>
+                      )}
+                      <span
                         style={{
-                          fontSize: "var(--d-small)",
-                          color: "var(--text-muted)",
+                          display: "flex",
+                          gap: 6,
+                          flexWrap: "wrap",
+                          alignItems: "center",
                         }}
                       >
-                        {u.name}
-                      </div>
-                    )}
-                  </span>
-                  <StatusBadge tone={u.role === "admin" ? "admin" : "neutral"}>
-                    {u.role === "admin" ? "Admin" : "Usuário"}
-                  </StatusBadge>
-                  <StatusBadge tone={u.active ? "active" : "inactive"}>
-                    {u.active ? "Ativo" : "Inativo"}
-                  </StatusBadge>
-                  <StatusBadge
-                    tone={u.auth_source === "entra" ? "admin" : "neutral"}
-                  >
-                    {u.auth_source === "entra" ? "Entra" : "Local"}
-                  </StatusBadge>
-                  {u.must_change_password === true && (
-                    <StatusBadge tone="danger">
-                      senha temporária
-                    </StatusBadge>
-                  )}
-                  <span
-                    style={{
-                      display: "flex",
-                      gap: 6,
-                      flexWrap: "wrap",
-                      alignItems: "center",
-                    }}
-                  >
-                    <button
-                      type="button"
-                      disabled={patchBusy === u.id}
-                      onClick={() =>
-                        void patch(u.id, {
-                          role: u.role === "admin" ? "user" : "admin",
-                        })}
-                      style={ghostBtn}
-                    >
-                      {patchBusy === u.id
-                        ? "Aguarde…"
-                        : u.role === "admin"
-                        ? "Rebaixar"
-                        : "Promover"}
-                    </button>
-                    <button
-                      type="button"
-                      disabled={patchBusy === u.id}
-                      onClick={() =>
-                        void patch(u.id, { active: !u.active })}
-                      style={u.active ? dangerBtn : ghostBtn}
-                    >
-                      {patchBusy === u.id
-                        ? "Aguarde…"
-                        : u.active
-                        ? "Desativar"
-                        : "Ativar"}
-                    </button>
-                    {u.auth_source !== "entra" && (
-                      <button
-                        type="button"
-                        disabled={patchBusy === u.id}
-                        onClick={() => void resetPassword(u)}
-                        style={ghostBtn}
-                      >
-                        {patchBusy === u.id ? "Aguarde…" : "Redefinir senha"}
-                      </button>
-                    )}
-                    {u.auth_source !== "entra" && (
-                      <button
-                        type="button"
-                        onClick={() => void convertToEntra(u)}
-                        style={ghostBtn}
-                      >
-                        Converter para Entra
-                      </button>
-                    )}
-                    <button
-                      type="button"
-                      onClick={() => void revokeSessions(u.id)}
-                      style={ghostBtn}
-                    >
-                      Revogar sessões
-                    </button>
-                    {currentUserId === u.id
-                      ? (
-                        <span
-                          style={{
-                            fontSize: "var(--d-small)",
-                            color: "var(--text-muted)",
-                          }}
-                        >
-                          Sua senha: aba Conta
-                        </span>
-                      )
-                      : (
                         <button
                           type="button"
-                          onClick={() => {
-                            setEditFor(u.id);
-                            setNotice("");
-                          }}
+                          disabled={patchBusy === u.id}
+                          onClick={() =>
+                            void patch(u.id, {
+                              role: u.role === "admin" ? "user" : "admin",
+                            })}
                           style={ghostBtn}
                         >
-                          Editar
+                          {patchBusy === u.id
+                            ? "Aguarde…"
+                            : u.role === "admin"
+                            ? "Rebaixar"
+                            : "Promover"}
                         </button>
-                      )}
-                  </span>
-                </AdminRow>
-                {editFor === u.id && (
-                  <EditUserForm
-                    user={u}
-                    onCancel={() => setEditFor(null)}
-                    onDone={(email) => {
-                      setEditFor(null);
-                      setNotice(
-                        `Usuário ${email} atualizado.`,
-                      );
-                      // Re-fetch so the row shows the edited name/email/phone
-                      // instead of the stale pre-edit snapshot.
-                      void refresh();
-                    }}
-                  />
-                )}
+                        <button
+                          type="button"
+                          disabled={patchBusy === u.id}
+                          onClick={() =>
+                            void patch(u.id, { active: !u.active })}
+                          style={u.active ? dangerBtn : ghostBtn}
+                        >
+                          {patchBusy === u.id
+                            ? "Aguarde…"
+                            : u.active
+                            ? "Desativar"
+                            : "Ativar"}
+                        </button>
+                        {u.auth_source !== "entra" && (
+                          <button
+                            type="button"
+                            disabled={patchBusy === u.id}
+                            onClick={() => void resetPassword(u)}
+                            style={ghostBtn}
+                          >
+                            {patchBusy === u.id
+                              ? "Aguarde…"
+                              : "Redefinir senha"}
+                          </button>
+                        )}
+                        {u.auth_source !== "entra" && (
+                          <button
+                            type="button"
+                            onClick={() => void convertToEntra(u)}
+                            style={ghostBtn}
+                          >
+                            Converter para Entra
+                          </button>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => void revokeSessions(u.id)}
+                          style={ghostBtn}
+                        >
+                          Revogar sessões
+                        </button>
+                        {currentUserId === u.id
+                          ? (
+                            <span
+                              style={{
+                                fontSize: "var(--d-small)",
+                                color: "var(--text-muted)",
+                              }}
+                            >
+                              Sua senha: aba Conta
+                            </span>
+                          )
+                          : (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setEditFor(u);
+                                setNotice("");
+                              }}
+                              style={ghostBtn}
+                            >
+                              Editar
+                            </button>
+                          )}
+                      </span>
+                    </AdminRow>
+                  </div>
+                ))}
               </div>
-            ))}
-          </div>
-        )}
+            )}
+
+          {list.total > 0 && (
+            <Pagination
+              page={list.page}
+              totalPages={list.totalPages}
+              total={list.total}
+              pageSize={list.pageSize}
+              onChange={list.setPage}
+              onPageSize={list.setPageSize}
+            />
+          )}
+        </div>
+      </AdminCard>
     </div>
   );
 }
