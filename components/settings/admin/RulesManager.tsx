@@ -422,7 +422,7 @@ export function RulesManager({ onCount }: { onCount?: (n: number) => void }) {
     <div style={{ display: "grid", gap: 12 }}>
       <AdminHero
         title="Regras de alerta"
-        hint="Sem regras, todo estado não conforme alerta. Com regras, só o que casar com escopo, gatilho e janela anti-ruído alerta — a de maior prioridade vence."
+        hint="Sem regras, todo estado não conforme alerta. Com regras, só o que casar com escopo, gatilho e janela anti-ruído alerta - a de maior prioridade vence."
         count={`${rules.filter((r) => r.active).length} ativas`}
       />
       {error && <ErrorBanner message={error} onRetry={() => void refresh()} />}
