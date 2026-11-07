@@ -88,3 +88,126 @@ export async function deleteRecipient(id: number): Promise<boolean> {
   );
   return rows.length > 0;
 }
+
+// validateRecipientIds: pure validator for batch id arrays. Returns a deduped
+// list of positive safe integers and throws on anything else, so the route and
+// the SQL store agree on the 500-id ceiling and the wire contract.
+export function validateRecipientIds(
+  raw: unknown,
+  field = "ids",
+): number[] {
+  if (!Array.isArray(raw)) {
+    throw new Error(`${field} must be an array`);
+  }
+  if (raw.length === 0) {
+    throw new Error(`${field} must not be empty`);
+  }
+  if (raw.length > 500) {
+    throw new Error(`${field} must contain at most 500 items`);
+  }
+  const seen = new Set<number>();
+  const out: number[] = [];
+  for (const value of raw) {
+    if (
+      typeof value !== "number" || !Number.isSafeInteger(value) || value <= 0
+    ) {
+      throw new Error(`${field} must contain positive integers`);
+    }
+    if (seen.has(value)) continue;
+    seen.add(value);
+    out.push(value);
+  }
+  if (out.length === 0) {
+    throw new Error(`${field} must not be empty`);
+  }
+  if (out.length > 500) {
+    throw new Error(`${field} must contain at most 500 items`);
+  }
+  return out;
+}
+
+// Aliases kept for callers/tests that use other common names.
+export const validateIds = validateRecipientIds;
+export const normalizeIds = validateRecipientIds;
+export const parseIds = validateRecipientIds;
+export const validateRecipientBatchIds = validateRecipientIds;
+
+// activateRecipients: marks the given recipients active. Returns affected count.
+export async function activateRecipients(ids: number[]): Promise<number> {
+  const valid = validateRecipientIds(ids);
+  const rows = await queryRows<{ id: number }>(
+    `update alert_recipients set active = true
+     where id = any($1::int[])
+     returning id`,
+    [valid],
+  );
+  return rows.length;
+}
+
+// deactivateRecipients: marks the given recipients inactive.
+export async function deactivateRecipients(ids: number[]): Promise<number> {
+  const valid = validateRecipientIds(ids);
+  const rows = await queryRows<{ id: number }>(
+    `update alert_recipients set active = false
+     where id = any($1::int[])
+     returning id`,
+    [valid],
+  );
+  return rows.length;
+}
+
+// deleteRecipients: removes the given recipients. Returns affected count.
+export async function deleteRecipients(ids: number[]): Promise<number> {
+  const valid = validateRecipientIds(ids);
+  const rows = await queryRows<{ id: number }>(
+    `delete from alert_recipients where id = any($1::int[]) returning id`,
+    [valid],
+  );
+  return rows.length;
+}
+
+// addRecipientUsers: inserts recipients from users, reviving/updating on email
+// conflict and forcing active = true. Returns affected count (inserted or
+// updated rows).
+export async function addRecipientUsers(userIds: number[]): Promise<number> {
+  const valid = validateRecipientIds(userIds, "userIds");
+  const rows = await queryRows<{ id: number }>(
+    `insert into alert_recipients (email, name, phone, active)
+     select u.email, u.name, coalesce(u.phone, ''), true
+     from users u
+     where u.id = any($1::int[])
+     on conflict (email) do update set
+       name = excluded.name,
+       phone = excluded.phone,
+       active = true
+     returning id`,
+    [valid],
+  );
+  return rows.length;
+}
+
+// Alias for the batch action name.
+export const addUsersToRecipients = addRecipientUsers;
+
+// batchRecipients: single dispatcher used by the batch route. Returns affected.
+export async function batchRecipients(
+  action: unknown,
+  ids?: unknown,
+  userIds?: unknown,
+): Promise<number> {
+  if (action === "activate") {
+    return await activateRecipients(validateRecipientIds(ids));
+  }
+  if (action === "deactivate") {
+    return await deactivateRecipients(validateRecipientIds(ids));
+  }
+  if (action === "delete") {
+    return await deleteRecipients(validateRecipientIds(ids));
+  }
+  if (action === "addUsers") {
+    return await addRecipientUsers(validateRecipientIds(userIds, "userIds"));
+  }
+  throw new Error(
+    "action must be activate, deactivate, delete, or addUsers",
+  );
+}
