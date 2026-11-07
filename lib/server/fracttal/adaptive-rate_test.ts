@@ -65,18 +65,35 @@ Deno.test("low remaining clamps spending without cutting the rate", () => {
 });
 
 Deno.test("exhausted window holds takeToken until reset", async () => {
+  let now = 0;
   const limiter = createAdaptiveRate({
     initialRatePerMin: 190,
     maxRatePerMin: 190,
     minRatePerMin: 190,
     burst: 1,
-    maxWaitMs: 50,
+    maxWaitMs: 20,
+    now: () => now,
   });
   await limiter.takeToken();
+  // A 0.15s reset is floored to five minutes, so the next token is held.
   limiter.recordSuccess(0, 0.15);
-  const t0 = Date.now();
-  await limiter.takeToken();
-  assertStrictEquals(Date.now() - t0 >= 80, true);
+  let released = false;
+  const pending = limiter.takeToken().then(() => {
+    released = true;
+  });
+  // Still inside the hold: a real timer tick happened, but the injected
+  // clock has not moved.
+  await new Promise((r) => setTimeout(r, 20));
+  assertStrictEquals(released, false);
+  // One millisecond short of five minutes proves the floor, not the caller's
+  // 0.15s reset, is what keeps the token held.
+  now = 5 * 60_000 - 1;
+  await new Promise((r) => setTimeout(r, 20));
+  assertStrictEquals(released, false);
+  // Past the reset: the pending sleeper wakes, refills and spends a token.
+  now = 5 * 60_000 + 1;
+  await pending;
+  assertStrictEquals(released, true);
   assertStrictEquals(limiter.currentRate(), 190);
 });
 
