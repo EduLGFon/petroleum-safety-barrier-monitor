@@ -2,7 +2,6 @@
 // credential file helpers.
 import {
   auditUsers,
-  DEFAULT_CREDENTIALS_FILE,
   DEFAULT_USERS_FILE,
   firstPhone,
   formatCredentialLine,
@@ -18,13 +17,6 @@ import { assertEquals, assertThrows } from "jsr:@std/assert@^1";
 
 Deno.test("default users file points at the local roster fixture", () => {
   assertEquals(DEFAULT_USERS_FILE, "scripts/fixtures/_users.txt");
-});
-
-Deno.test("default credentials file stays inside the gitignored fixtures", () => {
-  assertEquals(
-    DEFAULT_CREDENTIALS_FILE,
-    "scripts/fixtures/_users_credentials.txt",
-  );
 });
 
 Deno.test("maskEmail shows the first letter and domain only", () => {

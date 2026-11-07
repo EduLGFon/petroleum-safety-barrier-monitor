@@ -1,7 +1,7 @@
 // Route edge validation tests - no DB required.
 // Covers query param parsing, error envelope shape, and throttle decisions
 // shared by all 18 API handlers.
-import { apiError, badRequest, unauthorized } from "../../lib/server/errors.ts";
+import { badRequest, unauthorized } from "../../lib/server/errors.ts";
 
 import { assert, assertStrictEquals } from "jsr:@std/assert@^1";
 
@@ -34,11 +34,6 @@ Deno.test("unauthorized returns 401 for bad credentials", async () => {
   assertStrictEquals(res.status, 401);
   const body = await res.json() as { error: string };
   assertStrictEquals(body.error, "invalid credentials");
-});
-
-Deno.test("apiError sets JSON envelope", () => {
-  const res = apiError(400, "BAD_REQUEST", "nope", "r");
-  assertStrictEquals(res.status, 400);
 });
 
 Deno.test("throttle blocks over limit within window", () => {

@@ -6,24 +6,28 @@ import { checkSchemaOrder, checkTableOrder } from "./check-migration-order.ts";
 
 import { assertEquals } from "jsr:@std/assert@^1";
 
-Deno.test("checkSchemaOrder passes columns declared in CREATE TABLE", () => {
-  const violations = checkSchemaOrder(`
-    create table if not exists barriers (
-      id integer generated always as identity primary key,
-      tag text not null
-    );
-    create index if not exists idx_barriers_tag on barriers using btree (tag);
-  `);
-  assertEquals(violations, []);
-});
+Deno.test("checkSchemaOrder passes valid index placements", () => {
+  const cases = [{
+    name: "columns declared in CREATE TABLE",
+    sql: `
+      create table if not exists barriers (
+        id integer generated always as identity primary key,
+        tag text not null
+      );
+      create index if not exists idx_barriers_tag on barriers using btree (tag);
+    `,
+  }, {
+    name: "index after its ALTER stanza",
+    sql: `
+      create table if not exists barriers (id integer primary key);
+      alter table barriers add column if not exists is_active boolean;
+      create index if not exists idx_barriers_is_active on barriers(is_active);
+    `,
+  }];
 
-Deno.test("checkSchemaOrder passes an index after its ALTER stanza", () => {
-  const violations = checkSchemaOrder(`
-    create table if not exists barriers (id integer primary key);
-    alter table barriers add column if not exists is_active boolean;
-    create index if not exists idx_barriers_is_active on barriers(is_active);
-  `);
-  assertEquals(violations, []);
+  for (const { name, sql } of cases) {
+    assertEquals(checkSchemaOrder(sql), [], name);
+  }
 });
 
 Deno.test("checkSchemaOrder flags an index before its ALTER even when CREATE TABLE declares it", () => {
@@ -66,30 +70,36 @@ Deno.test("checkSchemaOrder skips expression index items without alarming", () =
   assertEquals(violations, []);
 });
 
-Deno.test("checkTableOrder flags foreign keys to tables created later", () => {
-  const violations = checkTableOrder(`
-    create table if not exists children (
-      parent_id integer references parents(id)
-    );
-    create table if not exists parents (id integer primary key);
-  `);
-  assertEquals(violations, [{
-    line: 2,
-    relation: "parents",
-    operation: "REFERENCES",
-  }]);
-});
+Deno.test("checkTableOrder flags forward references", () => {
+  const cases = [{
+    name: "foreign key to a table created later",
+    sql: `
+      create table if not exists children (
+        parent_id integer references parents(id)
+      );
+      create table if not exists parents (id integer primary key);
+    `,
+    expected: [{
+      line: 2,
+      relation: "parents",
+      operation: "REFERENCES",
+    }],
+  }, {
+    name: "ALTER TABLE before its table declaration",
+    sql: `
+      alter table users add column if not exists phone text;
+      create table if not exists users (id integer primary key);
+    `,
+    expected: [{
+      line: 2,
+      relation: "users",
+      operation: "ALTER TABLE",
+    }],
+  }];
 
-Deno.test("checkTableOrder flags ALTER TABLE before its table declaration", () => {
-  const violations = checkTableOrder(`
-    alter table users add column if not exists phone text;
-    create table if not exists users (id integer primary key);
-  `);
-  assertEquals(violations, [{
-    line: 2,
-    relation: "users",
-    operation: "ALTER TABLE",
-  }]);
+  for (const { name, sql, expected } of cases) {
+    assertEquals(checkTableOrder(sql), expected, name);
+  }
 });
 
 Deno.test("checkSchemaOrder keeps the real schema green", async () => {
