@@ -164,3 +164,15 @@ See git history for full context.
   Later batch actions keep one admin-only POST per resource, apply all ids in
   one transaction, enforce a documented maximum id count, and preserve the
   last-active-admin guard; the UI never widens authorization on its own.
+
+- D34: batch-endpoint pattern for settings admin actions. Bulk operations use
+  one admin-only POST per resource (`/api/users/batch`,
+  `/api/access-groups/batch`, `/api/recipients/batch`,
+  `/api/alert-rules/batch`) instead of N single-row requests; field options
+  reuse the existing `PUT /api/field-options?field=...` with the remaining
+  array. Each batch runs in one transaction, validates a documented maximum
+  id count (500 for users, recipients, and rules; 200 groups with 500
+  related ids and a 20,000 cross-product cap), preserves the
+  last-active-admin and last-active-local-admin guards, revokes sessions on
+  user active-state changes, and returns `{ affected }`. The UI sends one
+  request per action and never widens authorization.
