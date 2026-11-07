@@ -126,7 +126,8 @@ export function useAdminList<T, K extends AdminListKey = AdminListKey>(
   };
 
   const setPage = (next: number) => {
-    setPageState(Math.min(Math.max(1, next), totalPages));
+    const max = Math.max(1, Math.ceil(filtered.length / pageSize));
+    setPageState(Math.min(Math.max(1, next), max));
   };
 
   const setPageSize = (next: number) => {

@@ -208,11 +208,14 @@ export function SearchMultiSelect<K extends SearchKey = SearchKey>(
       });
     };
     place();
-    globalThis.addEventListener("scroll", place, { passive: true });
+    globalThis.addEventListener("scroll", place, {
+      capture: true,
+      passive: true,
+    });
     globalThis.addEventListener("resize", place);
     return () => {
       cancelAnimationFrame(raf);
-      globalThis.removeEventListener("scroll", place);
+      globalThis.removeEventListener("scroll", place, { capture: true });
       globalThis.removeEventListener("resize", place);
     };
   }, [open, maxPanelHeight]);
@@ -284,10 +287,35 @@ export function SearchMultiSelect<K extends SearchKey = SearchKey>(
     return -1;
   };
 
+  const lastEnabled = (): number => {
+    for (let i = filtered.length - 1; i >= 0; i--) {
+      if (!filtered[i]?.disabled) return i;
+    }
+    return -1;
+  };
+
   const onSearchKey = (event: KeyboardEvent) => {
     if (event.key === "ArrowDown") {
       event.preventDefault();
       const index = firstEnabled();
+      if (index >= 0) focusRow(index);
+      return;
+    }
+    if (event.key === "ArrowUp") {
+      event.preventDefault();
+      const index = lastEnabled();
+      if (index >= 0) focusRow(index);
+      return;
+    }
+    if (event.key === "Home") {
+      event.preventDefault();
+      const index = firstEnabled();
+      if (index >= 0) focusRow(index);
+      return;
+    }
+    if (event.key === "End") {
+      event.preventDefault();
+      const index = lastEnabled();
       if (index >= 0) focusRow(index);
       return;
     }
@@ -633,7 +661,11 @@ export function SearchMultiSelect<K extends SearchKey = SearchKey>(
                     role="option"
                     aria-selected={checked}
                     aria-disabled={option.disabled || undefined}
-                    tabIndex={activeIndex === index ? 0 : -1}
+                    tabIndex={activeIndex === index
+                      ? 0
+                      : (activeIndex < 0 && index === firstEnabled())
+                      ? 0
+                      : -1}
                     onFocus={() => setActiveIndex(index)}
                     onClick={() => toggleOption(option)}
                     onKeyDown={(event) => onRowKey(event, index)}
