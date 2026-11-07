@@ -8,7 +8,9 @@
   "nodeModulesDir": "manual",
   "tasks": {
     "check": "deno fmt && deno lint && deno check && deno run --allow-read=db/schema.sql scripts/check-migration-order.ts",
-    "test": "deno test --allow-read=scripts/fixtures,db/schema.sql --allow-net=127.0.0.1,localhost --allow-env=ALERT_PROVIDER_BASE_URL,ALERT_PROVIDER_TOKEN,ALERT_PROVIDER_COMPANY_ID,DATABASE_URL .",
+    // Parallel tests without type checking: `deno task check` owns fmt, lint
+    // and `deno check`, so the suite only needs to execute assertions.
+    "test": "deno test --parallel --no-check --allow-read=scripts/fixtures,db/schema.sql --allow-net=127.0.0.1,localhost --allow-env=ALERT_PROVIDER_BASE_URL,ALERT_PROVIDER_TOKEN,ALERT_PROVIDER_COMPANY_ID,DATABASE_URL .",
     "dev": "vite",
     "build": "vite build",
     "preview": "deno serve --allow-net --allow-env --allow-read --port 8300 _fresh/server.js",
