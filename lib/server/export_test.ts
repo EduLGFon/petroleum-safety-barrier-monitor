@@ -98,24 +98,46 @@ Deno.test("streamExportCsv of zero barriers still carries header + zeroed RESUMO
   );
 });
 
-Deno.test("streamExportCsv streams before the last batch is read", async () => {
-  // Back-pressure: the head plus the first batch must be readable while the
-  // source still has rows left, otherwise a big export buffers everything.
-  const many = mkCount(10);
-  let released = 0;
-  const source = {
-    async *[Symbol.asyncIterator]() {
-      for (let at = 0; at < many.length; at += 5) {
-        released += 5;
-        yield many.slice(at, at + 5);
-      }
+Deno.test("streamed exports emit before the last batch is read", async () => {
+  // Back-pressure: the head must be readable while the source still has rows
+  // left, otherwise a big export buffers everything.
+  const cases: Array<{
+    name: string;
+    open: (
+      source: AsyncIterable<Barrier[]>,
+      rows: Barrier[],
+    ) => ReadableStream<Uint8Array>;
+  }> = [
+    {
+      name: "csv",
+      open: (source, rows) => streamExportCsv(source, kpiOf(rows)),
     },
-  };
-  const reader = streamExportCsv(source, kpiOf(many)).getReader();
-  const head = await reader.read();
-  assertStrictEquals(head.done, false);
-  assertStrictEquals(released, 5);
-  await reader.cancel();
+    {
+      name: "xlsx",
+      open: (source, rows) =>
+        streamExportXlsx(source, {
+          companyName: "Petrobras",
+          kpi: kpiOf(rows),
+        }),
+    },
+  ];
+  for (const c of cases) {
+    const many = mkCount(10);
+    let released = 0;
+    const source = {
+      async *[Symbol.asyncIterator]() {
+        for (let at = 0; at < many.length; at += 5) {
+          released += 5;
+          yield many.slice(at, at + 5);
+        }
+      },
+    };
+    const reader = c.open(source, many).getReader();
+    const head = await reader.read();
+    assertStrictEquals(head.done, false, c.name);
+    assertStrictEquals(released, 5, c.name);
+    await reader.cancel();
+  }
 });
 
 Deno.test("streamExportXlsx writes a workbook package over every batch", async () => {
@@ -139,29 +161,6 @@ Deno.test("streamExportXlsx writes a workbook package over every batch", async (
   // Deflated: an 18k-row selection would be an order of magnitude bigger as
   // the HTML table this export used to be.
   assert(bin.length < 1_200 * 200, `workbook not compressed: ${bin.length}`);
-});
-
-Deno.test("streamExportXlsx streams before the last batch is read", async () => {
-  // Back-pressure: the ZIP header must be readable while the source still has
-  // rows left, otherwise a big export buffers everything.
-  const many = mkCount(10);
-  let released = 0;
-  const source = {
-    async *[Symbol.asyncIterator]() {
-      for (let at = 0; at < many.length; at += 5) {
-        released += 5;
-        yield many.slice(at, at + 5);
-      }
-    },
-  };
-  const reader = streamExportXlsx(source, {
-    companyName: "Petrobras",
-    kpi: kpiOf(many),
-  }).getReader();
-  const head = await reader.read();
-  assertStrictEquals(head.done, false);
-  assertStrictEquals(released, 5);
-  await reader.cancel();
 });
 
 Deno.test("streamExportPdf renders real PDF bytes over every batch", async () => {
