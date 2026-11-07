@@ -1299,7 +1299,191 @@ body.has-overlay .aurora-orb {
   color: var(--text-primary);
 }
 
+/* ── Settings workspace ──────────────────────────────────────────────────────
+   Centered modal with a fixed vertical page rail and a content column that
+   owns its own scroll. The workspace itself stays pointer-transparent so
+   clicks in the gutter reach the backdrop, while the dialog re-enables
+   pointer events. */
+.settings-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  background: rgba(2,6,23,.58);
+  backdrop-filter: blur(10px) saturate(1.05);
+  -webkit-backdrop-filter: blur(10px) saturate(1.05);
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  contain: strict;
+  transition:
+    opacity 0.26s var(--ease-std),
+    visibility 0s 0.26s;
+}
+.settings-backdrop[data-open="true"] {
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
+  transition: opacity 0.26s var(--ease-std);
+}
+.settings-workspace {
+  position: fixed;
+  inset: 0;
+  z-index: 1001;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: clamp(10px, 2.4vw, 34px);
+  pointer-events: none;
+  opacity: 0;
+  visibility: hidden;
+  transform: scale(0.975) translateY(8px);
+  transition:
+    opacity 0.26s var(--ease-out),
+    transform 0.3s var(--ease-out),
+    visibility 0s 0.3s;
+}
+.settings-workspace[data-open="true"] {
+  opacity: 1;
+  visibility: visible;
+  transform: none;
+  transition:
+    opacity 0.26s var(--ease-out),
+    transform 0.3s var(--ease-out);
+}
+.settings-dialog {
+  width: min(1180px, 100%);
+  height: 88dvh;
+  max-height: 88dvh;
+  display: flex;
+  overflow: hidden;
+  pointer-events: auto;
+  outline: none;
+  background: var(--au-dialog);
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  box-shadow:
+    var(--shadow-lg),
+    0 0 0 1px color-mix(in srgb, var(--accent) 8%, transparent);
+  contain: layout paint;
+}
+.settings-nav {
+  width: 232px;
+  flex: 0 0 232px;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  padding: 16px 12px 18px;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  border-right: 1px solid var(--border);
+  background: color-mix(in srgb, var(--bg-elevated) 72%, var(--au-dialog));
+}
+.settings-nav-group {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+.settings-nav-heading {
+  padding: 0 11px;
+  font-size: var(--d-caption);
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+.settings-nav-list {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+.settings-nav-item {
+  min-width: 0;
+  background: transparent;
+}
+.settings-nav-item:hover {
+  background: var(--bg-hover);
+}
+.settings-nav-item[aria-current="page"]:hover {
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+}
+.settings-nav-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--d-body);
+}
+.settings-content {
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: color-mix(in srgb, var(--au-dialog) 94%, var(--bg-elevated));
+}
+.settings-content-head {
+  min-width: 0;
+}
+.settings-content-scroll {
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+}
+
 /* ── Responsive adjustments for small screens ───────────────────────────────── */
+@media (max-width: 720px) {
+  .settings-workspace {
+    align-items: stretch;
+    justify-content: stretch;
+    padding: 0;
+  }
+  .settings-dialog {
+    width: 100%;
+    height: 100dvh;
+    max-height: 100dvh;
+    flex-direction: column;
+    border-radius: 0;
+    border-left: none;
+    border-right: none;
+  }
+  .settings-nav {
+    width: 100%;
+    flex: 0 0 auto;
+    max-height: 36dvh;
+    display: block;
+    padding: 10px 12px 12px;
+    border-right: none;
+    border-bottom: 1px solid var(--border);
+  }
+  .settings-nav-group {
+    margin-bottom: 8px;
+  }
+  .settings-nav-heading {
+    font-size: var(--d-tiny);
+  }
+  .settings-nav-list {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 2px 6px;
+  }
+  .settings-content-head {
+    padding: 13px 16px 10px;
+  }
+}
+@media (max-width: 420px) {
+  .settings-nav {
+    max-height: 30dvh;
+  }
+  .settings-nav-list {
+    grid-template-columns: 1fr;
+  }
+}
 @media (max-width: 768px) {
   .glass-card {
     padding: 10px;

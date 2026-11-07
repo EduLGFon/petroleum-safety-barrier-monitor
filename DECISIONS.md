@@ -148,3 +148,19 @@ See git history for full context.
   default, checks only local active unflagged rows, and prints counts only;
   `--apply` sets the flag with a session-safe update. Both paths are
   idempotent.
+
+- D33: settings is a centered workspace, not a slide-over. A blurred backdrop
+  frames a floating dialog about 1180px wide and 88dvh tall with a fixed
+  vertical page rail (Preferências, Conta, Administração, Sistema) and a
+  content column that owns its own scroll; the layout collapses to a single
+  column on small screens and never scrolls horizontally. The admin managers
+  remain one lazy chunk, loaded on the first admin page, and the shell and
+  `AdminSection` keep the fail-closed `sessionUser.role === "admin"` gate.
+  Shared primitives serve the next work units: `SearchMultiSelect` (portalled
+  searchable chips field, z-index 1300 above the workspace and rule editor),
+  `AdminFormDialog` (portalled sticky-header create/edit shell, z-index 1250),
+  and `useAdminList` plus `AdminListControls` (client-side search, 25/50/100
+  paging via `Pagination`, page/selection helpers, and selection pruning).
+  Later batch actions keep one admin-only POST per resource, apply all ids in
+  one transaction, enforce a documented maximum id count, and preserve the
+  last-active-admin guard; the UI never widens authorization on its own.
