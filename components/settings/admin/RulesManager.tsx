@@ -1,4 +1,4 @@
-// RulesManager - alert rule builder with a focused modal editor.
+// RulesManager - alert rule list with paging, search, selection and bulk actions.
 // This is why it exists: admins enable/mute alerts by scope (categories,
 // statuses, locations, criticality and more) and tune triggers, anti-noise
 // windows and delivery without code changes. The editor keeps the heavy form
@@ -16,6 +16,12 @@ import {
   StatusBadge,
 } from "./AdminPrimitives.tsx";
 
+import {
+  AdminBulkButton,
+  AdminSearchInput,
+  AdminSelectionBar,
+} from "./AdminListControls.tsx";
+
 import { adminApi } from "../../../lib/api/admin-client.ts";
 
 import {
@@ -28,13 +34,17 @@ import {
   ruleToDraft,
 } from "./rules-helpers.tsx";
 
-import { useEffect, useRef, useState } from "preact/hooks";
+import { RuleEditorModal, type TabKey } from "./RuleEditorModal.tsx";
+
+import { useEffect, useMemo, useRef, useState } from "preact/hooks";
+
+import { useAdminList } from "../../../hooks/useAdminList.ts";
 
 import { useAdminResource } from "../../../hooks/useAdminResource.ts";
 
 import { useFocusTrap } from "../../../hooks/useFocusTrap.ts";
 
-import { RuleEditorModal, type TabKey } from "./RuleEditorModal.tsx";
+import { Pagination } from "../../table/Pagination.tsx";
 
 function scopeSummary(r: AlertRule): string {
   const parts: string[] = [];
@@ -77,8 +87,6 @@ function scopeSummary(r: AlertRule): string {
 export function RulesManager({ onCount }: { onCount?: (n: number) => void }) {
   const [lookups, setLookups] = useState<Lookups | null>(null);
   const [form, setForm] = useState<Draft>(EMPTY_DRAFT);
-  // busy guards the modal save form only; row toggle/duplicate/remove use
-  // rowBusy below so one slow row never blocks the other rows.
   const [busy, setBusy] = useState(false);
   const [rowBusy, setRowBusy] = useState<number | null>(null);
   const [confirmId, setConfirmId] = useState<number | null>(null);
@@ -89,9 +97,14 @@ export function RulesManager({ onCount }: { onCount?: (n: number) => void }) {
     { count: number; tags: string[] } | null
   >(null);
   const [previewBusy, setPreviewBusy] = useState(false);
-  // Modal-scoped failure: save/preview problems render inside the dialog,
-  // never as a global banner that implies the rules list failed to load.
   const [modalError, setModalError] = useState("");
+  const [statusFilter, setStatusFilter] = useState<
+    "all" | "active" | "inactive"
+  >(
+    "all",
+  );
+  const [bulkBusy, setBulkBusy] = useState(false);
+  const [error, setError] = useState("");
   const modalRef = useRef<HTMLDivElement | null>(null);
   const previewTimer = useRef<number | undefined>(undefined);
   const previewAbort = useRef<AbortController | null>(null);
@@ -105,17 +118,25 @@ export function RulesManager({ onCount }: { onCount?: (n: number) => void }) {
         adminApi("/api/lookups", { signal }) as Promise<Lookups>,
       ]);
       setLookups(l);
-      onCount?.(r.filter((x) => x.active).length);
       return r;
     },
   );
-  const { items: rules, loading, error, setError, reload } = resource;
+  const { items: rules, loading, reload } = resource;
+  const listError = resource.error;
+
+  useEffect(() => {
+    onCount?.(rules.filter((x) => x.active).length);
+  }, [rules, onCount]);
+
+  useEffect(() => {
+    if (listError) setError(listError);
+  }, [listError]);
 
   async function refresh() {
+    setError("");
     await reload();
   }
 
-  // Escape closes the modal (backdrop click handled on the overlay).
   useEffect(() => {
     if (!modalOpen) return;
     const onKey = (e: KeyboardEvent) => {
@@ -125,8 +146,6 @@ export function RulesManager({ onCount }: { onCount?: (n: number) => void }) {
     return () => document.removeEventListener("keydown", onKey);
   }, [modalOpen]);
 
-  // Modal open: remember the trigger, lock body scroll, focus the first
-  // field. Close/unmount: unlock scroll, abort preview, restore focus.
   useEffect(() => {
     if (!modalOpen) return;
     lastFocus.current = document.activeElement as HTMLElement | null;
@@ -150,7 +169,6 @@ export function RulesManager({ onCount }: { onCount?: (n: number) => void }) {
     };
   }, [modalOpen]);
 
-  // Unmount safety for the debounced preview timer.
   useEffect(() => {
     return () => {
       if (previewTimer.current !== undefined) {
@@ -159,6 +177,20 @@ export function RulesManager({ onCount }: { onCount?: (n: number) => void }) {
       previewAbort.current?.abort();
     };
   }, []);
+
+  const scopedRules = useMemo(
+    () =>
+      statusFilter === "all"
+        ? rules
+        : rules.filter((r) => statusFilter === "active" ? r.active : !r.active),
+    [rules, statusFilter],
+  );
+
+  const list = useAdminList<AlertRule, number>({
+    items: scopedRules,
+    getId: (r) => r.id,
+    getSearchText: (r) => `${r.name} ${r.description} ${scopeSummary(r)}`,
+  });
 
   function update(patch: Partial<Draft>) {
     setForm((prev) => ({ ...prev, ...patch }));
@@ -184,7 +216,6 @@ export function RulesManager({ onCount }: { onCount?: (n: number) => void }) {
 
   async function save(e: Event) {
     e.preventDefault();
-    // Field-level numeric feedback beats a silent null in the payload.
     const bad = [
       ["staleDays", form.staleDays],
       ["staleRepeatDays", form.staleRepeatDays],
@@ -264,8 +295,6 @@ export function RulesManager({ onCount }: { onCount?: (n: number) => void }) {
     }
   }
 
-  // Debounced preview: rapid "Testar escopo" clicks or scope edits reuse one
-  // in-flight request; the previous fetch aborts instead of racing.
   function runPreview() {
     if (previewTimer.current !== undefined) {
       globalThis.clearTimeout(previewTimer.current);
@@ -329,6 +358,66 @@ export function RulesManager({ onCount }: { onCount?: (n: number) => void }) {
     }
   }
 
+  async function bulkActivate() {
+    const ids = [...list.selectedIds];
+    if (ids.length === 0) return;
+    setBulkBusy(true);
+    try {
+      await adminApi("/api/alert-rules/batch", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "activate", ids }),
+      });
+      list.clearAll();
+      await refresh();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setBulkBusy(false);
+    }
+  }
+
+  async function bulkDeactivate() {
+    const ids = [...list.selectedIds];
+    if (ids.length === 0) return;
+    setBulkBusy(true);
+    try {
+      await adminApi("/api/alert-rules/batch", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "deactivate", ids }),
+      });
+      list.clearAll();
+      await refresh();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setBulkBusy(false);
+    }
+  }
+
+  async function bulkDelete() {
+    const ids = [...list.selectedIds];
+    if (ids.length === 0) return;
+    if (!confirm(`Excluir ${ids.length} regra(s) selecionada(s)?`)) return;
+    setBulkBusy(true);
+    try {
+      await adminApi("/api/alert-rules/batch", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "delete", ids }),
+      });
+      list.clearAll();
+      await refresh();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setBulkBusy(false);
+    }
+  }
+
+  const selectedCount = list.selectedCount;
+
   return (
     <div style={{ display: "grid", gap: 12 }}>
       <AdminHero
@@ -337,19 +426,78 @@ export function RulesManager({ onCount }: { onCount?: (n: number) => void }) {
         count={`${rules.filter((r) => r.active).length} ativas`}
       />
       {error && <ErrorBanner message={error} onRetry={() => void refresh()} />}
-      <div style={{ display: "flex", justifyContent: "flex-end" }}>
+      <div
+        style={{
+          display: "flex",
+          gap: 8,
+          flexWrap: "wrap",
+          alignItems: "center",
+        }}
+      >
+        <AdminSearchInput
+          value={list.query}
+          onChange={list.setQuery}
+          placeholder="Buscar regras..."
+        />
+        <select
+          value={statusFilter}
+          onChange={(e) =>
+            setStatusFilter(
+              e.currentTarget.value as "all" | "active" | "inactive",
+            )}
+          style={{ padding: "6px 10px" }}
+        >
+          <option value="all">Todas</option>
+          <option value="active">Ativas</option>
+          <option value="inactive">Inativas</option>
+        </select>
         <button
           type="button"
           onClick={openCreate}
           className="lift"
-          style={{ ...primaryBtn }}
+          style={{ ...primaryBtn, marginLeft: "auto" }}
         >
           + Nova regra
         </button>
       </div>
+
+      <AdminSelectionBar
+        pageIds={list.pageIds}
+        selectedIds={list.selectedIds}
+        total={list.total}
+        onSelectPage={list.selectPage}
+        onSelectAll={list.selectAll}
+        onClearAll={list.clearAll}
+      >
+        {selectedCount > 0 && (
+          <>
+            <AdminBulkButton
+              onClick={() => void bulkActivate()}
+              disabled={bulkBusy}
+              tone="primary"
+            >
+              {bulkBusy ? "Aguarde…" : "Ativar"}
+            </AdminBulkButton>
+            <AdminBulkButton
+              onClick={() => void bulkDeactivate()}
+              disabled={bulkBusy}
+            >
+              {bulkBusy ? "Aguarde…" : "Desativar"}
+            </AdminBulkButton>
+            <AdminBulkButton
+              onClick={() => void bulkDelete()}
+              disabled={bulkBusy}
+              tone="danger"
+            >
+              {bulkBusy ? "Aguarde…" : "Excluir"}
+            </AdminBulkButton>
+          </>
+        )}
+      </AdminSelectionBar>
+
       {loading && rules.length === 0
         ? <SkeletonRows />
-        : rules.length === 0
+        : list.filtered.length === 0
         ? (
           <EmptyState text="Nenhuma regra. Todo estado não conforme alerta até você criar uma." />
         )
@@ -366,7 +514,7 @@ export function RulesManager({ onCount }: { onCount?: (n: number) => void }) {
                 Atualizando regras…
               </div>
             )}
-            {rules.map((r) => (
+            {list.pageItems.map((r) => (
               <AdminRow key={r.id}>
                 <Avatar name={r.name} />
                 <span style={{ minWidth: 0, flex: "1 1 160px" }}>
@@ -464,6 +612,17 @@ export function RulesManager({ onCount }: { onCount?: (n: number) => void }) {
             ))}
           </div>
         )}
+
+      {list.totalPages > 1 && (
+        <Pagination
+          page={list.page}
+          totalPages={list.totalPages}
+          total={list.total}
+          pageSize={list.pageSize}
+          onChange={list.setPage}
+          onPageSize={list.setPageSize}
+        />
+      )}
 
       <RuleEditorModal
         open={modalOpen}

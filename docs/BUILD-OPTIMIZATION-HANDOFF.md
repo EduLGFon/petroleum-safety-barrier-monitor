@@ -26,13 +26,13 @@ build work.
 
 Command: `deno task build` (expands to `vite build`).
 
-| Run | Conditions | Wall clock | Client build | SSR build |
-| --- | --- | --- | --- | --- |
-| 1 | Warm, no CI flag | 43,359 ms | not captured cleanly | not captured cleanly |
-| 2 | `CI=true` | 22,714 ms | 8.05 s | 13.54 s |
-| 3 | `CI=true` | 24,629 ms | 9.65 s | 13.93 s |
-| 4 | `CI=true` | 24,853 ms | 9.73 s | 14.08 s |
-| 5 | `vite build --debug` | 24,398 ms | 9.18 s | 13.86 s |
+| Run | Conditions           | Wall clock | Client build         | SSR build            |
+| --- | -------------------- | ---------- | -------------------- | -------------------- |
+| 1   | Warm, no CI flag     | 43,359 ms  | not captured cleanly | not captured cleanly |
+| 2   | `CI=true`            | 22,714 ms  | 8.05 s               | 13.54 s              |
+| 3   | `CI=true`            | 24,629 ms  | 9.65 s               | 13.93 s              |
+| 4   | `CI=true`            | 24,853 ms  | 9.73 s               | 14.08 s              |
+| 5   | `vite build --debug` | 24,398 ms  | 9.18 s               | 13.86 s              |
 
 Vite reported 203 modules in the client environment and 588 modules in the SSR
 environment. The 43.4 s first run was treated as an outlier, probably cold
@@ -41,13 +41,13 @@ transforms or contention with concurrent work. The stable baseline is about
 
 ## Build phase ranking
 
-| Rank | Phase | Measured time | Share of 23-25 s | Evidence |
-| --- | --- | --- | --- | --- |
-| 1 | SSR Vite build | 13.5-14.1 s | about 58-60% | `vite ... building ssr environment`, 588 modules |
-| 2 | Client Vite build | 8.0-9.7 s | about 35-39% | `vite ... building client environment`, 203 modules |
-| 3 | Vite startup, config, plugin init | about 0.3-0.6 s | about 1-2% | wall clock minus reported build times |
-| 4 | Deno task and module startup | about 0.1 s | under 1% | `deno eval "0"` = 96 ms, `deno run -A npm:vite --version` = 108 ms |
-| 5 | Fresh update check | about 0.29 s when online | async, normally hidden | `curl https://dl.deno.land/fresh/release-latest.txt` = 287 ms |
+| Rank | Phase                             | Measured time            | Share of 23-25 s       | Evidence                                                           |
+| ---- | --------------------------------- | ------------------------ | ---------------------- | ------------------------------------------------------------------ |
+| 1    | SSR Vite build                    | 13.5-14.1 s              | about 58-60%           | `vite ... building ssr environment`, 588 modules                   |
+| 2    | Client Vite build                 | 8.0-9.7 s                | about 35-39%           | `vite ... building client environment`, 203 modules                |
+| 3    | Vite startup, config, plugin init | about 0.3-0.6 s          | about 1-2%             | wall clock minus reported build times                              |
+| 4    | Deno task and module startup      | about 0.1 s              | under 1%               | `deno eval "0"` = 96 ms, `deno run -A npm:vite --version` = 108 ms |
+| 5    | Fresh update check                | about 0.29 s when online | async, normally hidden | `curl https://dl.deno.land/fresh/release-latest.txt` = 287 ms      |
 
 The reported client and SSR phases account for nearly all wall clock. There is
 no large hidden Deno or task-runner overhead to remove. The update check is not
@@ -113,13 +113,13 @@ before/after timings. Do not trust the existing `/tmp/vite8-bench` directory.
 
 ## Candidate work units for the next orchestrator
 
-| Unit | Scope | Risk | Files likely owned |
-| --- | --- | --- | --- |
-| U1 | Vite 8 and Rolldown upgrade, then build and smoke-verify output | High; build output contract | `deno.jsonc`, `deno.lock`, `vite.config.ts`, docs |
-| U2 | Content-hash build cache or no-op skip wrapper, with CI bypass | Medium; stale artifact risk | `scripts/build.ts` or equivalent, `deno.jsonc`, `.gitignore` |
-| U3 | SSR externalization and build tuning matrix (`maxParallelFileOps`, target, minify, chunking) | Medium; runtime and Docker risk | `vite.config.ts`, `Dockerfile`, docs |
-| U4 | Dockerfile build-layer caching and duplicate-build removal | Medium; deployment | `Dockerfile`, `.dockerignore`, docs |
-| U5 | Final `docs/BUILD-PERFORMANCE.md` ranking and decisions | Low | docs only |
+| Unit | Scope                                                                                        | Risk                            | Files likely owned                                           |
+| ---- | -------------------------------------------------------------------------------------------- | ------------------------------- | ------------------------------------------------------------ |
+| U1   | Vite 8 and Rolldown upgrade, then build and smoke-verify output                              | High; build output contract     | `deno.jsonc`, `deno.lock`, `vite.config.ts`, docs            |
+| U2   | Content-hash build cache or no-op skip wrapper, with CI bypass                               | Medium; stale artifact risk     | `scripts/build.ts` or equivalent, `deno.jsonc`, `.gitignore` |
+| U3   | SSR externalization and build tuning matrix (`maxParallelFileOps`, target, minify, chunking) | Medium; runtime and Docker risk | `vite.config.ts`, `Dockerfile`, docs                         |
+| U4   | Dockerfile build-layer caching and duplicate-build removal                                   | Medium; deployment              | `Dockerfile`, `.dockerignore`, docs                          |
+| U5   | Final `docs/BUILD-PERFORMANCE.md` ranking and decisions                                      | Low                             | docs only                                                    |
 
 U1 and U3 both touch `vite.config.ts`, so run them sequentially or combine them
 into one unit. The unmerged `worktree/ports-8300` branch also touches
