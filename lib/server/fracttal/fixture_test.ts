@@ -46,10 +46,6 @@ Deno.test("fixture maps to 3 inserts and 2 deliberate skips", async () => {
   const parsed = parsePage({ data: await loadFixture() });
   assertStrictEquals(parsed.items.length, 5);
   assertStrictEquals(parsed.malformed.length, 0);
-});
-
-Deno.test("fixture maps to 3 inserts and 2 deliberate skips", async () => {
-  const parsed = parsePage({ data: await loadFixture() });
   const inputs = [];
   const skips: string[] = [];
   for (const item of parsed.items) {
