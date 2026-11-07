@@ -3,6 +3,7 @@ import {
   normalizeEmail,
   normalizeName,
   normalizeOptionalReference,
+  normalizePhone,
   parsePositiveId,
   readJsonBodyCapped,
 } from "./validation.ts";
@@ -19,14 +20,40 @@ Deno.test("normalizeEmail trims and lowercases", () => {
 });
 
 Deno.test("normalizeEmail rejects invalid input", () => {
-  assertThrows(() => normalizeEmail("not-an-email"), Error, "invalid email");
+  for (const bad of ["", "no-at", "a@b", "@x.y", "a b@c.d", "not-an-email"]) {
+    assertThrows(() => normalizeEmail(bad), Error, "invalid email");
+  }
   assertThrows(() => normalizeEmail(42), Error, "must be a string");
+  assertThrows(() => normalizeEmail(null), Error, "must be a string");
 });
 
 Deno.test("normalizeName trims and caps", () => {
   assertStrictEquals(normalizeName(null), "");
+  assertStrictEquals(normalizeName(undefined), "");
   assertStrictEquals(normalizeName("  Ana  "), "Ana");
+  assertStrictEquals(normalizeName("x".repeat(500)).length, 200);
   assertThrows(() => normalizeName(42), Error, "must be a string");
+  assertThrows(() => normalizeName(7), Error, "must be a string");
+});
+
+Deno.test("normalizePhone keeps empty, normalizes domestic numbers", () => {
+  assertStrictEquals(normalizePhone(undefined), "");
+  assertStrictEquals(normalizePhone(""), "");
+  assertStrictEquals(normalizePhone(null), "");
+  assertStrictEquals(normalizePhone("+55 27 99874-6290"), "5527998746290");
+  assertStrictEquals(normalizePhone("27998746290"), "5527998746290");
+});
+
+Deno.test("normalizePhone rejects short numbers without area code", () => {
+  for (const bad of ["998746290", "123", 42, "a"]) {
+    let caught = false;
+    try {
+      normalizePhone(bad);
+    } catch {
+      caught = true;
+    }
+    assertStrictEquals(caught, true, String(bad));
+  }
 });
 
 Deno.test("parseIdParam accepts positive safe integers only", () => {

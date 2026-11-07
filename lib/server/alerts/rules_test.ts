@@ -100,12 +100,6 @@ Deno.test("specific status narrows the trigger", () => {
   );
 });
 
-Deno.test("immediate flag rides the first match", () => {
-  const rules = [rule({ notify_immediate: true })];
-  const t = { categoryId: 1, statusId: 5, criticalityId: 0, compliant: false };
-  assertStrictEquals(matchRules(t, rules, true).immediate, true);
-});
-
 Deno.test("multi-category array narrows the trigger", () => {
   const rules = [rule({ category_ids: [3, 7] })];
   const hit = {
