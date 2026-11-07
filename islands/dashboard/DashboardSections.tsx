@@ -12,6 +12,8 @@ import { TableStatusRow } from "../../components/table/TableStatusRow.tsx";
 
 import { DashboardFooter, DashboardOverlays } from "./DashboardChrome.tsx";
 
+import type { SettingsSection } from "../../components/SettingsPanel.tsx";
+
 import { LocationFilter } from "../../components/LocationFilter.tsx";
 
 import { ExportMenu } from "../../components/export/ExportMenu.tsx";
@@ -110,6 +112,9 @@ export function DashboardSections(
   }: SectionsProps,
 ) {
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [landingSection, setLandingSection] = useState<SettingsSection>(
+    "appearance",
+  );
   const { settings } = useSettings();
   const {
     location,
@@ -245,12 +250,14 @@ export function DashboardSections(
 
         {/* Header with merged connection + sync indicator */}
         <Header
-          onOpenSettings={() => setSettingsOpen(true)}
+          onOpenSettings={(section) => {
+            setLandingSection(section ?? "appearance");
+            setSettingsOpen(true);
+          }}
           companyName={companyName}
           apiBaseUrl={apiBaseUrl}
           sessionUser={sessionUser}
           syncStatus={syncStatus ?? null}
-          onOpenBarrier={(id) => setOpenId(id)}
         />
 
         {/* Location tabs */}
@@ -377,10 +384,16 @@ export function DashboardSections(
         }}
         settingsOpen={settingsOpen}
         onCloseSettings={() => setSettingsOpen(false)}
+        initialSection={landingSection}
         sessionUser={sessionUser}
         devFracttalRaw={devFracttalRaw}
         serverMode={serverMode}
         apiBaseUrl={apiBaseUrl}
+        syncStatus={syncStatus ?? null}
+        onOpenBarrier={(id) => {
+          setSettingsOpen(false);
+          setOpenId(id);
+        }}
         locations={settingLocations}
         availabilities={dispOpts}
         compliances={confOpts}

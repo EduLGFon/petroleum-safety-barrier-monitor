@@ -1,11 +1,15 @@
 // Dashboard chrome - footer signature line and overlay dialogs.
 // Why: keeps DashboardView to section composition; footer and modal wiring
 // render once and change rarely.
+import type { SettingsSection } from "../../components/SettingsPanel.tsx";
+
+import type { AuthUser, Barrier, SyncStatus } from "../../lib/types.ts";
+
 import { SettingsPanel } from "../../components/SettingsPanel.tsx";
 
 import { BarrierModal } from "../../components/BarrierModal.tsx";
 
-import type { AuthUser, Barrier } from "../../lib/types.ts";
+import type { Conn } from "../../hooks/useConnection.ts";
 
 // DashboardFooter: centered author signature closing the page.
 export function DashboardFooter() {
@@ -32,10 +36,14 @@ interface OverlaysProps {
   onBarrierSaved?: () => void;
   settingsOpen: boolean;
   onCloseSettings: () => void;
+  initialSection?: SettingsSection;
   sessionUser?: AuthUser | null;
   devFracttalRaw?: boolean;
   serverMode: boolean;
   apiBaseUrl: string;
+  syncStatus?: SyncStatus | null;
+  conn?: Conn;
+  onOpenBarrier?: (barrierId: number) => void;
   // Live vocabularies forwarded to the settings filters section.
   locations?: { code: string; name: string; type: string }[];
   availabilities?: string[];
@@ -53,10 +61,14 @@ export function DashboardOverlays(
     onBarrierSaved,
     settingsOpen,
     onCloseSettings,
+    initialSection,
     sessionUser = null,
     devFracttalRaw = false,
     serverMode,
     apiBaseUrl,
+    syncStatus = null,
+    conn,
+    onOpenBarrier,
     locations,
     availabilities,
     compliances,
@@ -79,7 +91,12 @@ export function DashboardOverlays(
       <SettingsPanel
         open={settingsOpen}
         onClose={onCloseSettings}
+        initialSection={initialSection}
         sessionUser={sessionUser}
+        syncStatus={syncStatus}
+        conn={conn}
+        apiBaseUrl={apiBaseUrl}
+        onOpenBarrier={onOpenBarrier}
         locations={locations}
         availabilities={availabilities}
         compliances={compliances}
