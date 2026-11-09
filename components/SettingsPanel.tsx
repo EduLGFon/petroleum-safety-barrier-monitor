@@ -1,5 +1,5 @@
 // SettingsPanel - centered settings workspace for appearance, filters,
-// account, admin pages, and the sync placeholder.
+// account, admin pages, and the live sync connection page.
 // This is why it exists: centralizes theme / accent / density / font size /
 // reduce-motion plus startup filter defaults from SettingsContext, with a
 // Conta page for every authenticated user and an admin-only page group for

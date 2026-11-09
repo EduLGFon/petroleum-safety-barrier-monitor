@@ -24,6 +24,8 @@ import { useSettings } from "../../context/SettingsContext.tsx";
 
 import type { useDashboard } from "../../hooks/useDashboard.ts";
 
+import { useConnection } from "../../hooks/useConnection.ts";
+
 import { useEffect, useMemo, useState } from "preact/hooks";
 
 import { FilterBar } from "../../components/FilterBar.tsx";
@@ -115,6 +117,13 @@ export function DashboardSections(
   const [landingSection, setLandingSection] = useState<SettingsSection>(
     "appearance",
   );
+  // Single heartbeat for the whole dashboard: Header renders the dot and the
+  // settings sync page needs the same live state, so the hook lives here and
+  // both consumers receive the result.
+  const healthUrl = apiBaseUrl
+    ? `${apiBaseUrl.replace(/\/$/, "")}/api/health`
+    : "/api/health";
+  const conn = useConnection(healthUrl);
   const { settings } = useSettings();
   const {
     location,
@@ -255,7 +264,7 @@ export function DashboardSections(
             setSettingsOpen(true);
           }}
           companyName={companyName}
-          apiBaseUrl={apiBaseUrl}
+          conn={conn}
           sessionUser={sessionUser}
           syncStatus={syncStatus ?? null}
         />
@@ -390,6 +399,7 @@ export function DashboardSections(
         serverMode={serverMode}
         apiBaseUrl={apiBaseUrl}
         syncStatus={syncStatus ?? null}
+        conn={conn}
         onOpenBarrier={(id) => {
           setSettingsOpen(false);
           setOpenId(id);

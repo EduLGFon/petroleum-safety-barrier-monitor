@@ -1571,6 +1571,10 @@ details[open] > summary .collapsible-chevron {
 
 /* ── Header identity pill ──────────────────────────────────────────────────── */
 .header-identity {
+  /* Non-admin standard entrance: short fade + lift, played once on mount.
+     Admin overrides this with the shimmer below; reduced motion and
+     html.no-anim collapse the duration globally. */
+  animation: fadeIn 0.3s var(--ease-out) backwards;
   transition:
     transform 0.18s var(--ease-std),
     box-shadow 0.18s var(--ease-std);
