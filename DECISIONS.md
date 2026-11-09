@@ -176,3 +176,14 @@ See git history for full context.
   last-active-admin and last-active-local-admin guards, revokes sessions on
   user active-state changes, and returns `{ affected }`. The UI sends one
   request per action and never widens authorization.
+
+- D35: batch endpoints use typed validation errors. Expected client-input
+  and domain rejections in the user, recipient, access-group, and alert-rule
+  batch SQL helpers throw `ValidationError`, which each route maps to 400
+  with the validation message. Every other error maps to 500 through the
+  standard `INTERNAL` envelope, so database text never reaches the client.
+  Substring matching on error messages is removed. Users and alert-rules
+  batches fail when any target id is missing; access-group related ids are
+  checked before insert so foreign-key violations cannot surface as 500.
+  Id validation uses `Number.isSafeInteger`, and alias exports and action
+  aliases are removed so the documented canonical contract is the only one.

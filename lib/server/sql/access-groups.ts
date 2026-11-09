@@ -3,6 +3,8 @@
 // stations; enforcement happens in the data routes via allowedLocationIds.
 import { queryRows, type TxQuery, withTx } from "../db.ts";
 
+import { ValidationError } from "../validation.ts";
+
 export interface AccessGroup {
   id: number;
   name: string;
@@ -248,8 +250,6 @@ export const ACCESS_GROUP_BATCH_ACTIONS = [
   "removeUsers",
   "addLocations",
   "removeLocations",
-  "addStations",
-  "removeStations",
 ] as const;
 
 export type AccessGroupBatchAction =
@@ -261,20 +261,13 @@ export interface AccessGroupBatchInput {
   groupIds?: unknown;
   userIds?: unknown;
   locationIds?: unknown;
-  stationIds?: unknown;
   locations?: unknown;
-  stations?: unknown;
   users?: unknown;
   relatedIds?: unknown;
 }
 
 export interface AccessGroupBatchValidated {
-  action:
-    | "delete"
-    | "addUsers"
-    | "removeUsers"
-    | "addLocations"
-    | "removeLocations";
+  action: AccessGroupBatchAction;
   groupIds: number[];
   relatedIds: number[];
 }
@@ -285,59 +278,35 @@ function toUniquePositiveIds(
   max: number,
 ): number[] {
   if (raw === undefined || raw === null) return [];
-  if (!Array.isArray(raw)) throw new Error(`${label} must be an array`);
+  if (!Array.isArray(raw)) {
+    throw new ValidationError(`${label} must be an array`);
+  }
   const out: number[] = [];
   const seen = new Set<number>();
   for (const n of raw) {
     if (typeof n !== "number" || !Number.isSafeInteger(n) || n <= 0) {
-      throw new Error(`${label} must be positive integers`);
+      throw new ValidationError(`${label} must be positive integers`);
     }
     if (seen.has(n)) continue;
     seen.add(n);
     out.push(n);
   }
   if (out.length > max) {
-    throw new Error(`${label} must contain at most ${max} ids`);
+    throw new ValidationError(`${label} must contain at most ${max} ids`);
   }
   return out;
 }
 
-function canonicalAction(raw: unknown): AccessGroupBatchValidated["action"] {
-  if (typeof raw !== "string") throw new Error("action must be a string");
-  const value = raw.trim();
-  switch (value) {
-    case "delete":
-    case "deleteGroups":
-    case "removeGroups":
-    case "excluir":
-      return "delete";
-    case "addUsers":
-    case "addUser":
-    case "add_users":
-      return "addUsers";
-    case "removeUsers":
-    case "removeUser":
-    case "remove_users":
-      return "removeUsers";
-    case "addLocations":
-    case "addLocation":
-    case "addStations":
-    case "addStation":
-    case "add_locations":
-    case "add_stations":
-      return "addLocations";
-    case "removeLocations":
-    case "removeLocation":
-    case "removeStations":
-    case "removeStation":
-    case "remove_locations":
-    case "remove_stations":
-      return "removeLocations";
-    default:
-      throw new Error(
-        "action must be one of delete, addUsers, removeUsers, addLocations, removeLocations",
-      );
+function canonicalAction(raw: unknown): AccessGroupBatchAction {
+  if (
+    raw === "delete" || raw === "addUsers" || raw === "removeUsers" ||
+    raw === "addLocations" || raw === "removeLocations"
+  ) {
+    return raw;
   }
+  throw new ValidationError(
+    "action must be one of delete, addUsers, removeUsers, addLocations, removeLocations",
+  );
 }
 
 // Pure validation for an access-groups batch request. Throws on any invalid
@@ -346,7 +315,7 @@ export function validateAccessGroupBatch(
   body: unknown,
 ): AccessGroupBatchValidated {
   if (!body || typeof body !== "object" || Array.isArray(body)) {
-    throw new Error("request body must be an object");
+    throw new ValidationError("request body must be an object");
   }
   const b = body as AccessGroupBatchInput;
   const action = canonicalAction(b.action);
@@ -355,31 +324,27 @@ export function validateAccessGroupBatch(
     "group ids",
     200,
   );
-  if (groupIds.length === 0) throw new Error("group ids must not be empty");
+  if (groupIds.length === 0) {
+    throw new ValidationError("group ids must not be empty");
+  }
   if (action === "delete") {
     // related ids are ignored for delete
     return { action, groupIds, relatedIds: [] };
   }
   const relatedRaw = action === "addUsers" || action === "removeUsers"
     ? (b.userIds ?? b.users ?? b.relatedIds)
-    : (b.locationIds ?? b.stationIds ?? b.locations ?? b.stations ??
-      b.relatedIds);
+    : (b.locationIds ?? b.locations ?? b.relatedIds);
   const relatedIds = toUniquePositiveIds(relatedRaw, "related ids", 500);
   if (relatedIds.length === 0) {
-    throw new Error("related ids must not be empty");
+    throw new ValidationError("related ids must not be empty");
   }
   if (groupIds.length * relatedIds.length > 20000) {
-    throw new Error(
+    throw new ValidationError(
       "cross product of group ids and related ids must not exceed 20000",
     );
   }
   return { action, groupIds, relatedIds };
 }
-
-// Aliases for callers/tests that prefer other names.
-export const validateAccessGroupBatchRequest = validateAccessGroupBatch;
-export const parseAccessGroupBatch = validateAccessGroupBatch;
-export const normalizeAccessGroupBatch = validateAccessGroupBatch;
 
 async function assertGroupsExist(
   query: (text: string, args?: unknown[]) => Promise<unknown[]>,
@@ -390,7 +355,35 @@ async function assertGroupsExist(
     [groupIds],
   ) as { id: number }[];
   if (rows.length !== groupIds.length) {
-    throw new Error("missing groups");
+    throw new ValidationError("missing groups");
+  }
+}
+
+// assertRelatedUsersExist / assertRelatedLocationsExist: fail closed before
+// an insert so a foreign-key violation becomes a typed 400 instead of a 500.
+async function assertRelatedUsersExist(
+  query: (text: string, args?: unknown[]) => Promise<unknown[]>,
+  userIds: number[],
+): Promise<void> {
+  const rows = await query(
+    `select id from users where id = any($1::int[])`,
+    [userIds],
+  ) as { id: number }[];
+  if (rows.length !== userIds.length) {
+    throw new ValidationError("missing users");
+  }
+}
+
+async function assertRelatedLocationsExist(
+  query: (text: string, args?: unknown[]) => Promise<unknown[]>,
+  locationIds: number[],
+): Promise<void> {
+  const rows = await query(
+    `select id from locations where id = any($1::int[])`,
+    [locationIds],
+  ) as { id: number }[];
+  if (rows.length !== locationIds.length) {
+    throw new ValidationError("missing locations");
   }
 }
 
@@ -422,6 +415,7 @@ export async function batchAddUsersToGroups(
   });
   return await withTx(async (query) => {
     await assertGroupsExist(query, validated.groupIds);
+    await assertRelatedUsersExist(query, validated.relatedIds);
     const rows = await query<{ user_id: number; group_id: number }>(
       `insert into user_access_groups (user_id, group_id)
        select u, g from unnest($1::int[]) as u, unnest($2::int[]) as g
@@ -465,6 +459,7 @@ export async function batchAddLocationsToGroups(
   });
   return await withTx(async (query) => {
     await assertGroupsExist(query, validated.groupIds);
+    await assertRelatedLocationsExist(query, validated.relatedIds);
     const rows = await query<{ group_id: number; location_id: number }>(
       `insert into access_group_locations (group_id, location_id)
        select g, l from unnest($1::int[]) as g, unnest($2::int[]) as l
@@ -533,11 +528,6 @@ export async function batchAccessGroups(
   }
   return { affected };
 }
-
-// Aliases for callers/tests that prefer other names.
-export const batchGroups = batchAccessGroups;
-export const runAccessGroupBatch = batchAccessGroups;
-export const executeAccessGroupBatch = batchAccessGroups;
 
 // Resolves the station ids a user may read. null is reserved for admins
 // (handled by the caller); an ungrouped user gets [] (no access). This is

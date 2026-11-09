@@ -1,6 +1,17 @@
 // Server validation - shared email/name normalizers for SQL stores.
 // This is why it exists: users, recipients, and authors each had a copy of
 // the same regex and length caps; one module keeps them in agreement.
+
+// ValidationError: typed client-input/domain rejection. Batch routes catch
+// this class to answer 400 without substring-matching error text, while any
+// other error keeps the 500 path and never leaks database messages.
+export class ValidationError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "ValidationError";
+  }
+}
+
 export function normalizeEmail(raw: unknown): string {
   if (typeof raw !== "string") throw new Error("email must be a string");
   const email = raw.trim().toLowerCase().slice(0, 254);

@@ -4,7 +4,9 @@
 // immediate vs digest, plus multi-select scopes, urgency, anti-noise
 // windows and priority). The detector reads active rows; the routes guard
 // writes behind admin auth.
-import { queryRows, withTx } from "../db.ts";
+import { queryRows, type TxQuery, withTx } from "../db.ts";
+
+import { ValidationError } from "../validation.ts";
 
 export type RuleUrgency = "any" | "urgent" | "critical";
 
@@ -571,25 +573,48 @@ export function normalizeAlertRuleBatchAction(
   if (raw === "activate" || raw === "deactivate" || raw === "delete") {
     return raw;
   }
-  throw new Error("action must be one of activate, deactivate, delete");
+  throw new ValidationError(
+    "action must be one of activate, deactivate, delete",
+  );
 }
 
 export function normalizeAlertRuleBatchIds(raw: unknown): number[] {
-  if (!Array.isArray(raw)) throw new Error("ids must be an array");
-  if (raw.length === 0) throw new Error("ids must not be empty");
-  if (raw.length > MAX_ALERT_RULE_BATCH_IDS) {
-    throw new Error(
-      `ids must contain at most ${MAX_ALERT_RULE_BATCH_IDS} items`,
-    );
+  if (!Array.isArray(raw)) {
+    throw new ValidationError("ids must be an array");
+  }
+  if (raw.length === 0) {
+    throw new ValidationError("ids must not be empty");
   }
   const seen = new Set<number>();
   for (const v of raw) {
-    if (typeof v !== "number" || !Number.isInteger(v) || v <= 0) {
-      throw new Error("ids must be positive integers");
+    if (typeof v !== "number" || !Number.isSafeInteger(v) || v <= 0) {
+      throw new ValidationError("ids must be positive integers");
     }
     seen.add(v);
   }
+  // Dedupe before the cap so 501 copies of one id are still one target.
+  if (seen.size > MAX_ALERT_RULE_BATCH_IDS) {
+    throw new ValidationError(
+      `ids must contain at most ${MAX_ALERT_RULE_BATCH_IDS} items`,
+    );
+  }
   return [...seen].sort((a, b) => a - b);
+}
+
+// assertAlertRulesExist: all-or-nothing target check inside the transaction.
+async function assertAlertRulesExist(
+  query: TxQuery,
+  ids: number[],
+): Promise<void> {
+  const rows = await query<{ id: number }>(
+    `select id from alert_rules where id = any($1::int[])`,
+    [ids],
+  );
+  if (rows.length !== ids.length) {
+    const present = new Set(rows.map((r) => r.id));
+    const missing = ids.filter((id) => !present.has(id));
+    throw new ValidationError(`missing alert rules: ${missing.join(", ")}`);
+  }
 }
 
 export async function batchUpdateAlertRulesActive(
@@ -598,9 +623,10 @@ export async function batchUpdateAlertRulesActive(
 ): Promise<number> {
   const norm = normalizeAlertRuleBatchIds(ids);
   return await withTx(async (query) => {
+    await assertAlertRulesExist(query, norm);
     const rows = await query<{ id: number }>(
       `update alert_rules set active = $2
-       where id = any ($1::int[])
+       where id = any ($1::int[]) and active <> $2
        returning id`,
       [norm, active],
     );
@@ -621,6 +647,7 @@ export async function batchDeactivateAlertRules(
 export async function batchDeleteAlertRules(ids: number[]): Promise<number> {
   const norm = normalizeAlertRuleBatchIds(ids);
   return await withTx(async (query) => {
+    await assertAlertRulesExist(query, norm);
     const rows = await query<{ id: number }>(
       `delete from alert_rules where id = any ($1::int[]) returning id`,
       [norm],
@@ -632,12 +659,16 @@ export async function batchDeleteAlertRules(ids: number[]): Promise<number> {
 export async function batchAlertRules(
   action: unknown,
   ids: unknown,
-): Promise<number> {
+): Promise<{ affected: number }> {
   const a = normalizeAlertRuleBatchAction(action);
   const normIds = normalizeAlertRuleBatchIds(ids);
-  if (a === "activate") return await batchUpdateAlertRulesActive(normIds, true);
-  if (a === "deactivate") {
-    return await batchUpdateAlertRulesActive(normIds, false);
+  let affected: number;
+  if (a === "activate") {
+    affected = await batchUpdateAlertRulesActive(normIds, true);
+  } else if (a === "deactivate") {
+    affected = await batchUpdateAlertRulesActive(normIds, false);
+  } else {
+    affected = await batchDeleteAlertRules(normIds);
   }
-  return await batchDeleteAlertRules(normIds);
+  return { affected };
 }

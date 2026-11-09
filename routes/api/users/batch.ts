@@ -3,6 +3,18 @@
 // one transactional request instead of N single-row PATCHes, while keeping the
 // last-active-admin and last-active-local-admin guards intact.
 import {
+  batchUsers,
+  normalizeUserBatchAction,
+  normalizeUserBatchIds,
+} from "../../../lib/server/sql/users.ts";
+
+import {
+  authStoreUnavailable,
+  denyByCredentials,
+  requireAdminAuth,
+} from "../../../lib/server/auth.ts";
+
+import {
   badRequest,
   internal,
   newRequestId,
@@ -11,20 +23,11 @@ import {
 } from "../../../lib/server/errors.ts";
 
 import {
-  authStoreUnavailable,
-  denyByCredentials,
-  requireAdminAuth,
-} from "../../../lib/server/auth.ts";
+  readJsonBody,
+  ValidationError,
+} from "../../../lib/server/validation.ts";
 
 import { routeClientKey, writeThrottle } from "../../../lib/server/throttle.ts";
-
-import { readJsonBody } from "../../../lib/server/validation.ts";
-
-import {
-  batchUsers,
-  normalizeUserBatchAction,
-  normalizeUserBatchIds,
-} from "../../../lib/server/sql/users.ts";
 
 import { loadServerConfig } from "../../../lib/server/config.ts";
 
@@ -69,12 +72,8 @@ export const handler = define.handlers({
         headers: { "cache-control": "no-store" },
       });
     } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
-      if (
-        message.includes("ids") || message.includes("action") ||
-        message.includes("last active") || message.includes("unique")
-      ) {
-        return badRequest(message, requestId);
+      if (err instanceof ValidationError) {
+        return badRequest(err.message, requestId);
       }
       return internal(
         "POST /api/users/batch",

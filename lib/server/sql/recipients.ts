@@ -6,6 +6,7 @@ import {
   normalizeEmail,
   normalizeName,
   normalizePhone,
+  ValidationError,
 } from "../validation.ts";
 
 export { normalizeEmail, normalizeName, normalizePhone };
@@ -97,13 +98,13 @@ export function validateRecipientIds(
   field = "ids",
 ): number[] {
   if (!Array.isArray(raw)) {
-    throw new Error(`${field} must be an array`);
+    throw new ValidationError(`${field} must be an array`);
   }
   if (raw.length === 0) {
-    throw new Error(`${field} must not be empty`);
+    throw new ValidationError(`${field} must not be empty`);
   }
   if (raw.length > 500) {
-    throw new Error(`${field} must contain at most 500 items`);
+    throw new ValidationError(`${field} must contain at most 500 items`);
   }
   const seen = new Set<number>();
   const out: number[] = [];
@@ -111,26 +112,20 @@ export function validateRecipientIds(
     if (
       typeof value !== "number" || !Number.isSafeInteger(value) || value <= 0
     ) {
-      throw new Error(`${field} must contain positive integers`);
+      throw new ValidationError(`${field} must contain positive integers`);
     }
     if (seen.has(value)) continue;
     seen.add(value);
     out.push(value);
   }
   if (out.length === 0) {
-    throw new Error(`${field} must not be empty`);
+    throw new ValidationError(`${field} must not be empty`);
   }
   if (out.length > 500) {
-    throw new Error(`${field} must contain at most 500 items`);
+    throw new ValidationError(`${field} must contain at most 500 items`);
   }
   return out;
 }
-
-// Aliases kept for callers/tests that use other common names.
-export const validateIds = validateRecipientIds;
-export const normalizeIds = validateRecipientIds;
-export const parseIds = validateRecipientIds;
-export const validateRecipientBatchIds = validateRecipientIds;
 
 // activateRecipients: marks the given recipients active. Returns affected count.
 export async function activateRecipients(ids: number[]): Promise<number> {
@@ -186,9 +181,6 @@ export async function addRecipientUsers(userIds: number[]): Promise<number> {
   return rows.length;
 }
 
-// Alias for the batch action name.
-export const addUsersToRecipients = addRecipientUsers;
-
 // batchRecipients: single dispatcher used by the batch route. Returns affected.
 export async function batchRecipients(
   action: unknown,
@@ -207,7 +199,7 @@ export async function batchRecipients(
   if (action === "addUsers") {
     return await addRecipientUsers(validateRecipientIds(userIds, "userIds"));
   }
-  throw new Error(
+  throw new ValidationError(
     "action must be activate, deactivate, delete, or addUsers",
   );
 }

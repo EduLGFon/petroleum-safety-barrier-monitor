@@ -71,26 +71,33 @@ When `AUTH_SSO_ENABLED=true`, Entra routes are available under `/auth/entra/*`. 
 
 Admin-only batch routes used by the settings workspace. Each applies all ids
 in one transaction, validates a documented maximum id count, and returns
-`{ affected }`.
+`{ affected }`. Validation and guard failures answer `400` with
+`{ error, code: "BAD_REQUEST", requestId }`; unexpected failures answer `500`
+with the standard `INTERNAL` envelope and never include raw database text.
 
 - `POST /api/users/batch` (admin): `{ action, ids }`. Actions:
-  `activate`, `deactivate`, `promote`, `demote`, `revokeSessions`
-  (PT/EN aliases accepted). Max 500 unique positive ids. Locks active
-  admins, preserves the last active admin and last active local admin
-  guards, revokes sessions on active-state changes. The UI redirects to
-  `/login` when the current user is in a deactivate or revoke set.
+  `activate`, `deactivate`, `promote`, `demote`, `revokeSessions` (canonical
+  names only, no aliases). Max 500 unique positive safe-integer ids. The
+  batch fails with 400 when any id is missing. Locks active admins, preserves
+  the last active admin and last active local admin guards, and revokes
+  sessions on active-state changes. `affected` counts rows actually changed;
+  `revokeSessions` counts deleted session rows. The UI redirects to `/login`
+  when the current user is in a deactivate or revoke set.
 - `POST /api/access-groups/batch` (admin): `{ action, ids, userIds? |
-  locationIds? }` with aliases (`groupIds`, `users`, `stations`, ...).
-  Actions: `delete`, `addUsers`, `removeUsers`, `addLocations`,
-  `removeLocations`. Max 200 group ids and 500 related ids; the cross
-  product is capped at 20,000. Uses `withTx`; cascade deletes; missing
-  groups return 400.
+  locationIds? }`. Actions: `delete`, `addUsers`, `removeUsers`,
+  `addLocations`, `removeLocations` (canonical names only). Max 200 group ids
+  and 500 related ids; the cross product is capped at 20,000. Uses `withTx`;
+  cascade deletes. Missing groups return 400. On `addUsers` and
+  `addLocations`, every related user or location id is checked inside the
+  same transaction, so unknown ids return 400 instead of a foreign-key 500.
 - `POST /api/recipients/batch` (admin): `{ action, ids?, userIds? }`.
-  Actions: `activate`, `deactivate`, `delete`, `addUsers`. Max 500 ids.
-  `addUsers` inserts from `users` with
+  Actions: `activate`, `deactivate`, `delete`, `addUsers`. Max 500 unique
+  positive safe-integer ids. `addUsers` inserts from `users` with
   `on conflict (email) do update set ... , active = true`.
 - `POST /api/alert-rules/batch` (admin): `{ action, ids }`. Actions:
-  `activate`, `deactivate`, `delete`. Max 500 ids, atomic.
+  `activate`, `deactivate`, `delete`. Max 500 unique ids, deduped before the
+  cap, atomic, and all-or-nothing: a missing id returns 400. `affected`
+  counts rows actually changed.
 - `PUT /api/field-options?field=<key>` (admin, existing route): replaces
   one field's option list with `{ options: string[] }`. Used by the
   options page for bulk removal (send the remaining array), add-option, and
