@@ -368,17 +368,20 @@ export function UsersManager(
           >
             Novo usuário
           </button>
-          {select("Filtrar por perfil", roleFilter, onRoleFilter, [
+          {select("Filtrar por perfil", roleFilter, (v) =>
+            onRoleFilter(v as typeof roleFilter), [
             ["all", "Todos os perfis"],
             ["admin", "Admin"],
             ["user", "Usuário"],
           ])}
-          {select("Filtrar por status", statusFilter, onStatusFilter, [
+          {select("Filtrar por status", statusFilter, (v) =>
+            onStatusFilter(v as typeof statusFilter), [
             ["all", "Todos os status"],
             ["active", "Ativo"],
             ["inactive", "Inativo"],
           ])}
-          {select("Filtrar por origem", sourceFilter, onSourceFilter, [
+          {select("Filtrar por origem", sourceFilter, (v) =>
+            onSourceFilter(v as typeof sourceFilter), [
             ["all", "Todas as origens"],
             ["entra", "Entra"],
             ["local", "Local"],
@@ -390,12 +393,14 @@ export function UsersManager(
         open={createOpen}
         mode="create"
         accessGroups={accessGroups}
-        onClose={() => setCreateOpen(false)}
+        onClose={() =>
+          setCreateOpen(false)}
         onSaved={(m) => {
           setNotice(m);
           void refresh();
         }}
-        onError={(m) => setError(m)}
+        onError={(m) =>
+          setError(m)}
       />
       {editFor && (
         <UserFormDialog
@@ -409,7 +414,8 @@ export function UsersManager(
             void refresh();
             setEditFor(null);
           }}
-          onError={(m) => setError(m)}
+          onError={(m) =>
+            setError(m)}
         />
       )}
       {resetTemp && (
@@ -462,7 +468,8 @@ export function UsersManager(
                 </AdminBulkButton>
                 <AdminBulkButton
                   disabled={busyBulk}
-                  onClick={() => void runBulk("promote")}
+                  onClick={() =>
+                    void runBulk("promote")}
                 >
                   Promover
                 </AdminBulkButton>
