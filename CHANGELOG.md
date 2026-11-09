@@ -12,7 +12,8 @@
   `POST /api/alert-rules/batch`, and bulk use of
   `PUT /api/field-options?field=...`.
 - Docs: architecture, API, decisions, and README updated for the settings
-  batch work (D34).
+  batch work (D34, D35); batch validation now returns typed 400s and hides
+  database errors.
 
 ## 2026-11-06
 
