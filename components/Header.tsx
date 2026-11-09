@@ -9,8 +9,6 @@ import {
   toHealthKind,
 } from "../lib/sync-indicator.ts";
 
-import { type Conn, useConnection } from "../hooks/useConnection.ts";
-
 import type { AuthUser, SyncStatus } from "../lib/types.ts";
 
 import type { SettingsSection } from "./SettingsPanel.tsx";
@@ -20,6 +18,8 @@ import { SyncHoverCard } from "./header/SyncHoverCard.tsx";
 import { useEffect, useRef, useState } from "preact/hooks";
 
 import { AURORA, AURORA_TYPE } from "../lib/aurora.ts";
+
+import type { Conn } from "../hooks/useConnection.ts";
 
 import { HealthDot } from "./header/HealthDot.tsx";
 
@@ -32,9 +32,9 @@ import { apiFetch } from "../lib/api/http.ts";
 interface Props {
   onOpenSettings: (section?: SettingsSection) => void;
   companyName?: string;
-  // Base URL of the API origin. Empty = same origin as the page, so the
-  // health probe defaults to the relative "/api/health".
-  apiBaseUrl?: string;
+  // Live server connection from the single heartbeat owned by
+  // DashboardSections. Header only renders the state.
+  conn: Conn;
   // Authenticated session identity (crossed from the server route). Shown
   // as email + role with a logout action; absent = menu hidden.
   sessionUser?: AuthUser | null;
@@ -88,20 +88,16 @@ async function logoutToLogin(): Promise<void> {
 // Header: title + merged health dot plus sync subtitle on the left,
 // settings gear on the right. Hovering or focusing the title block opens
 // the summary card (touch toggles it with a tap); its button opens the
-// full details dialog.
+// settings Sincronização page.
 export function Header(
   {
     onOpenSettings,
     companyName = "",
-    apiBaseUrl = "",
+    conn,
     sessionUser = null,
     syncStatus = null,
   }: Props,
 ) {
-  const healthUrl = apiBaseUrl
-    ? `${apiBaseUrl.replace(/\/$/, "")}/api/health`
-    : "/api/health";
-  const conn = useConnection(healthUrl);
   const [syncOpen, setSyncOpen] = useState(false);
   // Hover intent: a short close delay forgives cursor slips off the title
   // or card edges, so reaching the details button never races the dismiss.
@@ -229,7 +225,7 @@ export function Header(
                 gap: 8,
                 padding: "0 6px 0 12px",
                 height: 32,
-                background: AURORA.pill,
+                backgroundColor: AURORA.pill,
                 border: `1px solid ${AURORA.pillBorder}`,
                 borderRadius: 99,
                 color: AURORA.pillText,
@@ -247,7 +243,7 @@ export function Header(
                   whiteSpace: "nowrap",
                 }}
               >
-                {greetingName(sessionUser.name)}
+                {greetingName(sessionUser.name, sessionUser.email)}
               </span>
               {sessionUser.role === "admin" && (
                 <span

@@ -98,10 +98,11 @@ Shared primitives used by the admin pages:
 - `components/table/Pagination.tsx`: reused pager.
 - Workspace CSS classes live in `static/styles.css`.
 
-Header identity shows `Olá, {name || "Usuário"}` (email stays in `title`).
-Admins get a restrained animated gradient/halo/shimmer plus crown/sparkle;
-non-admins get the standard fade/hover/pulse. Reduced motion is respected
-across all themes.
+Header identity shows `Olá, {name}`, falling back to the email local part
+and then `Usuário` (the email stays in `title`). Admins get the animated
+gradient, halo, shimmer, gradient name text, and crown; non-admins get the
+standard fade-in and hover lift. Reduced motion and `html.no-anim` suppress
+the animation across all themes.
 
 ## Paging
 
@@ -143,8 +144,12 @@ single-row requests:
 Synchronization history lives as the "Sincronização" page inside the settings
 workspace instead of a modal. `SyncSection` reuses `SyncChangesList`, the
 same last-run metadata, the technical note, and the "Última sync" /
-"Últimas 24h" tabs. `SettingsPanel` accepts optional `syncStatus`, `conn`,
-`apiBaseUrl`, and `onOpenBarrier` props. `DashboardSections` tracks the
-landing section; the hover-card shortcut opens settings on `sync`, and opening
-a barrier from sync rows closes settings first. The old `SyncDetailsModal`
-and its lazy import were removed.
+"Últimas 24h" tabs. `DashboardSections` owns the single
+`useConnection(healthUrl)` heartbeat (health URL derived from `apiBaseUrl`)
+and passes `conn` to `Header` and `DashboardOverlays`; `DashboardChrome`
+forwards it to `SettingsPanel`, so the sync page health label follows the
+live connection instead of a hard-coded default. `SettingsPanel` accepts
+optional `syncStatus`, `conn`, `apiBaseUrl`, and `onOpenBarrier` props.
+`DashboardSections` tracks the landing section; the hover-card shortcut opens
+settings on `sync`, and opening a barrier from sync rows closes settings
+first. Sync history is no longer a separate modal.

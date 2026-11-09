@@ -1,9 +1,9 @@
 // SyncHoverCard - skim-friendly sync summary for hover/focus.
 // This is why it exists: the subtitle line stays one short row, while the
 // key facts (when, how long, what changed) ride this card. Verbose detail
-// (item list, raw scope, full note) lives in SyncDetailsModal behind the
-// "Ver detalhes" button. Labels avoid sync jargon so first-time operators
-// read it with no glossary.
+// (item list, raw scope, full note) lives in the settings Sincronização page
+// behind the "Ver detalhes" button. Labels avoid sync jargon so first-time
+// operators read it with no glossary.
 import {
   formatDuration,
   formatInstant,
@@ -48,7 +48,7 @@ export function Row({ k, v }: { k: string; v: string }) {
 
 // Stat: one labeled count (big aligned number, small caption). Numbers share
 // one tabular size and one row height so the four blocks always line up.
-// Exported for SyncDetailsModal, which repeats the same stats.
+// Exported for SyncChangesSummary, which repeats the same stats.
 export function Stat(
   { value, caption, color }: { value: number; caption: string; color: string },
 ) {
@@ -82,7 +82,8 @@ export function Stat(
 }
 
 // SectionTitle: small uppercase caption splitting card sections.
-// Exported for SyncDetailsModal, which shares the same section captions.
+// Exported for SyncChangesSummary and the settings sync page, which share
+// the same section captions.
 export function SectionTitle({ text }: { text: string }) {
   return (
     <div

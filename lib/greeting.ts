@@ -1,21 +1,15 @@
 // Greeting helper for the header identity pill.
 // This is why it exists: one source of truth for the "Olá, {name}" label so
 // the header and any future caller agree on the fallback and trimming.
-// Pure: no DOM, no state, deterministic for any input.
-export function greetingName(name: string | null | undefined): string {
+// Pure: no DOM, no state, deterministic for any input. Prefer the trimmed
+// display name; otherwise use the email local part (the only identity that
+// may still be populated); otherwise the generic "Usuário" label.
+export function greetingName(
+  name: string | null | undefined,
+  email?: string | null,
+): string {
   const trimmed = (name ?? "").trim();
-  return `Olá, ${trimmed || "Usuário"}`;
+  if (trimmed) return `Olá, ${trimmed}`;
+  const localPart = (email ?? "").split("@")[0].trim();
+  return `Olá, ${localPart || "Usuário"}`;
 }
-
-// Aliases kept for callers that prefer a different verb; all share one impl.
-export const greeting = greetingName;
-export const headerGreeting = greetingName;
-export const userGreeting = greetingName;
-export const formatGreeting = greetingName;
-export const greet = greetingName;
-export const ola = greetingName;
-
-export default greetingName;
-export const greetUser = greetingName;
-export const olaUsuario = greetingName;
-export const headerTitle = greetingName;

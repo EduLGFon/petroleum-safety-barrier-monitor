@@ -141,8 +141,9 @@ export function BarrierModal(
         style={{
           position: "fixed",
           inset: 0,
-          // Above SyncDetailsModal (990/991) so opening a barrier from the
-          // sync changes list blurs/dims the sync dialog too, not just the page.
+          // Barrier dialog sits above the page mesh. The settings workspace
+          // is higher (1000/1001), and opening a barrier from the sync list
+          // closes settings first, so the two overlays never stack.
           zIndex: 992,
           // Hidden (not just transparent) when closed: fullscreen
           // backdrop-filter snapshots the page even at opacity 0.
