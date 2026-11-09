@@ -1,9 +1,12 @@
 // Rule editor tab bodies - scope and anti-noise fields.
 // Split out of RulesManager so each tab can be reviewed on its own.
-import { Field, inputSt } from "./AdminPrimitives.tsx";
-import { SearchMultiSelect } from "../SearchMultiSelect.tsx";
 import { numCoercionError, toggleId, WEEKDAYS } from "./rules-helpers.tsx";
+
+import { SearchMultiSelect } from "../SearchMultiSelect.tsx";
+
 import type { Draft, Lookups } from "./rules-helpers.tsx";
+
+import { Field, inputSt } from "./AdminPrimitives.tsx";
 
 interface TabProps {
   form: Draft;
