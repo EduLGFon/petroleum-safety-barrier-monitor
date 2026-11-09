@@ -258,12 +258,8 @@ export type AccessGroupBatchAction =
 export interface AccessGroupBatchInput {
   action: string;
   ids?: unknown;
-  groupIds?: unknown;
   userIds?: unknown;
   locationIds?: unknown;
-  locations?: unknown;
-  users?: unknown;
-  relatedIds?: unknown;
 }
 
 export interface AccessGroupBatchValidated {
@@ -319,11 +315,7 @@ export function validateAccessGroupBatch(
   }
   const b = body as AccessGroupBatchInput;
   const action = canonicalAction(b.action);
-  const groupIds = toUniquePositiveIds(
-    b.ids ?? b.groupIds,
-    "group ids",
-    200,
-  );
+  const groupIds = toUniquePositiveIds(b.ids, "group ids", 200);
   if (groupIds.length === 0) {
     throw new ValidationError("group ids must not be empty");
   }
@@ -332,8 +324,8 @@ export function validateAccessGroupBatch(
     return { action, groupIds, relatedIds: [] };
   }
   const relatedRaw = action === "addUsers" || action === "removeUsers"
-    ? (b.userIds ?? b.users ?? b.relatedIds)
-    : (b.locationIds ?? b.locations ?? b.relatedIds);
+    ? b.userIds
+    : b.locationIds;
   const relatedIds = toUniquePositiveIds(relatedRaw, "related ids", 500);
   if (relatedIds.length === 0) {
     throw new ValidationError("related ids must not be empty");

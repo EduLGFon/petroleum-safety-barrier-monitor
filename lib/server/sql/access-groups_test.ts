@@ -39,6 +39,31 @@ Deno.test("access group batch accepts every canonical action", () => {
   assertEquals(removeLocations.action, "removeLocations");
 });
 
+Deno.test("access group batch rejects alias request keys", () => {
+  assertThrows(
+    () => validateAccessGroupBatch({ action: "delete", groupIds: [1] }),
+    ValidationError,
+  );
+  assertThrows(
+    () =>
+      validateAccessGroupBatch({
+        action: "addUsers",
+        ids: [1],
+        users: [10],
+      }),
+    ValidationError,
+  );
+  assertThrows(
+    () =>
+      validateAccessGroupBatch({
+        action: "addLocations",
+        ids: [1],
+        locations: [20],
+      }),
+    ValidationError,
+  );
+});
+
 Deno.test("access group batch rejects too many group ids", () => {
   const ids = Array.from({ length: 201 }, (_, i) => i + 1);
   assertThrows(

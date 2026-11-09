@@ -92,7 +92,7 @@ export async function deleteRecipient(id: number): Promise<boolean> {
 
 // validateRecipientIds: pure validator for batch id arrays. Returns a deduped
 // list of positive safe integers and throws on anything else, so the route and
-// the SQL store agree on the 500-id ceiling and the wire contract.
+// the SQL store agree on the 500 unique-id ceiling and the wire contract.
 export function validateRecipientIds(
   raw: unknown,
   field = "ids",
@@ -102,9 +102,6 @@ export function validateRecipientIds(
   }
   if (raw.length === 0) {
     throw new ValidationError(`${field} must not be empty`);
-  }
-  if (raw.length > 500) {
-    throw new ValidationError(`${field} must contain at most 500 items`);
   }
   const seen = new Set<number>();
   const out: number[] = [];

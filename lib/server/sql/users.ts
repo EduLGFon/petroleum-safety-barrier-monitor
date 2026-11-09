@@ -560,24 +560,28 @@ export async function batchUsers(
   ids: number[],
   action: UserBatchAction,
 ): Promise<{ affected: number }> {
+  // Re-normalize even though the route already does: a direct caller must
+  // get a typed 400-mapped rejection, never a TypeError during SQL binding.
+  const normIds = normalizeUserBatchIds(ids);
+  const a = normalizeUserBatchAction(action);
   return await withTx(async (query) => {
     await lockActiveAdmins(query);
     const rows = await query<
       { id: number; active: boolean; role: string; auth_source: string }
     >(
       `select id, active, role, auth_source from users where id = any($1)`,
-      [ids],
+      [normIds],
     );
     const byId = new Map(rows.map((r) => [r.id, r]));
-    const missing = ids.filter((id) => !byId.has(id));
+    const missing = normIds.filter((id) => !byId.has(id));
     if (missing.length > 0) {
       throw new ValidationError(`missing users: ${missing.join(", ")}`);
     }
 
-    if (action === "revokeSessions") {
+    if (a === "revokeSessions") {
       const deleted = await query<{ id: number }>(
         `delete from sessions where user_id = any($1::int[]) returning id`,
-        [ids],
+        [normIds],
       );
       return { affected: deleted.length };
     }
@@ -585,15 +589,15 @@ export async function batchUsers(
     let affected = 0;
     const changedActive: number[] = [];
 
-    for (const id of ids) {
+    for (const id of normIds) {
       const current = byId.get(id);
       if (!current) continue;
-      if (action === "activate") {
+      if (a === "activate") {
         if (current.active) continue;
         await query(`update users set active = true where id = $1`, [id]);
         affected += 1;
         changedActive.push(id);
-      } else if (action === "deactivate") {
+      } else if (a === "deactivate") {
         if (!current.active) continue;
         if (current.role === "admin") {
           if ((await countActiveAdmins(query)) <= 1) {
@@ -613,11 +617,11 @@ export async function batchUsers(
         await query(`update users set active = false where id = $1`, [id]);
         affected += 1;
         changedActive.push(id);
-      } else if (action === "promote") {
+      } else if (a === "promote") {
         if (current.role === "admin") continue;
         await query(`update users set role = 'admin' where id = $1`, [id]);
         affected += 1;
-      } else if (action === "demote") {
+      } else if (a === "demote") {
         if (current.role !== "admin") continue;
         if (current.active) {
           if ((await countActiveAdmins(query)) <= 1) {

@@ -25,6 +25,12 @@ Deno.test("validateRecipientIds rejects empty, oversized, and bad values", () =>
   assertThrows(() => validateRecipientIds(big), ValidationError);
 });
 
+Deno.test("validateRecipientIds dedupes before the max cap", () => {
+  assertEquals(validateRecipientIds(new Array(501).fill(7)), [7]);
+  const distinct = Array.from({ length: 501 }, (_, i) => i + 1);
+  assertThrows(() => validateRecipientIds(distinct), ValidationError);
+});
+
 Deno.test("batchRecipients accepts the four canonical actions", async () => {
   for (const action of ["activate", "deactivate", "delete"]) {
     await assertRejects(
