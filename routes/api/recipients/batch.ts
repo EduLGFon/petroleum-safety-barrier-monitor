@@ -15,13 +15,16 @@ import {
   rateLimited,
 } from "../../../lib/server/errors.ts";
 
+import {
+  readJsonBody,
+  ValidationError,
+} from "../../../lib/server/validation.ts";
+
 import { routeClientKey, writeThrottle } from "../../../lib/server/throttle.ts";
 
 import { batchRecipients } from "../../../lib/server/sql/recipients.ts";
 
 import { loadServerConfig } from "../../../lib/server/config.ts";
-
-import { readJsonBody } from "../../../lib/server/validation.ts";
 
 import { denyIfCrossSite } from "../../../lib/server/csrf.ts";
 
@@ -69,15 +72,8 @@ export const handler = define.handlers({
       );
       return ok({ affected }, requestId);
     } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
-      if (
-        message.includes("must be") ||
-        message.includes("action must be") ||
-        message.includes("array") ||
-        message.includes("positive integers") ||
-        message.includes("empty")
-      ) {
-        return badRequest(message, requestId);
+      if (err instanceof ValidationError) {
+        return badRequest(err.message, requestId);
       }
       return internal(
         "POST /api/recipients/batch",

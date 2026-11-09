@@ -2,6 +2,18 @@
 // This is why it exists: the rules page selects many rows and applies one
 // action atomically instead of N single-row requests.
 import {
+  batchAlertRules,
+  normalizeAlertRuleBatchAction,
+  normalizeAlertRuleBatchIds,
+} from "../../../lib/server/sql/alert_rules.ts";
+
+import {
+  authStoreUnavailable,
+  denyByCredentials,
+  requireAdminAuth,
+} from "../../../lib/server/auth.ts";
+
+import {
   badRequest,
   internal,
   newRequestId,
@@ -10,26 +22,17 @@ import {
 } from "../../../lib/server/errors.ts";
 
 import {
-  authStoreUnavailable,
-  denyByCredentials,
-  requireAdminAuth,
-} from "../../../lib/server/auth.ts";
-
-import { loadServerConfig } from "../../../lib/server/config.ts";
-
-import { readJsonBody } from "../../../lib/server/validation.ts";
+  readJsonBody,
+  ValidationError,
+} from "../../../lib/server/validation.ts";
 
 import { routeClientKey, writeThrottle } from "../../../lib/server/throttle.ts";
 
-import {
-  batchAlertRules,
-  normalizeAlertRuleBatchAction,
-  normalizeAlertRuleBatchIds,
-} from "../../../lib/server/sql/alert_rules.ts";
-
-import { define } from "../../../utils.ts";
+import { loadServerConfig } from "../../../lib/server/config.ts";
 
 import { denyIfCrossSite } from "../../../lib/server/csrf.ts";
+
+import { define } from "../../../utils.ts";
 
 export const handler = define.handlers({
   async POST(ctx) {
@@ -67,11 +70,18 @@ export const handler = define.handlers({
     try {
       const action = normalizeAlertRuleBatchAction(body.action);
       const ids = normalizeAlertRuleBatchIds(body.ids);
-      const affected = await batchAlertRules(action, ids);
-      return ok({ affected }, requestId);
+      const result = await batchAlertRules(action, ids);
+      return ok(result, requestId);
     } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
-      return badRequest(message, requestId);
+      if (err instanceof ValidationError) {
+        return badRequest(err.message, requestId);
+      }
+      return internal(
+        "POST /api/alert-rules/batch",
+        err,
+        requestId,
+        "Failed to run alert rule batch",
+      );
     }
   },
 });

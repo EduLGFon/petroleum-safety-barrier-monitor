@@ -1,5 +1,11 @@
 // API: /api/access-groups/batch - admin bulk operations on access groups.
 import {
+  authStoreUnavailable,
+  denyByCredentials,
+  requireAdminAuth,
+} from "../../../lib/server/auth.ts";
+
+import {
   badRequest,
   internal,
   newRequestId,
@@ -8,22 +14,19 @@ import {
 } from "../../../lib/server/errors.ts";
 
 import {
-  authStoreUnavailable,
-  denyByCredentials,
-  requireAdminAuth,
-} from "../../../lib/server/auth.ts";
-
-import { batchAccessGroups } from "../../../lib/server/sql/access-groups.ts";
+  readJsonBodyCapped,
+  ValidationError,
+} from "../../../lib/server/validation.ts";
 
 import { routeClientKey, writeThrottle } from "../../../lib/server/throttle.ts";
 
-import { readJsonBodyCapped } from "../../../lib/server/validation.ts";
+import { batchAccessGroups } from "../../../lib/server/sql/access-groups.ts";
 
 import { loadServerConfig } from "../../../lib/server/config.ts";
 
-import { define } from "../../../utils.ts";
-
 import { denyIfCrossSite } from "../../../lib/server/csrf.ts";
+
+import { define } from "../../../utils.ts";
 
 export const handler = define.handlers({
   async POST(ctx) {
@@ -68,15 +71,8 @@ export const handler = define.handlers({
       const result = await batchAccessGroups(parsed.body as never);
       return ok(result, requestId);
     } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
-      if (
-        message.includes("must be") ||
-        message.includes("missing groups") ||
-        message.includes("must not") ||
-        message.includes("empty") ||
-        message.includes("action")
-      ) {
-        return badRequest(message, requestId);
+      if (err instanceof ValidationError) {
+        return badRequest(err.message, requestId);
       }
       return internal(
         "POST /api/access-groups/batch",
