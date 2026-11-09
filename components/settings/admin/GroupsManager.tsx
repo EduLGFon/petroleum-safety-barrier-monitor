@@ -1,28 +1,33 @@
-// GroupsManager - admin groups with strict station access.
+// GroupsManager - admin access groups with search, paging, selection, and
+// guarded bulk actions. Each bulk action sends one batch request and reports
+// how many rows changed.
 import {
   AdminCard,
   AdminHero,
   AdminRow,
   EmptyState,
   ErrorBanner,
+  ghostBtn,
   StatusBadge,
 } from "./AdminPrimitives.tsx";
 
-import { AdminBulkButton } from "./AdminListControls.tsx";
-
 import { AdminSearchInput, AdminSelectionBar } from "./AdminListControls.tsx";
 
-import { GroupFormDialog } from "./GroupFormDialog.tsx";
-import { GroupBulkDialog } from "./GroupBulkDialog.tsx";
+import { useAdminResource } from "../../../hooks/useAdminResource.ts";
 
 import { useAdminList } from "../../../hooks/useAdminList.ts";
-import { useAdminResource } from "../../../hooks/useAdminResource.ts";
 
 import { adminApi } from "../../../lib/api/admin-client.ts";
 
-import { useState } from "preact/hooks";
+import { AdminBulkButton } from "./AdminListControls.tsx";
+
+import { GroupFormDialog } from "./GroupFormDialog.tsx";
+
+import { GroupBulkDialog } from "./GroupBulkDialog.tsx";
 
 import { Pagination } from "../../table/Pagination.tsx";
+
+import { useCallback, useState } from "preact/hooks";
 
 interface Group {
   id: number;
@@ -44,6 +49,10 @@ interface UserOpt {
   name: string;
 }
 
+// Stable identity helper so useAdminList does not rebuild its memos each
+// render.
+const getGroupId = (g: Group) => g.id;
+
 export function GroupsManager({ onCount }: { onCount?: (n: number) => void }) {
   const [locations, setLocations] = useState<LocationOpt[]>([]);
   const [users, setUsers] = useState<UserOpt[]>([]);
@@ -61,18 +70,22 @@ export function GroupsManager({ onCount }: { onCount?: (n: number) => void }) {
   const { items: groups, loading, error, setError, reload: reloadGroups } =
     resource;
 
+  // Search also matches station codes and user names, so it depends on the
+  // loaded lookups but stays stable across ordinary renders.
+  const getGroupSearchText = useCallback((g: Group) => {
+    const locNames = g.locationIds
+      .map((id) => locations.find((l) => l.id === id)?.code ?? "")
+      .join(" ");
+    const userNames = g.userIds
+      .map((id) => users.find((u) => u.id === id)?.name ?? "")
+      .join(" ");
+    return `${g.name} ${g.description} ${locNames} ${userNames}`;
+  }, [locations, users]);
+
   const list = useAdminList<Group, number>({
     items: groups,
-    getId: (g) => g.id,
-    getSearchText: (g) => {
-      const locNames = g.locationIds
-        .map((id) => locations.find((l) => l.id === id)?.code ?? "")
-        .join(" ");
-      const userNames = g.userIds
-        .map((id) => users.find((u) => u.id === id)?.name ?? "")
-        .join(" ");
-      return `${g.name} ${g.description} ${locNames} ${userNames}`;
-    },
+    getId: getGroupId,
+    getSearchText: getGroupSearchText,
   });
 
   const [formOpen, setFormOpen] = useState(false);
@@ -82,6 +95,8 @@ export function GroupsManager({ onCount }: { onCount?: (n: number) => void }) {
     "addUsers" | "removeUsers" | "addLocations" | "removeLocations"
   >("addUsers");
   const [rowBusy, setRowBusy] = useState<number | null>(null);
+  const [bulkBusy, setBulkBusy] = useState(false);
+  const [notice, setNotice] = useState("");
 
   async function refresh() {
     await reloadGroups();
@@ -112,25 +127,32 @@ export function GroupsManager({ onCount }: { onCount?: (n: number) => void }) {
   }
 
   async function bulkDelete() {
+    if (bulkBusy) return;
     const ids = [...list.selectedIds];
     if (ids.length === 0) return;
     if (!confirm(`Excluir ${ids.length} grupo(s)?`)) return;
+    setBulkBusy(true);
     try {
-      await adminApi("/api/access-groups/batch", {
+      const result = await adminApi("/api/access-groups/batch", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ action: "delete", ids }),
-      });
+      }) as { affected: number };
+      const affected = result.affected ?? ids.length;
       list.clearAll();
+      setNotice(`Ação concluída: ${affected} afetado(s).`);
       await refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setBulkBusy(false);
     }
   }
 
   function openBulk(
     mode: "addUsers" | "removeUsers" | "addLocations" | "removeLocations",
   ) {
+    if (bulkBusy) return;
     if (list.selectedIds.size === 0) return;
     setBulkMode(mode);
     setBulkOpen(true);
@@ -152,6 +174,35 @@ export function GroupsManager({ onCount }: { onCount?: (n: number) => void }) {
         count={`${groups.length} grupos`}
       />
       {error && <ErrorBanner message={error} onRetry={() => void refresh()} />}
+      {notice && (
+        <div
+          role="status"
+          className="animate-fade-in"
+          style={{
+            display: "flex",
+            gap: 10,
+            alignItems: "center",
+            justifyContent: "space-between",
+            background: "rgba(16,185,129,.14)",
+            border: "1px solid rgba(16,185,129,.3)",
+            color: "#10b981",
+            borderRadius: "var(--d-row-radius)",
+            padding: "10px 12px",
+            fontSize: "var(--d-small)",
+            fontWeight: 600,
+            lineHeight: 1.5,
+          }}
+        >
+          <span style={{ minWidth: 0 }}>{notice}</span>
+          <button
+            type="button"
+            onClick={() => setNotice("")}
+            style={ghostBtn}
+          >
+            Fechar
+          </button>
+        </div>
+      )}
 
       <AdminCard>
         <div
@@ -197,19 +248,35 @@ export function GroupsManager({ onCount }: { onCount?: (n: number) => void }) {
         >
           {list.selectedIds.size > 0 && (
             <>
-              <AdminBulkButton tone="danger" onClick={() => void bulkDelete()}>
+              <AdminBulkButton
+                tone="danger"
+                disabled={bulkBusy}
+                onClick={() => void bulkDelete()}
+              >
                 Excluir grupos
               </AdminBulkButton>
-              <AdminBulkButton onClick={() => openBulk("addUsers")}>
+              <AdminBulkButton
+                disabled={bulkBusy}
+                onClick={() => openBulk("addUsers")}
+              >
                 Adicionar usuários
               </AdminBulkButton>
-              <AdminBulkButton onClick={() => openBulk("removeUsers")}>
+              <AdminBulkButton
+                disabled={bulkBusy}
+                onClick={() => openBulk("removeUsers")}
+              >
                 Remover usuários
               </AdminBulkButton>
-              <AdminBulkButton onClick={() => openBulk("addLocations")}>
+              <AdminBulkButton
+                disabled={bulkBusy}
+                onClick={() => openBulk("addLocations")}
+              >
                 Adicionar estações
               </AdminBulkButton>
-              <AdminBulkButton onClick={() => openBulk("removeLocations")}>
+              <AdminBulkButton
+                disabled={bulkBusy}
+                onClick={() => openBulk("removeLocations")}
+              >
                 Remover estações
               </AdminBulkButton>
             </>
@@ -226,6 +293,7 @@ export function GroupsManager({ onCount }: { onCount?: (n: number) => void }) {
                     type="checkbox"
                     checked={list.selectedIds.has(g.id)}
                     onChange={() => list.toggle(g.id)}
+                    aria-label={`Selecionar ${g.name}`}
                     style={{ width: 16, height: 16 }}
                   />
                   <span style={{ minWidth: 0, flex: "1 1 160px" }}>
@@ -330,9 +398,10 @@ export function GroupsManager({ onCount }: { onCount?: (n: number) => void }) {
         locations={locations}
         users={users}
         onClose={() => setBulkOpen(false)}
-        onDone={() => {
+        onDone={(affected) => {
           setBulkOpen(false);
           list.clearAll();
+          setNotice(`Ação concluída: ${affected} afetado(s).`);
           void refresh();
         }}
       />

@@ -1,13 +1,15 @@
 // GroupFormDialog - create/edit an access group with stations and users.
-import { SearchMultiSelect } from "../../settings/SearchMultiSelect.tsx";
+// The form reseeds from props whenever it opens or the edited group changes,
+// so a create after an edit never reuses the previous values.
+import { Field, ghostBtn, inputSt, primaryBtn } from "./AdminPrimitives.tsx";
 
-import { AdminFormDialog } from "./AdminFormDialog.tsx";
+import { SearchMultiSelect } from "../../settings/SearchMultiSelect.tsx";
 
 import { adminApi } from "../../../lib/api/admin-client.ts";
 
-import { useState } from "preact/hooks";
+import { AdminFormDialog } from "./AdminFormDialog.tsx";
 
-import { Field, ghostBtn, inputSt, primaryBtn } from "./AdminPrimitives.tsx";
+import { useEffect, useState } from "preact/hooks";
 
 interface LocationOpt {
   id: number;
@@ -50,13 +52,21 @@ export function GroupFormDialog(
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
 
-  // Reset when the dialog opens for a different group.
-  // (Simple: sync on open change is handled by parent remounting via key.)
+  // Reseed on open or group change. The effect does not depend on the field
+  // values, so typing while the dialog stays open never resets the form.
+  useEffect(() => {
+    if (!open) return;
+    setName(group?.name ?? "");
+    setDescription(group?.description ?? "");
+    setLocationIds(group?.locationIds ?? []);
+    setUserIds(group?.userIds ?? []);
+    setError("");
+  }, [open, group?.id]);
 
   async function submit(e: Event) {
     e.preventDefault();
     if (!name.trim()) {
-      setError("name is required");
+      setError("Informe o nome do grupo.");
       return;
     }
     setBusy(true);

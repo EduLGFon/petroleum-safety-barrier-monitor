@@ -1,6 +1,6 @@
-// RecipientsManager - alert email audience with paging, selection, and bulk actions.
-// This is why it exists: the digest audience lives in alert_recipients;
-// this manager wraps its CRUD with PT labels, paging, and bulk operations.
+// RecipientsManager - alert email audience with paging, selection, and bulk
+// actions. The digest audience lives in alert_recipients; this manager wraps
+// its CRUD with PT labels and reports affected counts after bulk writes.
 import {
   AdminCard,
   AdminHero,
@@ -48,7 +48,12 @@ interface UserOption {
   phone: string;
 }
 
-// RecipientsManager: recipient CRUD with paging, selection, and bulk actions.
+// Stable helpers keep useAdminList's memo dependencies from changing every
+// render.
+const getRecipientId = (r: Recipient) => r.id;
+const getRecipientSearchText = (r: Recipient) =>
+  `${r.email} ${r.name} ${r.phone}`;
+
 export function RecipientsManager(
   { onCount }: { onCount?: (n: number) => void },
 ) {
@@ -57,6 +62,7 @@ export function RecipientsManager(
   const [confirmId, setConfirmId] = useState<number | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [bulkBusy, setBulkBusy] = useState(false);
+  const [notice, setNotice] = useState("");
 
   const resource = useAdminResource<Recipient>(async (signal?: AbortSignal) => {
     const list = await adminApi("/api/recipients", { signal }) as Recipient[];
@@ -79,8 +85,8 @@ export function RecipientsManager(
 
   const list = useAdminList<Recipient, number>({
     items,
-    getId: (r) => r.id,
-    getSearchText: (r) => `${r.email} ${r.name} ${r.phone}`,
+    getId: getRecipientId,
+    getSearchText: getRecipientSearchText,
   });
 
   const recipientEmails = new Set(items.map((r) => r.email.toLowerCase()));
@@ -120,6 +126,7 @@ export function RecipientsManager(
   }
 
   async function bulkAction(action: "activate" | "deactivate" | "delete") {
+    if (bulkBusy) return;
     const ids = [...list.selectedIds];
     if (ids.length === 0) return;
     if (
@@ -129,12 +136,14 @@ export function RecipientsManager(
     }
     setBulkBusy(true);
     try {
-      await adminApi("/api/recipients/batch", {
+      const result = await adminApi("/api/recipients/batch", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ action, ids }),
-      });
+      }) as { affected: number };
+      const affected = result.affected ?? ids.length;
       list.clearAll();
+      setNotice(`Ação concluída: ${affected} afetado(s).`);
       await refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
@@ -151,6 +160,35 @@ export function RecipientsManager(
         count={`${items.filter((r) => r.active).length} ativos`}
       />
       {error && <ErrorBanner message={error} onRetry={() => void refresh()} />}
+      {notice && (
+        <div
+          role="status"
+          className="animate-fade-in"
+          style={{
+            display: "flex",
+            gap: 10,
+            alignItems: "center",
+            justifyContent: "space-between",
+            background: "rgba(16,185,129,.14)",
+            border: "1px solid rgba(16,185,129,.3)",
+            color: "#10b981",
+            borderRadius: "var(--d-row-radius)",
+            padding: "10px 12px",
+            fontSize: "var(--d-small)",
+            fontWeight: 600,
+            lineHeight: 1.5,
+          }}
+        >
+          <span style={{ minWidth: 0 }}>{notice}</span>
+          <button
+            type="button"
+            onClick={() => setNotice("")}
+            style={ghostBtn}
+          >
+            Fechar
+          </button>
+        </div>
+      )}
       <AdminCard>
         <div
           style={{
