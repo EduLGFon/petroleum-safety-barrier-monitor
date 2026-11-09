@@ -128,27 +128,6 @@ export function numCoercionError(raw: string): string | null {
   return null;
 }
 
-// validateNumericDraft: maps Draft key -> field-level error for every numeric
-// timing/priority input. Empty means null (unset), which is valid.
-export function validateNumericDraft(d: Draft): Record<string, string> {
-  const errors: Record<string, string> = {};
-  const fields: [keyof Draft, string][] = [
-    ["staleDays", "Parado há N dias"],
-    ["staleRepeatDays", "Repetir lembrete"],
-    ["cooldownMinutes", "Pausa por barreira"],
-    ["maxPerDay", "Máx por dia"],
-    ["priority", "Prioridade"],
-    ["quietStart", "Silêncio das"],
-    ["quietEnd", "Silêncio até"],
-  ];
-  for (const [key, label] of fields) {
-    const raw = String(d[key] ?? "");
-    const err = numCoercionError(raw);
-    if (err) errors[key as string] = `${label}: ${err}`;
-  }
-  return errors;
-}
-
 export function draftToPayload(d: Draft): Record<string, unknown> {
   return {
     name: d.name,

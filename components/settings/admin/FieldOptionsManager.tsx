@@ -89,7 +89,9 @@ export function FieldOptionsManager(
     getSearchText: optionText,
   });
 
-  function save(next: string[]) {
+  // save returns true on success so callers (removeSelected) only
+  // clear selection after the PUT resolves.
+  function save(next: string[]): Promise<boolean> {
     const field = selected;
     const task = saveQueueRef.current.then(async () => {
       setBusy(true);
@@ -103,13 +105,15 @@ export function FieldOptionsManager(
         });
         setData((prev) => ({ ...prev, [field]: next }));
         setSuccess("Opções salvas com sucesso.");
+        return true;
       } catch (err) {
         setError(err instanceof Error ? err.message : String(err));
+        return false;
       } finally {
         setBusy(false);
       }
     });
-    saveQueueRef.current = task.catch(() => {});
+    saveQueueRef.current = task.then(() => {}, () => {});
     return task;
   }
 
@@ -126,11 +130,11 @@ export function FieldOptionsManager(
     void save(next);
   }
 
-  function removeSelected() {
+  async function removeSelected() {
     const selectedSet = list.selectedIds;
     const next = currentOpts.filter((opt) => !selectedSet.has(opt));
-    list.clearAll();
-    void save(next);
+    const ok = await save(next);
+    if (ok) list.clearAll();
   }
 
   function restoreDefaults() {
@@ -233,7 +237,7 @@ export function FieldOptionsManager(
                   <AdminBulkButton
                     tone="danger"
                     disabled={busy}
-                    onClick={removeSelected}
+                    onClick={() => void removeSelected()}
                   >
                     Remover selecionadas ({list.selectedCount})
                   </AdminBulkButton>

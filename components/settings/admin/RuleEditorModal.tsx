@@ -2,12 +2,15 @@
 // This is why it exists: admins tune multi-select scopes, triggers, and
 // anti-noise windows without leaving the rules list; the shared dialog keeps
 // focus trapping, scroll lock, and Escape handling consistent.
-import { AdminFormDialog } from "./AdminFormDialog.tsx";
 import { Field, ghostBtn, inputSt, primaryBtn } from "./AdminPrimitives.tsx";
+
 import { RuleScopeFields, RuleTimingFields } from "./RuleEditorTabs.tsx";
-import { numCoercionError } from "./rules-helpers.tsx";
+
 import type { Draft, Lookups } from "./rules-helpers.tsx";
-import type { RefObject } from "preact";
+
+import { AdminFormDialog } from "./AdminFormDialog.tsx";
+
+import { numCoercionError } from "./rules-helpers.tsx";
 
 export type TabKey = "basic" | "scope" | "timing";
 
@@ -19,7 +22,6 @@ export const TABS: { key: TabKey; label: string }[] = [
 
 interface Props {
   open: boolean;
-  modalRef?: RefObject<HTMLDivElement>;
   editingId: number | null;
   tab: TabKey;
   setTab: (t: TabKey) => void;

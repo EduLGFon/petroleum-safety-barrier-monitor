@@ -17,14 +17,6 @@ import {
 } from "./AdminPrimitives.tsx";
 
 import {
-  AdminBulkButton,
-  AdminSearchInput,
-  AdminSelectionBar,
-} from "./AdminListControls.tsx";
-
-import { adminApi } from "../../../lib/api/admin-client.ts";
-
-import {
   AlertRule,
   Draft,
   draftToPayload,
@@ -34,15 +26,21 @@ import {
   ruleToDraft,
 } from "./rules-helpers.tsx";
 
+import {
+  AdminBulkButton,
+  AdminSearchInput,
+  AdminSelectionBar,
+} from "./AdminListControls.tsx";
+
+import { useAdminResource } from "../../../hooks/useAdminResource.ts";
+
 import { RuleEditorModal, type TabKey } from "./RuleEditorModal.tsx";
 
 import { useEffect, useMemo, useRef, useState } from "preact/hooks";
 
 import { useAdminList } from "../../../hooks/useAdminList.ts";
 
-import { useAdminResource } from "../../../hooks/useAdminResource.ts";
-
-import { useFocusTrap } from "../../../hooks/useFocusTrap.ts";
+import { adminApi } from "../../../lib/api/admin-client.ts";
 
 import { Pagination } from "../../table/Pagination.tsx";
 
@@ -84,6 +82,16 @@ function scopeSummary(r: AlertRule): string {
   return parts.join(" · ");
 }
 
+// Stable list helpers hoisted to module scope so useAdminList does not
+// rebuild its filtered/selected state on every render.
+function ruleId(r: AlertRule): number {
+  return r.id;
+}
+
+function ruleSearchText(r: AlertRule): string {
+  return `${r.name} ${r.description} ${scopeSummary(r)}`;
+}
+
 export function RulesManager({ onCount }: { onCount?: (n: number) => void }) {
   const [lookups, setLookups] = useState<Lookups | null>(null);
   const [form, setForm] = useState<Draft>(EMPTY_DRAFT);
@@ -104,12 +112,10 @@ export function RulesManager({ onCount }: { onCount?: (n: number) => void }) {
     "all",
   );
   const [bulkBusy, setBulkBusy] = useState(false);
+  const [notice, setNotice] = useState("");
   const [error, setError] = useState("");
-  const modalRef = useRef<HTMLDivElement | null>(null);
   const previewTimer = useRef<number | undefined>(undefined);
   const previewAbort = useRef<AbortController | null>(null);
-  const lastFocus = useRef<HTMLElement | null>(null);
-  useFocusTrap(modalRef, modalOpen);
 
   const resource = useAdminResource<AlertRule>(
     async (signal?: AbortSignal) => {
@@ -137,36 +143,15 @@ export function RulesManager({ onCount }: { onCount?: (n: number) => void }) {
     await reload();
   }
 
+  // AdminFormDialog owns focus trap, Escape, scroll lock and focus
+  // restore. Only abort in-flight preview requests and clear the
+  // debounce timer when the editor closes.
   useEffect(() => {
-    if (!modalOpen) return;
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setModalOpen(false);
-    };
-    document.addEventListener("keydown", onKey);
-    return () => document.removeEventListener("keydown", onKey);
-  }, [modalOpen]);
-
-  useEffect(() => {
-    if (!modalOpen) return;
-    lastFocus.current = document.activeElement as HTMLElement | null;
-    const prevOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    const t = globalThis.setTimeout(() => {
-      const node = modalRef.current;
-      const first = node?.querySelector<HTMLElement>(
-        "input, select, textarea, button",
-      );
-      first?.focus();
-    }, 0);
-    return () => {
-      globalThis.clearTimeout(t);
-      document.body.style.overflow = prevOverflow;
-      previewAbort.current?.abort();
-      if (previewTimer.current !== undefined) {
-        globalThis.clearTimeout(previewTimer.current);
-      }
-      lastFocus.current?.focus?.();
-    };
+    if (modalOpen) return;
+    previewAbort.current?.abort();
+    if (previewTimer.current !== undefined) {
+      globalThis.clearTimeout(previewTimer.current);
+    }
   }, [modalOpen]);
 
   useEffect(() => {
@@ -188,9 +173,17 @@ export function RulesManager({ onCount }: { onCount?: (n: number) => void }) {
 
   const list = useAdminList<AlertRule, number>({
     items: scopedRules,
-    getId: (r) => r.id,
-    getSearchText: (r) => `${r.name} ${r.description} ${scopeSummary(r)}`,
+    getId: ruleId,
+    getSearchText: ruleSearchText,
   });
+
+  // Filter changes must not act on hidden selections: reset paging and
+  // clear selection whenever the status filter changes.
+  function setStatus(value: "all" | "active" | "inactive") {
+    setStatusFilter(value);
+    list.setPage(1);
+    list.clearAll();
+  }
 
   function update(patch: Partial<Draft>) {
     setForm((prev) => ({ ...prev, ...patch }));
@@ -363,12 +356,14 @@ export function RulesManager({ onCount }: { onCount?: (n: number) => void }) {
     if (ids.length === 0) return;
     setBulkBusy(true);
     try {
-      await adminApi("/api/alert-rules/batch", {
+      const result = await adminApi("/api/alert-rules/batch", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ action: "activate", ids }),
-      });
+      }) as { affected: number };
+      const affected = result.affected ?? ids.length;
       list.clearAll();
+      setNotice(`${affected} regra(s) ativada(s).`);
       await refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
@@ -382,12 +377,14 @@ export function RulesManager({ onCount }: { onCount?: (n: number) => void }) {
     if (ids.length === 0) return;
     setBulkBusy(true);
     try {
-      await adminApi("/api/alert-rules/batch", {
+      const result = await adminApi("/api/alert-rules/batch", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ action: "deactivate", ids }),
-      });
+      }) as { affected: number };
+      const affected = result.affected ?? ids.length;
       list.clearAll();
+      setNotice(`${affected} regra(s) desativada(s).`);
       await refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
@@ -402,12 +399,14 @@ export function RulesManager({ onCount }: { onCount?: (n: number) => void }) {
     if (!confirm(`Excluir ${ids.length} regra(s) selecionada(s)?`)) return;
     setBulkBusy(true);
     try {
-      await adminApi("/api/alert-rules/batch", {
+      const result = await adminApi("/api/alert-rules/batch", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ action: "delete", ids }),
-      });
+      }) as { affected: number };
+      const affected = result.affected ?? ids.length;
       list.clearAll();
+      setNotice(`${affected} regra(s) excluída(s).`);
       await refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
@@ -426,6 +425,35 @@ export function RulesManager({ onCount }: { onCount?: (n: number) => void }) {
         count={`${rules.filter((r) => r.active).length} ativas`}
       />
       {error && <ErrorBanner message={error} onRetry={() => void refresh()} />}
+      {notice && (
+        <div
+          role="status"
+          className="animate-fade-in"
+          style={{
+            display: "flex",
+            gap: 10,
+            alignItems: "center",
+            justifyContent: "space-between",
+            background: "rgba(16,185,129,.14)",
+            border: "1px solid rgba(16,185,129,.3)",
+            color: "#10b981",
+            borderRadius: "var(--d-row-radius)",
+            padding: "10px 12px",
+            fontSize: "var(--d-small)",
+            fontWeight: 600,
+            lineHeight: 1.5,
+          }}
+        >
+          <span style={{ minWidth: 0 }}>{notice}</span>
+          <button
+            type="button"
+            onClick={() => setNotice("")}
+            style={ghostBtn}
+          >
+            Fechar
+          </button>
+        </div>
+      )}
       <div
         style={{
           display: "flex",
@@ -442,7 +470,7 @@ export function RulesManager({ onCount }: { onCount?: (n: number) => void }) {
         <select
           value={statusFilter}
           onChange={(e) =>
-            setStatusFilter(
+            setStatus(
               e.currentTarget.value as "all" | "active" | "inactive",
             )}
           style={{ padding: "6px 10px" }}
@@ -516,6 +544,13 @@ export function RulesManager({ onCount }: { onCount?: (n: number) => void }) {
             )}
             {list.pageItems.map((r) => (
               <AdminRow key={r.id}>
+                <input
+                  type="checkbox"
+                  checked={list.selectedIds.has(r.id)}
+                  onChange={() => list.toggle(r.id)}
+                  aria-label={`Selecionar ${r.name}`}
+                  style={{ width: 16, height: 16, flexShrink: 0 }}
+                />
                 <Avatar name={r.name} />
                 <span style={{ minWidth: 0, flex: "1 1 160px" }}>
                   <div
@@ -613,7 +648,7 @@ export function RulesManager({ onCount }: { onCount?: (n: number) => void }) {
           </div>
         )}
 
-      {list.totalPages > 1 && (
+      {list.total > 0 && (
         <Pagination
           page={list.page}
           totalPages={list.totalPages}
@@ -626,7 +661,6 @@ export function RulesManager({ onCount }: { onCount?: (n: number) => void }) {
 
       <RuleEditorModal
         open={modalOpen}
-        modalRef={modalRef}
         editingId={editingId}
         tab={tab}
         setTab={setTab}
