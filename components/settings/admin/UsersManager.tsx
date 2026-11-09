@@ -16,21 +16,23 @@ import {
   StatusBadge,
 } from "./AdminPrimitives.tsx";
 
-import { useAdminResource } from "../../../hooks/useAdminResource.ts";
-
-import { useAdminList } from "../../../hooks/useAdminList.ts";
-
 import {
   AdminBulkButton,
   AdminSearchInput,
   AdminSelectionBar,
 } from "./AdminListControls.tsx";
 
-import { UserFormDialog } from "./UserFormDialog.tsx";
+import { useAdminResource } from "../../../hooks/useAdminResource.ts";
+
+import { useAdminList } from "../../../hooks/useAdminList.ts";
+
+import { TempPasswordDialog } from "./TempPasswordDialog.tsx";
+
+import { adminApi } from "../../../lib/api/admin-client.ts";
 
 import { Pagination } from "../../table/Pagination.tsx";
 
-import { adminApi } from "../../../lib/api/admin-client.ts";
+import { UserFormDialog } from "./UserFormDialog.tsx";
 
 import { useEffect, useState } from "preact/hooks";
 
@@ -68,6 +70,20 @@ export function mensagemAviso(
   if (aviso.sent) return "aviso enviado por MSGFLOW.";
   const motivo = aviso.reason ? `: ${aviso.reason}` : ".";
   return `aviso não enviado${motivo}`;
+}
+
+// getUserId/getUserSearchText: stable module-scope helpers so the list hook
+// does not recompute filters and re-run pruning on every render.
+function getUserId(user: PublicUser): number {
+  return user.id;
+}
+
+function getUserSearchText(user: PublicUser): string {
+  return `${user.email} ${user.name} ${
+    user.role === "admin" ? "admin administrador" : "user usuário"
+  } ${user.auth_source === "entra" ? "entra microsoft" : "local"} ${
+    user.active ? "ativo active" : "inativo inactive"
+  }`;
 }
 
 export function UsersManager(
@@ -130,14 +146,38 @@ export function UsersManager(
 
   const list = useAdminList<PublicUser, number>({
     items: filteredByFilters,
-    getId: (u) => u.id,
-    getSearchText: (u) =>
-      `${u.email} ${u.name} ${
-        u.role === "admin" ? "admin administrador" : "user usuário"
-      } ${u.auth_source === "entra" ? "entra microsoft" : "local"} ${
-        u.active ? "ativo active" : "inativo inactive"
-      }`,
+    getId: getUserId,
+    getSearchText: getUserSearchText,
   });
+
+  // A filter change starts a new scope: page one plus an empty selection,
+  // so hidden rows never ride along in a later bulk action.
+  function onRoleFilter(next: string) {
+    setRoleFilter(next as typeof roleFilter);
+    list.setPage(1);
+    list.clearAll();
+  }
+
+  function onStatusFilter(next: string) {
+    setStatusFilter(next as typeof statusFilter);
+    list.setPage(1);
+    list.clearAll();
+  }
+
+  function onSourceFilter(next: string) {
+    setSourceFilter(next as typeof sourceFilter);
+    list.setPage(1);
+    list.clearAll();
+  }
+
+  // One-time reset password, shown once in a dialog, never in a notice.
+  const [resetTemp, setResetTemp] = useState<
+    {
+      email: string;
+      senha: string;
+      aviso: AvisoEntrega | null;
+    } | null
+  >(null);
 
   async function refresh() {
     await reloadUsers();
@@ -186,12 +226,11 @@ export function UsersManager(
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ resetPassword: true }),
       }) as RedefinicaoResposta;
-      setNotice(`Senha de ${resposta.email} redefinida.`);
-      // Show temp password via a simple notice? Use alert-like inline.
-      // We'll store in notice with password.
-      setNotice(
-        `Senha temporária de ${resposta.email}: ${resposta.temporaryPassword}`,
-      );
+      setResetTemp({
+        email: resposta.email,
+        senha: resposta.temporaryPassword,
+        aviso: resposta.aviso ?? null,
+      });
       await refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
@@ -209,6 +248,15 @@ export function UsersManager(
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
       });
+      // Self-deactivation or self-demotion ends this session: leave at once.
+      const pedido = body as { active?: boolean; role?: string } | null;
+      if (
+        id === currentUserId &&
+        (pedido?.active === false || pedido?.role === "user")
+      ) {
+        globalThis.location.href = "/login";
+        return;
+      }
       await refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
@@ -321,20 +369,17 @@ export function UsersManager(
           >
             Novo usuário
           </button>
-          {select("Filtrar por perfil", roleFilter, (v) =>
-            setRoleFilter(v as typeof roleFilter), [
+          {select("Filtrar por perfil", roleFilter, onRoleFilter, [
             ["all", "Todos os perfis"],
             ["admin", "Admin"],
             ["user", "Usuário"],
           ])}
-          {select("Filtrar por status", statusFilter, (v) =>
-            setStatusFilter(v as typeof statusFilter), [
+          {select("Filtrar por status", statusFilter, onStatusFilter, [
             ["all", "Todos os status"],
             ["active", "Ativo"],
             ["inactive", "Inativo"],
           ])}
-          {select("Filtrar por origem", sourceFilter, (v) =>
-            setSourceFilter(v as typeof sourceFilter), [
+          {select("Filtrar por origem", sourceFilter, onSourceFilter, [
             ["all", "Todas as origens"],
             ["entra", "Entra"],
             ["local", "Local"],
@@ -346,14 +391,12 @@ export function UsersManager(
         open={createOpen}
         mode="create"
         accessGroups={accessGroups}
-        onClose={() =>
-          setCreateOpen(false)}
+        onClose={() => setCreateOpen(false)}
         onSaved={(m) => {
           setNotice(m);
           void refresh();
         }}
-        onError={(m) =>
-          setError(m)}
+        onError={(m) => setError(m)}
       />
       {editFor && (
         <UserFormDialog
@@ -367,8 +410,19 @@ export function UsersManager(
             void refresh();
             setEditFor(null);
           }}
-          onError={(m) =>
-            setError(m)}
+          onError={(m) => setError(m)}
+        />
+      )}
+      {resetTemp && (
+        <TempPasswordDialog
+          open
+          email={resetTemp.email}
+          senha={resetTemp.senha}
+          aviso={resetTemp.aviso}
+          onClose={() => {
+            setNotice(`Senha de ${resetTemp.email} redefinida.`);
+            setResetTemp(null);
+          }}
         />
       )}
 
@@ -409,8 +463,7 @@ export function UsersManager(
                 </AdminBulkButton>
                 <AdminBulkButton
                   disabled={busyBulk}
-                  onClick={() =>
-                    void runBulk("promote")}
+                  onClick={() => void runBulk("promote")}
                 >
                   Promover
                 </AdminBulkButton>
