@@ -1,16 +1,13 @@
 // TempPasswordDialog - one-time password reveal after an admin reset.
 // This is why it exists: a reset password must be shown exactly once with
 // copy and ack, and never persisted outside component state.
+import { type AvisoEntrega, mensagemAviso } from "./user-notice.ts";
+
 import { AdminFormDialog } from "./AdminFormDialog.tsx";
 
 import { useEffect, useState } from "preact/hooks";
 
 import { ghostBtn } from "./AdminPrimitives.tsx";
-
-interface AvisoEntrega {
-  sent: boolean;
-  reason?: string;
-}
 
 export interface TempPasswordDialogProps {
   open: boolean;
@@ -18,13 +15,6 @@ export interface TempPasswordDialogProps {
   senha: string;
   aviso?: AvisoEntrega | null;
   onClose: () => void;
-}
-
-function mensagemAviso(aviso: AvisoEntrega | null | undefined): string | null {
-  if (!aviso) return null;
-  if (aviso.sent) return "aviso enviado por MSGFLOW.";
-  const motivo = aviso.reason ? `: ${aviso.reason}` : ".";
-  return `aviso não enviado${motivo}`;
 }
 
 export function TempPasswordDialog(

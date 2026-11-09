@@ -4,6 +4,8 @@
 // default new-user type and local passwords as the second option.
 import { Field, ghostBtn, inputSt, primaryBtn } from "./AdminPrimitives.tsx";
 
+import { type AvisoEntrega, mensagemAviso } from "./user-notice.ts";
+
 import { SearchMultiSelect } from "../SearchMultiSelect.tsx";
 
 import { adminApi } from "../../../lib/api/admin-client.ts";
@@ -29,18 +31,6 @@ export interface UserFormDialogProps {
   onClose: () => void;
   onSaved: (message: string) => void;
   onError: (message: string) => void;
-}
-
-interface AvisoEntrega {
-  sent: boolean;
-  reason?: string;
-}
-
-function mensagemAviso(aviso: AvisoEntrega | null | undefined): string | null {
-  if (!aviso) return null;
-  if (aviso.sent) return "aviso enviado por MSGFLOW.";
-  const motivo = aviso.reason ? `: ${aviso.reason}` : ".";
-  return `aviso não enviado${motivo}`;
 }
 
 export function UserFormDialog(
@@ -69,10 +59,9 @@ export function UserFormDialog(
   >(null);
   const [copiaMsg, setCopiaMsg] = useState("");
 
-  const userId = user?.id ?? null;
-
-  // Reset every field when the dialog opens or targets another user/mode.
-  // The open guard keeps typing intact while the dialog stays open.
+  // Reset every field when the dialog opens or when another user/mode
+  // is targeted. Depending on the user object (not just its id) reseeds
+  // same-id refreshes; the open guard keeps typing intact while open.
   useEffect(() => {
     if (!open) return;
     if (mode === "edit" && user) {
@@ -95,7 +84,7 @@ export function UserFormDialog(
     setError("");
     setTempPassword(null);
     setCopiaMsg("");
-  }, [open, mode, userId]);
+  }, [open, mode, user]);
 
   const groupOptions = accessGroups.map((g) => ({ id: g.id, label: g.name }));
 

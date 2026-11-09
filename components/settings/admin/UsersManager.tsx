@@ -30,11 +30,13 @@ import { TempPasswordDialog } from "./TempPasswordDialog.tsx";
 
 import { adminApi } from "../../../lib/api/admin-client.ts";
 
+import { useEffect, useMemo, useState } from "preact/hooks";
+
 import { Pagination } from "../../table/Pagination.tsx";
 
 import { UserFormDialog } from "./UserFormDialog.tsx";
 
-import { useEffect, useState } from "preact/hooks";
+import type { AvisoEntrega } from "./user-notice.ts";
 
 interface PublicUser {
   id: number;
@@ -48,11 +50,6 @@ interface PublicUser {
   must_change_password: boolean;
 }
 
-interface AvisoEntrega {
-  sent: boolean;
-  reason?: string;
-}
-
 interface CriacaoResposta extends PublicUser {
   temporaryPassword?: string;
   aviso?: AvisoEntrega | null;
@@ -63,17 +60,8 @@ interface RedefinicaoResposta extends PublicUser {
   aviso: AvisoEntrega;
 }
 
-export function mensagemAviso(
-  aviso: AvisoEntrega | null | undefined,
-): string | null {
-  if (!aviso) return null;
-  if (aviso.sent) return "aviso enviado por MSGFLOW.";
-  const motivo = aviso.reason ? `: ${aviso.reason}` : ".";
-  return `aviso não enviado${motivo}`;
-}
-
-// getUserId/getUserSearchText: stable module-scope helpers so the list hook
-// does not recompute filters and re-run pruning on every render.
+// getUserId/getUserSearchText: stable module-scope callbacks, so the list
+// hook only recomputes filters and prunes selection when items change.
 function getUserId(user: PublicUser): number {
   return user.id;
 }
@@ -134,15 +122,24 @@ export function UsersManager(
     void loadGroups();
   }, []);
 
-  const filteredByFilters = users.filter((u) => {
-    if (roleFilter !== "all" && u.role !== roleFilter) return false;
-    if (statusFilter === "active" && !u.active) return false;
-    if (statusFilter === "inactive" && u.active) return false;
-    if (sourceFilter !== "all" && (u.auth_source ?? "local") !== sourceFilter) {
-      return false;
-    }
-    return true;
-  });
+  // Memoized on the filter inputs only, so the list hook keeps a stable
+  // items identity across unrelated renders.
+  const filteredByFilters = useMemo(
+    () =>
+      users.filter((u) => {
+        if (roleFilter !== "all" && u.role !== roleFilter) return false;
+        if (statusFilter === "active" && !u.active) return false;
+        if (statusFilter === "inactive" && u.active) return false;
+        if (
+          sourceFilter !== "all" &&
+          (u.auth_source ?? "local") !== sourceFilter
+        ) {
+          return false;
+        }
+        return true;
+      }),
+    [users, roleFilter, statusFilter, sourceFilter],
+  );
 
   const list = useAdminList<PublicUser, number>({
     items: filteredByFilters,
@@ -248,7 +245,9 @@ export function UsersManager(
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
       });
-      // Self-deactivation or self-demotion ends this session: leave at once.
+      // Deactivation ends this session, so leave at once. A demotion
+      // only drops admin rights: /login bounces back to the app as a
+      // normal user.
       const pedido = body as { active?: boolean; role?: string } | null;
       if (
         id === currentUserId &&

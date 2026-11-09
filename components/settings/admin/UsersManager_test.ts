@@ -4,7 +4,7 @@
 // provider body that could carry the password.
 import { assertStrictEquals } from "jsr:@std/assert@^1";
 
-import { mensagemAviso } from "./UsersManager.tsx";
+import { mensagemAviso } from "./user-notice.ts";
 
 Deno.test("mensagemAviso reports a delivered notice", () => {
   assertStrictEquals(
