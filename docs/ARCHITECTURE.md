@@ -115,26 +115,35 @@ select-all-across-filters controls.
 ## Batch endpoints
 
 Bulk admin actions use one admin-only POST per resource instead of N
-single-row requests:
+single-row requests. Expected validation and guard failures return 400 with
+the standard `BAD_REQUEST` envelope; unexpected failures return 500 through
+the `INTERNAL` envelope and never include database text (see D35). Each batch
+validates ids, actions, and caps before touching rows:
 
-- `POST /api/users/batch`: `{ action, ids }`, max 500 unique positive ids.
-  Actions: `activate`, `deactivate`, `promote`, `demote`,
-  `revokeSessions` (PT/EN aliases accepted). One transaction, locks active
-  admins, preserves the last active admin and last active local admin guards,
-  revokes sessions on active-state changes, returns `{ affected }`. The UI
-  redirects to `/login` when the current user is in a deactivate or revoke
-  set.
-- `POST /api/access-groups/batch`: `{ action, ids, userIds|locationIds }`,
-  max 200 group ids and 500 related ids, cross product capped at 20,000.
-  Actions: `delete`, `addUsers`, `removeUsers`, `addLocations`,
-  `removeLocations`. Uses `withTx`; cascade deletes; missing groups return
-  400; returns `{ affected }`.
-- `POST /api/recipients/batch`: `{ action, ids?, userIds? }`, max 500 ids.
-  Actions: `activate`, `deactivate`, `delete`, `addUsers`. `addUsers`
-  inserts from `users` with `on conflict (email) do update set ...,
-  active = true`. Returns `{ affected }`.
-- `POST /api/alert-rules/batch`: `{ action, ids }`, max 500 ids, atomic.
-  Actions: `activate`, `deactivate`, `delete`. Returns `{ affected }`.
+- `POST /api/users/batch`: `{ action, ids }`, max 500 unique positive
+  safe-integer ids. Actions are canonical only: `activate`, `deactivate`,
+  `promote`, `demote`, `revokeSessions`. A missing id returns 400
+  (all-or-nothing). Runs in one transaction, locks active admins, preserves the
+  last active admin and last active local admin guards, revokes sessions on
+  active-state changes, and `affected` counts rows actually changed while
+  `revokeSessions` counts deleted session rows. The UI redirects to `/login`
+  when the current user is in a deactivate or revoke set.
+- `POST /api/access-groups/batch`: `{ action, ids, userIds | locationIds }`
+  only, max 200 group ids and 500 related ids, cross product capped at 20,000.
+  Actions are canonical only: `delete`, `addUsers`, `removeUsers`,
+  `addLocations`, `removeLocations`. Uses `withTx`; cascade deletes; missing
+  groups return 400. `addUsers` and `addLocations` verify every related user or
+  location inside the same transaction, so unknown ids return 400 instead of a
+  foreign-key 500. Returns `{ affected }`.
+- `POST /api/recipients/batch`: `{ action, ids?, userIds? }`, max 500 unique
+  positive safe-integer ids, deduped before the cap. Actions: `activate`,
+  `deactivate`, `delete`, `addUsers`. `addUsers` inserts from `users` with
+  `on conflict (email) do update set ..., active = true`. Returns
+  `{ affected }`.
+- `POST /api/alert-rules/batch`: `{ action, ids }`, max 500 unique
+  safe-integer ids, deduped before the cap, atomic, all-or-nothing. Actions:
+  `activate`, `deactivate`, `delete`. A missing id returns 400 and `affected`
+  counts rows actually changed.
 - Field options keep the existing `PUT /api/field-options?field=...` with the
   remaining array for bulk removal, plus add-option and restore-defaults.
   Saves stay serialized through the existing queue.
