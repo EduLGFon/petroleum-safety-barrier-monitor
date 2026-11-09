@@ -1,6 +1,7 @@
 // RecipientFormDialog - create a recipient manually or from users.
-// This is why it exists: the recipients manager needs a tabbed create flow
-// (users-first, manual fallback) without growing RecipientsManager.
+// The tabbed flow opens on "Usuários" (one batch request) with "Manual" as
+// the fallback. E-mail always sends; the phone is used only for critical
+// barriers. Opening the dialog always clears the previous form state.
 import { SearchMultiSelect } from "../../settings/SearchMultiSelect.tsx";
 
 import { adminApi } from "../../../lib/api/admin-client.ts";
@@ -24,7 +25,7 @@ interface Props {
   onSaved: () => Promise<void> | void;
 }
 
-// RecipientFormDialog: tabs "Usuários" (default) and "Manual".
+// RecipientFormDialog: "Usuários" is the default tab and "Manual" is second.
 export function RecipientFormDialog(
   { open, users, usersError, onClose, onSaved }: Props,
 ) {

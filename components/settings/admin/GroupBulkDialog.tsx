@@ -1,13 +1,14 @@
 // GroupBulkDialog - bulk add/remove users or stations for selected groups.
+// Sends exactly one batch request per action and reports the affected count.
 import { SearchMultiSelect } from "../../settings/SearchMultiSelect.tsx";
 
-import { AdminFormDialog } from "./AdminFormDialog.tsx";
+import { ghostBtn, primaryBtn } from "./AdminPrimitives.tsx";
 
 import { adminApi } from "../../../lib/api/admin-client.ts";
 
-import { useState } from "preact/hooks";
+import { AdminFormDialog } from "./AdminFormDialog.tsx";
 
-import { ghostBtn, primaryBtn } from "./AdminPrimitives.tsx";
+import { useEffect, useState } from "preact/hooks";
 
 interface LocationOpt {
   id: number;
@@ -34,7 +35,7 @@ interface Props {
   locations: LocationOpt[];
   users: UserOpt[];
   onClose: () => void;
-  onDone: () => void;
+  onDone: (affected: number) => void;
 }
 
 const MODE_LABEL: Record<Mode, string> = {
@@ -50,6 +51,14 @@ export function GroupBulkDialog(
   const [selected, setSelected] = useState<number[]>([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+
+  // Cancel, reopen, or a mode switch must not keep the previous selection
+  // or a stale error. Field edits while open are not affected.
+  useEffect(() => {
+    if (!open) return;
+    setSelected([]);
+    setError("");
+  }, [open, mode]);
 
   async function submit(e: Event) {
     e.preventDefault();
@@ -68,13 +77,14 @@ export function GroupBulkDialog(
       };
       if (isUsers) body.userIds = selected;
       else body.locationIds = selected;
-      await adminApi("/api/access-groups/batch", {
+      const result = await adminApi("/api/access-groups/batch", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
-      });
+      }) as { affected: number };
       setSelected([]);
-      onDone();
+      setError("");
+      onDone(result.affected ?? groupIds.length);
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     } finally {
