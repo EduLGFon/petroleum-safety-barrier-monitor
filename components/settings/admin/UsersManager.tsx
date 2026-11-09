@@ -16,23 +16,27 @@ import {
   StatusBadge,
 } from "./AdminPrimitives.tsx";
 
-import { useAdminResource } from "../../../hooks/useAdminResource.ts";
-
-import { useAdminList } from "../../../hooks/useAdminList.ts";
-
 import {
   AdminBulkButton,
   AdminSearchInput,
   AdminSelectionBar,
 } from "./AdminListControls.tsx";
 
-import { UserFormDialog } from "./UserFormDialog.tsx";
+import { useAdminResource } from "../../../hooks/useAdminResource.ts";
 
-import { Pagination } from "../../table/Pagination.tsx";
+import { useAdminList } from "../../../hooks/useAdminList.ts";
+
+import { TempPasswordDialog } from "./TempPasswordDialog.tsx";
 
 import { adminApi } from "../../../lib/api/admin-client.ts";
 
-import { useEffect, useState } from "preact/hooks";
+import { useEffect, useMemo, useState } from "preact/hooks";
+
+import { Pagination } from "../../table/Pagination.tsx";
+
+import { UserFormDialog } from "./UserFormDialog.tsx";
+
+import type { AvisoEntrega } from "./user-notice.ts";
 
 interface PublicUser {
   id: number;
@@ -46,11 +50,6 @@ interface PublicUser {
   must_change_password: boolean;
 }
 
-interface AvisoEntrega {
-  sent: boolean;
-  reason?: string;
-}
-
 interface CriacaoResposta extends PublicUser {
   temporaryPassword?: string;
   aviso?: AvisoEntrega | null;
@@ -61,13 +60,18 @@ interface RedefinicaoResposta extends PublicUser {
   aviso: AvisoEntrega;
 }
 
-export function mensagemAviso(
-  aviso: AvisoEntrega | null | undefined,
-): string | null {
-  if (!aviso) return null;
-  if (aviso.sent) return "aviso enviado por MSGFLOW.";
-  const motivo = aviso.reason ? `: ${aviso.reason}` : ".";
-  return `aviso não enviado${motivo}`;
+// getUserId/getUserSearchText: stable module-scope callbacks, so the list
+// hook only recomputes filters and prunes selection when items change.
+function getUserId(user: PublicUser): number {
+  return user.id;
+}
+
+function getUserSearchText(user: PublicUser): string {
+  return `${user.email} ${user.name} ${
+    user.role === "admin" ? "admin administrador" : "user usuário"
+  } ${user.auth_source === "entra" ? "entra microsoft" : "local"} ${
+    user.active ? "ativo active" : "inativo inactive"
+  }`;
 }
 
 export function UsersManager(
@@ -118,26 +122,59 @@ export function UsersManager(
     void loadGroups();
   }, []);
 
-  const filteredByFilters = users.filter((u) => {
-    if (roleFilter !== "all" && u.role !== roleFilter) return false;
-    if (statusFilter === "active" && !u.active) return false;
-    if (statusFilter === "inactive" && u.active) return false;
-    if (sourceFilter !== "all" && (u.auth_source ?? "local") !== sourceFilter) {
-      return false;
-    }
-    return true;
-  });
+  // Memoized on the filter inputs only, so the list hook keeps a stable
+  // items identity across unrelated renders.
+  const filteredByFilters = useMemo(
+    () =>
+      users.filter((u) => {
+        if (roleFilter !== "all" && u.role !== roleFilter) return false;
+        if (statusFilter === "active" && !u.active) return false;
+        if (statusFilter === "inactive" && u.active) return false;
+        if (
+          sourceFilter !== "all" &&
+          (u.auth_source ?? "local") !== sourceFilter
+        ) {
+          return false;
+        }
+        return true;
+      }),
+    [users, roleFilter, statusFilter, sourceFilter],
+  );
 
   const list = useAdminList<PublicUser, number>({
     items: filteredByFilters,
-    getId: (u) => u.id,
-    getSearchText: (u) =>
-      `${u.email} ${u.name} ${
-        u.role === "admin" ? "admin administrador" : "user usuário"
-      } ${u.auth_source === "entra" ? "entra microsoft" : "local"} ${
-        u.active ? "ativo active" : "inativo inactive"
-      }`,
+    getId: getUserId,
+    getSearchText: getUserSearchText,
   });
+
+  // A filter change starts a new scope: page one plus an empty selection,
+  // so hidden rows never ride along in a later bulk action.
+  function onRoleFilter(next: string) {
+    setRoleFilter(next as typeof roleFilter);
+    list.setPage(1);
+    list.clearAll();
+  }
+
+  function onStatusFilter(next: string) {
+    setStatusFilter(next as typeof statusFilter);
+    list.setPage(1);
+    list.clearAll();
+  }
+
+  function onSourceFilter(next: string) {
+    setSourceFilter(next as typeof sourceFilter);
+    list.setPage(1);
+    list.clearAll();
+  }
+
+  // One-time reset password, shown once in a dialog, never in a notice.
+  const [resetTemp, setResetTemp] = useState<
+    {
+      email: string;
+      senha: string;
+      aviso: AvisoEntrega | null;
+    } | null
+  >(null);
 
   async function refresh() {
     await reloadUsers();
@@ -186,12 +223,11 @@ export function UsersManager(
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ resetPassword: true }),
       }) as RedefinicaoResposta;
-      setNotice(`Senha de ${resposta.email} redefinida.`);
-      // Show temp password via a simple notice? Use alert-like inline.
-      // We'll store in notice with password.
-      setNotice(
-        `Senha temporária de ${resposta.email}: ${resposta.temporaryPassword}`,
-      );
+      setResetTemp({
+        email: resposta.email,
+        senha: resposta.temporaryPassword,
+        aviso: resposta.aviso ?? null,
+      });
       await refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
@@ -209,6 +245,17 @@ export function UsersManager(
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
       });
+      // Deactivation ends this session, so leave at once. A demotion
+      // only drops admin rights: /login bounces back to the app as a
+      // normal user.
+      const pedido = body as { active?: boolean; role?: string } | null;
+      if (
+        id === currentUserId &&
+        (pedido?.active === false || pedido?.role === "user")
+      ) {
+        globalThis.location.href = "/login";
+        return;
+      }
       await refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
@@ -322,19 +369,19 @@ export function UsersManager(
             Novo usuário
           </button>
           {select("Filtrar por perfil", roleFilter, (v) =>
-            setRoleFilter(v as typeof roleFilter), [
+            onRoleFilter(v as typeof roleFilter), [
             ["all", "Todos os perfis"],
             ["admin", "Admin"],
             ["user", "Usuário"],
           ])}
           {select("Filtrar por status", statusFilter, (v) =>
-            setStatusFilter(v as typeof statusFilter), [
+            onStatusFilter(v as typeof statusFilter), [
             ["all", "Todos os status"],
             ["active", "Ativo"],
             ["inactive", "Inativo"],
           ])}
           {select("Filtrar por origem", sourceFilter, (v) =>
-            setSourceFilter(v as typeof sourceFilter), [
+            onSourceFilter(v as typeof sourceFilter), [
             ["all", "Todas as origens"],
             ["entra", "Entra"],
             ["local", "Local"],
@@ -369,6 +416,18 @@ export function UsersManager(
           }}
           onError={(m) =>
             setError(m)}
+        />
+      )}
+      {resetTemp && (
+        <TempPasswordDialog
+          open
+          email={resetTemp.email}
+          senha={resetTemp.senha}
+          aviso={resetTemp.aviso}
+          onClose={() => {
+            setNotice(`Senha de ${resetTemp.email} redefinida.`);
+            setResetTemp(null);
+          }}
         />
       )}
 

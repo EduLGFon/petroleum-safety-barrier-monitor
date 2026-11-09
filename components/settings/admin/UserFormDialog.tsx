@@ -2,15 +2,17 @@
 // This is why it exists: creation and editing share the AdminFormDialog shell
 // and the one-time temporary password block, with Microsoft Entra as the
 // default new-user type and local passwords as the second option.
-import { AdminFormDialog } from "./AdminFormDialog.tsx";
-
 import { Field, ghostBtn, inputSt, primaryBtn } from "./AdminPrimitives.tsx";
+
+import { type AvisoEntrega, mensagemAviso } from "./user-notice.ts";
 
 import { SearchMultiSelect } from "../SearchMultiSelect.tsx";
 
 import { adminApi } from "../../../lib/api/admin-client.ts";
 
-import { useState } from "preact/hooks";
+import { AdminFormDialog } from "./AdminFormDialog.tsx";
+
+import { useEffect, useState } from "preact/hooks";
 
 import type { ComponentChildren } from "preact";
 
@@ -29,18 +31,6 @@ export interface UserFormDialogProps {
   onClose: () => void;
   onSaved: (message: string) => void;
   onError: (message: string) => void;
-}
-
-interface AvisoEntrega {
-  sent: boolean;
-  reason?: string;
-}
-
-function mensagemAviso(aviso: AvisoEntrega | null | undefined): string | null {
-  if (!aviso) return null;
-  if (aviso.sent) return "aviso enviado por MSGFLOW.";
-  const motivo = aviso.reason ? `: ${aviso.reason}` : ".";
-  return `aviso não enviado${motivo}`;
 }
 
 export function UserFormDialog(
@@ -67,12 +57,47 @@ export function UserFormDialog(
       aviso: AvisoEntrega | null;
     } | null
   >(null);
+  const [copiaMsg, setCopiaMsg] = useState("");
 
-  // Reset form state when opening for a different user/mode.
-  // (Simple: reset on open change.)
-  // We keep minimal; parent controls open.
+  // Reset every field when the dialog opens or when another user/mode
+  // is targeted. Depending on the user object (not just its id) reseeds
+  // same-id refreshes; the open guard keeps typing intact while open.
+  useEffect(() => {
+    if (!open) return;
+    if (mode === "edit" && user) {
+      setEmail(user.email ?? "");
+      setName(user.name ?? "");
+      setPhone(user.phone ?? "");
+      setRole(user.role ?? "user");
+      setAuthSource(user.auth_source ?? "entra");
+    } else {
+      setEmail("");
+      setName("");
+      setPhone("");
+      setRole("user");
+      setAuthSource("entra");
+    }
+    setPassword("");
+    setEntraObjectId("");
+    setSelectedGroups([]);
+    setBusy(false);
+    setError("");
+    setTempPassword(null);
+    setCopiaMsg("");
+  }, [open, mode, user]);
 
   const groupOptions = accessGroups.map((g) => ({ id: g.id, label: g.name }));
+
+  // Copy the one-time password; it never leaves component state.
+  async function copiarSenha() {
+    if (!tempPassword) return;
+    try {
+      await navigator.clipboard.writeText(tempPassword.senha);
+      setCopiaMsg("Senha copiada.");
+    } catch {
+      setCopiaMsg("Não foi possível copiar. Selecione e copie.");
+    }
+  }
 
   async function submit(e: Event) {
     e.preventDefault();
@@ -122,6 +147,7 @@ export function UserFormDialog(
           senha: devolvida,
           aviso: created.aviso ?? null,
         });
+        setCopiaMsg("");
       } else {
         onSaved(`Usuário ${created.email} criado.`);
         onClose();
@@ -178,11 +204,30 @@ export function UserFormDialog(
     children = (
       <div style={{ display: "grid", gap: 8 }}>
         <strong>Senha temporária de {tempPassword.email}</strong>
-        <code
-          style={{ fontSize: 18, letterSpacing: 1, userSelect: "all" }}
+        <div
+          style={{
+            display: "flex",
+            gap: 8,
+            alignItems: "center",
+            flexWrap: "wrap",
+          }}
         >
-          {tempPassword.senha}
-        </code>
+          <code
+            style={{ fontSize: 18, letterSpacing: 1, userSelect: "all" }}
+          >
+            {tempPassword.senha}
+          </code>
+          <button
+            type="button"
+            onClick={() => void copiarSenha()}
+            style={ghostBtn}
+          >
+            Copiar
+          </button>
+        </div>
+        {copiaMsg && (
+          <span role="status" style={{ opacity: 0.8 }}>{copiaMsg}</span>
+        )}
         <span style={{ opacity: 0.8 }}>
           Anote e entregue à pessoa agora: esta senha não é guardada e não
           aparece de novo. No primeiro acesso ela é obrigada a trocar.
