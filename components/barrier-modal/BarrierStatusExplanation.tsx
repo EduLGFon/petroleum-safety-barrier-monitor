@@ -11,9 +11,9 @@ import {
 
 import { daysSince, fmtDate, humanDuration } from "../../lib/utils.ts";
 
-import { ChevronRightIcon } from "../ui/Icons.tsx";
-
 import type { Barrier } from "../../lib/types.ts";
+
+import { DSec } from "./primitives.tsx";
 
 import { Badge } from "../ui/Badge.tsx";
 
@@ -55,131 +55,105 @@ export function BarrierStatusExplanation({ b }: { b: Barrier }) {
   const participants = cause.participants ?? [];
 
   return (
-    <details open style={{ marginBottom: "var(--d-stack-sm)" }}>
-      <summary style={summaryStyle}>
-        <span>Causa da Disponibilidade</span>
-        <span className="collapsible-chevron">
-          <ChevronRightIcon
-            size={12}
-            color="var(--text-muted)"
-            strokeWidth={2}
-          />
-        </span>
-      </summary>
-      <div style={{ marginTop: "var(--d-stack-sm)" }}>
-        {b.statusSince && (
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: "var(--d-mini-gap)",
-              flexWrap: "wrap",
-              marginBottom: "var(--d-field-gap)",
-            }}
-          >
-            <span style={metaStyle}>desde {fmtDate(b.statusSince)}</span>
-            <span style={metaStyle}>
-              há {humanDuration(daysSince(b.statusSince))}
-            </span>
-          </div>
-        )}
-        <p style={ruleStyle}>{explanation.rule}</p>
-
-        <div style={cardStyle}>
-          {isWork
-            ? (
-              <>
-                <div
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: "var(--d-mini-gap)",
-                    flexWrap: "wrap",
-                    marginBottom: "var(--d-field-gap)",
-                  }}
-                >
-                  <Badge
-                    label={cause.sourceType ?? ""}
-                    solid="#38bdf8"
-                    bg="rgba(56,189,248,.1)"
-                    border="rgba(56,189,248,.28)"
-                    size="xs"
-                    dot={false}
-                  />
-                  {cause.operationState && (
-                    <span style={metaStyle}>
-                      {capitalize(cause.operationState)}
-                    </span>
-                  )}
-                  {cause.date && (
-                    <span style={metaStyle}>Data: {fmtDate(cause.date)}</span>
-                  )}
-                </div>
-                {cause.reference && (
-                  <div style={referenceStyle}>{cause.reference}</div>
-                )}
-                {cause.classification && (
-                  <div style={metaStyle}>
-                    Classificação: {cause.classification}
-                  </div>
-                )}
-                {cause.detail && <p style={detailStyle}>{cause.detail}</p>}
-                {cause.contingency && (
-                  <div style={metaStyle}>
-                    Sinal de contingência: {cause.contingency}
-                  </div>
-                )}
-                <div style={{ ...metaStyle, marginTop: "var(--d-field-gap)" }}>
-                  Registrado por: {cause.author || "Não informado"}
-                </div>
-                {participants.length > 0 && (
-                  <div style={{ ...metaStyle, marginTop: "var(--d-gap-2xs)" }}>
-                    {participants.map((person) =>
-                      `${person.role}: ${person.name}`
-                    ).join(" · ")}
-                  </div>
-                )}
-              </>
-            )
-            : (
-              <>
-                <p style={causeStyle}>
-                  {causeSentence(cause, b.statusSince)}
-                </p>
-                {cause.reference && (
-                  <div
-                    style={{ ...metaStyle, marginTop: "var(--d-field-gap)" }}
-                  >
-                    Referência: {cause.reference}
-                  </div>
-                )}
-                {cause.contingency && (
-                  <div style={{ ...metaStyle, marginTop: "var(--d-gap-2xs)" }}>
-                    Sinal de contingência: {cause.contingency}
-                  </div>
-                )}
-                {showRaw && <p style={detailStyle}>{rawNote}</p>}
-              </>
-            )}
+    <DSec title="Causa da Disponibilidade" open>
+      {b.statusSince && (
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: "var(--d-mini-gap)",
+            flexWrap: "wrap",
+            marginBottom: "var(--d-field-gap)",
+          }}
+        >
+          <span style={metaStyle}>desde {fmtDate(b.statusSince)}</span>
+          <span style={metaStyle}>
+            há {humanDuration(daysSince(b.statusSince))}
+          </span>
         </div>
+      )}
+      <p style={ruleStyle}>{explanation.rule}</p>
+
+      <div style={cardStyle}>
+        {isWork
+          ? (
+            <>
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "var(--d-mini-gap)",
+                  flexWrap: "wrap",
+                  marginBottom: "var(--d-field-gap)",
+                }}
+              >
+                <Badge
+                  label={cause.sourceType ?? ""}
+                  solid="#38bdf8"
+                  bg="rgba(56,189,248,.1)"
+                  border="rgba(56,189,248,.28)"
+                  size="xs"
+                  dot={false}
+                />
+                {cause.operationState && (
+                  <span style={metaStyle}>
+                    {capitalize(cause.operationState)}
+                  </span>
+                )}
+                {cause.date && (
+                  <span style={metaStyle}>Data: {fmtDate(cause.date)}</span>
+                )}
+              </div>
+              {cause.reference && (
+                <div style={referenceStyle}>{cause.reference}</div>
+              )}
+              {cause.classification && (
+                <div style={metaStyle}>
+                  Classificação: {cause.classification}
+                </div>
+              )}
+              {cause.detail && <p style={detailStyle}>{cause.detail}</p>}
+              {cause.contingency && (
+                <div style={metaStyle}>
+                  Sinal de contingência: {cause.contingency}
+                </div>
+              )}
+              <div style={{ ...metaStyle, marginTop: "var(--d-field-gap)" }}>
+                Registrado por: {cause.author || "Não informado"}
+              </div>
+              {participants.length > 0 && (
+                <div style={{ ...metaStyle, marginTop: "var(--d-gap-2xs)" }}>
+                  {participants.map((person) =>
+                    `${person.role}: ${person.name}`
+                  ).join(" · ")}
+                </div>
+              )}
+            </>
+          )
+          : (
+            <>
+              <p style={causeStyle}>
+                {causeSentence(cause, b.statusSince)}
+              </p>
+              {cause.reference && (
+                <div
+                  style={{ ...metaStyle, marginTop: "var(--d-field-gap)" }}
+                >
+                  Referência: {cause.reference}
+                </div>
+              )}
+              {cause.contingency && (
+                <div style={{ ...metaStyle, marginTop: "var(--d-gap-2xs)" }}>
+                  Sinal de contingência: {cause.contingency}
+                </div>
+              )}
+              {showRaw && <p style={detailStyle}>{rawNote}</p>}
+            </>
+          )}
       </div>
-    </details>
+    </DSec>
   );
 }
-
-const summaryStyle = {
-  cursor: "pointer",
-  display: "flex",
-  alignItems: "center",
-  gap: "var(--d-mini-gap)",
-  fontSize: "var(--d-caption)",
-  fontWeight: 800,
-  color: "var(--text-muted)",
-  textTransform: "uppercase" as const,
-  letterSpacing: "0.1em",
-  listStyle: "none",
-  padding: "var(--d-stack-sm) 0",
-};
 
 const metaStyle = {
   margin: 0,

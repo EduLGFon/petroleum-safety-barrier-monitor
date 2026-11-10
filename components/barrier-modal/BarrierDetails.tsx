@@ -12,11 +12,9 @@ import { fmtDate, installationLabel } from "../../lib/utils.ts";
 
 import { SCOPE_COLORS } from "../../lib/constants.ts";
 
-import { ChevronRightIcon } from "../ui/Icons.tsx";
-
 import type { Barrier } from "../../lib/types.ts";
 
-import { FR, Txt } from "./primitives.tsx";
+import { DSec, FR, Txt } from "./primitives.tsx";
 
 export function BarrierDetails({ b }: { b: Barrier }) {
   const deleted = (b.deletedAt ?? null) !== null;
@@ -38,23 +36,12 @@ export function BarrierDetails({ b }: { b: Barrier }) {
     <div style={{ padding: "var(--d-dialog-body)" }}>
       <BarrierStatusExplanation b={b} />
 
-      <details open style={{ marginBottom: "var(--d-stack-sm)" }}>
-        <summary style={summaryStyle}>
-          <span>Identificação</span>
-          <span className="collapsible-chevron">
-            <ChevronRightIcon
-              size={12}
-              color="var(--text-muted)"
-              strokeWidth={2}
-            />
-          </span>
-        </summary>
+      <DSec title="Identificação" open>
         <div
           style={{
             display: "grid",
             gridTemplateColumns: "1fr 1fr 1fr",
             gap: "var(--d-details-gap)",
-            marginTop: "var(--d-stack-sm)",
           }}
         >
           <FR
@@ -83,26 +70,14 @@ export function BarrierDetails({ b }: { b: Barrier }) {
           <FR Icon={LayersIcon} label="Categoria" value={b.category} />
           <FR Icon={LayersIcon} label="Agrupamento" value={b.grouping} />
         </div>
-      </details>
+      </DSec>
 
-      <details style={{ marginBottom: "var(--d-stack-sm)" }}>
-        <summary style={summaryStyle}>
-          <span>Ficha do Inventário</span>
-          <span className="collapsible-chevron">
-            <ChevronRightIcon
-              size={12}
-              color="var(--text-muted)"
-              strokeWidth={2}
-            />
-          </span>
-        </summary>
+      <DSec title="Ficha do Inventário">
         <div
           style={{
             display: "grid",
             gridTemplateColumns: "1fr 1fr 1fr",
             gap: "var(--d-details-gap)",
-            marginTop: "var(--d-stack-sm)",
-            marginBottom: "var(--d-stack-sm)",
           }}
         >
           <FR
@@ -154,26 +129,14 @@ export function BarrierDetails({ b }: { b: Barrier }) {
             italic={missing(b.maintStatus)}
           />
         </div>
-      </details>
+      </DSec>
 
-      <details open style={{ marginBottom: "var(--d-stack-sm)" }}>
-        <summary style={summaryStyle}>
-          <span>Plano de Manutenção</span>
-          <span className="collapsible-chevron">
-            <ChevronRightIcon
-              size={12}
-              color="var(--text-muted)"
-              strokeWidth={2}
-            />
-          </span>
-        </summary>
+      <DSec title="Plano de Manutenção" open>
         <div
           style={{
             display: "grid",
             gridTemplateColumns: "1fr 1fr 1fr",
             gap: "var(--d-details-gap)",
-            marginTop: "var(--d-stack-sm)",
-            marginBottom: "var(--d-stack-sm)",
           }}
         >
           <FR
@@ -195,100 +158,38 @@ export function BarrierDetails({ b }: { b: Barrier }) {
             italic={missing(b.failureFree)}
           />
         </div>
-      </details>
+      </DSec>
 
-      <details open style={{ marginBottom: "var(--d-stack-sm)" }}>
-        <summary style={summaryStyle}>
-          <span>Degradação</span>
-          <span className="collapsible-chevron">
-            <ChevronRightIcon
-              size={12}
-              color="var(--text-muted)"
-              strokeWidth={2}
-            />
-          </span>
-        </summary>
-        <div style={{ marginTop: "var(--d-stack-sm)" }}>
-          <Txt
-            value={b.degradationDesc || "Sem degradação registrada."}
-            muted={!b.degradationDesc}
-          />
-        </div>
-      </details>
+      <DSec title="Degradação" open>
+        <Txt
+          value={b.degradationDesc || "Sem degradação registrada."}
+          muted={!b.degradationDesc}
+        />
+      </DSec>
 
       {showComments && (
-        <details open style={{ marginBottom: "var(--d-stack-sm)" }}>
-          <summary style={summaryStyle}>
-            <span>Comentários</span>
-            <span className="collapsible-chevron">
-              <ChevronRightIcon
-                size={12}
-                color="var(--text-muted)"
-                strokeWidth={2}
-              />
-            </span>
-          </summary>
-          <div style={{ marginTop: "var(--d-stack-sm)" }}>
-            <Txt value={comments} />
-          </div>
-        </details>
+        <DSec title="Comentários" open>
+          <Txt value={comments} />
+        </DSec>
       )}
 
-      <details open style={{ marginBottom: "var(--d-stack-sm)" }}>
-        <summary style={summaryStyle}>
-          <span>Comentários complementares</span>
-          <span className="collapsible-chevron">
-            <ChevronRightIcon
-              size={12}
-              color="var(--text-muted)"
-              strokeWidth={2}
-            />
-          </span>
-        </summary>
-        <div style={{ marginTop: "var(--d-stack-sm)" }}>
-          <Txt
-            value={b.extraComments || "Sem comentários complementares."}
-            muted={!b.extraComments}
-          />
-        </div>
-      </details>
+      <DSec title="Comentários complementares" open>
+        <Txt
+          value={b.extraComments || "Sem comentários complementares."}
+          muted={!b.extraComments}
+        />
+      </DSec>
 
-      <details open style={{ marginBottom: "var(--d-stack-sm)" }}>
-        <summary style={summaryStyle}>
-          <span>Plano de Ação</span>
-          <span className="collapsible-chevron">
-            <ChevronRightIcon
-              size={12}
-              color="var(--text-muted)"
-              strokeWidth={2}
-            />
-          </span>
-        </summary>
-        <div style={{ marginTop: "var(--d-stack-sm)" }}>
-          <Txt
-            value={actionPlanText}
-            muted={actionPlanMuted}
-            accent={actionPlanAccent}
-          />
-        </div>
-      </details>
+      <DSec title="Plano de Ação" open>
+        <Txt
+          value={actionPlanText}
+          muted={actionPlanMuted}
+          accent={actionPlanAccent}
+        />
+      </DSec>
     </div>
   );
 }
-
-const summaryStyle = {
-  cursor: "pointer",
-  display: "flex",
-  alignItems: "center",
-  gap: "var(--d-mini-gap)",
-  fontSize: "var(--d-caption)",
-  fontWeight: 800,
-  color: "var(--text-muted)",
-  textTransform: "uppercase" as const,
-  letterSpacing: "0.1em",
-  listStyle: "none",
-  padding: "var(--d-stack-sm) 0",
-};
 
 export function hasDistinctComments(
   comments: string,

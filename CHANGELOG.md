@@ -1,5 +1,10 @@
 # Changelog
 
+## 2026-11-10
+
+- Barrier details: standardized the collapsible section spacing so headings sit
+  closer to their content and redundant margins no longer stack.
+
 ## 2026-11-09
 
 - Barrier details: new "Causa da Disponibilidade" section explains the current

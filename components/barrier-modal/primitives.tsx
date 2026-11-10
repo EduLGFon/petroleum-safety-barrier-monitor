@@ -1,6 +1,7 @@
-// primitives - FR, Sec, Lbl, Div, Txt micro-UI helpers for BarrierModal.
+// primitives - FR, DSec, Sec, Lbl, Div, Txt micro-UI helpers for BarrierModal.
 // Why: shared tiny dialog atoms keep Details/History/Header small and consistent.
 import type { ComponentChildren, FunctionComponent } from "preact";
+import { ChevronRightIcon } from "../ui/Icons.tsx";
 // FR renders a labeled metadata field with optional accent/italic/full-width styling.
 export function FR({
   Icon,
@@ -56,6 +57,43 @@ export function FR({
     </div>
   );
 }
+// DSec renders a collapsible dialog block with the shared heading rhythm.
+// Why: one summary/content spacing contract keeps Details consistent.
+export function DSec(
+  { title, open = false, children }: {
+    title: string;
+    open?: boolean;
+    children: ComponentChildren;
+  },
+) {
+  return (
+    <details open={open} style={{ marginBottom: "var(--d-stack-sm)" }}>
+      <summary style={summaryStyle}>
+        <span>{title}</span>
+        <span className="collapsible-chevron">
+          <ChevronRightIcon
+            size={12}
+            color="var(--text-muted)"
+            strokeWidth={2}
+          />
+        </span>
+      </summary>
+      <div style={{ marginTop: "var(--d-stack-sm)" }}>{children}</div>
+    </details>
+  );
+}
+const summaryStyle = {
+  cursor: "pointer",
+  display: "flex",
+  alignItems: "center",
+  gap: "var(--d-mini-gap)",
+  fontSize: "var(--d-caption)",
+  fontWeight: 800,
+  color: "var(--text-muted)",
+  textTransform: "uppercase" as const,
+  letterSpacing: "0.1em",
+  listStyle: "none",
+};
 // Sec renders an uppercase section heading for dialog body blocks.
 export function Sec({ children }: { children: ComponentChildren }) {
   return (
