@@ -99,10 +99,9 @@ Shared primitives used by the admin pages:
 - Workspace CSS classes live in `static/styles.css`.
 
 Header identity shows `Olá, {name}`, falling back to the email local part
-and then `Usuário` (the email stays in `title`). Admins get the animated
-gradient, halo, shimmer, gradient name text, and crown; non-admins get the
-standard fade-in and hover lift. Reduced motion and `html.no-anim` suppress
-the animation across all themes.
+and then `Usuário` (the email stays in `title`). Admins get a static crown
+emoji; both roles share the standard fade-in and hover lift. Reduced motion
+and `html.no-anim` suppress the animation across all themes.
 
 ## Paging
 

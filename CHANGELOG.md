@@ -2,6 +2,9 @@
 
 ## 2026-11-10
 
+- Header: removed the admin-only shimmer, halo, gradient text, and crown
+  sparkle; the admin pill now matches the standard identity pill and keeps a
+  static crown.
 - Barrier details: standardized the collapsible section spacing so headings sit
   closer to their content and redundant margins no longer stack.
 

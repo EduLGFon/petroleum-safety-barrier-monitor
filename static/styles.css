@@ -1571,9 +1571,8 @@ details[open] > summary .collapsible-chevron {
 
 /* ── Header identity pill ──────────────────────────────────────────────────── */
 .header-identity {
-  /* Non-admin standard entrance: short fade + lift, played once on mount.
-     Admin overrides this with the shimmer below; reduced motion and
-     html.no-anim collapse the duration globally. */
+  /* Standard entrance: short fade + lift, played once on mount. Reduced
+     motion and html.no-anim collapse the duration globally. */
   animation: fadeIn 0.3s var(--ease-out) backwards;
   transition:
     transform 0.18s var(--ease-std),
@@ -1581,77 +1580,4 @@ details[open] > summary .collapsible-chevron {
 }
 .header-identity:hover {
   transform: translateY(-1px);
-}
-.header-identity--admin {
-  position: relative;
-  overflow: hidden;
-  background-image: linear-gradient(
-    120deg,
-    var(--au-pill) 0%,
-    color-mix(in srgb, var(--accent) 22%, var(--au-pill)) 50%,
-    var(--au-pill) 100%
-  );
-  background-size: 200% 100%;
-  animation: headerAdminShimmer 4.5s linear infinite;
-  box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 35%, transparent),
-    0 4px 14px color-mix(in srgb, var(--accent) 18%, transparent);
-}
-.header-identity--admin::before {
-  content: "";
-  position: absolute;
-  inset: -2px;
-  border-radius: inherit;
-  background: radial-gradient(
-    circle at 30% 30%,
-    color-mix(in srgb, var(--accent) 28%, transparent),
-    transparent 60%
-  );
-  opacity: 0.55;
-  pointer-events: none;
-  animation: headerAdminHalo 3.2s ease-in-out infinite;
-}
-.header-identity-name--admin {
-  background: linear-gradient(
-    90deg,
-    var(--au-pill-text),
-    color-mix(in srgb, var(--accent) 40%, var(--au-pill-text))
-  );
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
-}
-.header-admin-crown {
-  animation: headerAdminSparkle 2.6s ease-in-out infinite;
-  filter: drop-shadow(0 0 4px color-mix(in srgb, var(--accent) 45%,
-    transparent));
-}
-@keyframes headerAdminShimmer {
-  0% {
-    background-position: 200% 0;
-  }
-  100% {
-    background-position: -200% 0;
-  }
-}
-@keyframes headerAdminHalo {
-  0%,
-  100% {
-    opacity: 0.4;
-    transform: scale(1);
-  }
-  50% {
-    opacity: 0.7;
-    transform: scale(1.05);
-  }
-}
-@keyframes headerAdminSparkle {
-  0%,
-  100% {
-    transform: scale(1) rotate(0deg);
-    opacity: 0.9;
-  }
-  50% {
-    transform: scale(1.15) rotate(8deg);
-    opacity: 1;
-  }
 }

@@ -215,9 +215,7 @@ export function Header(
         <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
           {sessionUser && (
             <span
-              className={sessionUser.role === "admin"
-                ? "glass-pill header-identity header-identity--admin"
-                : "glass-pill header-identity"}
+              className="glass-pill header-identity"
               title={sessionUser.email}
               style={{
                 display: "flex",
@@ -234,9 +232,6 @@ export function Header(
               }}
             >
               <span
-                className={sessionUser.role === "admin"
-                  ? "header-identity-name header-identity-name--admin"
-                  : "header-identity-name"}
                 style={{
                   overflow: "hidden",
                   textOverflow: "ellipsis",
@@ -247,7 +242,6 @@ export function Header(
               </span>
               {sessionUser.role === "admin" && (
                 <span
-                  className="header-admin-crown"
                   aria-hidden="true"
                   title="Administrador"
                   style={{ flexShrink: 0, lineHeight: 1 }}
