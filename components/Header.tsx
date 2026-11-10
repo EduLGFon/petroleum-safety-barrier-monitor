@@ -240,15 +240,6 @@ export function Header(
               >
                 {greetingName(sessionUser.name, sessionUser.email)}
               </span>
-              {sessionUser.role === "admin" && (
-                <span
-                  aria-hidden="true"
-                  title="Administrador"
-                  style={{ flexShrink: 0, lineHeight: 1 }}
-                >
-                  👑
-                </span>
-              )}
               <span
                 style={{
                   fontSize: "var(--d-caption)",
