@@ -28,6 +28,19 @@ export const STATUS_DIST: [number, number][] = [
   [5, 0.07],
 ];
 
+// Current-status notes mirror the deterministic explanation the sync writes,
+// so mock mode exercises the "Causa da Disponibilidade" card. Status 0 keeps a
+// plain available phrase and status 1 uses the stopped-asset sentence; 2-5 use
+// the structured OS/SS format with the optional contingency suffix.
+const CURRENT_STATUS_NOTES: Record<number, string> = {
+  0: "O ativo consta como disponível e não houve sinal de corretiva aberta ou equipamento parado nos dados consultados neste ciclo",
+  1: "Ordem de serviço aberta indica equipamento parado",
+  2: "Ordem de serviço em aberto. Classificação: Corretiva emergencial. Referência: OS-24018: Falha no intertravamento da válvula de bloqueio. Detalhe: Substituição do solenoide em andamento.\nEquipe de instrumentação acionada. Sinal de contingência: GM-03 atuando em paralelo",
+  3: "Ordem de serviço em aberto. Classificação: Corretiva planejada. Referência: OS-23871: Degradação do sensor de pressão. Detalhe: Calibração prevista para a próxima janela. Sinal de contingência: CEC do transmissor redundante",
+  4: "Solicitação de serviço em aberto. Classificação: Corretiva planejada. Referência: SS-11842: Leitura intermitente no transmissor de nível. Detalhe: Inspeção agendada pela instrumentação",
+  5: "Ordem de serviço em aberto. Classificação: Corretiva emergencial. Referência: OS-24102: Falha total no atuador de segurança. Detalhe: Aguardando peça sobressalente para reparo",
+};
+
 const HISTORY_NOTES_BY_STATUS_ID: Record<number, readonly string[]> = {
   0: [
     "Equipamento retornou ao serviço após manutenção corretiva.",
@@ -112,10 +125,11 @@ export function generateHistory(
     date: statusSince,
     statusId: currentStatusId,
     authorId: rng.int(0, Object.keys(AUTHOR_CODES).length),
-    note: rng.pick(
-      HISTORY_NOTES_BY_STATUS_ID[currentStatusId] ??
-        HISTORY_NOTES_BY_STATUS_ID[0],
-    ),
+    note: CURRENT_STATUS_NOTES[currentStatusId] ??
+      rng.pick(
+        HISTORY_NOTES_BY_STATUS_ID[currentStatusId] ??
+          HISTORY_NOTES_BY_STATUS_ID[0],
+      ),
   });
 
   entries.sort((a, b) => a.date.localeCompare(b.date));
