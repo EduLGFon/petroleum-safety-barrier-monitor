@@ -1,5 +1,11 @@
 # Changelog
 
+## 2026-11-09
+
+- Barrier details: new "Causa da Disponibilidade" section explains the current
+  status and shows the decisive OS/SS from the persisted history, including
+  reference, classification, detail, contingency signal, and people.
+
 ## 2026-11-07
 
 - Settings: centered workspace now covers admin paging, bulk selection, and

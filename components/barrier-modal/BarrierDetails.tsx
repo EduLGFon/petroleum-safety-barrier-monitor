@@ -6,15 +6,17 @@ import {
   UserIcon,
 } from "../ui/Icons.tsx";
 
+import { BarrierStatusExplanation } from "./BarrierStatusExplanation.tsx";
+
 import { fmtDate, installationLabel } from "../../lib/utils.ts";
 
 import { SCOPE_COLORS } from "../../lib/constants.ts";
 
+import { ChevronRightIcon } from "../ui/Icons.tsx";
+
 import type { Barrier } from "../../lib/types.ts";
 
 import { FR, Txt } from "./primitives.tsx";
-
-import { ChevronRightIcon } from "../ui/Icons.tsx";
 
 export function BarrierDetails({ b }: { b: Barrier }) {
   const deleted = (b.deletedAt ?? null) !== null;
@@ -34,6 +36,8 @@ export function BarrierDetails({ b }: { b: Barrier }) {
 
   return (
     <div style={{ padding: "var(--d-dialog-body)" }}>
+      <BarrierStatusExplanation b={b} />
+
       <details open style={{ marginBottom: "var(--d-stack-sm)" }}>
         <summary style={summaryStyle}>
           <span>Identificação</span>

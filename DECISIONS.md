@@ -187,3 +187,14 @@ See git history for full context.
   checked before insert so foreign-key violations cannot surface as 500.
   Id validation uses `Number.isSafeInteger`, and alias exports and action
   aliases are removed so the documented canonical contract is the only one.
+
+- D36: the barrier details "Causa da Disponibilidade" section derives the
+  cause at read time from the persisted `barrier_status_history.note` and
+  `barriers.comments` instead of persisting raw WO/WR rows or adding API
+  fields. The sync/import already writes the decisive event and its reference,
+  classification, detail, contingency signal, author, and participants, so
+  reusing it minimizes stored personal data, avoids schema/migration and wire
+  changes, and keeps every consumer read-only. Limitation: only the decisive
+  event is stored, so the card cannot reconstruct the full set of competing
+  work orders or service requests. The rule text mirrors `docs/STATUSES.md`
+  and unknown statuses keep a deterministic fallback.

@@ -32,6 +32,8 @@ Filtros: busca textual, tipologia, categoria, criticidade, disponibilidade, conf
 
 Abas: Detalhes, Contingência, Histórico. Admins também veem Edição.
 
+Na aba Detalhes, o bloco "Causa da Disponibilidade" explica o status atual e mostra a OS ou SS que influenciou a disponibilidade, com referência, classificação, detalhe e sinal de contingência quando houver. A explicação é derivada do histórico persistido, sem criar registros novos.
+
 Contingência: vínculos da barreira como contingência e vice-versa. Elegíveis: ativas, não excluídas, Disponível, Conforme, mesma instalação. Admins criam/removem vínculos e preenchem referências.
 
 Campos manuais: ao editar uma barreira, os campos alterados passam a ser
