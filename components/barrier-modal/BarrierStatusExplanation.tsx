@@ -11,8 +11,6 @@ import {
 
 import { daysSince, fmtDate, humanDuration } from "../../lib/utils.ts";
 
-import { DISP_COLORS } from "../../lib/constants.ts";
-
 import { ChevronRightIcon } from "../ui/Icons.tsx";
 
 import type { Barrier } from "../../lib/types.ts";
@@ -51,11 +49,6 @@ export function BarrierStatusExplanation({ b }: { b: Barrier }) {
   const cause = explanation.cause;
   const isWork = cause.kind === "work-order" ||
     cause.kind === "work-request";
-  const colors = DISP_COLORS[b.availability] ?? {
-    solid: "#94a3b8",
-    bg: "transparent",
-    border: "var(--border)",
-  };
   const rawNote = cause.rawNote?.trim() ?? "";
   const showRaw = rawNote !== "" && rawNote !== "Edição de barreira" &&
     (cause.kind === "manual" || cause.kind === "unknown");
@@ -74,25 +67,22 @@ export function BarrierStatusExplanation({ b }: { b: Barrier }) {
         </span>
       </summary>
       <div style={{ marginTop: "var(--d-stack-sm)" }}>
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: "var(--d-mini-gap)",
-            flexWrap: "wrap",
-            marginBottom: "var(--d-field-gap)",
-          }}
-        >
-          <Badge label={b.availability} {...colors} size="sm" />
-          {b.statusSince && (
-            <>
-              <span style={metaStyle}>desde {fmtDate(b.statusSince)}</span>
-              <span style={metaStyle}>
-                há {humanDuration(daysSince(b.statusSince))}
-              </span>
-            </>
-          )}
-        </div>
+        {b.statusSince && (
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: "var(--d-mini-gap)",
+              flexWrap: "wrap",
+              marginBottom: "var(--d-field-gap)",
+            }}
+          >
+            <span style={metaStyle}>desde {fmtDate(b.statusSince)}</span>
+            <span style={metaStyle}>
+              há {humanDuration(daysSince(b.statusSince))}
+            </span>
+          </div>
+        )}
         <p style={ruleStyle}>{explanation.rule}</p>
 
         <div style={cardStyle}>

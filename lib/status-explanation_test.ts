@@ -51,6 +51,20 @@ Deno.test("explainStatus exposes the documented rule sentences", () => {
   );
 });
 
+Deno.test("explainStatus reuses the base rule for contingency overlays", () => {
+  const degraded = explain({
+    availability: "Degradado Contingenciado",
+    statusHistory: [],
+  });
+  assertStrictEquals(degraded.rule, STATUS_RULES["Degradado"]);
+
+  const outage = explain({
+    availability: "Indisponível Contingenciado",
+    statusHistory: [],
+  });
+  assertStrictEquals(outage.rule, STATUS_RULES["Indisponível"]);
+});
+
 Deno.test("parseWorkNote reads an emergency WO with periods and newlines", () => {
   const parsed = parseWorkNote(EMERGENCY_NOTE);
   assert(parsed);

@@ -4,7 +4,9 @@
 
 - Barrier details: new "Causa da Disponibilidade" section explains the current
   status and shows the decisive OS/SS from the persisted history, including
-  reference, classification, detail, contingency signal, and people.
+  reference, classification, detail, contingency signal, and people. It reuses
+  the base status rule for contingency overlays and does not repeat the
+  availability badge already shown in the modal header.
 
 ## 2026-11-07
 

@@ -12,10 +12,6 @@ export const STATUS_RULES: Record<string, string> = {
     "Possui SS, OS ou tarefa de corretiva planejada (falha potencial) com atributo de urgência no ativo.",
   "Indisponível":
     "Possui SS, OS ou tarefa de corretiva emergencial (falha funcional) com atributo de urgência no ativo.",
-  "Degradado Contingenciado":
-    "Mesmos parâmetros de Degradado, com contingenciamento (GM ou CEC).",
-  "Indisponível Contingenciado":
-    "Mesmos parâmetros de Indisponível, com contingenciamento (GM ou CEC).",
   "Fora de Operação":
     "Equipamento protegido fora de operação, isolado positivamente do processo.",
 };
@@ -245,7 +241,8 @@ export function explainStatus(
   >,
 ): StatusExplanation {
   const status = b.availability;
-  const rule = STATUS_RULES[status] ?? RULE_FALLBACK;
+  const rule = STATUS_RULES[status] ?? STATUS_RULES[baseStatus(status)] ??
+    RULE_FALLBACK;
   const history = b.statusHistory ?? [];
   const targets = new Set<string>([status, baseStatus(status)]);
   const selected = latestEntry(history, targets) ?? latestOf(history);
