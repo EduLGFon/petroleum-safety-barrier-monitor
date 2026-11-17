@@ -1,4 +1,4 @@
-// Alert recipients SQL - CRUD for the urgent digest audience.
+// Alert recipients SQL - CRUD for the legacy manual recipient list.
 // This is why it exists: the send path must read recipients from the
 // database (not env), but only admins may change them - the routes guard
 // with P4 checkAdminAuth while this module stays a thin validated store.

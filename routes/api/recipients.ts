@@ -1,4 +1,5 @@
-// API: /api/recipients - alert digest audience, admin-only.
+// API: /api/recipients - legacy manual recipient list, admin-only, not read
+// by alert delivery.
 // This is why it exists: the send path reads recipients from the database;
 // only admins may list or change them (session or ADMIN_TOKEN on every
 // method, including GET - recipient addresses are admin data).
