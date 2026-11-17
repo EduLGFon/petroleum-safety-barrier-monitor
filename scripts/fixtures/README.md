@@ -45,4 +45,4 @@ urgent request.
 Unmapped labels in an applying or dry run are listed in the report, never
 guessed. The two asset skips reflect the headless fixture `MapContext`; the
 live sync creates missing location and category rows before mapping. Never
-commit live tenant output, roster files or personal data.
+commit live tenant output or personal data.

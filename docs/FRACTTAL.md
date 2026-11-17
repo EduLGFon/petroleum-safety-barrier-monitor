@@ -112,9 +112,9 @@ filtered here.
 Criticality ranks are `ESO > A > B > C > D`, derived from the TAG suffix letter
 plus the ESO flag and a last-resort priority label. Unparseable ranks fall back
 to `D` with a warning; rank ids are a hard contract with
-`db/seed_lookups.sql`. Unknown station and category labels are listed as skips
-and are created by the live sync before mapping; an unknown criticality rank
-still skips loudly.
+`db/seed_lookups.sql`. Dry runs list unknown station and category labels as
+skips; applying runs create the missing rows before mapping. An unknown
+criticality rank still skips loudly.
 
 ## Status derivation
 
