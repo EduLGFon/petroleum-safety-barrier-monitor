@@ -3,6 +3,7 @@
 // share, so they are verified without a DOM or network.
 import {
   filterByQuery,
+  normalizeSearchText,
   pageSlice,
   pruneKeys,
   toggleKey,
@@ -16,10 +17,38 @@ const rows = [
   { id: 3, text: "GAMMA" },
 ];
 
+const accentedRows = [
+  { id: 1, text: "João da Silva" },
+  { id: 2, text: "AÇÃO PREVENTIVA" },
+  { id: 3, text: "José Antunes" },
+];
+
+Deno.test("normalizeSearchText lowercases and strips diacritics", () => {
+  assertEquals(normalizeSearchText("AÇÃO"), "acao");
+  assertEquals(normalizeSearchText("João"), "joao");
+  assertEquals(normalizeSearchText("José"), "jose");
+  assertEquals(normalizeSearchText("plain ASCII"), "plain ascii");
+});
+
 Deno.test("filterByQuery matches case-insensitively and trims the query", () => {
   assertEquals(
     filterByQuery(rows, "  BeT ", (row) => row.text).map((row) => row.id),
     [2],
+  );
+});
+
+Deno.test("filterByQuery ignores accents in the query and row text", () => {
+  assertEquals(
+    filterByQuery(accentedRows, "joao", (row) => row.text).map((row) => row.id),
+    [1],
+  );
+  assertEquals(
+    filterByQuery(accentedRows, "acao", (row) => row.text).map((row) => row.id),
+    [2],
+  );
+  assertEquals(
+    filterByQuery(accentedRows, "JOSE", (row) => row.text).map((row) => row.id),
+    [3],
   );
 });
 
