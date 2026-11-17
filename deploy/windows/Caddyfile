@@ -1,9 +1,9 @@
 # Caddy reverse proxy for Barrier Monitor on Windows Server.
 # This is why it exists: `deno serve` speaks plain HTTP on :8300 and the
-# session cookie only sets Secure over https, so production must terminate
-# TLS in front (see docs/PORT-MAP.md finding 11.3). Caddy is a single
-# Windows exe with automatic HTTPS; the IIS alternative is documented in
-# docs/DEPLOY-WINDOWS.md for shops that already run IIS.
+# session cookie only sets Secure over https, so TLS terminates here. Caddy
+# is a single Windows exe with automatic HTTPS. Setup-Production.ps1 generates
+# the active config; the native path is documented in
+# docs/DEPLOY-WINDOWS.md, section "Reverse proxy and TLS".
 #
 # Usage:
 #   1. Set the public hostname below (no trailing slash, matches APP_BASE_URL).
