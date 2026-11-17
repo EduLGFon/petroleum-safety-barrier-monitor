@@ -24,19 +24,21 @@ import {
 
 import { useAdminResource } from "../../../hooks/useAdminResource.ts";
 
+import { useEffect, useMemo, useRef, useState } from "preact/hooks";
+
 import { useAdminList } from "../../../hooks/useAdminList.ts";
 
 import { TempPasswordDialog } from "./TempPasswordDialog.tsx";
 
 import { adminApi } from "../../../lib/api/admin-client.ts";
 
-import { useEffect, useMemo, useState } from "preact/hooks";
-
 import { Pagination } from "../../table/Pagination.tsx";
 
 import { UserFormDialog } from "./UserFormDialog.tsx";
 
 import type { AvisoEntrega } from "./user-notice.ts";
+
+import { AdminToast } from "./AdminToast.tsx";
 
 interface PublicUser {
   id: number;
@@ -91,7 +93,10 @@ export function UsersManager(
   const [accessGroups, setAccessGroups] = useState<
     { id: number; name: string }[]
   >([]);
-  const [notice, setNotice] = useState("");
+  const [toast, setToast] = useState<{ id: number; message: string } | null>(
+    null,
+  );
+  const toastSeq = useRef(0);
   const [busyBulk, setBusyBulk] = useState(false);
   const [patchBusy, setPatchBusy] = useState<number | null>(null);
   const [editFor, setEditFor] = useState<PublicUser | null>(null);
@@ -104,6 +109,18 @@ export function UsersManager(
   const [sourceFilter, setSourceFilter] = useState<
     "all" | "local" | "entra"
   >("all");
+
+  // Keep the existing setNotice("...")/setNotice("") call sites. A non-empty
+  // message bumps the id so a repeated success remounts the toast and restarts
+  // its timer; "" closes it.
+  function setNotice(message: string) {
+    if (message === "") {
+      setToast(null);
+      return;
+    }
+    toastSeq.current += 1;
+    setToast({ id: toastSeq.current, message });
+  }
 
   // Load access groups for the create dialog.
   async function loadGroups() {
@@ -318,34 +335,12 @@ export function UsersManager(
         count={`${users.length} no total`}
       />
       {error && <ErrorBanner message={error} onRetry={() => void refresh()} />}
-      {notice && (
-        <div
-          role="status"
-          className="animate-fade-in"
-          style={{
-            display: "flex",
-            gap: 10,
-            alignItems: "center",
-            justifyContent: "space-between",
-            background: "rgba(16,185,129,.14)",
-            border: "1px solid rgba(16,185,129,.3)",
-            color: "#10b981",
-            borderRadius: "var(--d-row-radius)",
-            padding: "10px 12px",
-            fontSize: "var(--d-small)",
-            fontWeight: 600,
-            lineHeight: 1.5,
-          }}
-        >
-          <span style={{ minWidth: 0 }}>{notice}</span>
-          <button
-            type="button"
-            onClick={() => setNotice("")}
-            style={ghostBtn}
-          >
-            Fechar
-          </button>
-        </div>
+      {toast && (
+        <AdminToast
+          key={toast.id}
+          message={toast.message}
+          onClose={() => setToast(null)}
+        />
       )}
 
       <AdminCard>
