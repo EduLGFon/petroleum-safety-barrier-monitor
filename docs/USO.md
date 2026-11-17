@@ -82,7 +82,7 @@ Em **Conta**, atualize nome, e-mail e telefone, e altere a própria senha. A alt
 
 ## Administração
 
-As telas administrativas confirmam o sucesso com um aviso temporário (toast), que pode ser fechado e desaparece sozinho. Erros permanecem visíveis na tela até a correção. A busca nas listas administrativas ignora maiúsculas e acentos.
+Na tela **Usuários**, as confirmações de sucesso aparecem como um aviso temporário (toast), que pode ser fechado e desaparece sozinho. Nas demais telas administrativas, as confirmações de sucesso permanecem na tela até serem fechadas. Erros permanecem na própria tela até serem corrigidos. A busca nas listas administrativas ignora maiúsculas e acentos.
 
 ### Usuários
 
