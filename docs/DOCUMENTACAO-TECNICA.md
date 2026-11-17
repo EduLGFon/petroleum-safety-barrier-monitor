@@ -219,7 +219,7 @@ Quando o SSO está desabilitado, todas as rotas `/auth/entra/*` respondem 404 (`
 
 ### 4.3 Primeiro acesso e senha temporária
 
-Uma conta local criada ou redefinida por um administrador recebe uma senha temporária gerada por pessoa, com 16 caracteres de um alfabeto de 54 símbolos sem caracteres ambíguos, devolvida uma única vez na resposta administrativa (`lib/server/auth/password.ts`, `routes/api/users.ts`). A conta fica com `must_change_password = true`.
+Uma conta local criada ou redefinida por um administrador recebe uma senha temporária gerada individualmente, com 16 caracteres de um alfabeto de 55 símbolos sem caracteres ambíguos (o comentário de `lib/server/auth/password.ts` diz 54, mas a constante `TEMP_ALPHABET` tem 55 caracteres), devolvida uma única vez na resposta administrativa (`lib/server/auth/password.ts`, `routes/api/users.ts`). A conta fica com `must_change_password = true`.
 
 No primeiro acesso:
 
@@ -1614,7 +1614,7 @@ As 25 tabelas de domínio, com chave e uso principal (`db/schema.sql`, `docs/DAT
 | sessão                           | 12 horas                                                       | `lib/server/auth/session.ts`                                         |
 | senha                            | 12 a 256 caracteres                                            | `lib/server/auth/password.ts`                                        |
 | iterações PBKDF2                 | 210.000                                                        | `lib/server/auth/password.ts`                                        |
-| senha temporária                 | 16 caracteres de 54 símbolos                                   | `lib/server/auth/password.ts`                                        |
+| senha temporária                 | 16 caracteres de 55 símbolos (o comentário do arquivo diz 54)  | `lib/server/auth/password.ts`                                        |
 | TTL de fluxo SSO                 | 120 a 900 s, padrão 600                                        | `lib/server/config.ts`                                               |
 | tolerância de relógio SSO        | 0 a 300 s, padrão 60                                           | `lib/server/config.ts`                                               |
 | timeout HTTP SSO                 | 1000 a 30.000 ms, padrão 10.000                                | `lib/server/config.ts`                                               |
@@ -1842,15 +1842,17 @@ As guardas abaixo são parte do contrato de segurança, integridade ou compatibi
 
 As divergências abaixo foram verificadas no código desta revisão. Quando a documentação e o código discordam, o comportamento descrito é o do código.
 
-#### D1. Contagem de `OWNABLE_FIELD_KEYS`: 24, não 25
+Os rótulos DV1 a DV15 identificam divergências deste documento e não são decisões de `DECISIONS.md`, cujos ids são D01 e D20 a D36.
+
+#### DV1. Contagem de `OWNABLE_FIELD_KEYS`: 24, não 25
 
 O dossiê de integrações menciona 25 chaves, mas `lib/field-ownership.ts` define **24**: `tag`, `locationId`, `typologyId`, `categoryId`, `groupingId`, `ownerId`, `criticalityId`, `comments`, `actionPlan`, `origin`, `installLocal`, `equipTypology`, `fieldInstalled`, `fieldOperational`, `opStatus`, `hasMaintPlan`, `planFollowed`, `failureFree`, `maintStatus`, `hasContingency`, `contingencyDesc`, `evidenceCode`, `degradationDesc` e `extraComments`. O teste `lib/field-ownership_test.ts` também confirma que toda chave apropriável tem coluna e origem no Fracttal. A contagem correta é 24, e este documento usa 24.
 
-#### D2. Contagem de `SIGNATURE_FIELD_KEYS`: 27, não 28
+#### DV2. Contagem de `SIGNATURE_FIELD_KEYS`: 27, não 28
 
 O dossiê de integrações menciona 28 chaves, mas `lib/server/fracttal/sync.ts` define **27**, incluindo `locDescId`, `isActive` e `scopeSource`, que não são apropriáveis. A ordem é contrato com a assinatura armazenada, e o comentário no próprio arquivo diz que a ordem não pode mudar sem atualizar o outro lado. A contagem correta é 27.
 
-#### D3. `FRACTTAL_SYNC_MAX_PAGES`: três defaults
+#### DV3. `FRACTTAL_SYNC_MAX_PAGES`: três defaults
 
 | Lugar                                        | Valor                                                       |
 | -------------------------------------------- | ----------------------------------------------------------- |
@@ -1861,51 +1863,51 @@ O dossiê de integrações menciona 28 chaves, mas `lib/server/fracttal/sync.ts`
 
 Não existe um único default. O valor efetivo depende do processo. O poller é o único que não aplica teto superior no parse da env; a guarda de página completa ainda impede que uma página truncada seja aplicada. Uma padronização exige decisão do dono, porque mudar o default do poller muda a carga upstream.
 
-#### D4. `notify_immediate` não torna o envio imediato
+#### DV4. `notify_immediate` não torna o envio imediato
 
 `notify_immediate` é apresentado como imediato versus digest pelo nome do campo, pelo mapa `Digest` de `docs/GLOSSARY.md` (`notify_immediate = false`), pela lista de colunas em `docs/DATABASE.md` e pelo comentário de `lib/server/sql/alert_rules.ts`. O código persiste o campo, coloca o valor em `payload.immediate` e o usa para escolher a regra, mas o `despachar_agora` do provedor vem exclusivamente de `mapLanding(statusId)`, que só é verdadeiro para status 5 (`lib/server/alerts/provider.ts`, `lib/server/alerts/immediate.ts`, `lib/server/alerts/rules.ts`). Regras com `notify_immediate = true` sobre status 4, 3, 2 ou 0 não tornam o POST imediato; o evento fica enfileirado para o próximo ciclo. A documentação deve ser corrigida ou a funcionalidade deve ser implementada; o comportamento atual é o do código.
 
-#### D5. Chave de deduplicação: a documentação omite o id do histórico
+#### DV5. Chave de deduplicação: a documentação omite o id do histórico
 
 `docs/DATABASE.md` descreve `dedup_key` único por barreira, data de transição e status. O código inclui o id da linha de histórico quando ele existe: `barrierId:date:statusId[:historyId]` (`lib/server/alerts/store.ts`, `lib/server/alerts/detect.ts`). A inclusão é intencional e está em D23: distingue dois landings reais do mesmo status no mesmo dia. A documentação do banco está desatualizada nesse ponto.
 
-#### D6. `status_since` no sync live versus importação
+#### DV6. `status_since` no sync live versus importação
 
 A documentação diz que a data do evento mais antiga dirige `status_since` e que, sem data, cai para hoje (`docs/FRACTTAL.md`). O import grava a data derivada (`scripts/fracttal-import.ts`). O sync live calcula `statusSince` na regra pura, mas o caminho de aplicação chama `record_status_change()` sem esse valor, e a função grava `current_date` (`lib/server/sql/sync-apply.ts`, `db/schema.sql`). Consequência: em transições do sync live, `Desde`, filtros de período e `stale_days` usam a data do processamento, não a data do evento upstream. É uma divergência de comportamento, não apenas de texto.
 
-#### D7. Elegibilidade de contingência usa status armazenado
+#### DV7. Elegibilidade de contingência usa status armazenado
 
 D23 afirma que a disponibilidade efetiva dirige contingências. A elegibilidade em `lib/server/sql/contingencies.ts` usa o status **armazenado** (`a.id = 0` sobre `c.availability_id`) e `is_compliant`, tanto na listagem quanto na criação. Uma barreira armazenada como 4 ou 5 com `has_contingency = Sim` é exibida como 3 ou 2 e conforme, mas não é elegível como contingência. O comportamento é consistente com a regra de negócio atual, mas não com a redação de D23.
 
-#### D8. No-op de mesmo status não está na função SQL
+#### DV8. No-op de mesmo status não está na função SQL
 
 `docs/STATUSES.md`, `docs/DATABASE.md` e `docs/FRACTTAL.md` afirmam que `record_status_change()` não insere histórico quando o status novo é igual ao atual. A função em `db/schema.sql` **não** verifica igualdade: ela sempre atualiza `availability_id` e `status_since` e insere uma linha de histórico. O no-op real está em `transitionBarrierStatus()`, que bloqueia a linha e retorna sem chamar a função, e no early return da rota de status (`lib/server/sql/barriers.ts`, `routes/api/barriers/[id]/status.ts`). Uma chamada SQL direta à função com o mesmo status cria uma linha de histórico extra. Para o usuário, o efeito observável é o documentado; para quem escreve SQL direto, não é.
 
-#### D9. Comentário de escopo obsoleto no parser
+#### DV9. Comentário de escopo obsoleto no parser
 
 `lib/server/fracttal/barrier-rules.ts` tem um comentário que diz que escopo vazio faria o sync pular a linha. O comportamento implementado é o oposto: o escopo é totalmente aberto, toda linha com código entra quando estação e categoria resolvem, e `scope_source` vira `all` quando nenhum gate casa (`lib/server/fracttal/map.ts`, `docs/FRACTTAL.md`). O comentário é legado e não deve ser usado como contrato.
 
-#### D10. Follow-up de plano preventivo é comportamento do import
+#### DV10. Follow-up de plano preventivo é comportamento do import
 
 `docs/FRACTTAL.md` descreve que o acompanhamento de plano preventivo usa o par de datas de manutenção agendada no import, para não marcar plano futuro como atrasado. O caminho live usa a data do evento corretivo para o preventivo e não tem par agendado equivalente (`lib/server/fracttal/work.ts`). A afirmação vale apenas para o import.
 
-#### D11. Audit de estações: exit 1 por estação desconhecida
+#### DV11. Audit de estações: exit 1 por estação desconhecida
 
 `docs/FRACTTAL.md` diz que o audit sai 1 em falha de auditoria de estação. O código também sai 1 por `unknown-station`, que é uma estação nova a triar, não necessariamente uma falha. O próprio script chama isso de triagem antes de aplicar (`scripts/fracttal-audit-stations.ts`).
 
-#### D12. `AUTH_ENTRA_CLIENT_ASSERTION_ALG` fora do `.env.example`
+#### DV12. `AUTH_ENTRA_CLIENT_ASSERTION_ALG` fora do `.env.example`
 
 A variável é lida em `lib/server/config.ts`, com default `RS256` e `PS256` aceito, mas não aparece em `.env.example`. O mesmo padrão vale para `APP_ENV`, `ADMIN_PASSWORD`, `SEED_FORCE`, `LEGACY_SHARED_PASSWORD` e `CHROME_NO_SANDBOX`, que são lidas por scripts ou deploy e não estão no exemplo. Isso não quebra boot, mas reduz a descoberta.
 
-#### D13. Topologia de produção descrita versus relato de handoff
+#### DV13. Topologia de produção descrita versus relato de handoff
 
 Os documentos do repositório descrevem Windows nativo com PostgreSQL 16, serviços `BarrierApp`, `BarrierPoller`, `BarrierAlerts` e `BarrierCaddy` (`docs/DEPLOY-WINDOWS.md`, `docs/PORT-MAP.md`). Um relato operacional de handoff de 16/11/2026, não versionado neste repositório, descreve PostgreSQL 18 em diretório vendorizado, base `monitor`, e serviços renomeados sem Caddy como serviço. Não é possível conciliar os dois sem confirmação do dono. Este documento trata a documentação versionada como referência de projeto e o relato como contexto operacional não verificado.
 
-#### D14. Handoff desatualizado sobre `CO`, `SM8` e senha padrão
+#### DV14. Handoff desatualizado sobre `CO`, `SM8` e senha padrão
 
 O mesmo relato diz que 14 usuários não foram importados porque as estações `CO` e `SM8` não existiam no catálogo, e fala em senha padrão. O código atual contém os aliases `SM8` e `CO` (D27) e gera senha por pessoa com `generateTemporaryPassword()` e troca obrigatória (`routes/api/users.ts`, D30, D32). A pendência de dados pode estar desatualizada; a validação exige consultar o catálogo real e reprocessar o roster.
 
-#### D15. Grupo `Acesso geral` reintroduz vínculos em toda migração
+#### DV15. Grupo `Acesso geral` reintroduz vínculos em toda migração
 
 A migração inscreve todos os usuários `role = 'user'` no grupo `Acesso geral` a cada execução, com `on conflict do nothing` (`db/schema.sql`). Se um administrador remover um vínculo para restringir acesso, a próxima migração pode recriá-lo. Isso não é uma divergência de documentação, mas uma tensão real entre a compatibilidade de migração e o fail-closed de D21.
 
