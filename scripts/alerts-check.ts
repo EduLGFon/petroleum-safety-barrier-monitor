@@ -21,6 +21,8 @@ import {
 
 import { runProviderCycle } from "../lib/server/alerts/run-provider.ts";
 
+import { loadAlertAudience } from "../lib/server/sql/alert-audience.ts";
+
 import { getResolverLabels } from "../lib/server/sql/vocabularies.ts";
 
 import { touchRuleTriggered } from "../lib/server/sql/alert_rules.ts";
@@ -30,8 +32,6 @@ import { listStaleBarriers } from "../lib/server/sql/alert_rules.ts";
 import { listAlertRules } from "../lib/server/sql/alert_rules.ts";
 
 import { getBarriersByIds } from "../lib/server/sql/barriers.ts";
-
-import { listRecipients } from "../lib/server/sql/recipients.ts";
 
 import type { StatusInfo } from "../lib/server/alerts/detect.ts";
 
@@ -91,14 +91,10 @@ async function main(): Promise<void> {
     Deno.exit(1);
   };
 
-  let recipients: Array<{ email: string; name: string; phone: string }>;
+  let recipients: Awaited<ReturnType<typeof loadAlertAudience>>;
   let rules: Awaited<ReturnType<typeof listAlertRules>> = [];
   try {
-    recipients = (await listRecipients(true)).map((r) => ({
-      email: r.email,
-      name: r.name,
-      phone: r.phone ?? "",
-    }));
+    recipients = await loadAlertAudience();
     rules = await listAlertRules(false);
   } catch (err) {
     await fail(err instanceof Error ? err.message : String(err));
@@ -176,6 +172,7 @@ async function main(): Promise<void> {
         `[alerts-check] done detected=${result.detected} ` +
           `enqueued=${result.enqueued} sent=${result.sent} ` +
           `failed=${result.failed} parked=${result.skippedDead} ` +
+          `skippedNoAudience=${result.skippedNoAudience} ` +
           `posted=${result.posted} parcial=${result.parcial} reprocessed=${result.reprocessed}`,
       );
     }

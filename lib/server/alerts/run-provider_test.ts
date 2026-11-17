@@ -201,3 +201,121 @@ Deno.test("provider cycle accepts planned stop without posting", async () => {
   assertStrictEquals(posts, 0);
   assertStrictEquals(result.sent, 1);
 });
+
+Deno.test("provider cycle sends only recipients scoped to the barrier station", async () => {
+  const store = fakeStore([unsent()]);
+  const seen: string[][] = [];
+  const result = await runProviderCycle({
+    store,
+    loadBarriers: () =>
+      Promise.resolve(new Map([[1, wire({ locationId: 1 })]])),
+    sender: {
+      post: (payload) => {
+        seen.push(
+          payload.destinatarios
+            .filter((dest) => dest.canal === "email")
+            .map((dest) => dest.valor),
+        );
+        return Promise.resolve({
+          ok: true,
+          duplicado: false,
+          parcial: false,
+          enfileirados: payload.destinatarios.length,
+          fila_ids: [],
+          por_canal: {},
+          rejeitados: [],
+          avisos: [],
+          aviso_token: null,
+          mensagem: "ok",
+        });
+      },
+    },
+    recipients: [
+      { email: "one@example.com", locationIds: [1] },
+      { email: "two@example.com", locationIds: [2] },
+    ],
+    companyId: 1,
+    dryRun: false,
+    statusInfo: {
+      labelOf: () => "Indisponivel",
+      compliantOf: () => false,
+    },
+  });
+  assertStrictEquals(result.posted, 1);
+  assertStrictEquals(seen.length, 1);
+  assertStrictEquals(seen[0]!.join(","), "one@example.com");
+});
+
+Deno.test("provider cycle delivers to admins without a station scope", async () => {
+  const store = fakeStore([unsent()]);
+  const seen: string[][] = [];
+  await runProviderCycle({
+    store,
+    loadBarriers: () =>
+      Promise.resolve(new Map([[1, wire({ locationId: 1 })]])),
+    sender: {
+      post: (payload) => {
+        seen.push(
+          payload.destinatarios
+            .filter((dest) => dest.canal === "email")
+            .map((dest) => dest.valor),
+        );
+        return Promise.resolve({
+          ok: true,
+          duplicado: false,
+          parcial: false,
+          enfileirados: payload.destinatarios.length,
+          fila_ids: [],
+          por_canal: {},
+          rejeitados: [],
+          avisos: [],
+          aviso_token: null,
+          mensagem: "ok",
+        });
+      },
+    },
+    recipients: [
+      { email: "admin@example.com", locationIds: null },
+      { email: "two@example.com", locationIds: [2] },
+    ],
+    companyId: 1,
+    dryRun: false,
+    statusInfo: {
+      labelOf: () => "Indisponivel",
+      compliantOf: () => false,
+    },
+  });
+  assertStrictEquals(seen.length, 1);
+  assertStrictEquals(seen[0]!.join(","), "admin@example.com");
+});
+
+Deno.test("provider cycle accepts an event with no station audience once", async () => {
+  const store = fakeStore([unsent()]);
+  let posts = 0;
+  const logs: string[] = [];
+  const result = await runProviderCycle({
+    store,
+    loadBarriers: () =>
+      Promise.resolve(new Map([[1, wire({ locationId: 1 })]])),
+    sender: {
+      post: () => {
+        posts++;
+        return Promise.reject(new Error("must not post"));
+      },
+    },
+    recipients: [{ email: "two@example.com", locationIds: [2] }],
+    companyId: 1,
+    dryRun: false,
+    logger: (line) => logs.push(line),
+    statusInfo: {
+      labelOf: () => "Indisponivel",
+      compliantOf: () => false,
+    },
+  });
+  assertStrictEquals(posts, 0);
+  assertStrictEquals(result.posted, 0);
+  assertStrictEquals(result.skippedNoAudience, 1);
+  assertStrictEquals(store.accepted.length, 1);
+  assertStrictEquals(store.accepted[0], 10);
+  assertStrictEquals(logs.some((line) => line.includes("no audience")), true);
+});

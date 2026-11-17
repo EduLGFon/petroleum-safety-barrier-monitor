@@ -2,6 +2,11 @@
 // Replaces the local SMTP digest: delivery, templates and retry belong to
 // the upstream provider. Detection, rules, watermark and dedup stay local.
 import {
+  type AlertAudienceRecipient,
+  recipientsForLocation,
+} from "./audience.ts";
+
+import {
   barrierLink,
   buildAlertPayload,
   mapLanding,
@@ -37,11 +42,7 @@ import { extractDetail } from "./enrich.ts";
 
 export const PROVIDER_MAX_SEND_RUNS = 5;
 
-export interface ProviderCycleRecipient {
-  email: string;
-  name?: string;
-  phone?: string;
-}
+export type ProviderCycleRecipient = AlertAudienceRecipient;
 
 export interface ProviderSender {
   post(payload: ProviderPayload): Promise<ProviderAccept>;
@@ -77,6 +78,7 @@ export interface ProviderCycleResult {
   sent: number;
   failed: number;
   skippedDead: number;
+  skippedNoAudience: number;
   posted: number;
   parcial: number;
 }
@@ -223,7 +225,7 @@ export async function runProviderCycle(
     labels,
     statusInfo,
   } = options;
-  const active = recipients.filter((r) => r.email.trim() !== "");
+  const audienceSize = recipients.filter((r) => r.email.trim() !== "").length;
   const result: ProviderCycleResult = {
     watermark: null,
     detected: 0,
@@ -232,6 +234,7 @@ export async function runProviderCycle(
     sent: 0,
     failed: 0,
     skippedDead: 0,
+    skippedNoAudience: 0,
     posted: 0,
     parcial: 0,
   };
@@ -450,9 +453,9 @@ export async function runProviderCycle(
   }
   const sendable = allUnsent.filter((e) => !isDead(e.payload));
   result.skippedDead = await store.countDead();
-  if (sendable.length === 0 || active.length === 0) {
+  if (sendable.length === 0) {
     logger(
-      `[provider] nothing to send (unsent=${sendable.length}, parked=${result.skippedDead}, recipients=${active.length})`,
+      `[provider] nothing to send (unsent=0, parked=${result.skippedDead}, audience=${audienceSize})`,
     );
     return result;
   }
@@ -466,6 +469,13 @@ export async function runProviderCycle(
   const at = now();
 
   async function processEvent(event: UnsentAlert): Promise<void> {
+    const wire = event.barrierId !== null
+      ? wires.get(event.barrierId)
+      : undefined;
+    const eventRecipients = recipientsForLocation(
+      recipients,
+      wire?.locationId ?? null,
+    );
     const mapping = mapLanding(event.statusId);
     if (!mapping.send) {
       try {
@@ -476,8 +486,10 @@ export async function runProviderCycle(
             rejeitados: [],
             avisos: ["suppressed: planned stop"],
           });
+        } else if (eventRecipients.length === 0) {
+          await store.markDelivered(event.id, "", true);
         } else {
-          for (const r of active) {
+          for (const r of eventRecipients) {
             await store.markDelivered(event.id, r.email, true);
           }
         }
@@ -490,9 +502,35 @@ export async function runProviderCycle(
       result.sent++;
       return;
     }
-    const wire = event.barrierId !== null
-      ? wires.get(event.barrierId)
-      : undefined;
+    // No recipient covers this station: never POST, and accept locally so
+    // the event does not retry forever without an audience.
+    if (eventRecipients.length === 0) {
+      if (dryRun) {
+        result.skippedNoAudience++;
+        logger(`[provider] event ${event.id} skipped: no audience for station`);
+        return;
+      }
+      try {
+        if (store.markProviderAccepted) {
+          await store.markProviderAccepted(event.id, {
+            parcial: false,
+            enfileirados: 0,
+            rejeitados: [],
+            avisos: ["sem destinatários para a estação"],
+          });
+        } else {
+          await store.markDelivered(event.id, "", true);
+        }
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        logger(`[provider] event ${event.id} accept failed: ${message}`);
+        result.failed++;
+        return;
+      }
+      result.skippedNoAudience++;
+      logger(`[provider] event ${event.id} skipped: no audience for station`);
+      return;
+    }
     const criticality = wire
       ? fromCriticalityId(wire.criticalityId)
       : String(event.payload.criticality ?? "");
@@ -518,7 +556,7 @@ export async function runProviderCycle(
       note: event.payload.note,
       companyId,
       link: barrierLink(appBaseUrl, event.barrierId),
-      recipients: active,
+      recipients: eventRecipients,
     });
     if (!payload) {
       logger(`[provider] event ${event.id} has no valid destinos, skipping`);
@@ -546,7 +584,7 @@ export async function runProviderCycle(
             avisos: res.avisos,
           });
         } else {
-          for (const r of active) {
+          for (const r of eventRecipients) {
             await store.markDelivered(event.id, r.email, true);
           }
         }
@@ -602,6 +640,11 @@ export async function runProviderCycle(
     },
   );
   await Promise.all(workers);
+  if (result.skippedNoAudience > 0) {
+    logger(
+      `[provider] ${result.skippedNoAudience} event(s) accepted without audience for their station`,
+    );
+  }
   return result;
 }
 

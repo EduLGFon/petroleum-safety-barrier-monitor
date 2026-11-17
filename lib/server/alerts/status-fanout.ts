@@ -8,7 +8,7 @@ import { getBarriersByIds } from "../sql/barriers.ts";
 
 import { getResolverLabels } from "../sql/vocabularies.ts";
 
-import { listRecipients } from "../sql/recipients.ts";
+import { loadAlertAudience } from "../sql/alert-audience.ts";
 
 import { sqlAlertStore } from "../sql/alerts.ts";
 
@@ -35,7 +35,7 @@ export async function fanoutStatusChange(
 ): Promise<void> {
   const logger = forRequest(requestId).line("info");
   const [recipRes, labelsRes, statusRes] = await Promise.allSettled([
-    listRecipients(true),
+    loadAlertAudience(),
     getResolverLabels(),
     queryRows<{ id: number; label: string; ok: boolean }>(
       `select id, label, is_compliant as ok from availability_statuses`,
@@ -70,11 +70,7 @@ export async function fanoutStatusChange(
     historyId,
     companyId: provider?.companyId ?? 1,
     appBaseUrl: Deno.env.get("APP_BASE_URL") || undefined,
-    recipients: recipients.map((r) => ({
-      email: r.email,
-      name: r.name,
-      phone: r.phone ?? "",
-    })),
+    recipients,
     logger,
     labels,
     statusInfo,

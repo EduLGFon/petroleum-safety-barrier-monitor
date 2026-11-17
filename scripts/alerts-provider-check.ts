@@ -1,6 +1,6 @@
 // scripts/alerts-provider-check.ts
 // Pre-flight check for the alert provider (msgflow) before production use.
-// Validates env, pings the provider, checks the DB tables/recipients/rules,
+// Validates env, pings the provider, checks the DB tables/audience/rules,
 // and optionally sends one real test alert through postAlert.
 //
 //   deno run -A --env-file=.env scripts/alerts-provider-check.ts
@@ -15,6 +15,8 @@ import {
   type ProviderConfig,
   providerConfigFromEnv,
 } from "../lib/server/alerts/provider.ts";
+
+import { loadAlertAudience } from "../lib/server/sql/alert-audience.ts";
 
 import { queryRows } from "../lib/server/db.ts";
 
@@ -160,9 +162,12 @@ async function main(): Promise<void> {
     const requiredTables = [
       "availability_statuses",
       "alert_events",
-      "alert_recipients",
       "alert_rules",
       "barriers",
+      "users",
+      "access_groups",
+      "access_group_locations",
+      "user_access_groups",
     ];
     for (const table of requiredTables) {
       try {
@@ -182,14 +187,16 @@ async function main(): Promise<void> {
     }
 
     try {
-      const rows = await queryRows<{ n: number }>(
-        "select count(*)::int as n from alert_recipients where active",
+      const audience = await loadAlertAudience();
+      check(
+        "alert audience exists",
+        audience.length > 0,
+        `${audience.length} recipients`,
+        false,
       );
-      const n = rows[0]!.n;
-      check("active recipients exist", n > 0, `${n} active`, false);
     } catch (err) {
       check(
-        "active recipients exist",
+        "alert audience exists",
         false,
         err instanceof Error ? err.message : String(err),
         false,
