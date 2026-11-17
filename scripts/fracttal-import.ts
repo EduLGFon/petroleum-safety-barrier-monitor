@@ -5,7 +5,7 @@
 // low memory, one object at a time), truncates the data tables, rebuilds the
 // dynamic lookup tables (locations, categories) from real equipment, derives
 // each barrier's availability from open corrective work orders/requests
-// (docs/FRACTTAL-DATA.md section 4), and writes barriers + one import stamp
+// (docs/FRACTTAL.md#dump-import), and writes barriers + one import stamp
 // per barrier into barrier_status_history.
 // Run (dry report first):  deno run -A --env-file=.env scripts/fracttal-import.ts --dir test/fracttal-dump-2026-09-14-04-34-49
 // Run (write to DB):      ... same command with --apply
