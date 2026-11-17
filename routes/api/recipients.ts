@@ -1,8 +1,10 @@
 // API: /api/recipients - legacy manual recipient list, admin-only, not read
 // by alert delivery.
-// This is why it exists: the send path reads recipients from the database;
-// only admins may list or change them (session or ADMIN_TOKEN on every
-// method, including GET - recipient addresses are admin data).
+// This route is legacy manual CRUD retained for operators; alert delivery
+// derives its audience from active users and access groups and no longer
+// reads this table. Only admins may list or change it (session or
+// ADMIN_TOKEN on every method, including GET - recipient addresses are
+// admin data).
 import {
   badRequest,
   created,
