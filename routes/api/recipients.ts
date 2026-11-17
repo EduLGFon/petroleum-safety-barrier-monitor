@@ -90,7 +90,8 @@ export const handler = define.handlers({
     }
   },
 
-  // POST { email, name?, phone? } - creates or revives (upsert on email).
+  // POST { email, name?, phone? } - creates a recipient; a duplicate email
+  // updates name/phone and leaves active unchanged.
   async POST(ctx) {
     const requestId = newRequestId();
     const csrf = denyIfCrossSite(ctx.req, requestId);

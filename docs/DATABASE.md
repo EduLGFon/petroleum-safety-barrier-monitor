@@ -208,7 +208,7 @@ list; status ownership stays with the history author.
 
 `DATABASE_URL` resolves from the process environment first and `.env`
 second. Deno `--env-file` never overwrites a variable already exported, so a
-shell export, systemd `Environment=` line or NSSM service value wins
+shell export or a service-manager value (Docker Compose, NSSM) wins
 silently. The usual symptom is `password authentication failed` on the
 first query while a migration run with different credentials succeeded.
 
