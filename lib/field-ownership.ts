@@ -97,8 +97,9 @@ export interface FracttalSource {
 // FRACTTAL_SOURCES: where to fix each field at the source. Derived-from
 // entries (status/work/heuristics) have no single Fracttal field to edit -
 // the caption says so instead of pointing at a wrong column. field_1..field_6
-// labels are API names: the Fracttal UI labels for custom fields are not in
-// the survey (docs/FRACTTAL-FIELD-SURVEY.md), confirm them with the operator.
+// labels are API names: the Fracttal UI labels for custom fields are not
+// documented upstream (docs/FRACTTAL.md#field-coverage); confirm them with
+// the operator.
 export const FRACTTAL_SOURCES: Record<OwnableFieldKey, FracttalSource> = {
   tag: {
     field: "Descrição do ativo",

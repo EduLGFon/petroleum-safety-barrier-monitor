@@ -65,8 +65,8 @@ export interface FracttalReport {
 }
 
 // FracttalWorkOrder: the slice of GET /work_orders output that status
-// derivation consumes. Field names mirror the dump census
-// (docs/FRACTTAL-DATA.md section 4); everything but the join code may be
+// derivation consumes. The asset it joins to comes from the documented item
+// tree (docs/FRACTTAL.md#data-hierarchy); everything but the join code may be
 // null upstream.
 export interface FracttalWorkOrder {
   code: string;
@@ -117,9 +117,9 @@ export interface FracttalWorkOrder {
 }
 
 // FracttalWorkRequest: the slice of GET /work_requests output that status
-// derivation consumes (docs/FRACTTAL-DATA.md section 5). The event date
-// mirrors the import extractor (date_maintenance only); the creation `date`
-// stays unread until live semantics are verified.
+// derivation consumes (docs/FRACTTAL.md#work-order-event-date for the event
+// date candidates). Urgency comes from is_urgent; the request dates fall back
+// in the documented order.
 export interface FracttalWorkRequest {
   code_item: string;
   id_status: number | null;

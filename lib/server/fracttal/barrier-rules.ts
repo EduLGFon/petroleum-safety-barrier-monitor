@@ -50,9 +50,11 @@ export const CRITICALITY_RANK_LABELS: readonly string[] = [
   "D",
 ];
 
-// Barrier scope: case/accent-insensitive keywords from
-// docs/FRACTTAL-DATA.md section 3, matched against the asset-type taxonomy
-// label only. Free-text description is NOT matched: it pulls in non-barrier
+// BARRIER_KEYWORDS: case/accent-insensitive taxonomy labels recorded as
+// scope provenance (docs/FRACTTAL.md#asset-taxonomy-and-scope), matched
+// against the asset-type taxonomy label only. The keyword gate does not
+// exclude rows: every equipment row enters and scopeSources stores the
+// provenance. Free-text description is NOT matched: it pulls in non-barrier
 // types (a gas pump whose description mentions "gas").
 export const BARRIER_KEYWORDS: readonly string[] = [
   "valvula",
@@ -615,15 +617,15 @@ export interface AvailabilityOut {
   note: string;
 }
 
-// resolveAvailability derives status by precedence (docs/FRACTTAL-DATA.md
-// section 4, docs/STATUSES.md for the contingency overlay): open emergency
-// corrective -> Indisponivel (5, or 2 when contingency is in place); open
-// planned corrective WITH urgent flag (StatusEvent.isUrgent, from WR
-// is_urgent) -> Degradada (4, or 3 when contingency is in place);
-// planned work without the urgent flag carries no status signal; stopped
-// asset or out-of-service date -> Fora de Operacao (1); asset
-// flagged unavailable -> Indisponivel (5, the documented P3 draft for the
-// bare flag); otherwise Disponivel (0).
+// resolveAvailability derives status by precedence
+// (docs/FRACTTAL.md#status-derivation, docs/STATUSES.md for the contingency
+// overlay): open emergency corrective -> Indisponível (5, or 2 when
+// contingency is in place); open planned corrective WITH urgent flag
+// (StatusEvent.isUrgent, from WR is_urgent) -> Degradado (4, or 3 when
+// contingency is in place); planned work without the urgent flag carries no
+// status signal; stopped asset or out-of-service date -> Fora de Operação
+// (1); asset flagged unavailable -> Indisponível (5, the documented P3 draft
+// for the bare flag); otherwise Disponível (0).
 export function resolveAvailability(
   signals: AvailabilitySignals,
   today: string,
