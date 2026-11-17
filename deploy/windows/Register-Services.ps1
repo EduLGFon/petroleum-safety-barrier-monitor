@@ -6,8 +6,8 @@
 .DESCRIPTION
   Why it exists: Windows Server has no systemd units, so the three Linux
   long-running processes (app, fracttal-poll, alerts-poll) become NSSM
-  services with auto-restart. Without NSSM, use Task Scheduler at startup
-  (see docs/DEPLOY-WINDOWS.md path A2). Re-running updates the binaries.
+  services with auto-restart. Re-running updates the binaries. See
+  docs/DEPLOY-WINDOWS.md, Windows native path, Services.
 .EXAMPLE
   powershell -ExecutionPolicy Bypass -File .\deploy\windows\Register-Services.ps1 -InstallDir C:\srv\barrier-monitor
 #>
