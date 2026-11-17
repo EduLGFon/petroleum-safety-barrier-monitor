@@ -36,17 +36,32 @@ export interface AdminListState<T, K extends AdminListKey> {
   selectedCount: number;
 }
 
-// filterByQuery: case-insensitive substring search over the row's search text.
-// An empty query returns the same array so callers can rely on reference
-// equality while idle.
+// normalizeSearchText: lowercase and strip diacritics so admin search treats
+// "joao" and "João" (or "acao" and "AÇÃO") as the same term. NFD splits base
+// letters from combining marks, which \p{Diacritic} then removes. Deterministic
+// and linear; the admin lists are small enough that the extra passes are cheap.
+export function normalizeSearchText(value: string): string {
+  return value
+    .normalize("NFD")
+    .replace(/\p{Diacritic}/gu, "")
+    .toLowerCase();
+}
+
+// filterByQuery: case-insensitive, diacritic-insensitive substring search over
+// the row's search text. An empty query returns the same array so callers can
+// rely on reference equality while idle; the early return also skips
+// normalization entirely.
 export function filterByQuery<T>(
   items: T[],
   query: string,
   getSearchText: (item: T) => string,
 ): T[] {
-  const q = query.trim().toLowerCase();
-  if (q === "") return items;
-  return items.filter((item) => getSearchText(item).toLowerCase().includes(q));
+  const trimmed = query.trim();
+  if (trimmed === "") return items;
+  const q = normalizeSearchText(trimmed);
+  return items.filter((item) =>
+    normalizeSearchText(getSearchText(item)).includes(q)
+  );
 }
 
 // pageSlice: 1-based page slice clamped to the last page. Empty lists yield
