@@ -1,7 +1,7 @@
 {
   "meta": {
     "synthetic": true,
-    "note": "Development/CI work fixture: open planned order drives FAL-EQ-001 to Degradada; the done order and the closed request are ignored."
+    "note": "Development/CI work fixture: the open planned order carries no status signal, so FAL-EQ-001 stays Disponível; the done order and the closed request are ignored."
   },
   "orders": [
     {

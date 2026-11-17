@@ -1,7 +1,8 @@
-// Alert recipients SQL - CRUD for the urgent digest audience.
-// This is why it exists: the send path must read recipients from the
-// database (not env), but only admins may change them - the routes guard
-// with P4 checkAdminAuth while this module stays a thin validated store.
+// Alert recipients SQL - CRUD for the legacy manual recipient list.
+// Alert delivery derives its audience from active users and access groups
+// and no longer reads this table; the list is retained for operators. Only
+// admins may change it - the routes guard with P4 checkAdminAuth while this
+// module stays a thin validated store.
 import {
   normalizeEmail,
   normalizeName,

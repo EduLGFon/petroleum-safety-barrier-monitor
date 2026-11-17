@@ -1,7 +1,10 @@
-// API: /api/recipients - alert digest audience, admin-only.
-// This is why it exists: the send path reads recipients from the database;
-// only admins may list or change them (session or ADMIN_TOKEN on every
-// method, including GET - recipient addresses are admin data).
+// API: /api/recipients - legacy manual recipient list, admin-only, not read
+// by alert delivery.
+// This route is legacy manual CRUD retained for operators; alert delivery
+// derives its audience from active users and access groups and no longer
+// reads this table. Only admins may list or change it (session or
+// ADMIN_TOKEN on every method, including GET - recipient addresses are
+// admin data).
 import {
   badRequest,
   created,
@@ -90,7 +93,8 @@ export const handler = define.handlers({
     }
   },
 
-  // POST { email, name?, phone? } - creates or revives (upsert on email).
+  // POST { email, name?, phone? } - creates a recipient; a duplicate email
+  // updates name/phone and leaves active unchanged.
   async POST(ctx) {
     const requestId = newRequestId();
     const csrf = denyIfCrossSite(ctx.req, requestId);

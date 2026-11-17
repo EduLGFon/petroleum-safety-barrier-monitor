@@ -1,6 +1,7 @@
-// RecipientsManager - alert email audience with paging, selection, and bulk
-// actions. The digest audience lives in alert_recipients; this manager wraps
-// its CRUD with PT labels and reports affected counts after bulk writes.
+// RecipientsManager - legacy manual recipient list with paging, selection, and
+// bulk actions. Alert delivery derives its audience from active users and
+// access groups, not this list; this manager wraps the list CRUD with PT labels
+// and reports affected counts after bulk writes.
 import {
   AdminCard,
   AdminHero,
