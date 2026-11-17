@@ -169,7 +169,7 @@ Never weaken these for convenience, speed, or simplicity.
 ## 10. Documentation
 
 - Kept docs: `readme.md`, `DECISIONS.md`, `docs/ARCHITECTURE.md`, `docs/API.md`, `docs/DATABASE.md`,
-  `docs/DEPLOY-WINDOWS.md`, `docs/FRACTTAL.md`, `docs/GLOSSARY.md`, `docs/STATUSES.md`, `docs/PORT-MAP.md`, `docs/USO.md`,
+  `docs/DEPLOY-WINDOWS.md`, `docs/FRACTTAL.md`, `docs/GLOSSARY.md`, `docs/STATUSES.md`, `docs/PORT-MAP.md`, `docs/USO.md`, `docs/DOCUMENTACAO-TECNICA.md`,
   and `scripts/fixtures/README.md`.
 - Read `docs/ARCHITECTURE.md` before architectural changes and before auth, permissions, retention, sync, alerts, or
   export work. Read `docs/GLOSSARY.md` and `docs/STATUSES.md` before changing user-visible text or status rules. Read
