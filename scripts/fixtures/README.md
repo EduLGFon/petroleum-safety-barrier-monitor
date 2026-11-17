@@ -12,13 +12,13 @@ resolve through `location_code` (fallback path).
 
 5 rows, one sync path each:
 
-| code             | path exercised                                             |
-| ---------------- | ---------------------------------------------------------- |
-| `FAL-EQ-001`     | match and insert (known category, parent-chain station)    |
-| `FAL-EQ-002`     | status change (out-of-service date maps Fora de Operação)  |
-| `FAL_EQ_003`     | deletion candidate (retired when absent upstream)          |
+| code             | path exercised                                                |
+| ---------------- | ------------------------------------------------------------- |
+| `FAL-EQ-001`     | match and insert (known category, parent-chain station)       |
+| `FAL-EQ-002`     | status change (out-of-service date maps Fora de Operação)     |
+| `FAL_EQ_003`     | deletion candidate (retired when absent upstream)             |
 | `FAL-EQ-004`     | skip: category `Typo Isolada` absent from the fixture context |
-| `X9-UNKNOWN-LOC` | skip: unknown station `ZZZ`                                |
+| `X9-UNKNOWN-LOC` | skip: unknown station `ZZZ`                                   |
 
 `FAL-EQ-002` also has `available: false`, but the explicit out-of-service date
 outranks the bare flag, so the row maps to Fora de Operação. The typo and
@@ -30,11 +30,11 @@ Work rows in live `/work_orders` and `/work_requests` shape for the status
 pass (`--work-fixture`, replayed by `work_test.ts`). The sample contains two
 orders and one request:
 
-| row                                                        | signal exercised                                       |
-| ---------------------------------------------------------- | ------------------------------------------------------ |
-| open `CORR - Corretiva Planejada` order (no `is_urgent`)   | planned event without urgent flag: no status signal    |
-| done corrective order                                      | ignored (closed gate)                                  |
-| solved request (`id_status` 4)                             | ignored (closed gate)                                  |
+| row                                                      | signal exercised                                    |
+| -------------------------------------------------------- | --------------------------------------------------- |
+| open `CORR - Corretiva Planejada` order (no `is_urgent`) | planned event without urgent flag: no status signal |
+| done corrective order                                    | ignored (closed gate)                               |
+| solved request (`id_status` 4)                           | ignored (closed gate)                               |
 
 The fixture deliberately has no `is_urgent` row. A planned corrective only
 changes availability when the urgent flag is present; without it the barrier
