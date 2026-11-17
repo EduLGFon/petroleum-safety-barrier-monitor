@@ -7,6 +7,7 @@ import {
   mapLanding,
   ocorridoEm,
 } from "./provider.ts";
+import { recipientsForLocation } from "./audience.ts";
 import { dedupKey } from "./store.ts";
 import { extractDetail } from "./enrich.ts";
 import { landingLabel } from "./detect.ts";
@@ -84,7 +85,7 @@ export async function maybeSendProviderImmediate(options: {
   if (!mapping.send || !mapping.despacharAgora || !sender) {
     return { enqueued, posted: 0 };
   }
-  const active = recipients.filter((r) => r.email.trim() !== "");
+  const active = recipientsForLocation(recipients, barrier.locationId);
   if (active.length === 0) return { enqueued, posted: 0 };
   const at = now();
   const criticality = resolved.criticality;
