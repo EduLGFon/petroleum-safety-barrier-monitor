@@ -74,6 +74,8 @@ import { createCycleLoop } from "../lib/server/fracttal/cycle.ts";
 
 import { runSync } from "../lib/server/fracttal/sync.ts";
 
+import { addSignalListenerBestEffort } from "../lib/server/fracttal/signals.ts";
+
 import { assertFracttalBaseUrl, loadSyncConfig } from "../lib/server/config.ts";
 
 const DEFAULT_BASE_URL = "https://app.fracttal.com/api";
@@ -328,8 +330,10 @@ function main(): void {
     await loop.stop();
     Deno.exit(0);
   };
-  Deno.addSignalListener("SIGINT", () => void stop());
-  Deno.addSignalListener("SIGTERM", () => void stop());
+  // Windows services (NSSM) never deliver SIGTERM and registering it threw
+  // at startup, crashing the service before the first cycle (audit F10):
+  // register the platform's deliverable stop signals, best-effort.
+  addSignalListenerBestEffort(() => void stop());
 
   loop.start();
   void logLastRunAge();

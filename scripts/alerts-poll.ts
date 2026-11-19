@@ -43,6 +43,8 @@ import { queryRows } from "../lib/server/db.ts";
 
 import { log } from "../lib/server/log.ts";
 
+import { addSignalListenerBestEffort } from "../lib/server/fracttal/signals.ts";
+
 const seconds = Math.max(
   60,
   Math.floor(Number(Deno.env.get("ALERTS_POLL_SECONDS")) || 900),
@@ -197,8 +199,10 @@ function main(): void {
     running = false;
     wake?.();
   };
-  Deno.addSignalListener("SIGINT", stop);
-  Deno.addSignalListener("SIGTERM", stop);
+  // Windows services (NSSM) never deliver SIGTERM and registering it threw
+  // at startup, crashing the service before the first cycle (audit F10):
+  // register the platform's deliverable stop signals, best-effort.
+  addSignalListenerBestEffort(stop);
   (async () => {
     while (running) {
       await cycle(provider, notifiers, new Date(), dashboardUrl);

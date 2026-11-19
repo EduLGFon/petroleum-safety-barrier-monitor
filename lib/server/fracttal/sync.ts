@@ -6,6 +6,8 @@
 // defaultSyncIo (imported lazily so fixtures/tests can run without a DB).
 import type { CatalogNeeds, MapContext, SyncBarrierInput } from "./map.ts";
 
+import type { FracttalAsset } from "./types.ts";
+
 import type { WorkEventsResolver } from "./work.ts";
 
 import { parsePage } from "./client.ts";
@@ -255,9 +257,20 @@ export function snapshotOf(
 }
 // planReconcile: pure diff of remote inputs vs local rows -> executable plan.
 // Deleted local rows reappearing upstream are restored, never duplicated.
+// protectedCodes (audit F1): codes observed upstream this sweep that did not
+// MAP (mapping skip, malformed row). Their local barriers must never retire:
+// the asset still exists upstream, only this run could not map it, so a
+// delete would hide it for as long as the skip persists (e.g. a missing
+// seed rank). Codes upstream genuinely removed are absent from that set and
+// still soft-delete.
+export interface ReconcileOptions {
+  protectedCodes?: readonly string[];
+}
+
 export function planReconcile(
   remote: SyncBarrierInput[],
   local: LocalBarrier[],
+  opts: ReconcileOptions = {},
 ): SyncPlan {
   const byCode = new Map<string, LocalBarrier>();
   for (const row of local) byCode.set(row.externalCode, row);
@@ -293,9 +306,14 @@ export function planReconcile(
   }
 
   // Deletions: scoped locals absent upstream are soft-deleted; rows already
-  // deleted stay untouched so later restores keep a clean signal.
+  // deleted stay untouched so later restores keep a clean signal. Codes
+  // seen-but-unmapped upstream (opts.protectedCodes) never delete: they were
+  // present in this sweep, so retiring them would be a silent drop, not a
+  // reconcile.
+  const protectedCodes = new Set(opts.protectedCodes ?? []);
   for (const [code, row] of byCode) {
     if (touched.has(code)) continue;
+    if (protectedCodes.has(code)) continue;
     if (row.deletedAt !== null) continue;
     entries.push({ kind: "delete", local: row });
   }
@@ -479,12 +497,48 @@ export async function runSync(
     const parsed = parsePage({ data: rows });
     baseResult.malformed = parsed.malformed;
 
+    // seenCodes: every external code the sweep observed this cycle, mapped
+    // or not (audit F1). A mapping skip or malformed row still exists
+    // upstream - only its mapping failed here - so its code protects the
+    // local row from the reconcile delete: an unmapped seed rank or an
+    // upstream schema drift must downgrade visibility to a logged skip,
+    // never a soft delete. Codes upstream truly removed are absent from
+    // this set and still retire. Malformed rows give up their code
+    // best-effort (the row usually fails on another field).
+    const seenCodes = new Set<string>();
+    for (const item of parsed.items) {
+      if (item.code !== "") seenCodes.add(item.code);
+    }
+    for (const m of parsed.malformed) {
+      const raw = rows[m.index];
+      if (typeof raw !== "object" || raw === null) continue;
+      const code = (raw as Record<string, unknown>).code;
+      if (typeof code === "string" && code.trim() !== "") {
+        seenCodes.add(code.trim());
+      } else if (typeof code === "number" && Number.isFinite(code)) {
+        seenCodes.add(String(code));
+      }
+    }
+    // Offset pages can straddle an upstream write mid-sweep: the merged
+    // result may hold one duplicate and one missing row while
+    // rows.length === total still passes the completeness guard (audit F8).
+    // Each code maps once, so a duplicate cannot double-count; the missing
+    // row is only protected when it was seen - a genuinely absent code
+    // still retires on a later clean cycle.
+    const planned = new Set<string>();
+    const items: FracttalAsset[] = [];
+    for (const item of parsed.items) {
+      if (planned.has(item.code)) continue;
+      planned.add(item.code);
+      items.push(item);
+    }
+
     // Catalog bootstrap before mapping: without it every asset whose
     // station/category label postdates the seed (or a dump import) skips,
     // and a migrate-only database never reaches full tenant coverage.
     // Dry runs stay read-only, so they keep reporting those skips instead.
     if (!dryRun && io.ensureCatalog) {
-      await io.ensureCatalog(catalogNeeds(parsed.items));
+      await io.ensureCatalog(catalogNeeds(items));
     }
 
     const ctx = await io.buildMapContext();
@@ -492,7 +546,7 @@ export async function runSync(
     const mappingSkips: Array<{ code: string; reason: string }> = [];
     const mappingWarnings: Array<{ code: string; warning: string }> = [];
     const workEvents = options.workEvents ?? null;
-    for (const item of parsed.items) {
+    for (const item of items) {
       const mapped = mapAsset(
         item,
         ctx,
@@ -514,7 +568,9 @@ export async function runSync(
     const remoteCodes = [...new Set(inputs.map((i) => i.externalCode))];
     const local = await io.loadLocal(scopeLocationIds, remoteCodes);
 
-    const plan = planReconcile(inputs, local);
+    const plan = planReconcile(inputs, local, {
+      protectedCodes: [...seenCodes],
+    });
     baseResult.plan = plan;
 
     if (dryRun) return baseResult;
