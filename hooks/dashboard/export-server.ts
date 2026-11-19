@@ -5,7 +5,7 @@
 // covers the same rows as the table (scope filters plus the selected ids).
 import type { BarriersQuery } from "../../lib/wireTypes.ts";
 
-import { browserTimeZone } from "../../lib/export/html.ts";
+import { browserTimeZone, download } from "../../lib/export/html.ts";
 
 import { toPtError } from "../../lib/api/error-pt.ts";
 
@@ -79,25 +79,17 @@ async function requestFile(
   return { res };
 }
 
-// downloadBlob: saves a response body as a file without mounting anything
-// into the page DOM (a large report injected for printing is what used to
-// freeze the tab).
-function downloadBlob(blob: Blob, filename: string): void {
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = filename;
-  a.click();
-  URL.revokeObjectURL(url);
-}
-
 // exportFromServer: runs the export for the whole selection. Every format
 // comes back as one file download, so a selection too large for any preview
-// still comes out complete.
+// still comes out complete. The shared download() helper saves the body
+// without mounting anything into the page DOM (a large report injected for
+// printing is what used to freeze the tab) and defers the object-URL revoke,
+// so the browser's asynchronous click can start the download before the URL
+// disappears.
 export async function exportFromServer(
   req: ServerExportRequest,
 ): Promise<void> {
   if (!req.baseUrl) throw new Error("Exportação indisponível (sem baseUrl)");
   const { res } = await requestFile(req);
-  downloadBlob(await res.blob(), `${req.filename}${FMT_EXT[req.kind]}`);
+  download(await res.blob(), `${req.filename}${FMT_EXT[req.kind]}`);
 }

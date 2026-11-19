@@ -1,4 +1,5 @@
-// Unit tests for HTTP adapter auth mapping - session expiry signals.
+// Unit tests for HTTP adapter auth mapping - session expiry signals - plus
+// the ETag revalidation cache contract (collections and single rows).
 // This is why they exist: the dashboard redirects to /login on
 // AuthExpiredError, so the 401/404 mapping (and the row-level 404=null
 // contract) must stay exact without a database or server.
@@ -12,6 +13,8 @@ import {
 import { AuthExpiredError, httpAdapterFactory } from "./http.ts";
 
 import { isAuthExpired } from "./http.ts";
+
+import type { WireBarrier } from "../wireTypes.ts";
 
 function stubFetch(status: number, body: unknown = {}): () => void {
   const prev = globalThis.fetch;
@@ -99,6 +102,101 @@ Deno.test("getBarrierById treats camouflaged 404 as expired", async () => {
     assertStrictEquals((err as AuthExpiredError).status, 404);
   } finally {
     restore();
+  }
+});
+
+// wireRow: a complete minimal wire barrier the resolver accepts, so a
+// single-row response can be exercised without a server.
+function wireRow(id: number, tag: string): WireBarrier {
+  return {
+    id,
+    tag,
+    typologyId: 1,
+    locationId: 1,
+    locDescId: 1,
+    criticalityId: 1,
+    categoryId: 1,
+    groupingId: 1,
+    ownerId: -1,
+    availabilityId: 1,
+    comments: "",
+    actionPlan: "",
+    statusSince: "2026-01-01T00:00:00Z",
+    statusHistory: [],
+    origin: "",
+    externalCode: "",
+    locationName: "",
+    installLocal: "",
+    equipTypology: "",
+    fieldInstalled: "",
+    fieldOperational: "",
+    opStatus: "",
+    hasMaintPlan: "",
+    planFollowed: "",
+    failureFree: "",
+    maintStatus: "",
+    hasContingency: "",
+    contingencyDesc: "",
+    evidenceCode: "",
+    degradationDesc: "",
+    extraComments: "",
+  };
+}
+
+Deno.test("getBarrierById revalidates with ETag and serves 304 from memory", async () => {
+  // Regression: single rows used to bypass the per-adapter ETag cache, so
+  // every detail-modal fetch re-downloaded and re-parsed the whole row.
+  const api = httpAdapterFactory("http://x");
+  const seen: Array<Record<string, string>> = [];
+  const prev = globalThis.fetch;
+  const tag = '"row1"';
+  const row = wireRow(9, "V-01");
+  globalThis.fetch = ((_url: unknown, init?: { headers?: unknown }) => {
+    seen.push({ ...(init?.headers as Record<string, string>) });
+    if (
+      (init?.headers as Record<string, string>)?.["If-None-Match"] === tag
+    ) {
+      return Promise.resolve(
+        new Response(null, { status: 304, headers: { etag: tag } }),
+      );
+    }
+    return Promise.resolve(
+      new Response(JSON.stringify(row), {
+        status: 200,
+        headers: { etag: tag },
+      }),
+    );
+  }) as typeof fetch;
+  try {
+    const first = await api.getBarrierById(9);
+    assertStrictEquals(first?.id, 9);
+    assertStrictEquals(seen[0]?.["If-None-Match"], undefined);
+    const second = await api.getBarrierById(9);
+    assertStrictEquals(second?.id, 9);
+    assertStrictEquals(seen[1]?.["If-None-Match"], tag);
+    assertStrictEquals(seen.length, 2);
+  } finally {
+    globalThis.fetch = prev;
+  }
+});
+
+Deno.test("getBarrierById refreshes the row cache when the ETag changes", async () => {
+  const api = httpAdapterFactory("http://y");
+  const prev = globalThis.fetch;
+  let tag = '"r1"';
+  globalThis.fetch = (() =>
+    Promise.resolve(
+      new Response(
+        JSON.stringify(wireRow(9, tag === '"r1"' ? "OLD" : "NEW")),
+        { status: 200, headers: { etag: tag } },
+      ),
+    )) as typeof fetch;
+  try {
+    assertStrictEquals((await api.getBarrierById(9))?.tag, "OLD");
+    tag = '"r2"';
+    assertStrictEquals((await api.getBarrierById(9))?.tag, "NEW");
+  } finally {
+    globalThis.fetch = prev;
   }
 });
 

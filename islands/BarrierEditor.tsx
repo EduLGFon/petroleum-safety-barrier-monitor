@@ -10,7 +10,7 @@ import {
 
 import { toPtError } from "../lib/api/error-pt.ts";
 
-import { useEffect, useState } from "preact/hooks";
+import { useEffect, useRef, useState } from "preact/hooks";
 
 import type { Barrier } from "../lib/types.ts";
 
@@ -66,6 +66,21 @@ export function BarrierEditor(
     barrier.manualFields ?? [],
   );
   const [pendingSync, setPendingSync] = useState<string[]>([]);
+
+  // The success callback is deferred 500ms so the "salvo" flash reads before
+  // onSaved closes the editor. The timer is tracked: unmount cancels it (the
+  // island may be gone) and a newer save supersedes a pending one, so onSaved
+  // can never fire twice or into a dead component.
+  const savedTimerRef = useRef<number | undefined>(undefined);
+
+  useEffect(() => {
+    return () => {
+      if (savedTimerRef.current !== undefined) {
+        clearTimeout(savedTimerRef.current);
+        savedTimerRef.current = undefined;
+      }
+    };
+  }, []);
 
   // Identification & core fields
   const [tag, setTag] = useState(barrier.tag);
@@ -287,7 +302,14 @@ export function BarrierEditor(
 
       const updated = (await res.json()) as Barrier;
       setSuccess("Barreira atualizada com sucesso.");
-      setTimeout(() => {
+      // Only one deferred success may be pending: scheduling a new one
+      // cancels the previous beat so overlapping saves never queue
+      // duplicate onSaved calls.
+      if (savedTimerRef.current !== undefined) {
+        clearTimeout(savedTimerRef.current);
+      }
+      savedTimerRef.current = setTimeout(() => {
+        savedTimerRef.current = undefined;
         onSaved(updated);
       }, 500);
     } catch (err) {

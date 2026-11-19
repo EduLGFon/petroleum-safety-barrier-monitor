@@ -15,6 +15,11 @@ export function useFakeProgress(onDone: () => void) {
     const steps = 40, dur = 1200;
     let raf = 0;
     let started = 0;
+    // Both completion timers are tracked: the exit beat and the inner done
+    // beat. Unmounting mid-splash cancels them, so the splash never calls
+    // setState (or onDone) after the island is gone.
+    let exitTimer = 0;
+    let doneTimer = 0;
     const tick = (now: number) => {
       if (!started) started = now;
       const elapsed = now - started;
@@ -24,16 +29,20 @@ export function useFakeProgress(onDone: () => void) {
       setProgress(Math.round(e * 100));
       if (step >= steps) {
         setReady(true);
-        setTimeout(() => {
+        exitTimer = setTimeout(() => {
           setExit(true);
-          setTimeout(done, 550);
+          doneTimer = setTimeout(done, 550);
         }, 300);
         return;
       }
       raf = requestAnimationFrame(tick);
     };
     raf = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(raf);
+    return () => {
+      cancelAnimationFrame(raf);
+      clearTimeout(exitTimer);
+      clearTimeout(doneTimer);
+    };
   }, [done]);
 
   const msg = progress < 35
