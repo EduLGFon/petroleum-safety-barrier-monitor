@@ -94,9 +94,19 @@ const ADMIN_COLUMNS = `${PUBLIC_COLUMNS}, entra_oid`;
 const USER_COLUMNS =
   "id, email, name, coalesce(phone, '') as phone, password_hash, role, active, created_at::text, auth_source, entra_tid, entra_oid, must_change_password";
 
-export async function listUsers(): Promise<AdminUser[]> {
-  const rows = await queryRows<AdminUser>(
-    `select ${ADMIN_COLUMNS} from users order by id`,
+// LIST_USERS_MAX_ROWS: hard ceiling for the admin list. The admin screen
+// paginates client-side over the whole array, so this is a whole-list bound,
+// not a page. 5000 matches the batch ceiling and keeps a pathological users
+// table from exhausting memory on GET /api/users; normal deployments stay far
+// below it.
+export const LIST_USERS_MAX_ROWS = 5000;
+
+export async function listUsers(
+  query: TxQuery = queryRows,
+): Promise<AdminUser[]> {
+  const rows = await query<AdminUser>(
+    `select ${ADMIN_COLUMNS} from users order by id limit $1`,
+    [LIST_USERS_MAX_ROWS],
   );
   return rows;
 }

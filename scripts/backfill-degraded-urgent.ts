@@ -13,6 +13,10 @@
 // Admin overrides are respected: rows whose latest history author is not the
 // sync author (id 10) are skipped, exactly like the sync planner.
 //
+// The apply loop is one transaction: either every row is demoted and the
+// audit row is written, or nothing is. A per-row COMMIT would leave a
+// half-demoted dataset and a misleading audit trail when a later row fails.
+//
 // Run (dry report first):
 //   deno run -A --env-file=.env scripts/backfill-degraded-urgent.ts
 // Apply:
@@ -24,6 +28,61 @@ const SYNC_AUTHOR_ID = 10;
 const NOTE =
   "Regra atualizada: Degradada exige gatilho urgente (is_urgent); sem evidência de urgência, retorna a Disponível";
 
+// Same transaction demotes the status (sanctioned path) and clears the
+// urgent-gated sheet fields so a demoted row does not keep a stale Degradada
+// description/action/failure flag.
+const DEMOTE_FIELDS_SQL =
+  `update barriers set degradation_desc = '', action_plan = '', failure_free = 'Sim', op_status = 'Disponível', maint_status = 'Disponível', field_operational = 'Sim', has_contingency = 'Não', contingency_desc = null, evidence_code = null where id = $1`;
+
+export interface DegradedBarrierRow {
+  id: number;
+  external_code: string;
+  availability_id: number;
+  latest_author: number | null;
+}
+
+// Minimal client surface the apply loop needs. Structural typing lets main()
+// pass the real PoolClient and tests pass a fake that records statements.
+export interface BackfillClient {
+  queryArray(text: string, args?: unknown[]): Promise<unknown>;
+}
+
+// applyDemotions: the whole apply loop under one BEGIN/COMMIT. The sync_state
+// audit row is inserted inside the same transaction after every row has been
+// processed, so a rollback leaves neither partial demotions nor a success
+// marker. Returns the number of rows demoted.
+export async function applyDemotions(
+  client: BackfillClient,
+  rows: readonly DegradedBarrierRow[],
+): Promise<number> {
+  await client.queryArray("BEGIN", []);
+  try {
+    let demoted = 0;
+    for (const row of rows) {
+      await client.queryArray(
+        "select record_status_change($1, $2, $3, $4)",
+        [row.id, 0, SYNC_AUTHOR_ID, NOTE],
+      );
+      await client.queryArray(DEMOTE_FIELDS_SQL, [row.id]);
+      demoted++;
+      if (demoted % 500 === 0) console.log(`  processed ${demoted}...`);
+    }
+    await client.queryArray(
+      `insert into sync_state (scope, status, inserts, note) values ('backfill-degraded-urgent', 'ok', 0, $1)`,
+      [`demoted ${demoted} degraded rows without urgent trigger to Disponivel`],
+    );
+    await client.queryArray("COMMIT", []);
+    return demoted;
+  } catch (err) {
+    try {
+      await client.queryArray("ROLLBACK", []);
+    } catch {
+      // Already closed; the original error is the one that matters.
+    }
+    throw err;
+  }
+}
+
 async function main(): Promise<void> {
   const apply = new Set(Deno.args).has("--apply");
   const connectionString = Deno.env.get("DATABASE_URL");
@@ -34,12 +93,7 @@ async function main(): Promise<void> {
   const pool = new Pool(connectionString, 1, true);
   const client = await pool.connect();
   try {
-    const rows = await client.queryObject<{
-      id: number;
-      external_code: string;
-      availability_id: number;
-      latest_author: number | null;
-    }>(
+    const rows = await client.queryObject<DegradedBarrierRow>(
       `select b.id, b.external_code, b.availability_id,
         (select h.author_id from barrier_status_history h
           where h.barrier_id = b.id order by h.created_at desc, h.id desc limit 1) as latest_author
@@ -80,35 +134,7 @@ async function main(): Promise<void> {
       return;
     }
 
-    let demoted = 0;
-    for (const r of syncOwned) {
-      // Same tx demotes the status (sanctioned path) and clears the
-      // urgent-gated sheet fields so a demoted row does not keep a stale
-      // Degradada description/action/failure flag.
-      await client.queryArray("BEGIN", []);
-      try {
-        await client.queryArray(
-          "select record_status_change($1, $2, $3, $4)",
-          [r.id, 0, SYNC_AUTHOR_ID, NOTE],
-        );
-        await client.queryArray(
-          `update barriers set degradation_desc = '', action_plan = '', failure_free = 'Sim', op_status = 'Disponível', maint_status = 'Disponível', field_operational = 'Sim', has_contingency = 'Não', contingency_desc = null, evidence_code = null where id = $1`,
-          [r.id],
-        );
-        await client.queryArray("COMMIT", []);
-      } catch (err) {
-        try {
-          await client.queryArray("ROLLBACK", []);
-        } catch { /* already closed */ }
-        throw err;
-      }
-      demoted++;
-      if (demoted % 500 === 0) console.log(`  demoted ${demoted}...`);
-    }
-    await client.queryArray(
-      `insert into sync_state (scope, status, inserts, note) values ('backfill-degraded-urgent', 'ok', 0, $1)`,
-      [`demoted ${demoted} degraded rows without urgent trigger to Disponivel`],
-    );
+    const demoted = await applyDemotions(client, syncOwned);
     console.log(`\nDone: demoted ${demoted} rows to Disponivel (0).`);
     console.log(
       `Next sync/import re-promotes rows whose open planned trigger carries is_urgent=true.`,
