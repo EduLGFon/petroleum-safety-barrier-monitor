@@ -57,16 +57,37 @@ export async function upsertFieldOptionSet(
   return { ...row, options: asStrings(row.options) };
 }
 
-// seedFieldOptions: inserts seed defaults for missing fields only.
-export async function seedFieldOptions(fields: FieldKey[]): Promise<void> {
-  for (const field of fields) {
-    await queryRows(
-      `insert into field_option_sets (field, options, updated_by)
-       values ($1, $2::jsonb, 'seed')
+// buildSeedFieldOptionsStatement: one multi-row INSERT for every missing
+// field. One statement per read on a fresh database instead of N round
+// trips; duplicates are dropped so a repeated key can never make the same
+// command touch the same row twice. Returns an empty text for an empty list
+// so the caller skips the round trip.
+export function buildSeedFieldOptionsStatement(
+  fields: readonly FieldKey[],
+): { text: string; args: unknown[] } {
+  const unique = [...new Set(fields)];
+  if (unique.length === 0) return { text: "", args: [] };
+  const values = unique.map((_, index) => {
+    const fieldIdx = index * 2 + 1;
+    return `($${fieldIdx}, $${fieldIdx + 1}::jsonb, 'seed')`;
+  });
+  return {
+    text: `insert into field_option_sets (field, options, updated_by)
+       values ${values.join(", ")}
        on conflict (field) do nothing`,
-      [field, JSON.stringify(SEED_DEFAULTS[field])],
-    );
-  }
+    args: unique.flatMap((field) => [
+      field,
+      JSON.stringify(SEED_DEFAULTS[field]),
+    ]),
+  };
+}
+
+// seedFieldOptions: inserts seed defaults for missing fields only, batched
+// into a single statement.
+export async function seedFieldOptions(fields: FieldKey[]): Promise<void> {
+  const { text, args } = buildSeedFieldOptionsStatement(fields);
+  if (text === "") return;
+  await queryRows(text, args);
 }
 
 // asStrings: jsonb arrives as string[] via pg driver; guards the shape.

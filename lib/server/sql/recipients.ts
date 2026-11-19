@@ -12,7 +12,7 @@ import {
 
 export { normalizeEmail, normalizeName, normalizePhone };
 
-import { queryRows } from "../db.ts";
+import { queryRows, type TxQuery } from "../db.ts";
 
 export interface AlertRecipient {
   id: number;
@@ -23,14 +23,24 @@ export interface AlertRecipient {
   created_at: string;
 }
 
+// LIST_RECIPIENTS_MAX_ROWS: hard ceiling for the legacy manual list. The
+// admin screen paginates client-side over the whole array, so this is a
+// whole-list bound, not a page. 5000 matches the recipient batch ceiling and
+// bounds memory on GET /api/recipients; the send audience no longer reads
+// this table, so truncation cannot change alert delivery.
+export const LIST_RECIPIENTS_MAX_ROWS = 5000;
+
 export async function listRecipients(
   activeOnly = false,
+  query: TxQuery = queryRows,
 ): Promise<AlertRecipient[]> {
-  return await queryRows<AlertRecipient>(
+  return await query<AlertRecipient>(
     `select id, email, name, coalesce(phone, '') as phone, active, created_at::text
      from alert_recipients
      ${activeOnly ? "where active" : ""}
-     order by id`,
+     order by id
+     limit $1`,
+    [LIST_RECIPIENTS_MAX_ROWS],
   );
 }
 

@@ -1,7 +1,14 @@
-// Pure tests for user batch helpers (no DB).
-import { normalizeUserBatchAction, normalizeUserBatchIds } from "./users.ts";
+// Pure tests for user batch helpers and list bounds (no DB).
+import {
+  LIST_USERS_MAX_ROWS,
+  listUsers,
+  normalizeUserBatchAction,
+  normalizeUserBatchIds,
+} from "./users.ts";
 
-import { assertEquals, assertThrows } from "jsr:@std/assert@^1";
+import { assert, assertEquals, assertThrows } from "jsr:@std/assert@^1";
+
+import type { TxQuery } from "../db.ts";
 
 import { ValidationError } from "../validation.ts";
 
@@ -42,4 +49,21 @@ Deno.test("normalizeUserBatchAction rejects aliases and unknown values", () => {
   );
   assertThrows(() => normalizeUserBatchAction("Rebaixar"), ValidationError);
   assertThrows(() => normalizeUserBatchAction("foo"), ValidationError);
+});
+
+Deno.test("listUsers bounds the admin list with a documented cap", async () => {
+  const calls: Array<{ text: string; args: Array<unknown> }> = [];
+  const query: TxQuery = <U>(
+    text: string,
+    args: Array<unknown> = [],
+  ): Promise<U[]> => {
+    calls.push({ text, args });
+    return Promise.resolve([] as U[]);
+  };
+
+  assertEquals(await listUsers(query), []);
+  assert(calls[0]!.text.includes("from users order by id"));
+  assert(calls[0]!.text.includes("limit $1"));
+  assertEquals(calls[0]!.args, [LIST_USERS_MAX_ROWS]);
+  assert(LIST_USERS_MAX_ROWS > 0 && LIST_USERS_MAX_ROWS <= 5000);
 });
