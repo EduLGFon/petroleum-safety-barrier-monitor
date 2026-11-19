@@ -47,10 +47,12 @@ function parseEnvFile(text: string): Record<string, string> {
     if (eq < 0) continue;
     const key = line.slice(0, eq).trim();
     let val = line.slice(eq + 1).trim();
-    if (
-      (val.startsWith('"') && val.endsWith('"')) ||
-      (val.startsWith("'") && val.endsWith("'"))
-    ) {
+    if (val.length >= 2 && val.startsWith('"') && val.endsWith('"')) {
+      // Double-quoted: written by deploy/windows/Setup-Production.ps1, which
+      // escapes \ and " inside the quotes; unescape symmetrically here so a
+      // value like "A \"B\" C" round-trips.
+      val = val.slice(1, -1).replace(/\\(["\\])/g, "$1");
+    } else if (val.length >= 2 && val.startsWith("'") && val.endsWith("'")) {
       val = val.slice(1, -1);
     }
     out[key] = val;
@@ -302,6 +304,16 @@ function checkPlatform(): void {
   }
 }
 
+// isMissingTable: true when a query failed only because the schema is not
+// migrated yet (Postgres 42P01 / undefined_table). Setup-Production.ps1 runs
+// `db:migrate` before the doctor gate for exactly this reason; a manual
+// `deno task doctor` on a fresh database should point at the migration,
+// not fail the whole preflight.
+function isMissingTable(err: unknown): boolean {
+  const msg = err instanceof Error ? err.message : String(err);
+  return /42P01|undefined_table|relation\s+"?\w+"?\s+does not exist/i.test(msg);
+}
+
 async function checkSso(): Promise<void> {
   let config;
   try {
@@ -390,17 +402,42 @@ async function checkSso(): Promise<void> {
     try {
       const client = await pool.connect();
       try {
-        const result = await client.queryObject<{ n: string }>(
-          "select count(*)::text as n from users where role = 'admin' and active and auth_source = 'local'",
-        );
-        const count = Number(result.rows[0]?.n ?? 0);
+        let adminCount = 0;
+        try {
+          const result = await client.queryObject<{ n: string }>(
+            "select count(*)::text as n from users where role = 'admin' and active and auth_source = 'local'",
+          );
+          adminCount = Number(result.rows[0]?.n ?? 0);
+        } catch (err) {
+          if (isMissingTable(err)) {
+            push(
+              "sso-schema",
+              "warn",
+              "users table missing: run `deno task db:migrate` before using doctor as a gate",
+            );
+            return;
+          }
+          throw err;
+        }
         push(
           "sso-local-admin",
-          count > 0 ? "ok" : "fail",
-          `${count} active local admin(s)`,
+          adminCount > 0 ? "ok" : "fail",
+          `${adminCount} active local admin(s)`,
         );
-        await client.queryArray("select 1 from auth_flows limit 1");
-        push("sso-auth-flows", "ok", "auth_flows table present");
+        try {
+          await client.queryArray("select 1 from auth_flows limit 1");
+          push("sso-auth-flows", "ok", "auth_flows table present");
+        } catch (err) {
+          if (isMissingTable(err)) {
+            push(
+              "sso-auth-flows",
+              "warn",
+              "auth_flows table missing: run `deno task db:migrate`",
+            );
+          } else {
+            throw err;
+          }
+        }
       } finally {
         client.release();
       }

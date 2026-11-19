@@ -8,29 +8,40 @@
   and Setup-Production.ps1 lives inside the repo (chicken-and-egg). This
   tiny script fetches the zip, expands it to -InstallDir, and forwards every
   other bound parameter to the real setup script via hashtable splatting, so
-  unknown-to-bootstrap knobs are never silently dropped (PowerShell errors
-  on undeclared names instead - run Setup-Production.ps1 directly for those).
+  known knobs are never silently dropped (PowerShell errors on undeclared
+  names instead - run Setup-Production.ps1 directly for those).
+  Secrets are NEVER command-line arguments: set ADMIN_PASSWORD /
+  DB_PASSWORD / POSTGRES_SUPER_PASSWORD / FRACTTAL_SECRET in the environment
+  or answer the setup prompts. Passing them here aborts the setup, because
+  Bootstrap forwards them to Setup-Production.ps1 on its command line.
 .EXAMPLE
   powershell -ExecutionPolicy Bypass -File .\Bootstrap.ps1 `
     -RepoZipUrl https://github.com/org/repo/archive/refs/heads/master.zip `
-    -Hostname barreiras.example.com -AdminEmail you@example.com
+    -Hostname monitor.example.com -AdminEmail you@example.com
 #>
 param(
   [string]$RepoZipUrl = '',
   [string]$InstallDir = 'C:\srv\barrier-monitor',
   [string]$Branch = 'master',
+  [string]$ServicePrefix = 'SeaMonitor',
   [string]$Hostname = '',
+  [string[]]$AllowedLanRanges = @(),
   [string]$CompanyName = '',
   [string]$AdminEmail = '',
   [string]$AdminPassword = '',
+  [string]$DbName = 'monitor',
   [string]$DbPassword = '',
   [string]$PostgresSuperPassword = '',
+  [string]$PostgresBinDir = 'C:\sites\seacrest\.vendor\pgsql18\bin',
+  [string]$BackupDir = 'D:\backups\monitor',
+  [string]$AppPort = '8300',
   [string]$FracttalKey = '',
   [string]$FracttalSecret = '',
-  [string]$SmtpHost = '',
-  [string]$SmtpUser = '',
-  [string]$SmtpPass = '',
-  [string]$OpsEmailTo = ''
+  [switch]$SkipCaddy,
+  [switch]$SkipFirewall,
+  [switch]$AllowLanAppPort,
+  [switch]$Unattended,
+  [switch]$CheckOnly
 )
 
 $ErrorActionPreference = 'Stop'
