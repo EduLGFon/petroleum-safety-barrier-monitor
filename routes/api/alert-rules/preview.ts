@@ -21,15 +21,25 @@ import { readThrottle, routeClientKey } from "../../../lib/server/throttle.ts";
 
 import { loadServerConfig } from "../../../lib/server/config.ts";
 
+import { parsePositiveIntParam } from "../_params.ts";
+
 import { queryRows } from "../../../lib/server/db.ts";
 
 import { define } from "../../../utils.ts";
 
+// parseIds: comma list of strict positive integers. Blank entries are
+// skipped; anything that is not a whole decimal number is rejected by
+// hasInvalidIds before this runs.
 function parseIds(value: string | null): number[] | null {
   if (value === null || value.trim() === "") return null;
-  const ids = value.split(",").map((s) => Number(s.trim())).filter((n) =>
-    Number.isInteger(n) && n > 0
-  );
+  const ids: number[] = [];
+  for (const part of value.split(",")) {
+    const t = part.trim();
+    if (t === "") continue;
+    const n = parsePositiveIntParam(t);
+    if (n === undefined) continue;
+    ids.push(n);
+  }
   return ids.length > 0 ? ids : null;
 }
 
@@ -43,8 +53,7 @@ function hasInvalidIds(value: string | null): boolean {
   for (const p of parts) {
     const t = p.trim();
     if (t === "") continue;
-    const n = Number(t);
-    if (!Number.isInteger(n) || n <= 0) return true;
+    if (parsePositiveIntParam(t) === undefined) return true;
   }
   return false;
 }
@@ -101,13 +110,16 @@ export const handler = define.handlers({
       const groupingIds = parseIds(q.get("groupingIds"));
       const ownerIds = parseIds(q.get("ownerIds"));
       const staleDaysRaw = q.get("staleDays");
-      const staleDays = staleDaysRaw === null || staleDaysRaw === ""
-        ? null
-        : Number(staleDaysRaw);
-      if (
-        staleDays !== null && (!Number.isInteger(staleDays) || staleDays <= 0)
-      ) {
-        return badRequest("staleDays must be a positive integer", requestId);
+      let staleDays: number | null = null;
+      if (staleDaysRaw !== null && staleDaysRaw !== "") {
+        // Strict parse: only a whole decimal number is a day count, so
+        // "1e2", "0x10" and "7.5" are rejected instead of being
+        // reinterpreted as 100, 16 and 8.
+        const parsed = parsePositiveIntParam(staleDaysRaw);
+        if (parsed === undefined) {
+          return badRequest("staleDays must be a positive integer", requestId);
+        }
+        staleDays = parsed;
       }
       const onlyNoPlan = q.get("onlyNoActionPlan") === "1";
       const filters: string[] = [

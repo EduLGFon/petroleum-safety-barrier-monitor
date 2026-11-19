@@ -9,6 +9,11 @@ interface Entry {
   body: unknown;
 }
 
+// MEMO_MAX_ENTRIES: ceiling on cached responses. The map is swept back to
+// this budget on every write, so a burst of distinct scopes cannot grow it
+// without bound.
+const MEMO_MAX_ENTRIES = 500;
+
 const store = new Map<string, Entry>();
 
 function now(): number {
@@ -26,12 +31,17 @@ export function memoGet(key: string, ttlMs: number): unknown | undefined {
   return e.body;
 }
 
-// set: stores a fresh entry, evicting oldest when over budget.
+// set: stores a fresh entry, evicting oldest entries when over budget.
+// The sweep removes every key above the cap, not just the first one: a
+// single eviction can leave the map above the budget (the head of the map
+// is the oldest insertion, not necessarily the stalest entry), and the memo
+// must stay bounded no matter how many keys are written.
 export function memoSet(key: string, body: unknown): void {
   store.set(key, { at: now(), body });
-  if (store.size > 500) {
+  while (store.size > MEMO_MAX_ENTRIES) {
     const oldest = store.keys().next();
-    if (!oldest.done) store.delete(oldest.value);
+    if (oldest.done) break;
+    store.delete(oldest.value);
   }
 }
 

@@ -3,6 +3,18 @@
 // and resetting passwords are the core of access management. The last
 // active admin cannot be demoted, deactivated, or deleted.
 import {
+  normalizeEmail,
+  normalizeEntraObjectId,
+  normalizeName,
+  normalizePhone,
+  parseIdParam,
+  POSTGRES_UNIQUE_VIOLATION,
+  postgresErrorInfo,
+  readJsonBody,
+  ValidationError,
+} from "../../../lib/server/validation.ts";
+
+import {
   generateTemporaryPassword,
   hashPassword,
   validateNewPassword,
@@ -25,12 +37,6 @@ import {
 } from "../../../lib/server/auth.ts";
 
 import {
-  normalizeEntraObjectId,
-  parseIdParam,
-  readJsonBody,
-} from "../../../lib/server/validation.ts";
-
-import {
   deleteUser,
   getUserById,
   updateUser,
@@ -48,6 +54,84 @@ import { routeClientKey, writeThrottle } from "../../../lib/server/throttle.ts";
 import { denyIfCrossSite } from "../../../lib/server/csrf.ts";
 
 import { define } from "../../../utils.ts";
+
+interface UserPatchBody {
+  email?: unknown;
+  name?: unknown;
+  phone?: unknown;
+  role?: unknown;
+  active?: unknown;
+  password?: unknown;
+  resetPassword?: unknown;
+  authSource?: unknown;
+  entraObjectId?: unknown;
+}
+
+// Last-admin guard texts raised by the user store. The pattern is anchored
+// on the exact guard family on purpose: a database error that merely mentions
+// "admin" must never be answered as a 400, and the guard text we return is
+// the policy wording the admin UI already localizes.
+const LAST_ADMIN_GUARD_RE =
+  /^cannot (demote|deactivate|delete|convert) the last active( local)? admin$/;
+
+// lastAdminMessage: the guard text when the failure is a last-admin guard,
+// undefined for every other failure (those stay on the 500 path).
+function lastAdminMessage(err: unknown): string | undefined {
+  if (!(err instanceof Error)) return undefined;
+  return LAST_ADMIN_GUARD_RE.test(err.message) ? err.message : undefined;
+}
+
+// duplicateMessage: a unique violation reported by the driver, mapped to a
+// controlled message. The SQLSTATE and the constraint name decide - never the
+// error text, so driver wording can never leak into a response.
+function duplicateMessage(err: unknown): string | undefined {
+  const info = postgresErrorInfo(err);
+  if (info.code !== POSTGRES_UNIQUE_VIOLATION) return undefined;
+  return info.constraint === "users_email_key"
+    ? "email already exists"
+    : "duplicate value";
+}
+
+// validateUserPatch: typed checks on the request body before anything
+// reaches the store. A rejection is a ValidationError, so the route maps it
+// to 400 by type instead of by matching error text later.
+function validateUserPatch(body: UserPatchBody): void {
+  if (body.email !== undefined) normalizeEmail(body.email);
+  if (body.name !== undefined) normalizeName(body.name);
+  if (body.phone !== undefined) normalizePhone(body.phone);
+  if (
+    body.role !== undefined && body.role !== "admin" && body.role !== "user"
+  ) {
+    throw new ValidationError("role must be admin or user");
+  }
+  if (body.active !== undefined && typeof body.active !== "boolean") {
+    throw new ValidationError("active must be a boolean");
+  }
+  if (
+    body.authSource !== undefined && body.authSource !== "local" &&
+    body.authSource !== "entra"
+  ) {
+    throw new ValidationError("authSource must be local or entra");
+  }
+  if (
+    body.entraObjectId !== undefined && body.entraObjectId !== null &&
+    body.entraObjectId !== ""
+  ) {
+    normalizeEntraObjectId(body.entraObjectId);
+  }
+}
+
+// hasUserUpdate: true when the request carries at least one field the store
+// would write. An empty set is "nothing to update" - a client-input
+// rejection, so it is raised here as a typed error.
+function hasUserUpdate(body: UserPatchBody): boolean {
+  if (body.email !== undefined || body.name !== undefined) return true;
+  if (body.phone !== undefined || body.role !== undefined) return true;
+  if (body.active !== undefined || body.authSource !== undefined) return true;
+  if (body.password !== undefined || body.resetPassword === true) return true;
+  const oid = body.entraObjectId;
+  return oid !== undefined && oid !== null && oid !== "";
+}
 
 export const handler = define.handlers({
   // PATCH { name?, role?, active?, password? } - partial update.
@@ -82,18 +166,14 @@ export const handler = define.handlers({
     }
     const parsed = await readJsonBody(ctx.req);
     if (!parsed.ok) return badRequest("Invalid JSON body", requestId);
-    const body = parsed.body as {
-      email?: unknown;
-      name?: unknown;
-      phone?: unknown;
-      role?: unknown;
-      active?: unknown;
-      password?: unknown;
-      resetPassword?: unknown;
-      authSource?: unknown;
-      entraObjectId?: unknown;
-    };
+    const body = parsed.body as UserPatchBody;
     try {
+      // Typed input validation first: a malformed body is rejected here,
+      // before any query runs, and the catch below maps it to 400 by type.
+      validateUserPatch(body);
+      if (!hasUserUpdate(body)) {
+        throw new ValidationError("nothing to update");
+      }
       let passwordHash: string | undefined;
       // resetPassword: the admin asks the system to draw a new password
       // instead of inventing one. This is how an account that still carries
@@ -153,6 +233,22 @@ export const handler = define.handlers({
       if (body.authSource !== undefined || body.entraObjectId !== undefined) {
         const target = await getUserById(id);
         if (!target) return notFound("User not found", requestId);
+        // Domain rejections the store would raise for an impossible identity
+        // change, answered here so they stay typed 400s.
+        if (body.authSource === "local" && target.auth_source === "entra") {
+          return badRequest(
+            "conversion back to local is not supported",
+            requestId,
+          );
+        }
+        const bindsObjectId = body.entraObjectId !== undefined &&
+          body.entraObjectId !== null && body.entraObjectId !== "";
+        if (
+          bindsObjectId && target.auth_source !== "entra" &&
+          body.authSource !== "entra"
+        ) {
+          return badRequest("entraObjectId requires an Entra user", requestId);
+        }
         if (body.authSource === "entra" || body.entraObjectId !== undefined) {
           let authConfig;
           try {
@@ -226,34 +322,29 @@ export const handler = define.handlers({
         { headers: { "cache-control": "no-store" } },
       );
     } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
-      // A self-demotion/deactivation is still the last-admin guard, but the
-      // caller can act on a clearer "your own account" explanation. The wire
-      // message stays English; the UI localizes it.
-      if (message.includes("duplicate") || message.includes("unique")) {
-        return badRequest(
-          message.includes("email") || message.includes("users_email")
-            ? "email already exists"
-            : "duplicate value",
-          requestId,
-        );
+      // Typed classification: a ValidationError is a client-input rejection
+      // and keeps its 400, a unique violation is a duplicate row the caller
+      // can fix, and the last-admin guard is a policy rejection with its own
+      // wording. Everything else is internal - database text never reaches a
+      // client, and no error is classified by matching words in a message.
+      if (err instanceof ValidationError) {
+        return badRequest(err.message, requestId);
       }
-      const publicMessage = auth.user?.id === id &&
-          message.includes("last active admin")
-        ? message.replace(
-          "the last active admin",
-          "your own account while you are the last active admin",
-        )
-        : message;
-      if (
-        message.includes("email") || message.includes("name") ||
-        message.includes("phone") || message.includes("role") ||
-        message.includes("active") || message.includes("password") ||
-        message.includes("nothing to update") ||
-        message.includes("last active") ||
-        message.includes("authSource") || message.includes("entra") ||
-        message.includes("SSO")
-      ) {
+      const duplicate = duplicateMessage(err);
+      if (duplicate !== undefined) {
+        return badRequest(duplicate, requestId);
+      }
+      const guard = lastAdminMessage(err);
+      if (guard !== undefined) {
+        // A self-demotion/deactivation is still the last-admin guard, but the
+        // caller can act on a clearer "your own account" explanation. The
+        // wire message stays English; the UI localizes it.
+        const publicMessage = auth.user?.id === id
+          ? guard.replace(
+            "the last active admin",
+            "your own account while you are the last active admin",
+          )
+          : guard;
         return badRequest(publicMessage, requestId);
       }
       return internal(
@@ -300,14 +391,16 @@ export const handler = define.handlers({
       if (!removed) return notFound("User not found", requestId);
       return ok({ ok: true }, requestId);
     } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
-      if (message.includes("last active admin")) {
+      // Only the last-admin guard is a client-answerable rejection; every
+      // other failure stays internal so database text never leaks.
+      const guard = lastAdminMessage(err);
+      if (guard !== undefined) {
         const publicMessage = auth.user?.id === id
-          ? message.replace(
+          ? guard.replace(
             "the last active admin",
             "your own account while you are the last active admin",
           )
-          : message;
+          : guard;
         return badRequest(publicMessage, requestId);
       }
       return internal(

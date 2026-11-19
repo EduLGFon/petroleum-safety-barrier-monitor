@@ -13,6 +13,17 @@ export function parseIntParam(v: string | null): number | undefined {
   return Number.isSafeInteger(n) ? n : undefined;
 }
 
+// parsePositiveIntParam: strict positive integer. Only whole decimal digits
+// count - "0x10", "1e2", "12abc", "NaN" and "Infinity" are not ids the
+// caller may have meant, so they are rejected instead of being reinterpreted.
+export function parsePositiveIntParam(v: string | null): number | undefined {
+  if (v === null) return undefined;
+  const t = v.trim();
+  if (t === "" || !/^\d+$/.test(t)) return undefined;
+  const n = Number(t);
+  return Number.isSafeInteger(n) && n > 0 ? n : undefined;
+}
+
 // Parses a comma-separated list of integers (multi-select filters).
 // Single value returns a number for backward compat? Keep array when multiple.
 export function parseIntArrayParam(

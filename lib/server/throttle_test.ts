@@ -1,5 +1,5 @@
 // Unit tests for the fixed-window throttle (P4) - injected clock, no sleeps.
-import { createThrottle, throttleKey } from "./throttle.ts";
+import { createThrottle, isIpLiteral, throttleKey } from "./throttle.ts";
 
 import { assertStrictEquals } from "jsr:@std/assert@^1";
 
@@ -33,4 +33,52 @@ Deno.test("throttleKey reads the remote hostname, never proxy headers", () => {
   assertStrictEquals(throttleKey({ hostname: "10.0.0.7" }), "10.0.0.7");
   assertStrictEquals(throttleKey(undefined), "unknown");
   assertStrictEquals(throttleKey({}), "unknown");
+});
+
+Deno.test("isIpLiteral accepts real IPv4 and IPv6 addresses", () => {
+  for (
+    const ok of [
+      "203.0.113.9",
+      "10.0.0.7",
+      "0.0.0.0",
+      "255.255.255.255",
+      "::1",
+      "::",
+      "2001:db8::1",
+      "fe80::1",
+      "::ffff:192.0.2.1",
+      "0:0:0:0:0:ffff:1.2.3.4",
+      " 203.0.113.9 ",
+    ]
+  ) {
+    assertStrictEquals(isIpLiteral(ok), true, ok);
+  }
+});
+
+Deno.test("isIpLiteral rejects anything that is not an address", () => {
+  // A permissive shape check let partial addresses and punctuation through
+  // as bucket keys, so a caller could pick a key that is not an address.
+  for (
+    const bad of [
+      "",
+      "   ",
+      "1.2.3",
+      "1.2.3.4.5",
+      "999.1.1.1",
+      "010.1.1.1",
+      "1.2.3.-1",
+      "::1::2",
+      "1:2:3:4:5:6:7",
+      "1:2:3:4:5:6:7:8:9",
+      "fe80::1%eth0",
+      "...",
+      "::.",
+      "localhost",
+      "example.com",
+      "deadbeef",
+      "0x10",
+    ]
+  ) {
+    assertStrictEquals(isIpLiteral(bad), false, bad);
+  }
 });

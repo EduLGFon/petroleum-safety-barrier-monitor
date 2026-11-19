@@ -118,13 +118,60 @@ function trustedProxyHosts(): Set<string> {
   return out;
 }
 
+// isIpv4: four dotted decimal octets, each 0-255 and without leading
+// zeros (a padded octet is read differently by different parsers, so it is
+// not an address the app should key on).
+function isIpv4(value: string): boolean {
+  const parts = value.split(".");
+  if (parts.length !== 4) return false;
+  for (const part of parts) {
+    if (!/^\d{1,3}$/.test(part)) return false;
+    if (part.length > 1 && part.startsWith("0")) return false;
+    const n = Number(part);
+    if (!Number.isSafeInteger(n) || n > 255) return false;
+  }
+  return true;
+}
+
+// isIpv6: colon-separated hex groups. At most one "::" (which stands for
+// at least one zero group) and an optional embedded IPv4 tail.
+function isIpv6(value: string): boolean {
+  if (!value.includes(":")) return false;
+  const marker = value.indexOf("::");
+  if (marker !== -1 && marker !== value.lastIndexOf("::")) return false;
+  const head = marker === -1 ? value : value.slice(0, marker);
+  const tail = marker === -1 ? "" : value.slice(marker + 2);
+  const count = (part: string): number | null => {
+    if (part === "") return 0;
+    let total = 0;
+    for (const group of part.split(":")) {
+      if (group === "") return null;
+      if (group.includes(".")) {
+        if (!isIpv4(group)) return null;
+        total += 2;
+        continue;
+      }
+      if (!/^[0-9a-fA-F]{1,4}$/.test(group)) return null;
+      total += 1;
+    }
+    return total;
+  };
+  const headCount = count(head);
+  const tailCount = count(tail);
+  if (headCount === null || tailCount === null) return false;
+  // Without "::" every group must be present; with it the written groups
+  // must leave room for at least one zero group.
+  return marker === -1 ? headCount === 8 : headCount + tailCount <= 7;
+}
+
 // isIpLiteral: narrow shape check before trusting an edge header as a
-// bucket key. Hostnames are not accepted.
+// bucket key. Only a real IPv4 or IPv6 address is accepted - hostnames,
+// partial addresses and punctuation are not.
 export function isIpLiteral(value: string): boolean {
   const v = value.trim();
   if (v === "") return false;
-  // IPv4 or IPv6 (including IPv4-mapped forms).
-  return /^[0-9a-fA-F:.]+$/.test(v) && (v.includes(".") || v.includes(":"));
+  if (v.includes(":")) return isIpv6(v);
+  return isIpv4(v);
 }
 
 // routeClientKey: extracts the client identity from a Fresh route context
