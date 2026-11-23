@@ -8,6 +8,8 @@ import { xlsxChunks } from "../export/xlsx/workbook.ts";
 
 import type { Bytes } from "../export/xlsx/zip.ts";
 
+import { chunkStream } from "./exportStream.ts";
+
 import type { KpiSnapshot } from "../types.ts";
 
 import type { Barrier } from "../types.ts";
@@ -28,27 +30,5 @@ export function streamExportXlsx(
   batches: AsyncIterable<Barrier[]>,
   meta: XlsxMeta,
 ): ReadableStream<Bytes> {
-  const chunks = xlsxChunks(batches, meta);
-  return new ReadableStream<Bytes>({
-    async pull(controller) {
-      try {
-        const { value, done } = await chunks.next();
-        if (done) {
-          controller.close();
-          return;
-        }
-        controller.enqueue(value);
-      } catch (e) {
-        try {
-          await chunks.return?.(undefined);
-        } catch {
-          // Ignore cleanup failures; the source error is what matters.
-        }
-        throw e;
-      }
-    },
-    async cancel() {
-      await chunks.return?.(undefined);
-    },
-  });
+  return chunkStream(xlsxChunks(batches, meta));
 }

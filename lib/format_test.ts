@@ -45,6 +45,31 @@ Deno.test("daysSince clamps invalid/future dates and measures real spans", () =>
   assertStrictEquals(daysSince("2026-09-24", now), 0);
 });
 
+Deno.test("daysSince counts days in UTC, not in the process zone", () => {
+  // The instant of a date-time without an offset is read as UTC: the export
+  // server runs in UTC and the browser in Sao Paulo, and the same row must
+  // not come out one day apart. The expectation is spelled out in UTC, so
+  // the assertion holds in every zone.
+  const now = Date.UTC(2026, 8, 23, 1, 0, 0);
+  const expected = Math.floor((now - Date.UTC(2026, 8, 11)) / 86_400_000);
+  assertStrictEquals(daysSince("2026-09-11T00:00:00", now), expected);
+  assertStrictEquals(daysSince("2026-09-11T00:00:00Z", now), expected);
+  // The two spellings are the same instant, so they always agree.
+  assertStrictEquals(
+    daysSince("2026-09-11T00:00:00", now),
+    daysSince("2026-09-11T00:00:00Z", now),
+  );
+  // A bare date is UTC midnight (the ECMAScript rule) and counts the same.
+  assertStrictEquals(daysSince("2026-09-11", now), expected);
+  // An explicit offset is honoured as given.
+  assertStrictEquals(daysSince("2026-09-11T03:00:00+03:00", now), expected);
+  // A Postgres timestamp (space separator, no offset) is UTC too.
+  assertStrictEquals(
+    daysSince("2026-09-11 10:00:00", now),
+    Math.floor((now - Date.UTC(2026, 8, 11, 10)) / 86_400_000),
+  );
+});
+
 Deno.test("installationLabel joins code and name", () => {
   assertStrictEquals(
     installationLabel("FAL", "Fazenda Alegre"),

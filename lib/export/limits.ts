@@ -3,6 +3,10 @@
 // and up), so the ceiling comes from the formats themselves rather than an
 // arbitrary cap, and the over-cap wording stays identical wherever a refusal
 // still happens.
+// The server path streams the rows from the database, so this ceiling is a
+// format limit. The client (mock) path has no stream: it assembles the whole
+// file in the browser, so the same ceiling is also the memory bound there -
+// a documented ceiling instead of a rewrite of the browser builder.
 import { fmt } from "../format.ts";
 
 // Hard ceiling for one export in any format and mode. Sits below Excel's
@@ -20,4 +24,13 @@ export const EXPORT_PAGE_ROWS = 5_000;
 export function refusalMessage(format: string, count: number): string {
   return `${format} comporta até ${fmt(EXPORT_MAX_ROWS)} registros por ` +
     `exportação; o filtro tem ${fmt(count)}. Filtre mais ou exporte CSV.`;
+}
+
+// selectionRefusalMessage: pt-BR error for a selection over the ceiling,
+// naming the real count of selected rows. A selection is refused, never
+// cut: a cut selection would export a subset while the file claimed to
+// cover the whole selection, which is silent data loss.
+export function selectionRefusalMessage(count: number): string {
+  return `A seleção tem ${fmt(count)} registros e a exportação comporta até ` +
+    `${fmt(EXPORT_MAX_ROWS)}. Reduza a seleção ou filtre o escopo.`;
 }

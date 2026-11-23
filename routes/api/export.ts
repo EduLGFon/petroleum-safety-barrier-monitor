@@ -28,11 +28,17 @@ import {
 
 import { exportThrottle, routeClientKey } from "../../lib/server/throttle.ts";
 
-import { EXPORT_MAX_ROWS, refusalMessage } from "../../lib/export/limits.ts";
+import {
+  EXPORT_MAX_ROWS,
+  refusalMessage,
+  selectionRefusalMessage,
+} from "../../lib/export/limits.ts";
 
 import { FMT_EXT, FMT_MIME, normalizeFmt } from "../../lib/export/format.ts";
 
 import { checkDbThrottle } from "../../lib/server/sql/throttle.ts";
+
+import { parseSelectionIds } from "../../lib/export/selection.ts";
 
 import { streamExportXlsx } from "../../lib/server/exportXlsx.ts";
 
@@ -70,22 +76,6 @@ interface ExportRequest {
   format: Fmt;
   ids?: number[];
   timeZone?: string;
-}
-
-// parseIds: only positive safe integers, deduped and capped at the row
-// ceiling. An empty or malformed list means the export covers the whole
-// filtered scope, so a bad body can never widen or narrow it silently.
-function parseIds(raw: unknown): number[] | undefined {
-  if (!Array.isArray(raw)) return undefined;
-  const ids = [
-    ...new Set(
-      raw.filter((n): n is number =>
-        typeof n === "number" && Number.isSafeInteger(n) && n > 0
-      ),
-    ),
-  ];
-  if (ids.length === 0) return undefined;
-  return ids.slice(0, EXPORT_MAX_ROWS);
 }
 
 // readBody: the optional JSON payload. A missing or non-JSON body is a valid
@@ -173,9 +163,19 @@ async function stream(
   if (!requested) {
     return badRequest("format must be csv, xlsx or pdf", requestId);
   }
+  const selection = parseSelectionIds(body.ids);
+  // A selection over the row ceiling is refused with the real count, never
+  // cut: a cut selection would export a subset while the file claimed to
+  // cover the whole selection.
+  if (selection.overCeiling !== undefined) {
+    return badRequest(
+      selectionRefusalMessage(selection.overCeiling),
+      requestId,
+    );
+  }
   const req: ExportRequest = {
     format: requested,
-    ids: parseIds(body.ids),
+    ids: selection.ids,
     timeZone: resolveTimeZone(body.timeZone),
   };
   const query: BarriersQuery = {
