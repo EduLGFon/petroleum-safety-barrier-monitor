@@ -40,6 +40,7 @@ import {
 import {
   createUser,
   listUsers,
+  normalizeAuthSource,
   normalizeRole,
 } from "../../lib/server/sql/users.ts";
 
@@ -135,7 +136,15 @@ export const handler = define.handlers({
       accessGroupIds?: unknown;
     };
     try {
-      const role = normalizeRole(body.role ?? "user");
+      const role = (() => {
+        try {
+          return normalizeRole(body.role ?? "user");
+        } catch (e) {
+          throw new ValidationError(
+            e instanceof Error ? e.message : "role must be admin or user",
+          );
+        }
+      })();
       const groupIds = body.accessGroupIds === undefined
         ? []
         : Array.isArray(body.accessGroupIds)
@@ -150,13 +159,17 @@ export const handler = define.handlers({
           );
         }
       }
-      const authSource = body.authSource === "entra" ? "entra" : "local";
-      if (
-        body.authSource !== undefined && body.authSource !== "local" &&
-        body.authSource !== "entra"
-      ) {
-        throw new ValidationError("authSource must be local or entra");
-      }
+      const authSource = (() => {
+        try {
+          return normalizeAuthSource(body.authSource ?? "local");
+        } catch (e) {
+          throw new ValidationError(
+            e instanceof Error
+              ? e.message
+              : "authSource must be local or entra",
+          );
+        }
+      })();
       let user;
       let temporaryPassword: string | null = null;
       if (authSource === "entra") {
