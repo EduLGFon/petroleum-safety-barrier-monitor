@@ -107,6 +107,13 @@ export async function detectUrgentTransitions(
     }
     const predecessor = matchIdx > 0 ? history[matchIdx - 1] : undefined;
     const fromStatusId: number | null = predecessor?.statusId ?? null;
+    // Same-status consecutive rows are note-only appends (a decisive work
+    // order changed while the availability did not): they are not
+    // transitions, so they must never enqueue an alert. Without this the
+    // appended row gets a fresh history id in the dedup key and the legacy
+    // path alerts again on a landing that already fired. First landings
+    // keep fromStatusId null and still alert; real transitions differ.
+    if (fromStatusId !== null && fromStatusId === c.statusId) continue;
     const match = matchRules(
       {
         categoryId: wire.categoryId,

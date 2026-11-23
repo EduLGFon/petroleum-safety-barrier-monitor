@@ -172,23 +172,28 @@ export async function applyPlanEntries(
           `update barriers set ${sets.join(", ")} where id = $1`,
           updateArgs,
         );
-        // Re-read the latest author inside the transaction when the
-        // status is about to change. The plan-time snapshot can be stale
-        // on a long sweep; an admin override that landed mid-run must win.
+        // Re-read the latest author (and its note) inside the transaction.
+        // The plan-time snapshot can be stale on a long sweep; an admin
+        // override that landed mid-run must win. The latest note drives the
+        // history-only append below so a changed work order folio is
+        // captured even when the availability id is unchanged.
         let lastAuthor = latestAuthors.get(entry.local.id) ?? null;
-        if (entry.statusChanged) {
-          const latest = await tx<{ author_id: number }>(
-            `select author_id from barrier_status_history
-             where barrier_id = $1
-             order by created_at desc, id desc limit 1`,
-            [entry.local.id],
-          );
-          lastAuthor = latest[0]?.author_id ?? null;
+        let latestNote: string | null = null;
+        const latest = await tx<{ author_id: number; note: string | null }>(
+          `select author_id, note from barrier_status_history
+           where barrier_id = $1
+           order by created_at desc, id desc limit 1`,
+          [entry.local.id],
+        );
+        if (latest.length > 0) {
+          lastAuthor = latest[0].author_id;
+          latestNote = latest[0].note;
         }
         // An admin-authored latest transition is an explicit override: the
-        // sync must not revert it to the remote value on the next sweep.
-        // Only sync-owned statuses (latest author is the sync author, or no
-        // history row at all - legacy / seed) get overwritten by upstream.
+        // sync must not revert it to the remote value on the next sweep, nor
+        // append history rows on top of it. Only sync-owned statuses (latest
+        // author is the sync author, or no history row at all - legacy /
+        // seed) get touched by upstream.
         const adminOwnsStatus = !statusIsSyncOwned(lastAuthor);
         const propagateStatus = entry.statusChanged && !adminOwnsStatus;
         if (propagateStatus) {
@@ -197,6 +202,38 @@ export async function applyPlanEntries(
             [
               entry.local.id,
               input.availabilityId,
+              SYNC_AUTHOR_ID,
+              input.history.note,
+              rid,
+              input.history.sourceAuthor,
+              JSON.stringify(input.history.participants),
+            ],
+          );
+        }
+        // Decisive work-order change on an unchanged status: append ONE
+        // history row carrying the new note without touching
+        // availability_id / status_since / comments beyond the normal
+        // update above, and without record_status_change (which would reset
+        // status_since). The detector drops same-status consecutive rows,
+        // so this note row never enqueues a duplicate alert. Idempotent:
+        // when the latest note already equals the input note nothing is
+        // written.
+        if (
+          !entry.statusChanged && !adminOwnsStatus &&
+          latestNote !== input.history.note
+        ) {
+          await tx(
+            `insert into barrier_status_history
+               (barrier_id, date, status_id, author_id, note, sync_run_id,
+                source_author, participants)
+             values ($1,
+                     coalesce((select status_since from barriers where id = $1),
+                              current_date),
+                     $2, $3, $4, $5, nullif(trim($6), ''),
+                     coalesce($7::jsonb, '[]'::jsonb))`,
+            [
+              entry.local.id,
+              entry.local.availabilityId,
               SYNC_AUTHOR_ID,
               input.history.note,
               rid,
