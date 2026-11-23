@@ -433,20 +433,139 @@ Deno.test("access-groups duplicateMessage: message containing unique but no SQLS
   assertStrictEquals(accessGroupDuplicateMessage(err), undefined);
 });
 
-import { handler as authPasswordHandler } from "./auth/password.ts";
-import { handler as authProfileHandler } from "./auth/profile.ts";
 import { handler as authLoginHandler } from "./auth/login.ts";
+
+import { handler as authPasswordHandler } from "./auth/password.ts";
+
 import { handler as contingenciesHandler } from "./barriers/[id]/contingencies.ts";
 
-Deno.test("typed error classification routes export handlers", () => {
-  for (
-    const h of [
-      authPasswordHandler,
-      authProfileHandler,
-      authLoginHandler,
-      contingenciesHandler,
-    ]
-  ) {
-    if (!h || typeof h !== "object") throw new Error("handler missing");
+import { hashPassword } from "../../lib/server/auth/password.ts";
+
+// --- Typed error classification at the route edge --------------------------
+// These routes classify client-input rejections by type (ValidationError)
+// and duplicate rows by SQLSTATE, never by matching words in an error
+// message. Each test below drives the real handler and asserts the 400.
+
+function loginRequest(body: unknown): Request {
+  return new Request("http://localhost/api/auth/login", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(body),
+  });
+}
+
+Deno.test("POST /api/auth/login maps an invalid email to 400 by type", async () => {
+  const post = authLoginHandler.POST;
+  if (!post) throw new Error("POST /api/auth/login handler is missing");
+  const res = await post(
+    routeCtx(
+      loginRequest({ email: "not-an-email", password: "whatever-123456" }),
+    ),
+  );
+  assertStrictEquals(res.status, 400);
+  const body = await envelope(res);
+  assertStrictEquals(body.code, "BAD_REQUEST");
+  assertStrictEquals(body.error, "invalid email address");
+});
+
+Deno.test("POST /api/auth/login maps a missing password to 400", async () => {
+  const post = authLoginHandler.POST;
+  if (!post) throw new Error("POST /api/auth/login handler is missing");
+  const res = await post(routeCtx(loginRequest({ email: "user@example.com" })));
+  assertStrictEquals(res.status, 400);
+  const body = await envelope(res);
+  assertStrictEquals(body.code, "BAD_REQUEST");
+});
+
+Deno.test("POST /api/auth/password maps a short new password to 400 by type", async () => {
+  const post = authPasswordHandler.POST;
+  if (!post) throw new Error("POST /api/auth/password handler is missing");
+  const stored = await hashPassword("correct-current-123456");
+  const restore = installPool(fakePool({
+    session: {
+      id: 42,
+      email: "user@example.com",
+      name: "User",
+      role: "user",
+      authSource: "local",
+      passwordHash: stored,
+    },
+    target: {
+      id: 42,
+      email: "user@example.com",
+      name: "User",
+      role: "user",
+      authSource: "local",
+      passwordHash: stored,
+    },
+  }));
+  try {
+    const req = new Request("http://localhost/api/auth/password", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        cookie: `${SESSION_COOKIE}=session-token`,
+      },
+      body: JSON.stringify({
+        currentPassword: "correct-current-123456",
+        newPassword: "short",
+      }),
+    });
+    const res = await post(routeCtx(req));
+    assertStrictEquals(res.status, 400);
+    const body = await envelope(res);
+    assertStrictEquals(body.code, "BAD_REQUEST");
+    assertStrictEquals(body.error, "password must be at least 12 characters");
+  } finally {
+    restore();
   }
+});
+
+Deno.test("POST /api/barriers/:id/contingencies maps a bad id to 400 by type", async () => {
+  const post = contingenciesHandler.POST;
+  if (!post) throw new Error("POST contingencies handler is missing");
+  await withAdminToken(async () => {
+    const req = new Request(
+      "http://localhost/api/barriers/abc/contingencies",
+      {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          authorization: "Bearer test-admin-token",
+        },
+        body: JSON.stringify({ contingencyBarrierId: 2 }),
+      },
+    );
+    const res = await post(routeCtx(req, { id: "abc" }));
+    assertStrictEquals(res.status, 400);
+    const body = await envelope(res);
+    assertStrictEquals(body.code, "BAD_REQUEST");
+  });
+});
+
+Deno.test("PATCH /api/barriers/:id/contingencies maps a bad reference to 400 by type", async () => {
+  const patch = contingenciesHandler.PATCH;
+  if (!patch) throw new Error("PATCH contingencies handler is missing");
+  await withAdminToken(async () => {
+    const req = new Request("http://localhost/api/barriers/1/contingencies", {
+      method: "PATCH",
+      headers: {
+        "content-type": "application/json",
+        authorization: "Bearer test-admin-token",
+      },
+      body: JSON.stringify({
+        contingencyBarrierId: "not-a-number",
+        managementChange: "ok",
+        riskAnalysis: "ok",
+      }),
+    });
+    const res = await patch(routeCtx(req, { id: "1" }));
+    assertStrictEquals(res.status, 400);
+    const body = await envelope(res);
+    assertStrictEquals(body.code, "BAD_REQUEST");
+    assertStrictEquals(
+      body.error,
+      "contingencyBarrierId must be a positive integer",
+    );
+  });
 });
