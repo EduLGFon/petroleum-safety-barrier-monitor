@@ -71,8 +71,6 @@ function normalizeInput<T>(fn: () => T): T {
   }
 }
 
-// isUniqueViolation: Postgres 23505. The response stays generic so callers
-// cannot use this endpoint to test whether an address belongs to an account.
 // duplicateMessage: a unique violation reported by the driver, mapped to a
 // controlled message. The response stays generic so callers cannot use this
 // endpoint to test whether an address belongs to an account.

@@ -401,3 +401,21 @@ Deno.test("admin password write with a too short password answers 400", async ()
     }
   });
 });
+
+import { handler as authPasswordHandler } from "./auth/password.ts";
+import { handler as authProfileHandler } from "./auth/profile.ts";
+import { handler as authLoginHandler } from "./auth/login.ts";
+import { handler as contingenciesHandler } from "./barriers/[id]/contingencies.ts";
+
+Deno.test("typed error classification routes export handlers", () => {
+  for (
+    const h of [
+      authPasswordHandler,
+      authProfileHandler,
+      authLoginHandler,
+      contingenciesHandler,
+    ]
+  ) {
+    if (!h || typeof h !== "object") throw new Error("handler missing");
+  }
+});
