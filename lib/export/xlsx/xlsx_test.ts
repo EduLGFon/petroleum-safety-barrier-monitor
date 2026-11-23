@@ -352,3 +352,31 @@ Deno.test("xlsxColWidths fits the content and caps free text", () => {
   assert(empty.every((w) => w >= 6));
   assert(empty[4] > 6); // "Categoria" header
 });
+
+Deno.test("writeZip cancellation runs source finally", async () => {
+  let sourceFinally = false;
+  async function* source() {
+    try {
+      yield new Uint8Array([1, 2, 3]) as Bytes;
+      // keep producing so the consumer can break mid-stream
+      await new Promise((r) => setTimeout(r, 5));
+      yield new Uint8Array([4, 5, 6]) as Bytes;
+    } finally {
+      sourceFinally = true;
+    }
+  }
+  const gen = writeZip((async function* () {
+    yield { name: "a.xml", chunks: source() };
+  })());
+  // consume only the first chunk then break
+  const it = gen[Symbol.asyncIterator]();
+  await it.next();
+  await it.next();
+  try {
+    const _ret = it.return as (v?: unknown) => Promise<IteratorResult<unknown>>;
+    await _ret();
+  } catch { /* ignore */ }
+  // give microtasks/macrotasks a chance
+  await new Promise((r) => setTimeout(r, 20));
+  assert(sourceFinally, "source finally did not run");
+});
