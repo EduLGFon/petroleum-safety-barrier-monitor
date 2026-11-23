@@ -34,7 +34,12 @@ import {
 
 import { loadServerConfig } from "../../lib/server/config.ts";
 
-import { readJsonBody } from "../../lib/server/validation.ts";
+import {
+  POSTGRES_UNIQUE_VIOLATION,
+  postgresErrorInfo,
+  readJsonBody,
+  ValidationError,
+} from "../../lib/server/validation.ts";
 
 import { define } from "../../utils.ts";
 
@@ -64,6 +69,17 @@ async function guard(
   }
   if (!auth.ok) return denyByCredentials(req, auth.message, requestId);
   return null;
+}
+
+// duplicateMessage: a unique violation reported by the driver, mapped to a
+// controlled message. The SQLSTATE and the constraint name decide - never the
+// error text.
+function duplicateMessage(err: unknown): string | undefined {
+  const info = postgresErrorInfo(err);
+  if (info.code !== POSTGRES_UNIQUE_VIOLATION) return undefined;
+  return info.constraint === "alert_recipients_email_key"
+    ? "email already exists"
+    : "duplicate value";
 }
 
 export const handler = define.handlers({
@@ -122,12 +138,12 @@ export const handler = define.handlers({
       );
       return created(createdRecipient, requestId);
     } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
-      if (
-        message.startsWith("invalid email") || message.includes("name") ||
-        message.includes("phone")
-      ) {
-        return badRequest(message, requestId);
+      if (err instanceof ValidationError) {
+        return badRequest(err.message, requestId);
+      }
+      const duplicate = duplicateMessage(err);
+      if (duplicate !== undefined) {
+        return badRequest(duplicate, requestId);
       }
       return internal(
         "POST /api/recipients",
