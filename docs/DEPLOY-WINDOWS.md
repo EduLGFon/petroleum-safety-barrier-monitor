@@ -58,8 +58,11 @@ Windows native:
   archive there, or clone the repository when Git is available.
 - PostgreSQL 16 is installed by setup when missing (the vendor PostgreSQL 18
   binaries at `C:\sites\seacrest\.vendor\pgsql18\bin` are used when
-  present). When PostgreSQL already exists, pass `-PostgresSuperPassword` (or
-  set `POSTGRES_SUPER_PASSWORD`) so setup can ensure the role and database.
+  present). When PostgreSQL already exists, persist
+  `POSTGRES_SUPER_PASSWORD` at User or Machine scope and start an elevated
+  session, or answer the interactive prompt, so setup can ensure the role and
+  database. Do not pass `-PostgresSuperPassword` on the command line: setup
+  rejects CLI secrets to keep them out of process lists and shell history.
 - Port 80 reachable by clients; add 443 when Caddy runs with a hostname.
 
 Docker Compose:
@@ -316,13 +319,17 @@ fresh backup before starting.
 
 ```powershell
 # List the archive contents before restoring.
-& 'C:\Program Files\PostgreSQL\16\bin\pg_restore.exe' `
+# Vendor PG18 default path (matches Backup-Database.ps1); substitute your own
+# installed path on an EDB PG16 host (e.g. C:\Program Files\PostgreSQL\16\bin\pg_restore.exe).
+& 'C:\sites\seacrest\.vendor\pgsql18\bin\pg_restore.exe' `
   --list 'D:\backups\monitor\monitor-YYYY-MM-DD_HHmm.dump'
 
 Stop-Service SeaMonitorApp,SeaMonitorPoller,SeaMonitorAlerts -Force
 
 # Prompts for the barrier role password (the one in .env). --clean replaces objects.
-& 'C:\Program Files\PostgreSQL\16\bin\pg_restore.exe' `
+# Vendor PG18 default path (matches Backup-Database.ps1); substitute your own
+# installed path on an EDB PG16 host (e.g. C:\Program Files\PostgreSQL\16\bin\pg_restore.exe).
+& 'C:\sites\seacrest\.vendor\pgsql18\bin\pg_restore.exe' `
   -U barrier -h localhost -p 5432 -d monitor --clean --if-exists `
   'D:\backups\monitor\monitor-YYYY-MM-DD_HHmm.dump'
 
