@@ -50,4 +50,3 @@ Global defaults: ~/.config/opencode/AGENTS.md
 ## Overrides
 
 - Override: web UI may use backdrop blur/glass effects (settings backdrop, login backdrop, modal/card surfaces) as an intentional visual design (DECISIONS.md D33). The global "no blur / extremely fast / extremely low battery" surface rule does not apply here. Keep effects bounded: respect prefers-reduced-motion and the "Desativar desfoque" setting, avoid animating blur, and keep non-visual paths (sync, alerts, exports) efficient.
-- No telemetry/analytics/ads/crash reporting or local DB without an explicit project rule and privacy review.
