@@ -17,10 +17,21 @@ export function normalizeAuthorName(raw: unknown): string {
   return name;
 }
 
-export async function listAuthors(): Promise<AuthorRow[]> {
-  return await queryRows<AuthorRow>(
-    `select id, name from authors order by name`,
-  );
+export async function listAuthors(
+  limit?: number,
+  offset?: number,
+): Promise<AuthorRow[]> {
+  const args: unknown[] = [];
+  let sql = `select id, name from authors order by name`;
+  if (limit !== undefined) {
+    args.push(limit);
+    sql += ` limit $${args.length}`;
+  }
+  if (offset !== undefined) {
+    args.push(offset);
+    sql += ` offset $${args.length}`;
+  }
+  return await queryRows<AuthorRow>(sql, args);
 }
 
 // getOrCreateAuthor: finds by exact name or inserts with the next free id.
