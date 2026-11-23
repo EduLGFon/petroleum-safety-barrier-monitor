@@ -44,6 +44,8 @@ import {
 } from "../../../lib/server/throttle.ts";
 
 import {
+  POSTGRES_UNIQUE_VIOLATION,
+  postgresErrorInfo,
   readJsonBody,
   ValidationError,
 } from "../../../lib/server/validation.ts";
@@ -53,8 +55,6 @@ import { deleteSessionsForUser } from "../../../lib/server/sql/sessions.ts";
 import { loadServerConfig } from "../../../lib/server/config.ts";
 
 import { denyIfCrossSite } from "../../../lib/server/csrf.ts";
-
-import { PostgresError } from "@db/postgres";
 
 import { define } from "../../../utils.ts";
 
@@ -71,10 +71,13 @@ function normalizeInput<T>(fn: () => T): T {
   }
 }
 
-// isUniqueViolation: Postgres 23505. The response stays generic so callers
-// cannot use this endpoint to test whether an address belongs to an account.
-function isUniqueViolation(err: unknown): boolean {
-  return err instanceof PostgresError && err.fields?.code === "23505";
+// duplicateMessage: a unique violation reported by the driver, mapped to a
+// controlled message. The response stays generic so callers cannot use this
+// endpoint to test whether an address belongs to an account.
+function duplicateMessage(err: unknown): string | undefined {
+  const info = postgresErrorInfo(err);
+  if (info.code !== POSTGRES_UNIQUE_VIOLATION) return undefined;
+  return "profile update failed";
 }
 
 export const handler = define.handlers({
@@ -213,9 +216,8 @@ export const handler = define.handlers({
       if (err instanceof ValidationError) {
         return badRequest(err.message, requestId);
       }
-      if (isUniqueViolation(err)) {
-        return badRequest("profile update failed", requestId);
-      }
+      const duplicate = duplicateMessage(err);
+      if (duplicate) return badRequest(duplicate, requestId);
       return internal(
         "PATCH /api/auth/profile",
         err,

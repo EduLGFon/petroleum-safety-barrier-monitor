@@ -41,7 +41,10 @@ import { verifyPassword } from "../../../lib/server/auth/password.ts";
 
 import { loadServerConfig } from "../../../lib/server/config.ts";
 
-import { readJsonBody } from "../../../lib/server/validation.ts";
+import {
+  readJsonBody,
+  ValidationError,
+} from "../../../lib/server/validation.ts";
 
 import { define } from "../../../utils.ts";
 
@@ -137,8 +140,9 @@ export const handler = define.handlers({
         },
       });
     } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
-      if (message.includes("email")) return badRequest(message, requestId);
+      if (err instanceof ValidationError) {
+        return badRequest(err.message, requestId);
+      }
       return internal("POST /api/auth/login", err, requestId, "Login failed");
     }
   },
