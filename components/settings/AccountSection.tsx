@@ -66,6 +66,14 @@ export function emailConfirmRequiredFor(
 // email differs from the loaded value AND a confirmation was typed, so an
 // unchanged profile never carries a password across the wire and an Entra
 // account (no local password to confirm with) sends a clean body.
+// emailEditableFor: Entra accounts have no local password, so the server
+// rejects an e-mail change for them ("password login is not enabled for
+// this account"); the e-mail field is disabled and explained instead of
+// collecting a confirmation that can never succeed.
+export function emailEditableFor(authSource: "local" | "entra"): boolean {
+  return authSource !== "entra";
+}
+
 export function buildProfileBody(
   loaded: SavedIdentity,
   draft: {
@@ -134,6 +142,9 @@ export function AccountSection(
   const [profileError, setProfileError] = useState("");
   const [profileDone, setProfileDone] = useState(false);
   const [profileEmailChanged, setProfileEmailChanged] = useState(false);
+  // Manual evidence: a successful local e-mail change revokes every session
+  // on the server (see PATCH /api/auth/profile), so this panel swaps to a
+  // login notice instead of the normal "Perfil atualizado." status.
 
   if (!sessionUser) {
     return (
@@ -422,18 +433,18 @@ export function AccountSection(
             <input
               type="email"
               required
-              disabled={sessionUser.authSource === "entra"}
+              disabled={!emailEditableFor(sessionUser.authSource)}
               value={email}
               onInput={(e) => setEmail(e.currentTarget.value)}
               style={{
                 ...inputSt,
-                opacity: sessionUser.authSource === "entra" ? 0.6 : 1,
+                opacity: emailEditableFor(sessionUser.authSource) ? 1 : 0.6,
                 cursor: sessionUser.authSource === "entra"
                   ? "not-allowed"
                   : "text",
               }}
             />
-            {sessionUser.authSource === "entra" && (
+            {!emailEditableFor(sessionUser.authSource) && (
               <span
                 style={{
                   fontSize: "var(--d-small)",

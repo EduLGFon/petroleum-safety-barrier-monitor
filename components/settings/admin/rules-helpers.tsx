@@ -110,6 +110,17 @@ export const EMPTY_DRAFT: Draft = {
 
 export const WEEKDAYS = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
 
+// ruleNameError: pure validation decision for the alert-rule name. The
+// browser's required attribute does not cover saves triggered from other
+// tabs, so the editor validates the trimmed name in JS. Returns null when
+// the name is usable.
+export function ruleNameError(name: string): string | null {
+  return name.trim() === "" ? "Informe o nome da regra." : null;
+}
+// Backwards-compatible aliases for the same decision.
+export const validateRuleName = ruleNameError;
+export const ruleNameRequired = ruleNameError;
+
 export function numOrNull(s: string): number | null {
   const t = s.trim();
   if (t === "") return null;

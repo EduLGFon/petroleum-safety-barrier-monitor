@@ -9,6 +9,7 @@ import {
   EMPTY_DRAFT,
   numCoercionError,
   numOrNull,
+  ruleNameError,
   ruleToDraft,
 } from "./rules-helpers.tsx";
 
@@ -182,4 +183,10 @@ Deno.test("draftsDiffer is false for equal drafts and true per change", () => {
   );
   // The untouched default draft must never read as dirty.
   assertEquals(draftsDiffer(ruleToDraft(sampleRule()), EMPTY_DRAFT), true);
+});
+
+Deno.test("ruleNameError requires a non-empty name", () => {
+  assertEquals(ruleNameError(""), "Informe o nome da regra.");
+  assertEquals(ruleNameError("   "), "Informe o nome da regra.");
+  assertEquals(ruleNameError("Regra"), null);
 });

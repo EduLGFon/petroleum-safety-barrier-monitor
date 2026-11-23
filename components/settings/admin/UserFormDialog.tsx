@@ -120,6 +120,7 @@ export function UserFormDialog(
   const [error, setError] = useState("");
   const [tempPassword, setTempPassword] = useState<TempPassword | null>(null);
   const [copiaMsg, setCopiaMsg] = useState("");
+  const [copying, setCopying] = useState(false);
 
   // Values the form was seeded with: the dirty check compares live state
   // against this snapshot so an accidental dismissal can ask first.
@@ -137,6 +138,8 @@ export function UserFormDialog(
   const copiedRef = useRef(false);
   // Pending copy promise: acking before it settles must still wait for it.
   const copyPromiseRef = useRef<Promise<void> | null>(null);
+  const copyPendingRef = useRef(false);
+  const copyInvalidatedRef = useRef(false);
 
   useEffect(() => {
     aliveRef.current = true;
@@ -169,6 +172,9 @@ export function UserFormDialog(
     setCopiaMsg("");
     copiedRef.current = false;
     copyPromiseRef.current = null;
+    copyPendingRef.current = false;
+    copyInvalidatedRef.current = false;
+    setCopying(false);
   }, [open, mode, user]);
 
   const groupOptions = accessGroups.map((g) => ({ id: g.id, label: g.name }));
@@ -190,20 +196,29 @@ export function UserFormDialog(
   // Copy the one-time password; it never leaves component state.
   async function copiarSenha() {
     if (!tempPassword) return;
+    if (copyPendingRef.current) return;
+    copyPendingRef.current = true;
+    setCopying(true);
+    copyInvalidatedRef.current = false;
     const senha = tempPassword.senha;
     const promise = (async () => {
       try {
         await navigator.clipboard.writeText(senha);
         if (!aliveRef.current) return;
+        if (copyInvalidatedRef.current) return;
         copiedRef.current = true;
         setCopiaMsg(
           "Senha copiada. Cole no campo de senha da pessoa, não em chat ou e-mail.",
         );
       } catch {
         if (!aliveRef.current) return;
+        if (copyInvalidatedRef.current) return;
         setCopiaMsg("Não foi possível copiar. Selecione e copie.");
       }
-    })();
+    })().finally(() => {
+      copyPendingRef.current = false;
+      if (aliveRef.current) setCopying(false);
+    });
     copyPromiseRef.current = promise;
     await promise;
   }
@@ -298,7 +313,16 @@ export function UserFormDialog(
     const copyPending = copyPromiseRef.current;
     if (copyPending) {
       try {
-        await copyPending;
+        const outcome = await Promise.race([
+          copyPending.then(() => "done", () => "error"),
+          new Promise<string>((resolve) =>
+            setTimeout(() => resolve("timeout"), 0)
+          ),
+        ]);
+        if (outcome === "timeout") {
+          copyInvalidatedRef.current = true;
+          clearPasswordClipboard();
+        }
       } catch {
         // The copy already reported its own failure; nothing to clear.
       }
@@ -376,8 +400,9 @@ export function UserFormDialog(
           "button",
           {
             type: "button",
+            disabled: copying,
             onClick: () => void copiarSenha(),
-            style: ghostBtn,
+            style: { ...ghostBtn, opacity: copying ? 0.7 : 1 },
           },
           "Copiar",
         ),

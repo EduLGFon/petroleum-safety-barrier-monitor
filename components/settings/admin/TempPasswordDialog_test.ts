@@ -277,3 +277,79 @@ Deno.test("ack before copy resolves still clears the clipboard (deferred)", asyn
     stub.restore();
   }
 });
+
+function stubNeverResolvingClipboard() {
+  const writes: string[] = [];
+  const nav = globalThis.navigator as unknown as Record<string, unknown>;
+  const prev = Object.getOwnPropertyDescriptor(nav, "clipboard");
+  Object.defineProperty(nav, "clipboard", {
+    configurable: true,
+    writable: true,
+    value: {
+      writeText: (text: string) => {
+        writes.push(text);
+        return new Promise<void>(() => {});
+      },
+    },
+  });
+  return {
+    writes,
+    restore() {
+      if (prev) Object.defineProperty(nav, "clipboard", prev);
+      else delete nav.clipboard;
+    },
+  };
+}
+
+Deno.test("a hung copy cannot block the acknowledgement", async () => {
+  const m = await mountTempPassword();
+  const stub = stubNeverResolvingClipboard();
+  try {
+    const copy = m.buttonByText("Copiar");
+    assert(copy !== null);
+    await act(() => copy!.click());
+    const ack = m.buttonByText("Já anotei");
+    assert(ack !== null);
+    await act(async () => {
+      ack!.click();
+      await new Promise((resolve) => setTimeout(resolve, 20));
+    });
+    await flush();
+    assertEquals(
+      m.closeCount(),
+      1,
+      "the ack must close even if the copy hangs",
+    );
+    assertEquals(stub.writes, ["TEMP-pass-42", ""]);
+  } finally {
+    m.unmount();
+    stub.restore();
+  }
+});
+
+Deno.test("rapid double copy queues only one write before ack", async () => {
+  const m = await mountTempPassword();
+  const stub = stubDeferredClipboard();
+  try {
+    const copy = m.buttonByText("Copiar");
+    assert(copy !== null);
+    await act(() => copy!.click());
+    // A second click while the first write is pending must not start a
+    // second clipboard write.
+    await act(() => copy!.click());
+    const ack = m.buttonByText("Já anotei");
+    assert(ack !== null);
+    await act(async () => {
+      ack!.click();
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      stub.resolve();
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+    await flush();
+    assertEquals(stub.writes.filter((w) => w === "TEMP-pass-42").length, 1);
+    assertEquals(m.closeCount(), 1);
+  } finally {
+    m.unmount();
+    stub.restore();
+  }
+});

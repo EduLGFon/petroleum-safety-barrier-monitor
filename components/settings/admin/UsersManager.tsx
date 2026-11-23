@@ -76,14 +76,16 @@ function getUserSearchText(user: PublicUser): string {
   }`;
 }
 
-// canStartConvertToEntra: pure decision for the irreversible convert action.
-// The global busy guard must be checked BEFORE the confirmation prompt so a
-// mis-click during an in-flight write cannot queue a second destructive
-// action or race on patchBusy. Exported so the decision is testable without
+// canStartUserAction: pure decision for any row action that must not overlap
+// an in-flight write. The global busy guard must be checked BEFORE showing
+// an irreversible confirmation so a mis-click cannot queue a second action
+// or race on patchBusy. Exported so the decision is testable without
 // mounting the manager.
-export function canStartConvertToEntra(patchBusy: number | null): boolean {
+export function canStartUserAction(patchBusy: number | null): boolean {
   return patchBusy === null;
 }
+// Backwards-compatible alias for the convert action.
+export const canStartConvertToEntra = canStartUserAction;
 
 export function UsersManager(
   { onCount, currentUserId }: {
@@ -221,6 +223,10 @@ export function UsersManager(
   // equivalent bulk buttons do; promotion and activation are not
   // destructive and keep the one-click path.
   async function requestRoleToggle(user: PublicUser) {
+    if (!canStartUserAction(patchBusy)) {
+      setError("Aguarde a conclusão da operação em andamento.");
+      return;
+    }
     if (
       user.role === "admin" &&
       !confirm(
@@ -233,6 +239,10 @@ export function UsersManager(
   }
 
   async function requestActiveToggle(user: PublicUser) {
+    if (!canStartUserAction(patchBusy)) {
+      setError("Aguarde a conclusão da operação em andamento.");
+      return;
+    }
     if (
       user.active &&
       !confirm(
@@ -250,7 +260,7 @@ export function UsersManager(
   // person out until a database fix. Confirm, then route through the same
   // patchBusy guard as every other row action (no double submit).
   async function convertToEntra(user: PublicUser) {
-    if (!canStartConvertToEntra(patchBusy)) {
+    if (!canStartUserAction(patchBusy)) {
       setError("Aguarde a conclusão da operação em andamento.");
       return;
     }
@@ -282,12 +292,15 @@ export function UsersManager(
 
   async function resetPassword(user: PublicUser) {
     if (user.auth_source === "entra") return;
+    if (!canStartUserAction(patchBusy)) {
+      setError("Aguarde a conclusão da operação em andamento.");
+      return;
+    }
     if (
       !confirm(
         `Redefinir a senha de ${user.email}? A senha atual deixa de valer e uma temporária é gerada.`,
       )
     ) return;
-    if (patchBusy !== null) return;
     setPatchBusy(user.id);
     try {
       const resposta = await adminApi(`/api/users/${user.id}`, {

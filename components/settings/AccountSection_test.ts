@@ -14,6 +14,7 @@
 import {
   buildProfileBody,
   emailConfirmRequiredFor,
+  emailEditableFor,
   emailRequiresPassword,
 } from "./AccountSection.tsx";
 
@@ -110,4 +111,9 @@ Deno.test("emailConfirmRequiredFor follows emailRequiresPassword on local", () =
   );
   assert(!emailConfirmRequiredFor("local", saved.email, saved.email));
   assert(emailConfirmRequiredFor("local", "ana@plataforma.br", "nova@x.br"));
+});
+
+Deno.test("emailEditableFor disables editing for Entra accounts", () => {
+  assert(emailEditableFor("local"));
+  assert(!emailEditableFor("entra"));
 });

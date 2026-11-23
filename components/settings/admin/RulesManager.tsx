@@ -24,6 +24,7 @@ import {
   EMPTY_DRAFT,
   Lookups,
   numCoercionError,
+  ruleNameError,
   ruleToDraft,
 } from "./rules-helpers.tsx";
 
@@ -220,8 +221,9 @@ export function RulesManager({ onCount }: { onCount?: (n: number) => void }) {
     // The name input lives in the "basic" tab; when saving from another
     // tab the browser cannot enforce the required attribute (the control
     // is not in the DOM), so validate here like the numeric fields.
-    if (form.name.trim() === "") {
-      setModalError("Informe o nome da regra.");
+    const nameError = ruleNameError(form.name);
+    if (nameError) {
+      setModalError(nameError);
       return;
     }
     const bad = [

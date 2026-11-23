@@ -5,7 +5,7 @@
 import { assertEquals, assertStrictEquals } from "jsr:@std/assert@^1";
 
 import { mensagemAviso } from "./user-notice.ts";
-import { canStartConvertToEntra } from "./UsersManager.tsx";
+import { canStartConvertToEntra, canStartUserAction } from "./UsersManager.tsx";
 
 Deno.test("mensagemAviso reports a delivered notice", () => {
   assertStrictEquals(
@@ -29,4 +29,10 @@ Deno.test("mensagemAviso returns null without an outcome", () => {
 Deno.test("canStartConvertToEntra blocks while a write is in flight", () => {
   assertEquals(canStartConvertToEntra(null), true);
   assertEquals(canStartConvertToEntra(42), false);
+});
+
+Deno.test("canStartUserAction blocks while a write is in flight", () => {
+  assertEquals(canStartUserAction(null), true);
+  assertEquals(canStartUserAction(7), false);
+  assertEquals(canStartConvertToEntra(null), true);
 });
