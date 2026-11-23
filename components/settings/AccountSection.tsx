@@ -44,10 +44,26 @@ export function emailRequiresPassword(loaded: string, draft: string): boolean {
   return normalizeClientEmail(loaded) !== normalizeClientEmail(draft);
 }
 
+// emailConfirmRequiredFor: does the profile form need to show and collect
+// the current-password confirmation for this auth source and this draft?
+// Entra accounts have no local password (users.password_hash is null by
+// the auth_source_shape check), so the AUTH contract can only bind for
+// local accounts; prompting an Entra user would lock them out of the very
+// profile PATCH that lets them fix a stale IdP address. Extracted so the
+// authSource branch is a pure decision under test, not inline JSX logic.
+export function emailConfirmRequiredFor(
+  authSource: "local" | "entra",
+  loaded: string,
+  draft: string,
+): boolean {
+  return authSource !== "entra" && emailRequiresPassword(loaded, draft);
+}
+
 // buildProfileBody: pure request-builder for the profile PATCH. Name,
 // email, and phone always go; currentPassword is attached only when the
-// email differs from the loaded value, so an unchanged profile never
-// carries a password across the wire.
+// email differs from the loaded value AND a confirmation was typed, so an
+// unchanged profile never carries a password across the wire and an Entra
+// account (no local password to confirm with) sends a clean body.
 export function buildProfileBody(
   loaded: SavedIdentity,
   draft: {
@@ -63,7 +79,9 @@ export function buildProfileBody(
     phone: draft.phone,
   };
   if (emailRequiresPassword(loaded.email, draft.email)) {
-    body.currentPassword = draft.currentPassword;
+    if (draft.currentPassword !== "") {
+      body.currentPassword = draft.currentPassword;
+    }
   }
   return body;
 }
@@ -87,8 +105,8 @@ export function AccountSection(
   const [emailConfirmPassword, setEmailConfirmPassword] = useState("");
   // Server-side identity, mirrored from the prop and refreshed from the
   // PATCH response so the header reflects an e-mail change without a
-  // navigation (D23: identity is session-derived; the browser is not told
-  // to re-fetch /me, so we hand the response back to the same panel).
+  // navigation (identity is session-derived and the browser is not told to
+  // re-fetch /me, so we hand the response back to the same panel).
   const [saved, setSaved] = useState<SavedIdentity>({
     name: sessionUser?.name ?? "",
     email: sessionUser?.email ?? "",
@@ -151,7 +169,14 @@ export function AccountSection(
 
   // The prompt only appears on a real email change; a case-only or
   // space-only edit is the same identity on the server, so no password.
-  const emailChanged = emailRequiresPassword(saved.email, email);
+  // Entra accounts have no local password to confirm with (the identity is
+  // the IdP's), so the confirmation field never shows for them and an
+  // e-mail change stays possible.
+  const emailConfirmRequired = emailConfirmRequiredFor(
+    sessionUser.authSource,
+    saved.email,
+    email,
+  );
 
   async function submitProfile(e: Event) {
     e.preventDefault();
@@ -185,9 +210,9 @@ export function AccountSection(
       setEmailConfirmPassword("");
       setProfileDone(true);
     } catch (err) {
-      // adminApi already maps wire errors to pt-BR, including the
-      // "current password is incorrect" 400/401 the AUTH unit returns for
-      // a wrong email confirmation; show it as-is.
+      // adminApi already maps wire errors to pt-BR (400 bad request or 401
+      // wrong current password on the confirm path, 400 duplicate e-mail);
+      // show the localized message as-is.
       setProfileError(err instanceof Error ? err.message : String(err));
     } finally {
       setProfileBusy(false);
@@ -367,7 +392,7 @@ export function AccountSection(
               style={inputSt}
             />
           </Field>
-          {emailChanged && (
+          {emailConfirmRequired && (
             <Field label="Senha atual (confirmação para trocar o e-mail)">
               <input
                 type="password"

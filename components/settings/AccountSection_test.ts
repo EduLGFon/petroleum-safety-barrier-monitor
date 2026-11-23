@@ -1,14 +1,21 @@
 // Regression tests for the account e-mail change guard (audit U7 follow-up).
-// This is why they exist: PATCH /api/auth/profile now requires the caller's
-// current password for any e-mail change. The section sends the field only
-// when the draft email actually differs from the saved one (case and space
-// changes normalize away on the server), so a "same email, different case"
-// edit never prompts for a password and never carries one across the wire.
-// The pure helpers are the exact decision the component makes, so we cover
-// them here instead of mounting the section through linkedom (AccountSection
-// is written in Fresh-precompiled JSX and does not mount under the harness;
-// see scripts/test-dom.ts).
-import { buildProfileBody, emailRequiresPassword } from "./AccountSection.tsx";
+// This is why they exist: changing one's own e-mail through the profile form
+// now asks for the caller's current password and carries it on the PATCH,
+// but only for local accounts (an Entra row has no password_hash to
+// verify against) and only when the draft e-mail actually differs from the
+// saved one (case and space changes normalize away on the server) and only
+// when a confirmation was typed. So a "same e-mail, different case" edit
+// never prompts, and a password-less body (an Entra account) never carries
+// even an empty secret across the wire. The pure helpers are the exact
+// decision the component makes, so we cover them here instead of mounting
+// the section through linkedom (AccountSection is written in
+// Fresh-precompiled JSX and does not mount under the harness; see
+// scripts/test-dom.ts).
+import {
+  buildProfileBody,
+  emailConfirmRequiredFor,
+  emailRequiresPassword,
+} from "./AccountSection.tsx";
 
 import { assert, assertEquals } from "jsr:@std/assert@^1";
 
@@ -67,4 +74,32 @@ Deno.test("buildProfileBody does not attach currentPassword on case flips", () =
     currentPassword: "should-not-appear",
   });
   assert(!("currentPassword" in body));
+});
+
+Deno.test("buildProfileBody never sends an empty password, even on change", () => {
+  // Entra accounts have no local password, so the form never collects one;
+  // the wire body must not carry an empty secret either.
+  const body = buildProfileBody(saved, {
+    name: "Ana",
+    email: "nova@plataforma.br",
+    phone: "",
+    currentPassword: "",
+  });
+  assert(!("currentPassword" in body), "an empty confirmation stays local");
+});
+
+Deno.test("emailConfirmRequiredFor skips the prompt entirely for Entra rows", () => {
+  // An Entra account has no local password (users.password_hash is null),
+  // so prompting one would lock the person out of the profile PATCH that
+  // lets them fix a stale IdP address.
+  assert(!emailConfirmRequiredFor("entra", "ana@plataforma.br", ""));
+  assert(
+    !emailConfirmRequiredFor("entra", "ana@plataforma.br", "nova@x.br"),
+  );
+});
+
+Deno.test("emailConfirmRequiredFor follows emailRequiresPassword on local", () => {
+  assert(!emailConfirmRequiredFor("local", "ana@plataforma.br", "ANA@x.br"));
+  assert(!emailConfirmRequiredFor("local", saved.email, saved.email));
+  assert(emailConfirmRequiredFor("local", "ana@plataforma.br", "nova@x.br"));
 });
