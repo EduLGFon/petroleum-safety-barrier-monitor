@@ -549,6 +549,45 @@ Deno.test("runSync maps a duplicated code once", async () => {
   assertStrictEquals(state.calls.startRun.length, 0);
 });
 
+// Regression (review of audit F1 fix): the protection set must hold TRIMMED
+// codes. mapAsset trims the upstream code before storing external_code, so a
+// whitespace-padded code that skips mapping protects the same barrier its
+// mapped form would - the untrimmed set left the barrier soft-deleted.
+Deno.test("runSync protects a padded code that skipped mapping", async () => {
+  const { io } = makeFakeIo();
+  const paddedLocal = localRow({
+    id: 17,
+    externalCode: "FAL-EQ-PAD",
+    signature: fieldsSignature(baseInput({ externalCode: "FAL-EQ-PAD" })),
+  });
+  const scopingIo: SyncIo = {
+    ...io,
+    loadLocal() {
+      return Promise.resolve([paddedLocal]);
+    },
+  };
+  const rows = [
+    rawRow(),
+    // Padded upstream code, unmappable category: stored trimmed as
+    // external_code by the previous cycle, so it must not retire.
+    rawRow({
+      id: 48,
+      code: " FAL-EQ-PAD ",
+      groups_description: "Categoria Inexistente",
+    }),
+  ];
+  const result = await runSync(() => Promise.resolve(rows), {
+    io: scopingIo,
+    dryRun: true,
+  });
+  assertStrictEquals(result.mappingSkips.length, 1);
+  assertStrictEquals(
+    result.mappingSkips[0]!.code.includes("FAL-EQ-PAD"),
+    true,
+  );
+  assertStrictEquals(result.plan.counts.deletes, 0);
+});
+
 Deno.test("runSync starts the audit run before fetching rows", async () => {
   const { io } = makeFakeIo();
   const order: string[] = [];

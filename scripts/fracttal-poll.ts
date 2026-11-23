@@ -54,8 +54,6 @@ import {
   type WorkFetch,
 } from "../lib/server/fracttal/live-scope.ts";
 
-import { consoleNotifier } from "../lib/server/fracttal/notify.ts";
-
 import {
   getSyncStatus,
   recordSyncFailure,
@@ -64,19 +62,21 @@ import {
 
 import { OPEN_WORK_ORDER_STATUSES } from "../lib/server/fracttal/barrier-rules.ts";
 
+import { addSignalListenerBestEffort } from "../lib/server/fracttal/signals.ts";
+
+import { assertFracttalBaseUrl, loadSyncConfig } from "../lib/server/config.ts";
+
 import { createFracttalClient } from "../lib/server/fracttal/client.ts";
 
 import type { ItemTypeValue } from "../lib/server/fracttal/itemType.ts";
 
 import type { OpsNotifier } from "../lib/server/fracttal/notify.ts";
 
+import { consoleNotifier } from "../lib/server/fracttal/notify.ts";
+
 import { createCycleLoop } from "../lib/server/fracttal/cycle.ts";
 
 import { runSync } from "../lib/server/fracttal/sync.ts";
-
-import { addSignalListenerBestEffort } from "../lib/server/fracttal/signals.ts";
-
-import { assertFracttalBaseUrl, loadSyncConfig } from "../lib/server/config.ts";
 
 const DEFAULT_BASE_URL = "https://app.fracttal.com/api";
 

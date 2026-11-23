@@ -21,6 +21,8 @@ import {
   providerConfigFromEnv,
 } from "../lib/server/alerts/provider.ts";
 
+import { addSignalListenerBestEffort } from "../lib/server/fracttal/signals.ts";
+
 import { runProviderCycle } from "../lib/server/alerts/run-provider.ts";
 
 import { loadAlertAudience } from "../lib/server/sql/alert-audience.ts";
@@ -42,8 +44,6 @@ import { sqlAlertStore } from "../lib/server/sql/alerts.ts";
 import { queryRows } from "../lib/server/db.ts";
 
 import { log } from "../lib/server/log.ts";
-
-import { addSignalListenerBestEffort } from "../lib/server/fracttal/signals.ts";
 
 const seconds = Math.max(
   60,

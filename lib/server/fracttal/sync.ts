@@ -6,9 +6,9 @@
 // defaultSyncIo (imported lazily so fixtures/tests can run without a DB).
 import type { CatalogNeeds, MapContext, SyncBarrierInput } from "./map.ts";
 
-import type { FracttalAsset } from "./types.ts";
-
 import type { WorkEventsResolver } from "./work.ts";
+
+import type { FracttalAsset } from "./types.ts";
 
 import { parsePage } from "./client.ts";
 
@@ -504,10 +504,14 @@ export async function runSync(
     // upstream schema drift must downgrade visibility to a logged skip,
     // never a soft delete. Codes upstream truly removed are absent from
     // this set and still retire. Malformed rows give up their code
-    // best-effort (the row usually fails on another field).
+    // best-effort (the row usually fails on another field). Codes are
+    // TRIMMED to match the stored external_code: mapAsset trims before
+    // mapping, so a whitespace-padded upstream code must protect the same
+    // barrier its mapped form would.
     const seenCodes = new Set<string>();
     for (const item of parsed.items) {
-      if (item.code !== "") seenCodes.add(item.code);
+      const code = item.code.trim();
+      if (code !== "") seenCodes.add(code);
     }
     for (const m of parsed.malformed) {
       const raw = rows[m.index];

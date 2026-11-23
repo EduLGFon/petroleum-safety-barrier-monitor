@@ -1,9 +1,13 @@
 // Unit tests for urgent transition detection (P5) - fake store slice.
 import { assertStrictEquals } from "jsr:@std/assert@^1";
-import type { WireBarrier } from "../../wireTypes.ts";
-import { detectUrgentTransitions } from "./detect.ts";
-import type { TransitionCandidate } from "./store.ts";
+
 import type { AlertRule } from "../sql/alert_rules.ts";
+
+import type { WireBarrier } from "../../wireTypes.ts";
+
+import { detectUrgentTransitions } from "./detect.ts";
+
+import type { TransitionCandidate } from "./store.ts";
 
 function wire(over: Partial<WireBarrier> = {}): WireBarrier {
   return {
@@ -292,4 +296,49 @@ Deno.test("detect leaves fromStatusId null for a first landing", async () => {
     null,
   );
   assertStrictEquals(legacy.length, 1);
+});
+
+// ---- id-absent candidates (fallback branch, no id in production calls) ----
+
+Deno.test("detect id-absent candidates fall back to the same-day match", async () => {
+  // Without a candidate id the fallback resolves the LATEST same-day
+  // same-status entry (enrich.ts parity) and takes its predecessor, so
+  // from -> to rules still narrow correctly for legacy callers.
+  const history = [
+    historyEntry(101, "2026-09-13T10:00:00Z", 4),
+    historyEntry(102, "2026-09-13T11:00:00Z", 5),
+  ];
+  const candidates: TransitionCandidate[] = [
+    { barrierId: 1, transitionDate: "2026-09-13", statusId: 5 },
+  ];
+  const out = await detectUrgentTransitions(
+    storeFor(candidates),
+    loaderFor(history),
+    null,
+    undefined,
+    [rule({ from_status_ids: [4], to_status_ids: [5] })],
+    true,
+  );
+  assertStrictEquals(out.length, 1);
+});
+
+Deno.test("detect id-absent candidates fail closed without a same-day match", async () => {
+  // No same-day same-status entry to stand in for the candidate: the
+  // fallback finds nothing, from stays null, and from -> to rules fail
+  // closed instead of borrowing the older day's status.
+  const history = [
+    historyEntry(101, "2026-09-12T10:00:00Z", 4),
+  ];
+  const candidates: TransitionCandidate[] = [
+    { barrierId: 1, transitionDate: "2026-09-13", statusId: 5 },
+  ];
+  const out = await detectUrgentTransitions(
+    storeFor(candidates),
+    loaderFor(history),
+    null,
+    undefined,
+    [rule({ from_status_ids: [4], to_status_ids: [5] })],
+    true,
+  );
+  assertStrictEquals(out.length, 0);
 });
