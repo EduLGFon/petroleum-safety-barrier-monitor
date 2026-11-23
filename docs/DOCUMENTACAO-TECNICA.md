@@ -196,15 +196,15 @@ Este nível descreve o que existe na interface e o que cada fluxo permite. Ele �
 
 ### 4.1 Páginas e rotas de interface
 
-| Rota                              | Público               | Comportamento                                                                                                                        |
-| --------------------------------- | --------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
-| `/login`                          | público               | formulário de e-mail e senha, botão de login Microsoft quando o SSO está habilitado e mensagens de falha                             |
-| `/trocar-senha`                   | sessão local pendente | troca obrigatória de senha temporária; a sessão permanece autenticada, mas contida                                                   |
-| `/`                               | sessão autenticada    | painel principal; sem sessão redireciona para `/login` com retorno, e conta local com troca pendente recebe 303 para `/trocar-senha` |
-| `/auth/entra/login`               | público               | inicia o fluxo OIDC com PKCE, state e nonce                                                                                          |
-| `/auth/entra/callback`            | público               | valida o retorno do provedor e cria a sessão, ou volta ao login com código de erro                                                   |
-| `/auth/entra/frontchannel-logout` | público               | revoga sessões pelo `sid` hasheado quando o recurso está habilitado                                                                  |
-| `/auth/entra/logged-out`          | público               | limpa a sessão local e volta ao login                                                                                                |
+| Rota                              | Público               | Comportamento                                                                                                                                              |
+| --------------------------------- | --------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `/login`                          | público               | formulário de e-mail e senha, botão de login Microsoft quando o SSO está habilitado e mensagens de falha                                                   |
+| `/trocar-senha`                   | sessão local pendente | troca obrigatória de senha temporária; a sessão permanece autenticada, mas contida                                                                         |
+| `/`                               | sessão autenticada    | painel principal; sem sessão redireciona para `/login` com retorno, e conta local com troca pendente recebe 303 para `/trocar-senha`                       |
+| `/auth/entra/login`               | público               | inicia o fluxo OIDC com PKCE, state e nonce                                                                                                                |
+| `/auth/entra/callback`            | público               | valida o retorno do provedor e cria a sessão, ou volta ao login com código de erro                                                                         |
+| `/auth/entra/frontchannel-logout` | público               | revoga sessões pelo `sid` hasheado quando o recurso está habilitado                                                                                        |
+| `/auth/entra/logged-out`          | público               | 404 quando o SSO está desabilitado; em requisição cross-site não revoga a sessão do servidor, apenas limpa o cookie e redireciona para `/login?sso=logout` |
 
 O gate de sessão da página inicial roda no servidor, não na ilha (`routes/index.tsx`). Essa escolha é deliberada: um gate no cliente seria apenas uma sugestão, e a decisão de acesso precisa acontecer antes de qualquer dado ser carregado.
 
@@ -570,7 +570,7 @@ Regras (`lib/server/auth.ts`, `lib/server/sql/access-groups.ts`, `docs/ARCHITECT
 - O mesmo escopo é aplicado a leitura de barreiras, KPI, gráfico, vocabulários, exportação e busca de barreira por id. Um cliente pode estreitar o escopo com filtros, nunca ampliá-lo.
 - Não há Row-Level Security. O banco não filtra linhas por usuário; uma conexão SQL direta vê tudo (`db/schema.sql`, `docs/DATABASE.md`).
 
-**Risco de migração documentado.** A migração cria o grupo `Acesso geral` com todas as estações e inscreve nele **todos** os usuários com role `user` (`db/schema.sql`). O comando é reexecutado a cada `db:migrate` e usa `on conflict do nothing`, o que preserva acesso em migrações, mas também pode reintroduzir um vínculo removido manualmente. Se esse grupo não for limpo, o filtro por estação fica inócuo para os não administradores. A seção 10 trata isso como pendência operacional.
+**Grupo padrão.** A migração cria a linha do grupo `Acesso geral`, mas não (re)concede estações nem inscreve usuários: `db:migrate` é idempotente e não desfaz remoções feitas por um administrador (`db/schema.sql`). O grupo permanece disponível para quem o usa; a remoção manual de vínculos persiste entre migrações.
 
 ### 5.6 KPI e gráfico
 
@@ -1073,7 +1073,7 @@ A categoria vem de `groups_description` trimado ou do fallback `(sem categoria)`
 
 #### Reconciliação e idempotência
 
-`planReconcile(remote, local)` é puro e classifica cada linha em `insert`, `update`, `restore`, `delete` ou `skip` (`lib/server/fracttal/sync.ts`). A reconciliação é por `external_code`. Uma linha local já deletada que reaparece upstream vira `restore`, nunca duplicata. Linhas locais ausentes upstream recebem soft delete, mas apenas dentro do escopo resolvido.
+`planReconcile(remote, local)` é puro e classifica cada linha em `insert`, `update`, `restore`, `delete` ou `skip` (`lib/server/fracttal/sync.ts`). A reconciliação é por `external_code`. Uma linha local já deletada que reaparece upstream vira `restore`, nunca duplicata. Linhas locais ausentes upstream recebem soft delete, mas apenas dentro do escopo resolvido. Um código visto upstream que pula o mapeamento ou chega malformado (linha skip) também é protegido contra soft delete: a barreira existente não é ocultada, apenas o skip é registrado. Os códigos são comparados já normalizados (trim), de modo que um código upstream com espaços não escapa à proteção.
 
 A assinatura de mudança tem 27 chaves e a ordem faz parte do contrato com a assinatura armazenada (`lib/server/fracttal/sync.ts`). Mesma assinatura mais mesmo status resulta em `skip`; `hasContingency` normaliza nulo para `Não`, e `contingencyDesc` normaliza nulo para string vazia. `diffSignatureFields` nomeia as colunas que mudaram e acrescenta `availabilityId` quando o status virou; `snapshotOf` grava um JSON simétrico com apenas as chaves de assinatura e o status.
 
@@ -1098,7 +1098,7 @@ A auditoria operacional vive em `sync_state` (`scope`, `status`, `cursor`, `inse
 | `fracttal:import`     | reconstrói o banco a partir de um dump local, em passes A, B e C, com streaming objeto a objeto | dry-run por padrão; `--apply` trunca histórico, barreiras, sync e eventos, depois recria estações e categorias com ids determinísticos; passa `available: true` porque a semântica do dump não foi verificada |
 | `fracttal:sync`       | replay de fixture por padrão; `--live` faz sweep real                                           | `--pages` padrão 200, máximo 400; `--work-pages` padrão 5, máximo 40; escrita só com `--apply`; fixture precisa ser filho direto de `scripts/fixtures/*.json`                                                 |
 | `fracttal:force-sync` | sweep live completo de recuperação                                                              | `--pages` padrão 400, máximo 400; dry-run por padrão; sobreposição gera exit 3, salvo `--force`; credenciais ausentes geram exit 2                                                                            |
-| `fracttal:poll`       | loop live com passagem de trabalho compartilhada e sweep completo de equipment                  | `FRACTTAL_POLL_SECONDS` com piso 60; `FRACTTAL_SYNC_MAX_PAGES` com padrão 250; lock por escopo; SIGINT e SIGTERM esperam o sweep em voo                                                                       |
+| `fracttal:poll`       | loop live com passagem de trabalho compartilhada e sweep completo de equipment                  | `FRACTTAL_POLL_SECONDS` com piso 60; `FRACTTAL_SYNC_MAX_PAGES` com padrão 250; lock por escopo; no Windows os pollers registram SIGINT e SIGBREAK, nos demais SIGINT e SIGTERM, e aguardam o sweep em voo     |
 
 A variável `FRACTTAL_SYNC_MAX_PAGES` tem três valores em jogo: `.env.example` comenta 200, o poller usa 250 e o script `fracttal:sync` usa 200 no `--pages`. O `fracttal:force-sync` usa 400. A divergência é de defaults, não de contrato de ambiente, e está registrada na seção 9.
 
@@ -1192,13 +1192,13 @@ O `Dockerfile` tem dois estágios, `base` e `prod`, sobre `denoland/deno:2.9.7` 
 
 O caminho Windows é Windows Server 2022 ou 2025 com Deno, PostgreSQL, NSSM e Caddy, instalado por `deploy/windows/Setup.cmd`, que relança `Setup-Production.ps1` elevado (`docs/DEPLOY-WINDOWS.md`). O instalador:
 
-- instala Deno 2.9.7 pinado, PostgreSQL 16 na porta 5432 quando ausente, NSSM e Caddy;
+- instala Deno 2.9.7 pinado, PostgreSQL 18 no diretório vendorizado (padrão `C:\sites\seacrest\.vendor\pgsql18\bin`) com fallback EDB PostgreSQL 16 quando ausente, NSSM e Caddy;
 - cria `.env` a partir de `.env.example` com senha de banco, `ADMIN_TOKEN` e senha de admin gerados; um `.env` existente nunca é rotacionado; a ACL é restrita;
 - roda `doctor`, build, migrações e criação do primeiro admin;
 - registra serviços, firewall, Caddy opcional e tarefa de backup;
 - faz smoke test de `/api/health` e `/login`.
 
-Os serviços NSSM são `BarrierApp`, `BarrierPoller`, `BarrierAlerts` e `BarrierCaddy`; no Docker os nomes equivalentes são os serviços do Compose. A postura de firewall é negar inbound por padrão; o setup só abre 80 e 443 com `-AllowedLanRanges`, e a porta 8300 nunca é aberta, exceto com `-SkipCaddy -AllowLanAppPort`, que serve HTTP puro e só é aceitável atrás de VPN (`docs/DEPLOY-WINDOWS.md`).
+Os serviços NSSM usam o prefixo configurável (`-ServicePrefix`, padrão `SeaMonitor`): `SeaMonitorApp`, `SeaMonitorPoller`, `SeaMonitorAlerts` e `SeaMonitorCaddy`; `-ServicePrefix Barrier` restaura o layout legado `Barrier*`. No Docker os nomes equivalentes são os serviços do Compose. A postura de firewall é negar inbound por padrão; o setup só abre 80 e 443 com `-AllowedLanRanges`, e a porta 8300 nunca é aberta, exceto com `-SkipCaddy -AllowLanAppPort`, que serve HTTP puro e só é aceitável atrás de VPN (`docs/DEPLOY-WINDOWS.md`).
 
 O Caddy faz `reverse_proxy 127.0.0.1:8300` com `X-Real-IP`, remove o banner do servidor e aplica `nosniff`, `DENY` e `no-referrer`; HSTS fica comentado até o primeiro smoke test HTTPS; nunca há `Access-Control-Allow-Origin`, porque o desenho é mesma origem (`deploy/windows/Caddyfile`).
 
@@ -1432,22 +1432,22 @@ Além de `/api/*`, as páginas são `/`, `/login`, `/trocar-senha` e `/auth/entr
 
 #### Sessões e conta
 
-| Método e caminho          | Auth           | Observação                                                                                                                                             |
-| ------------------------- | -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `POST /api/auth/login`    | público        | `{ email, password }`; 200 com usuário público e cookie; 401 genérico; revoga sessão apresentada antes de emitir a nova; throttle de escrita           |
-| `POST /api/auth/logout`   | público        | `{ ok, ssoLogoutUrl }`; limpa o cookie; sessão ausente ou inválida ainda sucede                                                                        |
-| `GET /api/auth/me`        | somente sessão | usuário atual com `allowedLocationIds`, `auth_source`, `auth_method` e `mustChangePassword`                                                            |
-| `POST /api/auth/password` | somente sessão | `{ currentPassword, newPassword }`; verifica a atual, aplica 12 a 256, rejeita reuso, limpa o flag, revoga sessões e limpa o cookie na mesma transação |
-| `PATCH /api/auth/profile` | somente sessão | `{ name?, email?, phone?, currentPassword?, newPassword? }`; token responde 401 `session required`                                                     |
+| Método e caminho          | Auth           | Observação                                                                                                                                                                                                                                      |
+| ------------------------- | -------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `POST /api/auth/login`    | público        | `{ email, password }`; 200 com usuário público e cookie; 401 genérico; revoga sessão apresentada antes de emitir a nova; throttle de escrita                                                                                                    |
+| `POST /api/auth/logout`   | público        | `{ ok, ssoLogoutUrl }`; limpa o cookie; sessão ausente ou inválida ainda sucede                                                                                                                                                                 |
+| `GET /api/auth/me`        | somente sessão | usuário atual com `allowedLocationIds`, `auth_source`, `auth_method` e `mustChangePassword`                                                                                                                                                     |
+| `POST /api/auth/password` | somente sessão | `{ currentPassword, newPassword }`; verifica a atual, aplica 12 a 256, rejeita reuso, limpa o flag, revoga sessões e limpa o cookie na mesma transação                                                                                          |
+| `PATCH /api/auth/profile` | somente sessão | `{ name?, email?, phone?, currentPassword?, newPassword? }`; mudança de e-mail exige `currentPassword`, contas Entra-only não podem mudar e-mail, erro de duplicidade é genérico e sessões são revogadas; token responde 401 `session required` |
 
 #### Entra OIDC
 
-| Método e caminho                      | Auth    | Observação                                                                                                     |
-| ------------------------------------- | ------- | -------------------------------------------------------------------------------------------------------------- |
-| `GET /auth/entra/login`               | público | 302 para o Entra com PKCE, state e nonce; `no-store`                                                           |
-| `GET /auth/entra/callback`            | público | 303 para o caminho de retorno com cookie, ou `/login?sso=<codigo>`; valida issuer, nonce, state, PKCE e claims |
-| `GET /auth/entra/frontchannel-logout` | público | 200 `text/plain` em configuração válida; valida issuer e `sid` hasheado e revoga sessões                       |
-| `GET /auth/entra/logged-out`          | público | 303 para `/login?sso=logout`; limpa sessão e cookie                                                            |
+| Método e caminho                      | Auth    | Observação                                                                                                                           |
+| ------------------------------------- | ------- | ------------------------------------------------------------------------------------------------------------------------------------ |
+| `GET /auth/entra/login`               | público | 302 para o Entra com PKCE, state e nonce; `no-store`                                                                                 |
+| `GET /auth/entra/callback`            | público | 303 para o caminho de retorno com cookie, ou `/login?sso=<codigo>`; valida issuer, nonce, state, PKCE e claims                       |
+| `GET /auth/entra/frontchannel-logout` | público | 200 `text/plain` em configuração válida; valida issuer e `sid` hasheado e revoga sessões                                             |
+| `GET /auth/entra/logged-out`          | público | 404 quando o SSO está desabilitado; em GET cross-site não revoga a sessão do servidor; 303 para `/login?sso=logout` e limpa o cookie |
 
 #### Barreiras
 
@@ -1478,17 +1478,17 @@ Além de `/api/*`, as páginas são `/`, `/login`, `/trocar-senha` e `/auth/entr
 
 #### Exportação
 
-| Método e caminho        | Auth  | Observação  |
-| ----------------------- | ----- | ----------- |
-| `GET, POST /api/export` | dados | `format=csv |
+| Método e caminho        | Auth  | Observação                                                                                        |
+| ----------------------- | ----- | ------------------------------------------------------------------------------------------------- |
+| `GET, POST /api/export` | dados | `format=csv\|xlsx\|pdf`, filtros compartilhados de barreira, corpo `{ format?, ids?, timeZone? }` |
 
 #### Inspeção de sync
 
-| Método e caminho        | Auth  | Observação                                                                                                  |
-| ----------------------- | ----- | ----------------------------------------------------------------------------------------------------------- |
-| `GET /api/sync-status`  | dados | `{ state, runningSince, lastRun, totals }`; `state` é `syncing`, `idle`, `stale` ou `unknown`; memo de 15 s |
-| `GET /api/sync-runs`    | dados | `?limit=` de 1 a 50, padrão 10; runs concluídas mais novas primeiro                                         |
-| `GET /api/sync-changes` | dados | `?scope=last-run                                                                                            |
+| Método e caminho        | Auth  | Observação                                                                                                              |
+| ----------------------- | ----- | ----------------------------------------------------------------------------------------------------------------------- |
+| `GET /api/sync-status`  | dados | `{ state, runningSince, lastRun, totals }`; `state` é `syncing`, `idle`, `stale` ou `unknown`; memo de 15 s             |
+| `GET /api/sync-runs`    | dados | `?limit=` de 1 a 50, padrão 10; runs concluídas mais novas primeiro                                                     |
+| `GET /api/sync-changes` | dados | `?scope=last-run\|last-day`, `?runId=`, `?kind=new\|updated\|removed\|restored\|all`, `?query=`, `?page=`, `?pageSize=` |
 
 #### Usuários
 
@@ -1506,7 +1506,7 @@ Além de `/api/*`, as páginas são `/`, `/login`, `/trocar-senha` e `/auth/entr
 | ------------------------------------------- | ----- | --------------------------------------------------------------------------------------------------------------------------------------------- |
 | `GET, POST /api/access-groups`              | admin | lista ordenada por nome com `locationIds` e `userIds`, ou 201 com grupo criado; nome obrigatório; corpo de 10.000 bytes; nome duplicado é 400 |
 | `GET, PATCH, DELETE /api/access-groups/:id` | admin | PATCH substitui arrays; DELETE cascateia vínculos; corpo de 10.000 bytes                                                                      |
-| `POST /api/access-groups/batch`             | admin | `{ action, ids, userIds?                                                                                                                      |
+| `POST /api/access-groups/batch`             | admin | `{ action, ids, userIds? \| locationIds? }`                                                                                                   |
 
 #### Destinatários legados
 
@@ -1899,17 +1899,17 @@ D23 afirma que a disponibilidade efetiva dirige contingências. A elegibilidade 
 
 A variável é lida em `lib/server/config.ts`, com default `RS256` e `PS256` aceito, mas não aparece em `.env.example`. O mesmo padrão vale para `APP_ENV`, `ADMIN_PASSWORD`, `SEED_FORCE`, `LEGACY_SHARED_PASSWORD` e `CHROME_NO_SANDBOX`, que são lidas por scripts ou deploy e não estão no exemplo. Isso não quebra boot, mas reduz a descoberta.
 
-#### DV13. Topologia de produção descrita versus relato de handoff
+#### DV13. Topologia de produção APP10 documentada
 
-Os documentos do repositório descrevem Windows nativo com PostgreSQL 16, serviços `BarrierApp`, `BarrierPoller`, `BarrierAlerts` e `BarrierCaddy` (`docs/DEPLOY-WINDOWS.md`, `docs/PORT-MAP.md`). Um relato operacional de handoff de 16/11/2026, não versionado neste repositório, descreve PostgreSQL 18 em diretório vendorizado, base `monitor`, e serviços renomeados sem Caddy como serviço. Não é possível conciliar os dois sem confirmação do dono. Este documento trata a documentação versionada como referência de projeto e o relato como contexto operacional não verificado.
+A documentação versionada descreve agora a topologia APP10 como padrão: PostgreSQL 18 no diretório vendorizado, base `monitor`, serviços com prefixo `SeaMonitor` (`SeaMonitorApp`, `SeaMonitorPoller`, `SeaMonitorAlerts`, `SeaMonitorCaddy`) e tarefa de backup `BarrierBackup`. O layout legado `Barrier*` permanece disponível via `-ServicePrefix Barrier`, e o EDB PostgreSQL 16 é o fallback quando o diretório vendorizado não existe. O relato operacional de handoff de 16/11/2026, que descrevia a mesma topologia, deixa de ser divergente; a divergência residual é apenas o prefixo legado e a versão do PostgreSQL no fallback (`docs/DEPLOY-WINDOWS.md`, `docs/PORT-MAP.md`, `deploy/windows/Setup-Production.ps1`).
 
 #### DV14. Handoff desatualizado sobre `CO`, `SM8` e senha padrão
 
 O mesmo relato diz que 14 usuários não foram importados porque as estações `CO` e `SM8` não existiam no catálogo, e fala em senha padrão. O código atual contém os aliases `SM8` e `CO` (D27) e gera senha por pessoa com `generateTemporaryPassword()` e troca obrigatória (`routes/api/users.ts`, D30, D32). A pendência de dados pode estar desatualizada; a validação exige consultar o catálogo real e reprocessar o roster.
 
-#### DV15. Grupo `Acesso geral` reintroduz vínculos em toda migração
+#### DV15. Grupo `Acesso geral` não recria vínculos em migração
 
-A migração inscreve todos os usuários `role = 'user'` no grupo `Acesso geral` a cada execução, com `on conflict do nothing` (`db/schema.sql`). Se um administrador remover um vínculo para restringir acesso, a próxima migração pode recriá-lo. Isso não é uma divergência de documentação, mas uma tensão real entre a compatibilidade de migração e o fail-closed de D21.
+A migração mantém apenas a linha do grupo `Acesso geral`; ela não (re)inscreve usuários nem (re)concede estações, então remoções feitas por um administrador persistem entre execuções de `db:migrate` (`db/schema.sql`). A tensão anterior entre compatibilidade de migração e fail-closed de D21 deixa de existir para esse grupo.
 
 ### 9.3 O que foi verificado nesta revisão
 
@@ -1955,11 +1955,11 @@ Os itens abaixo não são bugs de código comprovados. São decisões de negóci
 
 ### 10.3 Grupo `Acesso geral` e o escopo de estações
 
-**O que se sabe.** A migração cria o grupo `Acesso geral` com todas as estações e inscreve nele todos os usuários com role `user`, usando `on conflict do nothing` (`db/schema.sql`). O comando é reaplicado a cada `db:migrate`. Se um administrador remover um vínculo para restringir uma pessoa, a próxima migração pode recriá-lo. O relato operacional indica que, em produção, os não administradores foram removidos desse grupo para o filtro por estação funcionar.
+**O que se sabe.** A migração cria apenas a linha do grupo `Acesso geral`; ela não inscreve usuários nem concede estações, e `db:migrate` não desfaz remoções feitas por um administrador (`db/schema.sql`). O grupo pode ser usado manualmente para dar acesso amplo, mas não é recriado automaticamente.
 
-**Por que importa.** Enquanto o vínculo existir, o usuário comum vê todas as estações e recebe alertas de todas elas. Isso anula o fail-closed de D21 e o filtro por estação da audiência, sem quebrar nenhum teste. É um risco silencioso de exposição de dados e de excesso de alertas.
+**Por que importa.** O fail-closed de D21 segue valendo: um usuário sem grupo vê zero estações, e uma remoção de vínculo persiste entre migrações. O risco residual é operacional: se alguém inscrever usuários nesse grupo, eles passam a ver todas as estações e a receber alertas de todas elas.
 
-**Quem decide.** O dono da operação e o administrador do monitor. Uma correção definitiva é mudança de schema e precisa de decisão registrada; uma correção operacional é remover os vínculos e evitar `db:migrate` sem revisão.
+**Quem decide.** O dono da operação e o administrador do monitor. O grupo permanece disponível para uso deliberado; a exposição depende da inscrição manual, não da migração.
 
 **Evidência a coletar.** Contar membros do grupo antes e depois de uma migração em banco de teste; listar as estações do grupo; verificar `allowedLocationIds` de uma conta não administradora; comparar o conjunto de estações do grupo com o esperado por pessoa. Não expor e-mails no relatório; usar apenas contagens e ids.
 
@@ -2005,7 +2005,7 @@ Os itens abaixo não são bugs de código comprovados. São decisões de negóci
 
 ### 10.8 Topologia e versão de produção
 
-**O que se sabe.** Os documentos versionados descrevem Windows nativo com PostgreSQL 16, serviços `BarrierApp`, `BarrierPoller`, `BarrierAlerts` e `BarrierCaddy` (`docs/DEPLOY-WINDOWS.md`, `docs/PORT-MAP.md`). O relato de handoff de 16/11/2026 descreve PostgreSQL 18 em diretório vendorizado, base `monitor` e serviços renomeados, sem Caddy como serviço. O relato não está versionado e não é verificável pelo repositório.
+**O que se sabe.** A documentação versionada descreve a topologia APP10 como padrão: Windows nativo com PostgreSQL 18 no diretório vendorizado, base `monitor`, serviços `SeaMonitorApp`, `SeaMonitorPoller`, `SeaMonitorAlerts` e `SeaMonitorCaddy`, além da tarefa `BarrierBackup` (`docs/DEPLOY-WINDOWS.md`, `docs/PORT-MAP.md`, `deploy/windows/Setup-Production.ps1`). O layout legado `Barrier*` e o fallback EDB PostgreSQL 16 permanecem disponíveis por parâmetro. O relato de handoff de 16/11/2026 descreve a mesma topologia APP10 e deixa de ser não verificável quanto à versão, ao diretório do banco e aos nomes de serviço; a confirmação residual é a topologia efetivamente instalada no host (prefixo, diretório do banco e portas).
 
 **Por que importa.** Runbooks, backup, restore, upgrade de versão e abertura de firewall dependem da topologia real. Seguir o documento errado pode levar a backup no diretório errado, restore em base errada ou janela de manutenção no serviço errado. A divergência de versão maior do PostgreSQL também afeta o procedimento de upgrade.
 
