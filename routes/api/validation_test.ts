@@ -18,6 +18,8 @@ import { createThrottle } from "../../lib/server/throttle.ts";
 
 import { handler as userPatchHandler } from "./users/[id].ts";
 
+import { handler as syncRunsRoute } from "./sync-runs.ts";
+
 Deno.test("parseIntParam rejects non-integers", () => {
   assertStrictEquals(parseIntParam("abc"), undefined);
   assertStrictEquals(parseIntParam("1.5"), undefined);
@@ -89,6 +91,12 @@ function previewHandler(): RouteHandler {
   return handler;
 }
 
+function syncRunsHandler(): RouteHandler {
+  const handler = syncRunsRoute.GET as unknown as RouteHandler | undefined;
+  if (!handler) throw new Error("GET /api/sync-runs handler is missing");
+  return handler;
+}
+
 // routeCtx: the slice of the Fresh context a route handler reads.
 function routeCtx(req: Request, params: Record<string, string> = {}) {
   return {
@@ -107,35 +115,65 @@ function adminWriteRequest(headers: Record<string, string>): Request {
   });
 }
 
-// sessionPool: the pool is a process-wide cache (globalThis.__barrierPool),
-// so a test can install a stub that answers the session lookup and nothing
+interface FakeUser {
+  id: number;
+  email: string;
+  name: string;
+  role: string;
+  authSource: string;
+  passwordHash: string | null;
+}
+
+interface FakePoolOptions {
+  // session: the row the session lookup resolves to.
+  session?: FakeUser | null;
+  // target: the row the user lookup resolves to.
+  target?: FakeUser | null;
+  // onQuery: observes every statement the route runs.
+  onQuery?: (text: string, args: unknown[]) => void;
+}
+
+// fakePool: the pool is a process-wide cache (globalThis.__barrierPool), so
+// a test can install a stub that answers the lookups it needs and nothing
 // else. No real database is contacted.
-function sessionPool(
-  user: {
-    id: number;
-    email: string;
-    name: string;
-    role: string;
-  } | null,
-): unknown {
+function fakePool(options: FakePoolOptions): unknown {
+  const sessionRow = options.session
+    ? {
+      id: options.session.id,
+      email: options.session.email,
+      name: options.session.name,
+      phone: "",
+      role: options.session.role,
+      active: true,
+      auth_source: options.session.authSource,
+      auth_method: "password",
+      mustChangePassword: false,
+    }
+    : null;
+  const userRow = options.target
+    ? {
+      id: options.target.id,
+      email: options.target.email,
+      name: options.target.name,
+      phone: "",
+      role: options.target.role,
+      active: true,
+      password_hash: options.target.passwordHash,
+      must_change_password: false,
+      auth_source: options.target.authSource,
+      entra_tid: null,
+      entra_oid: null,
+    }
+    : null;
   const client = {
-    queryObject: (text: string) => {
+    queryObject: (text: string, args: unknown[] = []) => {
+      options.onQuery?.(text, args);
       const sql = text.toLowerCase();
       if (sql.includes("from sessions s join users u")) {
-        if (!user) return Promise.resolve({ rows: [] });
-        return Promise.resolve({
-          rows: [{
-            id: user.id,
-            email: user.email,
-            name: user.name,
-            phone: "",
-            role: user.role,
-            active: true,
-            auth_source: "local",
-            auth_method: "password",
-            mustChangePassword: false,
-          }],
-        });
+        return Promise.resolve({ rows: sessionRow ? [sessionRow] : [] });
+      }
+      if (sql.includes("from users where id = $1")) {
+        return Promise.resolve({ rows: userRow ? [userRow] : [] });
       }
       if (sql.includes("count(*)::text as n from user_access_groups")) {
         return Promise.resolve({ rows: [{ n: "0" }] });
@@ -150,13 +188,15 @@ function sessionPool(
   };
 }
 
-function installPool(pool: unknown): void {
-  (globalThis as unknown as { __barrierPool?: unknown }).__barrierPool = pool;
-}
-
-function removePool(): void {
-  (globalThis as unknown as { __barrierPool?: unknown }).__barrierPool =
-    undefined;
+// installPool: swaps the cached pool and returns the restore function, so
+// the previous pool (if any) survives the test untouched.
+function installPool(pool: unknown): () => void {
+  const globals = globalThis as unknown as { __barrierPool?: unknown };
+  const previous = globals.__barrierPool;
+  globals.__barrierPool = pool;
+  return () => {
+    globals.__barrierPool = previous;
+  };
 }
 
 async function envelope(res: Response): Promise<{
@@ -190,11 +230,15 @@ Deno.test("dead credential on an admin write answers 401", async () => {
 });
 
 Deno.test("authenticated non-admin on an admin write answers 403", async () => {
-  installPool(sessionPool({
-    id: 7,
-    email: "user@example.com",
-    name: "User",
-    role: "user",
+  const restore = installPool(fakePool({
+    session: {
+      id: 7,
+      email: "user@example.com",
+      name: "User",
+      role: "user",
+      authSource: "local",
+      passwordHash: null,
+    },
   }));
   try {
     const res = await adminWriteHandler()(
@@ -208,7 +252,7 @@ Deno.test("authenticated non-admin on an admin write answers 403", async () => {
     const body = await envelope(res);
     assertStrictEquals(body.code, "FORBIDDEN");
   } finally {
-    removePool();
+    restore();
   }
 });
 
@@ -264,5 +308,96 @@ Deno.test("alert rule preview rejects a stale day count that is not a whole numb
     const body = await envelope(res);
     assertStrictEquals(body.code, "BAD_REQUEST");
     assertStrictEquals(body.error, "staleDays must be a positive integer");
+  });
+});
+
+Deno.test("alert rule preview rejects a scope id list that is not whole numbers", async () => {
+  await withAdminToken(async () => {
+    // "1e2", "0x10", a negative and a zero are not ids the caller may have
+    // meant: they used to be read as 100, 16, -1 and 0.
+    for (const bad of ["1e2", "0x10", "-1", "0"]) {
+      const res = await previewHandler()(
+        routeCtx(
+          new Request(
+            `http://localhost/api/alert-rules/preview?categoryIds=${
+              encodeURIComponent(bad)
+            }`,
+            { headers: { authorization: "Bearer test-admin-token" } },
+          ),
+        ),
+      );
+      assertStrictEquals(res.status, 400, bad);
+      const body = await envelope(res);
+      assertStrictEquals(body.code, "BAD_REQUEST", bad);
+      assertStrictEquals(
+        body.error,
+        "categoryIds must be positive integers",
+        bad,
+      );
+    }
+  });
+});
+
+Deno.test("sync runs limit falls back to the default for a malformed value", async () => {
+  await withAdminToken(async () => {
+    const seen: unknown[][] = [];
+    const restore = installPool(fakePool({
+      onQuery: (text, args) => {
+        if (text.toLowerCase().includes("from sync_state")) seen.push(args);
+      },
+    }));
+    try {
+      // A partial or exponential value is not a limit: the route must ask
+      // for the default 10 runs instead of 12 or 100.
+      for (const bad of ["12abc", "1e2"]) {
+        const res = await syncRunsHandler()(
+          routeCtx(
+            new Request(`http://localhost/api/sync-runs?limit=${bad}`, {
+              headers: { authorization: "Bearer test-admin-token" },
+            }),
+          ),
+        );
+        assertStrictEquals(res.status, 200, bad);
+      }
+      assertStrictEquals(seen.length, 2);
+      for (const args of seen) assertStrictEquals(args[0], 10);
+    } finally {
+      restore();
+    }
+  });
+});
+
+Deno.test("admin password write with a too short password answers 400", async () => {
+  await withAdminToken(async () => {
+    const restore = installPool(fakePool({
+      target: {
+        id: 1,
+        email: "user@example.com",
+        name: "User",
+        role: "user",
+        authSource: "local",
+        passwordHash: "pbkdf2$210000$salt$hash",
+      },
+    }));
+    try {
+      const req = new Request("http://localhost/api/users/1", {
+        method: "PATCH",
+        headers: {
+          "content-type": "application/json",
+          authorization: "Bearer test-admin-token",
+        },
+        body: JSON.stringify({ password: "short" }),
+      });
+      const res = await adminWriteHandler()(routeCtx(req, { id: "1" }));
+      assertStrictEquals(res.status, 400);
+      const body = await envelope(res);
+      assertStrictEquals(body.code, "BAD_REQUEST");
+      assertStrictEquals(
+        body.error,
+        "password must be at least 12 characters",
+      );
+    } finally {
+      restore();
+    }
   });
 });

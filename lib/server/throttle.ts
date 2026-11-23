@@ -141,13 +141,19 @@ function isIpv6(value: string): boolean {
   if (marker !== -1 && marker !== value.lastIndexOf("::")) return false;
   const head = marker === -1 ? value : value.slice(0, marker);
   const tail = marker === -1 ? "" : value.slice(marker + 2);
-  const count = (part: string): number | null => {
+  // count: groups of one part, or null when the part is malformed. An
+  // embedded IPv4 counts as two groups and is only legal as the last group
+  // of the whole address, so "::1.2.3.4:5" and "1.2.3.4::" are rejected.
+  const count = (part: string, ipv4Allowed: boolean): number | null => {
     if (part === "") return 0;
+    const groups = part.split(":");
     let total = 0;
-    for (const group of part.split(":")) {
+    for (let i = 0; i < groups.length; i++) {
+      const group = groups[i];
       if (group === "") return null;
       if (group.includes(".")) {
-        if (!isIpv4(group)) return null;
+        const isLast = i === groups.length - 1;
+        if (!ipv4Allowed || !isLast || !isIpv4(group)) return null;
         total += 2;
         continue;
       }
@@ -156,8 +162,10 @@ function isIpv6(value: string): boolean {
     }
     return total;
   };
-  const headCount = count(head);
-  const tailCount = count(tail);
+  // With "::" the head is followed by the tail, so only the tail may end in
+  // an embedded IPv4; without it the whole address may.
+  const headCount = count(head, marker === -1);
+  const tailCount = count(tail, true);
   if (headCount === null || tailCount === null) return false;
   // Without "::" every group must be present; with it the written groups
   // must leave room for at least one zero group.

@@ -77,6 +77,11 @@ Deno.test("isIpLiteral rejects anything that is not an address", () => {
       "example.com",
       "deadbeef",
       "0x10",
+      // An embedded IPv4 is only legal as the last group of the address.
+      "::1.2.3.4:5",
+      "1.2.3.4::",
+      "1.2.3.4:5::6",
+      "::ffff:1.2.3.4:5",
     ]
   ) {
     assertStrictEquals(isIpLiteral(bad), false, bad);

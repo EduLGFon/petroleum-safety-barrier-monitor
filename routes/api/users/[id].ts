@@ -92,6 +92,21 @@ function duplicateMessage(err: unknown): string | undefined {
     : "duplicate value";
 }
 
+// validatedPassword: the password policy gate. The policy helper raises a
+// plain Error, so the rejection is translated into the typed error the
+// route maps to 400 - a short, long or non-string password is client input,
+// never an internal failure. The wording is kept so the admin UI still
+// localizes it.
+function validatedPassword(raw: unknown): string {
+  try {
+    return validateNewPassword(raw);
+  } catch (err) {
+    throw new ValidationError(
+      err instanceof Error ? err.message : "invalid password",
+    );
+  }
+}
+
 // validateUserPatch: typed checks on the request body before anything
 // reaches the store. A rejection is a ValidationError, so the route maps it
 // to 400 by type instead of by matching error text later.
@@ -221,7 +236,7 @@ export const handler = define.handlers({
             requestId,
           );
         }
-        const next = validateNewPassword(body.password);
+        const next = validatedPassword(body.password);
         // Match the self-service route: a reset must actually change the
         // password, not re-hash the same one.
         const currentPasswordHash = target.password_hash as string;
