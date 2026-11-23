@@ -1192,13 +1192,13 @@ O `Dockerfile` tem dois estágios, `base` e `prod`, sobre `denoland/deno:2.9.7` 
 
 O caminho Windows é Windows Server 2022 ou 2025 com Deno, PostgreSQL, NSSM e Caddy, instalado por `deploy/windows/Setup.cmd`, que relança `Setup-Production.ps1` elevado (`docs/DEPLOY-WINDOWS.md`). O instalador:
 
-- instala Deno 2.9.7 pinado, PostgreSQL 16 na porta 5432 quando ausente, NSSM e Caddy;
+- instala Deno 2.9.7 pinado, PostgreSQL 18 no diretório vendorizado (padrão `C:\sites\seacrest\.vendor\pgsql18\bin`) com fallback EDB PostgreSQL 16 quando ausente, NSSM e Caddy;
 - cria `.env` a partir de `.env.example` com senha de banco, `ADMIN_TOKEN` e senha de admin gerados; um `.env` existente nunca é rotacionado; a ACL é restrita;
 - roda `doctor`, build, migrações e criação do primeiro admin;
 - registra serviços, firewall, Caddy opcional e tarefa de backup;
 - faz smoke test de `/api/health` e `/login`.
 
-Os serviços NSSM são `BarrierApp`, `BarrierPoller`, `BarrierAlerts` e `BarrierCaddy`; no Docker os nomes equivalentes são os serviços do Compose. A postura de firewall é negar inbound por padrão; o setup só abre 80 e 443 com `-AllowedLanRanges`, e a porta 8300 nunca é aberta, exceto com `-SkipCaddy -AllowLanAppPort`, que serve HTTP puro e só é aceitável atrás de VPN (`docs/DEPLOY-WINDOWS.md`).
+Os serviços NSSM usam o prefixo configurável (`-ServicePrefix`, padrão `SeaMonitor`): `SeaMonitorApp`, `SeaMonitorPoller`, `SeaMonitorAlerts` e `SeaMonitorCaddy`; `-ServicePrefix Barrier` restaura o layout legado `Barrier*`. No Docker os nomes equivalentes são os serviços do Compose. A postura de firewall é negar inbound por padrão; o setup só abre 80 e 443 com `-AllowedLanRanges`, e a porta 8300 nunca é aberta, exceto com `-SkipCaddy -AllowLanAppPort`, que serve HTTP puro e só é aceitável atrás de VPN (`docs/DEPLOY-WINDOWS.md`).
 
 O Caddy faz `reverse_proxy 127.0.0.1:8300` com `X-Real-IP`, remove o banner do servidor e aplica `nosniff`, `DENY` e `no-referrer`; HSTS fica comentado até o primeiro smoke test HTTPS; nunca há `Access-Control-Allow-Origin`, porque o desenho é mesma origem (`deploy/windows/Caddyfile`).
 
@@ -1478,17 +1478,17 @@ Além de `/api/*`, as páginas são `/`, `/login`, `/trocar-senha` e `/auth/entr
 
 #### Exportação
 
-| Método e caminho        | Auth  | Observação  |
-| ----------------------- | ----- | ----------- |
-| `GET, POST /api/export` | dados | `format=csv |
+| Método e caminho        | Auth  | Observação                                                                                        |
+| ----------------------- | ----- | ------------------------------------------------------------------------------------------------- |
+| `GET, POST /api/export` | dados | `format=csv\|xlsx\|pdf`, filtros compartilhados de barreira, corpo `{ format?, ids?, timeZone? }` |
 
 #### Inspeção de sync
 
-| Método e caminho        | Auth  | Observação                                                                                                  |
-| ----------------------- | ----- | ----------------------------------------------------------------------------------------------------------- |
-| `GET /api/sync-status`  | dados | `{ state, runningSince, lastRun, totals }`; `state` é `syncing`, `idle`, `stale` ou `unknown`; memo de 15 s |
-| `GET /api/sync-runs`    | dados | `?limit=` de 1 a 50, padrão 10; runs concluídas mais novas primeiro                                         |
-| `GET /api/sync-changes` | dados | `?scope=last-run                                                                                            |
+| Método e caminho        | Auth  | Observação                                                                                                              |
+| ----------------------- | ----- | ----------------------------------------------------------------------------------------------------------------------- |
+| `GET /api/sync-status`  | dados | `{ state, runningSince, lastRun, totals }`; `state` é `syncing`, `idle`, `stale` ou `unknown`; memo de 15 s             |
+| `GET /api/sync-runs`    | dados | `?limit=` de 1 a 50, padrão 10; runs concluídas mais novas primeiro                                                     |
+| `GET /api/sync-changes` | dados | `?scope=last-run\|last-day`, `?runId=`, `?kind=new\|updated\|removed\|restored\|all`, `?query=`, `?page=`, `?pageSize=` |
 
 #### Usuários
 
@@ -1506,7 +1506,7 @@ Além de `/api/*`, as páginas são `/`, `/login`, `/trocar-senha` e `/auth/entr
 | ------------------------------------------- | ----- | --------------------------------------------------------------------------------------------------------------------------------------------- |
 | `GET, POST /api/access-groups`              | admin | lista ordenada por nome com `locationIds` e `userIds`, ou 201 com grupo criado; nome obrigatório; corpo de 10.000 bytes; nome duplicado é 400 |
 | `GET, PATCH, DELETE /api/access-groups/:id` | admin | PATCH substitui arrays; DELETE cascateia vínculos; corpo de 10.000 bytes                                                                      |
-| `POST /api/access-groups/batch`             | admin | `{ action, ids, userIds?                                                                                                                      |
+| `POST /api/access-groups/batch`             | admin | `{ action, ids, userIds? \| locationIds? }`                                                                                                   |
 
 #### Destinatários legados
 
@@ -1899,9 +1899,9 @@ D23 afirma que a disponibilidade efetiva dirige contingências. A elegibilidade 
 
 A variável é lida em `lib/server/config.ts`, com default `RS256` e `PS256` aceito, mas não aparece em `.env.example`. O mesmo padrão vale para `APP_ENV`, `ADMIN_PASSWORD`, `SEED_FORCE`, `LEGACY_SHARED_PASSWORD` e `CHROME_NO_SANDBOX`, que são lidas por scripts ou deploy e não estão no exemplo. Isso não quebra boot, mas reduz a descoberta.
 
-#### DV13. Topologia de produção descrita versus relato de handoff
+#### DV13. Topologia de produção APP10 documentada
 
-Os documentos do repositório descrevem Windows nativo com PostgreSQL 16, serviços `BarrierApp`, `BarrierPoller`, `BarrierAlerts` e `BarrierCaddy` (`docs/DEPLOY-WINDOWS.md`, `docs/PORT-MAP.md`). Um relato operacional de handoff de 16/11/2026, não versionado neste repositório, descreve PostgreSQL 18 em diretório vendorizado, base `monitor`, e serviços renomeados sem Caddy como serviço. Não é possível conciliar os dois sem confirmação do dono. Este documento trata a documentação versionada como referência de projeto e o relato como contexto operacional não verificado.
+A documentação versionada descreve agora a topologia APP10 como padrão: PostgreSQL 18 no diretório vendorizado, base `monitor`, serviços com prefixo `SeaMonitor` (`SeaMonitorApp`, `SeaMonitorPoller`, `SeaMonitorAlerts`, `SeaMonitorCaddy`) e tarefa de backup `BarrierBackup`. O layout legado `Barrier*` permanece disponível via `-ServicePrefix Barrier`, e o EDB PostgreSQL 16 é o fallback quando o diretório vendorizado não existe. O relato operacional de handoff de 16/11/2026, que descrevia a mesma topologia, deixa de ser divergente; a divergência residual é apenas o prefixo legado e a versão do PostgreSQL no fallback (`docs/DEPLOY-WINDOWS.md`, `docs/PORT-MAP.md`, `deploy/windows/Setup-Production.ps1`).
 
 #### DV14. Handoff desatualizado sobre `CO`, `SM8` e senha padrão
 
@@ -2005,7 +2005,7 @@ Os itens abaixo não são bugs de código comprovados. São decisões de negóci
 
 ### 10.8 Topologia e versão de produção
 
-**O que se sabe.** Os documentos versionados descrevem Windows nativo com PostgreSQL 16, serviços `BarrierApp`, `BarrierPoller`, `BarrierAlerts` e `BarrierCaddy` (`docs/DEPLOY-WINDOWS.md`, `docs/PORT-MAP.md`). O relato de handoff de 16/11/2026 descreve PostgreSQL 18 em diretório vendorizado, base `monitor` e serviços renomeados, sem Caddy como serviço. O relato não está versionado e não é verificável pelo repositório.
+**O que se sabe.** A documentação versionada descreve a topologia APP10 como padrão: Windows nativo com PostgreSQL 18 no diretório vendorizado, base `monitor`, serviços `SeaMonitorApp`, `SeaMonitorPoller`, `SeaMonitorAlerts` e `SeaMonitorCaddy`, além da tarefa `BarrierBackup` (`docs/DEPLOY-WINDOWS.md`, `docs/PORT-MAP.md`, `deploy/windows/Setup-Production.ps1`). O layout legado `Barrier*` e o fallback EDB PostgreSQL 16 permanecem disponíveis por parâmetro. O relato de handoff de 16/11/2026 descreve a mesma topologia APP10 e deixa de ser não verificável quanto à versão, ao diretório do banco e aos nomes de serviço; a confirmação residual é a topologia efetivamente instalada no host (prefixo, diretório do banco e portas).
 
 **Por que importa.** Runbooks, backup, restore, upgrade de versão e abertura de firewall dependem da topologia real. Seguir o documento errado pode levar a backup no diretório errado, restore em base errada ou janela de manutenção no serviço errado. A divergência de versão maior do PostgreSQL também afeta o procedimento de upgrade.
 

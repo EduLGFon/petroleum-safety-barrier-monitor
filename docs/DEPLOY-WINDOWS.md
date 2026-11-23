@@ -290,7 +290,7 @@ From another machine, test the public URL, not 8300.
 
 ### Backup and restore
 
-Setup registers the scheduled task `SeaMonitorBackup` to run daily at 02:00 as
+Setup registers the scheduled task `BarrierBackup` to run daily at 02:00 as
 SYSTEM. It calls `deploy\windows\Backup-Database.ps1`, which:
 
 - Reads `DATABASE_URL` from the environment or the repository `.env`.
@@ -341,7 +341,7 @@ the restore against `monitor`. Finally run `Test-BarrierHealth.ps1`.
 `Uninstall-Production.ps1` stops and removes the prefixed services
 (SeaMonitorApp, SeaMonitorPoller, SeaMonitorAlerts, SeaMonitorCaddy by default),
 removes the monitor firewall rules and
-the SeaMonitorBackup task, then exits. Code, database, PostgreSQL, Deno, tools and
+the BarrierBackup task, then exits. Code, database, PostgreSQL, Deno, tools and
 backup files stay in place, so re-running setup restores the install.
 
 ```powershell
@@ -450,7 +450,7 @@ docker compose cp db:/tmp/barreiras.dump ./barreiras.dump
 
 docker compose stop app poller alerts
 docker compose cp ./barreiras.dump db:/tmp/barreiras.dump
-docker compose exec db pg_restore -U barrier -d monitor --clean --if-exists /tmp/barreiras.dump
+docker compose exec db pg_restore -U barrier -d barreiras --clean --if-exists /tmp/barreiras.dump
 docker compose start app poller alerts
 ```
 
@@ -477,8 +477,10 @@ update; dump, recreate the volume, and restore with the procedure above.
   was passed. Add the office/VPN ranges, or use `-SkipFirewall` and document the
   exception.
 - **Setup asks for a Postgres superuser password**: an existing PostgreSQL 16
-  cluster was found. Pass `-PostgresSuperPassword` or set
-  `POSTGRES_SUPER_PASSWORD`.
+  cluster was found. Persist `POSTGRES_SUPER_PASSWORD` at User or Machine scope
+  and start an elevated session, or answer the interactive prompt. Do not pass
+  `-PostgresSuperPassword` on the command line: setup rejects CLI secrets to
+  keep them out of process lists and shell history.
 - **doctor fails**: fix `DATABASE_URL` and `ADMIN_TOKEN` in `.env`, then run
   `deno task doctor` again. Setup fails hard on doctor errors.
 - **SeaMonitorApp is stopped**: check `logs\SeaMonitorApp-err.log`, confirm port 8300
@@ -495,7 +497,7 @@ update; dump, recreate the volume, and restore with the procedure above.
   mail server. Add the provider token; without it the loop only detects and
   reports.
 - **Backup task fails or the health check warns**: confirm `D:\backups` exists
-  and SYSTEM can write it, and that PostgreSQL 16's `pg_dump.exe` is present.
+  and SYSTEM can write it, and that the vendorized PG18 `pg_dump.exe` is present at `C:\sites\seacrest\.vendor\pgsql18\bin`.
   Run `Backup-Database.ps1` manually to see the error.
 - **Compose guard fails**: set a unique `POSTGRES_PASSWORD` of at least 16
   characters, or use an external database with `DATABASE_URL_DOCKER`.
