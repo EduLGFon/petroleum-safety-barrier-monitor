@@ -196,15 +196,15 @@ Este nível descreve o que existe na interface e o que cada fluxo permite. Ele �
 
 ### 4.1 Páginas e rotas de interface
 
-| Rota                              | Público               | Comportamento                                                                                                                        |
-| --------------------------------- | --------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
-| `/login`                          | público               | formulário de e-mail e senha, botão de login Microsoft quando o SSO está habilitado e mensagens de falha                             |
-| `/trocar-senha`                   | sessão local pendente | troca obrigatória de senha temporária; a sessão permanece autenticada, mas contida                                                   |
-| `/`                               | sessão autenticada    | painel principal; sem sessão redireciona para `/login` com retorno, e conta local com troca pendente recebe 303 para `/trocar-senha` |
-| `/auth/entra/login`               | público               | inicia o fluxo OIDC com PKCE, state e nonce                                                                                          |
-| `/auth/entra/callback`            | público               | valida o retorno do provedor e cria a sessão, ou volta ao login com código de erro                                                   |
-| `/auth/entra/frontchannel-logout` | público               | revoga sessões pelo `sid` hasheado quando o recurso está habilitado                                                                  |
-| `/auth/entra/logged-out`          | público               | limpa a sessão local e volta ao login                                                                                                |
+| Rota                              | Público               | Comportamento                                                                                                                                              |
+| --------------------------------- | --------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `/login`                          | público               | formulário de e-mail e senha, botão de login Microsoft quando o SSO está habilitado e mensagens de falha                                                   |
+| `/trocar-senha`                   | sessão local pendente | troca obrigatória de senha temporária; a sessão permanece autenticada, mas contida                                                                         |
+| `/`                               | sessão autenticada    | painel principal; sem sessão redireciona para `/login` com retorno, e conta local com troca pendente recebe 303 para `/trocar-senha`                       |
+| `/auth/entra/login`               | público               | inicia o fluxo OIDC com PKCE, state e nonce                                                                                                                |
+| `/auth/entra/callback`            | público               | valida o retorno do provedor e cria a sessão, ou volta ao login com código de erro                                                                         |
+| `/auth/entra/frontchannel-logout` | público               | revoga sessões pelo `sid` hasheado quando o recurso está habilitado                                                                                        |
+| `/auth/entra/logged-out`          | público               | 404 quando o SSO está desabilitado; em requisição cross-site não revoga a sessão do servidor, apenas limpa o cookie e redireciona para `/login?sso=logout` |
 
 O gate de sessão da página inicial roda no servidor, não na ilha (`routes/index.tsx`). Essa escolha é deliberada: um gate no cliente seria apenas uma sugestão, e a decisão de acesso precisa acontecer antes de qualquer dado ser carregado.
 
@@ -570,7 +570,7 @@ Regras (`lib/server/auth.ts`, `lib/server/sql/access-groups.ts`, `docs/ARCHITECT
 - O mesmo escopo é aplicado a leitura de barreiras, KPI, gráfico, vocabulários, exportação e busca de barreira por id. Um cliente pode estreitar o escopo com filtros, nunca ampliá-lo.
 - Não há Row-Level Security. O banco não filtra linhas por usuário; uma conexão SQL direta vê tudo (`db/schema.sql`, `docs/DATABASE.md`).
 
-**Risco de migração documentado.** A migração cria o grupo `Acesso geral` com todas as estações e inscreve nele **todos** os usuários com role `user` (`db/schema.sql`). O comando é reexecutado a cada `db:migrate` e usa `on conflict do nothing`, o que preserva acesso em migrações, mas também pode reintroduzir um vínculo removido manualmente. Se esse grupo não for limpo, o filtro por estação fica inócuo para os não administradores. A seção 10 trata isso como pendência operacional.
+**Grupo padrão.** A migração cria a linha do grupo `Acesso geral`, mas não (re)concede estações nem inscreve usuários: `db:migrate` é idempotente e não desfaz remoções feitas por um administrador (`db/schema.sql`). O grupo permanece disponível para quem o usa; a remoção manual de vínculos persiste entre migrações.
 
 ### 5.6 KPI e gráfico
 
@@ -1073,7 +1073,7 @@ A categoria vem de `groups_description` trimado ou do fallback `(sem categoria)`
 
 #### Reconciliação e idempotência
 
-`planReconcile(remote, local)` é puro e classifica cada linha em `insert`, `update`, `restore`, `delete` ou `skip` (`lib/server/fracttal/sync.ts`). A reconciliação é por `external_code`. Uma linha local já deletada que reaparece upstream vira `restore`, nunca duplicata. Linhas locais ausentes upstream recebem soft delete, mas apenas dentro do escopo resolvido.
+`planReconcile(remote, local)` é puro e classifica cada linha em `insert`, `update`, `restore`, `delete` ou `skip` (`lib/server/fracttal/sync.ts`). A reconciliação é por `external_code`. Uma linha local já deletada que reaparece upstream vira `restore`, nunca duplicata. Linhas locais ausentes upstream recebem soft delete, mas apenas dentro do escopo resolvido. Um código visto upstream que pula o mapeamento ou chega malformado (linha skip) também é protegido contra soft delete: a barreira existente não é ocultada, apenas o skip é registrado. Os códigos são comparados já normalizados (trim), de modo que um código upstream com espaços não escapa à proteção.
 
 A assinatura de mudança tem 27 chaves e a ordem faz parte do contrato com a assinatura armazenada (`lib/server/fracttal/sync.ts`). Mesma assinatura mais mesmo status resulta em `skip`; `hasContingency` normaliza nulo para `Não`, e `contingencyDesc` normaliza nulo para string vazia. `diffSignatureFields` nomeia as colunas que mudaram e acrescenta `availabilityId` quando o status virou; `snapshotOf` grava um JSON simétrico com apenas as chaves de assinatura e o status.
 
@@ -1098,7 +1098,7 @@ A auditoria operacional vive em `sync_state` (`scope`, `status`, `cursor`, `inse
 | `fracttal:import`     | reconstrói o banco a partir de um dump local, em passes A, B e C, com streaming objeto a objeto | dry-run por padrão; `--apply` trunca histórico, barreiras, sync e eventos, depois recria estações e categorias com ids determinísticos; passa `available: true` porque a semântica do dump não foi verificada |
 | `fracttal:sync`       | replay de fixture por padrão; `--live` faz sweep real                                           | `--pages` padrão 200, máximo 400; `--work-pages` padrão 5, máximo 40; escrita só com `--apply`; fixture precisa ser filho direto de `scripts/fixtures/*.json`                                                 |
 | `fracttal:force-sync` | sweep live completo de recuperação                                                              | `--pages` padrão 400, máximo 400; dry-run por padrão; sobreposição gera exit 3, salvo `--force`; credenciais ausentes geram exit 2                                                                            |
-| `fracttal:poll`       | loop live com passagem de trabalho compartilhada e sweep completo de equipment                  | `FRACTTAL_POLL_SECONDS` com piso 60; `FRACTTAL_SYNC_MAX_PAGES` com padrão 250; lock por escopo; SIGINT e SIGTERM esperam o sweep em voo                                                                       |
+| `fracttal:poll`       | loop live com passagem de trabalho compartilhada e sweep completo de equipment                  | `FRACTTAL_POLL_SECONDS` com piso 60; `FRACTTAL_SYNC_MAX_PAGES` com padrão 250; lock por escopo; no Windows os pollers registram SIGINT e SIGBREAK, nos demais SIGINT e SIGTERM, e aguardam o sweep em voo     |
 
 A variável `FRACTTAL_SYNC_MAX_PAGES` tem três valores em jogo: `.env.example` comenta 200, o poller usa 250 e o script `fracttal:sync` usa 200 no `--pages`. O `fracttal:force-sync` usa 400. A divergência é de defaults, não de contrato de ambiente, e está registrada na seção 9.
 
@@ -1432,22 +1432,22 @@ Além de `/api/*`, as páginas são `/`, `/login`, `/trocar-senha` e `/auth/entr
 
 #### Sessões e conta
 
-| Método e caminho          | Auth           | Observação                                                                                                                                             |
-| ------------------------- | -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `POST /api/auth/login`    | público        | `{ email, password }`; 200 com usuário público e cookie; 401 genérico; revoga sessão apresentada antes de emitir a nova; throttle de escrita           |
-| `POST /api/auth/logout`   | público        | `{ ok, ssoLogoutUrl }`; limpa o cookie; sessão ausente ou inválida ainda sucede                                                                        |
-| `GET /api/auth/me`        | somente sessão | usuário atual com `allowedLocationIds`, `auth_source`, `auth_method` e `mustChangePassword`                                                            |
-| `POST /api/auth/password` | somente sessão | `{ currentPassword, newPassword }`; verifica a atual, aplica 12 a 256, rejeita reuso, limpa o flag, revoga sessões e limpa o cookie na mesma transação |
-| `PATCH /api/auth/profile` | somente sessão | `{ name?, email?, phone?, currentPassword?, newPassword? }`; token responde 401 `session required`                                                     |
+| Método e caminho          | Auth           | Observação                                                                                                                                                                                                                                      |
+| ------------------------- | -------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `POST /api/auth/login`    | público        | `{ email, password }`; 200 com usuário público e cookie; 401 genérico; revoga sessão apresentada antes de emitir a nova; throttle de escrita                                                                                                    |
+| `POST /api/auth/logout`   | público        | `{ ok, ssoLogoutUrl }`; limpa o cookie; sessão ausente ou inválida ainda sucede                                                                                                                                                                 |
+| `GET /api/auth/me`        | somente sessão | usuário atual com `allowedLocationIds`, `auth_source`, `auth_method` e `mustChangePassword`                                                                                                                                                     |
+| `POST /api/auth/password` | somente sessão | `{ currentPassword, newPassword }`; verifica a atual, aplica 12 a 256, rejeita reuso, limpa o flag, revoga sessões e limpa o cookie na mesma transação                                                                                          |
+| `PATCH /api/auth/profile` | somente sessão | `{ name?, email?, phone?, currentPassword?, newPassword? }`; mudança de e-mail exige `currentPassword`, contas Entra-only não podem mudar e-mail, erro de duplicidade é genérico e sessões são revogadas; token responde 401 `session required` |
 
 #### Entra OIDC
 
-| Método e caminho                      | Auth    | Observação                                                                                                     |
-| ------------------------------------- | ------- | -------------------------------------------------------------------------------------------------------------- |
-| `GET /auth/entra/login`               | público | 302 para o Entra com PKCE, state e nonce; `no-store`                                                           |
-| `GET /auth/entra/callback`            | público | 303 para o caminho de retorno com cookie, ou `/login?sso=<codigo>`; valida issuer, nonce, state, PKCE e claims |
-| `GET /auth/entra/frontchannel-logout` | público | 200 `text/plain` em configuração válida; valida issuer e `sid` hasheado e revoga sessões                       |
-| `GET /auth/entra/logged-out`          | público | 303 para `/login?sso=logout`; limpa sessão e cookie                                                            |
+| Método e caminho                      | Auth    | Observação                                                                                                                           |
+| ------------------------------------- | ------- | ------------------------------------------------------------------------------------------------------------------------------------ |
+| `GET /auth/entra/login`               | público | 302 para o Entra com PKCE, state e nonce; `no-store`                                                                                 |
+| `GET /auth/entra/callback`            | público | 303 para o caminho de retorno com cookie, ou `/login?sso=<codigo>`; valida issuer, nonce, state, PKCE e claims                       |
+| `GET /auth/entra/frontchannel-logout` | público | 200 `text/plain` em configuração válida; valida issuer e `sid` hasheado e revoga sessões                                             |
+| `GET /auth/entra/logged-out`          | público | 404 quando o SSO está desabilitado; em GET cross-site não revoga a sessão do servidor; 303 para `/login?sso=logout` e limpa o cookie |
 
 #### Barreiras
 
@@ -1907,9 +1907,9 @@ Os documentos do repositório descrevem Windows nativo com PostgreSQL 16, servi�
 
 O mesmo relato diz que 14 usuários não foram importados porque as estações `CO` e `SM8` não existiam no catálogo, e fala em senha padrão. O código atual contém os aliases `SM8` e `CO` (D27) e gera senha por pessoa com `generateTemporaryPassword()` e troca obrigatória (`routes/api/users.ts`, D30, D32). A pendência de dados pode estar desatualizada; a validação exige consultar o catálogo real e reprocessar o roster.
 
-#### DV15. Grupo `Acesso geral` reintroduz vínculos em toda migração
+#### DV15. Grupo `Acesso geral` não recria vínculos em migração
 
-A migração inscreve todos os usuários `role = 'user'` no grupo `Acesso geral` a cada execução, com `on conflict do nothing` (`db/schema.sql`). Se um administrador remover um vínculo para restringir acesso, a próxima migração pode recriá-lo. Isso não é uma divergência de documentação, mas uma tensão real entre a compatibilidade de migração e o fail-closed de D21.
+A migração mantém apenas a linha do grupo `Acesso geral`; ela não (re)inscreve usuários nem (re)concede estações, então remoções feitas por um administrador persistem entre execuções de `db:migrate` (`db/schema.sql`). A tensão anterior entre compatibilidade de migração e fail-closed de D21 deixa de existir para esse grupo.
 
 ### 9.3 O que foi verificado nesta revisão
 
@@ -1955,11 +1955,11 @@ Os itens abaixo não são bugs de código comprovados. São decisões de negóci
 
 ### 10.3 Grupo `Acesso geral` e o escopo de estações
 
-**O que se sabe.** A migração cria o grupo `Acesso geral` com todas as estações e inscreve nele todos os usuários com role `user`, usando `on conflict do nothing` (`db/schema.sql`). O comando é reaplicado a cada `db:migrate`. Se um administrador remover um vínculo para restringir uma pessoa, a próxima migração pode recriá-lo. O relato operacional indica que, em produção, os não administradores foram removidos desse grupo para o filtro por estação funcionar.
+**O que se sabe.** A migração cria apenas a linha do grupo `Acesso geral`; ela não inscreve usuários nem concede estações, e `db:migrate` não desfaz remoções feitas por um administrador (`db/schema.sql`). O grupo pode ser usado manualmente para dar acesso amplo, mas não é recriado automaticamente.
 
-**Por que importa.** Enquanto o vínculo existir, o usuário comum vê todas as estações e recebe alertas de todas elas. Isso anula o fail-closed de D21 e o filtro por estação da audiência, sem quebrar nenhum teste. É um risco silencioso de exposição de dados e de excesso de alertas.
+**Por que importa.** O fail-closed de D21 segue valendo: um usuário sem grupo vê zero estações, e uma remoção de vínculo persiste entre migrações. O risco residual é operacional: se alguém inscrever usuários nesse grupo, eles passam a ver todas as estações e a receber alertas de todas elas.
 
-**Quem decide.** O dono da operação e o administrador do monitor. Uma correção definitiva é mudança de schema e precisa de decisão registrada; uma correção operacional é remover os vínculos e evitar `db:migrate` sem revisão.
+**Quem decide.** O dono da operação e o administrador do monitor. O grupo permanece disponível para uso deliberado; a exposição depende da inscrição manual, não da migração.
 
 **Evidência a coletar.** Contar membros do grupo antes e depois de uma migração em banco de teste; listar as estações do grupo; verificar `allowedLocationIds` de uma conta não administradora; comparar o conjunto de estações do grupo com o esperado por pessoa. Não expor e-mails no relatório; usar apenas contagens e ids.
 

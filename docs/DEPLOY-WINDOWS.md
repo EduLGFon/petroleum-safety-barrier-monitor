@@ -3,12 +3,18 @@
 Barrier Monitor has two supported deployment paths:
 
 - **Windows native**: `deploy/windows/Setup.cmd` launches
-  `Setup-Production.ps1`, which installs Deno 2.9.7 and PostgreSQL 16,
-  registers the NSSM services BarrierApp, BarrierPoller, BarrierAlerts and
-  BarrierCaddy, and puts Caddy TLS in front of the app.
+  `Setup-Production.ps1`, which installs Deno 2.9.7, registers the NSSM
+  services SeaMonitorApp, SeaMonitorPoller, SeaMonitorAlerts and
+  SeaMonitorCaddy (legacy Barrier* names via `-ServicePrefix Barrier`), and
+  puts Caddy TLS in front of the app. Defaults target the APP10 topology:
+  database `monitor`, role `barrier`, PostgreSQL 18 binaries at
+  `C:\sites\seacrest\.vendor\pgsql18\bin`, backups under
+  `D:\backups\monitor`, app on port 8300 bound to loopback.
 - **Docker Compose**: `compose.yml` runs PostgreSQL 18-alpine plus the app,
   poller, alerts and one-off tools containers. Use a host with Docker Engine
-  and Compose v2. Docker Desktop is not supported on Windows Server.
+  and Compose v2. Docker Desktop is not supported on Windows Server. Compose
+  is supported but is not the production path on Windows Server; the native
+  path above is.
 
 Both paths are supported. This document does not assume which path a given
 production host uses; follow the section that matches that host.
@@ -50,9 +56,10 @@ Windows native:
 - Windows Server 2022 or 2025, 64-bit, with a local administrator.
 - Code at `C:\srv\barrier-monitor` (the default path). Extract a repository
   archive there, or clone the repository when Git is available.
-- PostgreSQL 16 is installed by setup when missing. When PostgreSQL already
-  exists, pass `-PostgresSuperPassword` so setup can ensure the role and
-  database.
+- PostgreSQL 16 is installed by setup when missing (the vendor PostgreSQL 18
+  binaries at `C:\sites\seacrest\.vendor\pgsql18\bin` are used when
+  present). When PostgreSQL already exists, pass `-PostgresSuperPassword` (or
+  set `POSTGRES_SUPER_PASSWORD`) so setup can ensure the role and database.
 - Port 80 reachable by clients; add 443 when Caddy runs with a hostname.
 
 Docker Compose:
@@ -64,6 +71,32 @@ Docker Compose:
 - A strong `POSTGRES_PASSWORD` (16 or more characters) or an external database
   URL in `DATABASE_URL_DOCKER`.
 - Loopback ports 8300 and 5432 free.
+
+## Secrets and elevation
+
+Secrets never ride the command line. `-AdminPassword`, `-DbPassword`,
+`-PostgresSuperPassword` and `-FracttalSecret` are rejected when passed on
+the CLI, because the value stays visible in process lists and shell history.
+Use the matching environment variable (`ADMIN_PASSWORD`, `DB_PASSWORD`,
+`POSTGRES_SUPER_PASSWORD`, `FRACTTAL_SECRET`) in an already elevated
+PowerShell, or answer the interactive prompt.
+
+`POSTGRES_SUPER_PASSWORD` is read from the environment or prompted. Under
+`-Unattended`, setup fails closed if it is missing.
+
+Setup self-elevates through an encoded child command: the whole invocation
+(script path plus non-secret arguments, single-quoted) is Base64-encoded into
+`-EncodedCommand`, so values survive the UAC hop. Windows UAC builds the
+elevated child's environment from the persisted User/Machine variables and
+does not carry runtime-set process variables across. A non-elevated run with
+secret environment variables visible fails closed before elevation, because
+the parent cannot tell a persisted secret from a runtime-set one. Run Setup
+from an already elevated PowerShell for env-secret workflows. `-Elevated` is
+the internal UAC-child marker; `-NoElevate` never opens UAC and requires an
+already elevated session.
+
+The `.env` writer rejects values containing double quotes or backslashes, so
+generated and prompted secrets stay round-trippable through both readers.
 
 ## Windows native path
 
@@ -88,28 +121,35 @@ and forwards the arguments. `barrier.example.com` is a placeholder, not a real
 hostname. Replace the example range with the office or VPN CIDRs: setup
 refuses to open web ports without `-AllowedLanRanges`. On an unfamiliar host,
 run setup first with `-CheckOnly`: it probes disk, ports, existing services,
-`.env` and network reachability, prints the plan, and changes nothing.
+`.env` and network reachability, prints the plan, and changes nothing. Before
+production, run every step in `deploy/windows/ACCEPTANCE.md`; that checklist
+is unexecuted and must pass on a Windows host first.
 
 A real run does the following:
 
 - Installs pinned Deno 2.9.7 under `C:\tools\deno` and adds it to the machine
   PATH.
 - Installs PostgreSQL 16 on port 5432 when missing (unattended EDB installer,
-  with a winget fallback), and ensures role `barrier` and database `barreiras`.
+  with a winget fallback), and ensures role `barrier` and database `monitor`
+  (legacy `barreiras` via `-DbName barreiras`).
 - Installs NSSM and Caddy when needed.
 - Creates `.env` once from `.env.example` with a generated database password,
   `ADMIN_TOKEN` and, when omitted, an admin password. Existing `.env` files
   are never rotated. The file ACL is restricted to Administrators and SYSTEM.
+  Values containing `"` or `\` are rejected by the `.env` writer.
 - Runs `deno task doctor`, builds `_fresh/server.js`, applies migrations, and
   creates the first admin account.
 - Registers the services, firewall rules, optional Caddy site and the nightly
   backup task, then smoke tests `/api/health` and `/login`.
 
 Generated secrets and any generated Postgres superuser password are printed
-once at the end. Store them before closing the window. Prefer the interactive
-prompt or the documented environment variable over passing a password as a
-command-line argument, because command lines appear in process lists and shell
-history.
+once at the end. Store them before closing the window. Secrets are never passed
+on the command line: set `ADMIN_PASSWORD`, `DB_PASSWORD`,
+`POSTGRES_SUPER_PASSWORD` or `FRACTTAL_SECRET` in an already elevated
+PowerShell, or answer the interactive prompts. Passing `-AdminPassword`,
+`-DbPassword`, `-PostgresSuperPassword` or `-FracttalSecret` aborts setup.
+`POSTGRES_SUPER_PASSWORD` is read from the environment or prompted; under
+`-Unattended` setup fails closed if it is missing. See the Elevation section.
 
 After setup finishes, open the URL in the summary (`https://` hostname in
 domain mode, or the server IP in IP mode), sign in with the admin email and the
@@ -118,23 +158,37 @@ saved password, and run `Test-BarrierHealth.ps1`. Nightly backups start at
 
 Useful parameters:
 
-- `-Hostname <dns>`: automatic HTTPS through Caddy; also opens 443.
+- `-Hostname <dns>`: automatic HTTPS through Caddy; also opens 443. SSO needs
+  an https `APP_BASE_URL`, so SSO requires `-Hostname`. Without it, IP mode
+  is plain HTTP with no SSO.
+- `-ServicePrefix <name>` (default `SeaMonitor`): service name prefix.
+  `-ServicePrefix Barrier` restores the legacy Barrier* layout.
+- `-DbName <name>` (default `monitor`): database name. `-DbName barreiras`
+  restores the legacy database.
+- `-DbUser <name>` (default `barrier`), `-PostgresBinDir <path>` (default
+  `C:\sites\seacrest\.vendor\pgsql18\bin`), `-BackupDir <path>` (default
+  `D:\backups\monitor`), `-AppPort <port>` (default 8300),
+  `-PgPort <port>` (default 5432), `-BindHost <ip>` (default `127.0.0.1`).
 - `-AllowedLanRanges '10.0.0.0/8','192.168.0.0/16'`: scopes Windows Firewall to
   the client network; required before web ports are opened.
-- `-SkipCaddy`: no reverse proxy; the app stays loopback-only.
-- `-SkipCaddy -AllowLanAppPort` with ranges: exposes plain HTTP on 8300.
-  Discouraged; only behind a VPN.
-- `-SkipPostgres`, `-SkipBackup`, `-SkipFirewall`: skip those stages. Record
-  any skipped control as a documented exception.
+- `-SkipPostgres`, `-SkipCaddy`, `-SkipBackup`, `-SkipFirewall`: skip those
+  stages. Record any skipped control as a documented exception.
+- `-SkipCaddy -AllowLanAppPort` with ranges: exposes plain HTTP on the app
+  port. Discouraged; only behind a VPN.
 - `-SourceZip <path>`: install from a local archive. `-RepoUrl` and `-Branch`
   clone from Git when Git is installed.
-- `-Unattended`: skip the typed YES, for scripted re-runs only.
+- `-Unattended`: skip the typed YES, for scripted re-runs only. Fails closed
+  when `POSTGRES_SUPER_PASSWORD` is missing.
+- `-CheckOnly`: probe and print the plan without changing anything.
+- `-Elevated` / `-NoElevate`: internal UAC marker and opt-out. `-NoElevate`
+  never opens UAC and requires an already elevated session.
 
 Without `-Hostname` and with Caddy enabled, setup uses IP mode: users open
 plain HTTP on port 80 and there is no TLS, because automatic certificates need
 a DNS name. Keep that mode on a trusted LAN or VPN. Re-run with `-Hostname`
 later to add HTTPS. Existing `.env` files are preserved, so update
-`APP_BASE_URL` to the https URL when switching modes.
+`APP_BASE_URL` to the https URL when switching modes. SSO is unavailable in IP
+mode because it requires an https `APP_BASE_URL`.
 
 ### Update
 
@@ -158,34 +212,40 @@ unchanged and requires an explicit, documented exception.
 
 ### Services
 
-NSSM registers four auto-start services:
+NSSM registers four auto-start services (default prefix `SeaMonitor`; legacy
+`Barrier*` via `-ServicePrefix Barrier`):
 
-| Service       | Runs                        | Listener                     |
-| ------------- | --------------------------- | ---------------------------- |
-| BarrierApp    | `deno task start`           | 127.0.0.1:8300               |
-| BarrierPoller | `scripts/fracttal-poll.ts`  | outbound HTTPS               |
-| BarrierAlerts | `scripts/alerts-poll.ts`    | outbound HTTPS               |
-| BarrierCaddy  | Caddy with generated config | TCP 80; 443 with `-Hostname` |
+| Service          | Runs                                                | Listener                                     |
+| ---------------- | --------------------------------------------------- | -------------------------------------------- |
+| SeaMonitorApp    | `deno serve ... --host <BindHost> --port <AppPort>` | `<BindHost>:<AppPort>` (loopback by default) |
+| SeaMonitorPoller | `scripts/fracttal-poll.ts`                          | outbound HTTPS                               |
+| SeaMonitorAlerts | `scripts/alerts-poll.ts`                            | outbound HTTPS                               |
+| SeaMonitorCaddy  | Caddy with generated config                         | TCP 80; 443 with `-Hostname`                 |
+
+`Register-Services.ps1` owns the service command line. It sets NSSM stop
+methods and `POOL_SIZE` to 10 for the app, 4 for the poller and 2 for alerts,
+and a shared `DENO_DIR`. The app binds to `-BindHost` (loopback by default);
+only `-SkipCaddy -AllowLanAppPort` with ranges switches it to `0.0.0.0`.
 
 Check status and read logs:
 
 ```powershell
-Get-Service BarrierApp,BarrierPoller,BarrierAlerts,BarrierCaddy
-Get-Content C:\srv\barrier-monitor\logs\BarrierApp-err.log -Tail 50
+Get-Service SeaMonitorApp,SeaMonitorPoller,SeaMonitorAlerts,SeaMonitorCaddy
+Get-Content C:\srv\barrier-monitor\logs\SeaMonitorApp-err.log -Tail 50
 ```
 
-When `.env` has no `FRACTTAL_KEY`, setup disables BarrierPoller because the
+When `.env` has no `FRACTTAL_KEY`, setup disables SeaMonitorPoller because the
 poller exits without upstream credentials. After adding the keys, enable it:
 
 ```powershell
-Set-Service BarrierPoller -StartupType Automatic
-Start-Service BarrierPoller
+Set-Service SeaMonitorPoller -StartupType Automatic
+Start-Service SeaMonitorPoller
 ```
 
 ### Reverse proxy and TLS
 
 Setup generates `C:\srv\barrier-monitor\caddy\Caddyfile` from
-`deploy\windows\Caddyfile` and runs it through the BarrierCaddy service. The
+`deploy\windows\Caddyfile` and runs it through the prefixed Caddy service. The
 generated file is owned by setup; change the template and re-run instead of
 editing it by hand.
 
@@ -210,6 +270,10 @@ backup and recent log errors, writes the same report to
 powershell -ExecutionPolicy Bypass -File .\deploy\windows\Test-BarrierHealth.ps1
 ```
 
+`Test-BarrierHealth.ps1` accepts `-ServicePrefix`, `-AppPort`, `-PgPort`,
+`-PostgresBinDir` and `-DbName` so it can follow a non-default install, and
+exits with a non-zero code when any check fails.
+
 Other checks:
 
 - `deno task doctor`: validates `.env` and boot configuration. Setup runs it
@@ -226,13 +290,15 @@ From another machine, test the public URL, not 8300.
 
 ### Backup and restore
 
-Setup registers the scheduled task `BarrierBackup` to run daily at 02:00 as
+Setup registers the scheduled task `SeaMonitorBackup` to run daily at 02:00 as
 SYSTEM. It calls `deploy\windows\Backup-Database.ps1`, which:
 
 - Reads `DATABASE_URL` from the environment or the repository `.env`.
 - Writes a custom-format dump with `pg_dump -Fc` to
-  `D:\backups\barreiras` by default, named
-  `barreiras-YYYY-MM-DD_HHmm.dump`.
+  `D:\backups\monitor` by default, named
+  `monitor-YYYY-MM-DD_HHmm.dump` (the prefix derives from `-DbName`).
+- Uses `PGPASSWORD` for the child process; the database URL is never passed on
+  the command line.
 - Fails the task when the dump is empty, so a silent backup gap is visible.
 - Deletes dumps older than 14 days; override with `-RetainDays` on a manual
   run.
@@ -241,7 +307,7 @@ Run a backup manually when needed:
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\deploy\windows\Backup-Database.ps1 `
-  -BackupDir D:\backups\barreiras
+  -BackupDir D:\backups\monitor
 ```
 
 There is no restore helper: restore is a manual `pg_restore`. The dump is
@@ -251,30 +317,31 @@ fresh backup before starting.
 ```powershell
 # List the archive contents before restoring.
 & 'C:\Program Files\PostgreSQL\16\bin\pg_restore.exe' `
-  --list 'D:\backups\barreiras\barreiras-YYYY-MM-DD_HHmm.dump'
+  --list 'D:\backups\monitor\monitor-YYYY-MM-DD_HHmm.dump'
 
-Stop-Service BarrierApp,BarrierPoller,BarrierAlerts -Force
+Stop-Service SeaMonitorApp,SeaMonitorPoller,SeaMonitorAlerts -Force
 
 # Prompts for the barrier role password (the one in .env). --clean replaces objects.
 & 'C:\Program Files\PostgreSQL\16\bin\pg_restore.exe' `
-  -U barrier -h localhost -p 5432 -d barreiras --clean --if-exists `
-  'D:\backups\barreiras\barreiras-YYYY-MM-DD_HHmm.dump'
+  -U barrier -h localhost -p 5432 -d monitor --clean --if-exists `
+  'D:\backups\monitor\monitor-YYYY-MM-DD_HHmm.dump'
 
-Start-Service BarrierApp,BarrierAlerts
-if ((Get-Service BarrierPoller).StartType -ne 'Disabled') {
-  Start-Service BarrierPoller
+Start-Service SeaMonitorApp,SeaMonitorAlerts
+if ((Get-Service SeaMonitorPoller).StartType -ne 'Disabled') {
+  Start-Service SeaMonitorPoller
 }
 Invoke-RestMethod http://127.0.0.1:8300/api/ready
 ```
 
 If unsure, restore into a scratch database first and inspect it. Then repeat
-the restore against `barreiras`. Finally run `Test-BarrierHealth.ps1`.
+the restore against `monitor`. Finally run `Test-BarrierHealth.ps1`.
 
 ### Uninstall
 
-`Uninstall-Production.ps1` stops and removes BarrierApp, BarrierPoller,
-BarrierAlerts and BarrierCaddy, removes the Barrier Monitor firewall rules and
-the BarrierBackup task, then exits. Code, database, PostgreSQL, Deno, tools and
+`Uninstall-Production.ps1` stops and removes the prefixed services
+(SeaMonitorApp, SeaMonitorPoller, SeaMonitorAlerts, SeaMonitorCaddy by default),
+removes the monitor firewall rules and
+the SeaMonitorBackup task, then exits. Code, database, PostgreSQL, Deno, tools and
 backup files stay in place, so re-running setup restores the install.
 
 ```powershell
@@ -285,7 +352,7 @@ Opt-in switches are:
 
 - `-RemoveCode` deletes the install directory, including logs.
 - `-RemoveDatabase` takes a final backup, asks for the database name, and drops
-  `barreiras`; it also requires `-PostgresSuperPassword`.
+  the database (default `monitor`); it also requires `-PostgresSuperPassword`.
 
 ## Docker Compose path
 
@@ -383,7 +450,7 @@ docker compose cp db:/tmp/barreiras.dump ./barreiras.dump
 
 docker compose stop app poller alerts
 docker compose cp ./barreiras.dump db:/tmp/barreiras.dump
-docker compose exec db pg_restore -U barrier -d barreiras --clean --if-exists /tmp/barreiras.dump
+docker compose exec db pg_restore -U barrier -d monitor --clean --if-exists /tmp/barreiras.dump
 docker compose start app poller alerts
 ```
 
@@ -414,15 +481,15 @@ update; dump, recreate the volume, and restore with the procedure above.
   `POSTGRES_SUPER_PASSWORD`.
 - **doctor fails**: fix `DATABASE_URL` and `ADMIN_TOKEN` in `.env`, then run
   `deno task doctor` again. Setup fails hard on doctor errors.
-- **BarrierApp is stopped**: check `logs\BarrierApp-err.log`, confirm port 8300
+- **SeaMonitorApp is stopped**: check `logs\SeaMonitorApp-err.log`, confirm port 8300
   is free, and confirm `.env` is readable by the service account. Re-run setup
   to re-register services.
 - **Dashboard loads but data fails**: call `/api/ready`. A 503 points at the
   database or boot configuration, not at the frontend.
 - **No certificate for the hostname**: confirm the DNS A record, that clients
   and the ACME challenge can reach ports 80 and 443, and check
-  `logs\BarrierCaddy-err.log`. Caddy retries automatically after DNS is fixed.
-- **BarrierPoller is disabled or restarting**: `.env` has no upstream
+  `logs\SeaMonitorCaddy-err.log`. Caddy retries automatically after DNS is fixed.
+- **SeaMonitorPoller is disabled or restarting**: `.env` has no upstream
   credentials. Add them, then set the service back to Automatic and start it.
 - **Alerts do not send**: delivery uses the alert provider API, not a local
   mail server. Add the provider token; without it the loop only detects and
@@ -443,6 +510,7 @@ update; dump, recreate the volume, and restore with the procedure above.
 
 ## See also
 
+- [Windows acceptance checklist (unexecuted)](../deploy/windows/ACCEPTANCE.md)
 - [Port map](./PORT-MAP.md)
 - [Architecture](./ARCHITECTURE.md)
 - [Database](./DATABASE.md)

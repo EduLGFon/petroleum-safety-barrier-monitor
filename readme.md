@@ -99,8 +99,15 @@ also defines the Fracttal poller and alert-loop services. Use
 
 The supported Windows path is Windows Server 2022/2025 with Deno, PostgreSQL,
 NSSM, and Caddy, installed through [deploy/windows/Setup.cmd](deploy/windows/Setup.cmd).
-See [docs/DEPLOY-WINDOWS.md](docs/DEPLOY-WINDOWS.md) for prerequisites,
-`.env` values, and the idempotent upgrade flow.
+Defaults target the APP10 topology: SeaMonitor* services, database `monitor`,
+role `barrier`, PostgreSQL 18 binaries at `C:\sites\seacrest\.vendor\pgsql18\bin`,
+backups under `D:\backups\monitor`, app on port 8300 bound to loopback (legacy
+Barrier* via `-ServicePrefix Barrier` and `-DbName barreiras`). Secrets are
+never passed on the command line; use env vars in an elevated shell or the
+prompt. Setup self-elevates. Before production, run the unexecuted checklist in
+[deploy/windows/ACCEPTANCE.md](deploy/windows/ACCEPTANCE.md). See
+[docs/DEPLOY-WINDOWS.md](docs/DEPLOY-WINDOWS.md) for prerequisites, `.env`
+values, and the idempotent upgrade flow.
 
 ### Standalone build
 
