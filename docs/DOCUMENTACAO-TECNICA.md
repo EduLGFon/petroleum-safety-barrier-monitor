@@ -1842,7 +1842,7 @@ As guardas abaixo são parte do contrato de segurança, integridade ou compatibi
 
 As divergências abaixo foram verificadas no código desta revisão. Quando a documentação e o código discordam, o comportamento descrito é o do código.
 
-Os rótulos DV1 a DV15 identificam divergências deste documento e não são decisões de `DECISIONS.md`, cujos ids são D01 e D20 a D36.
+Os rótulos DV1 a DV15 identificam divergências deste documento e não são decisões de `DECISIONS.md`, cujos ids são D01 e D20 a D37.
 
 #### DV1. Contagem de `OWNABLE_FIELD_KEYS`: 24, não 25
 

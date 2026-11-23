@@ -122,3 +122,7 @@ only the decisive event is stored, so competing work orders cannot be reconstruc
 ## D37
 
 Sync, alert, and auth policy alignment from the 2026-11 audit and deferred follow-ups. Fracttal sync stays read-only with host allow-list and adaptive backoff; station alias and mobile test-unit split remain the only normalization rules. Alert audience derives from active users and access groups filtered per station at delivery, with `alert_recipients` as the legacy manual list. Auth keeps lowercase emails, PBKDF2-SHA256 210k iterations, opaque 12h sessions stored as SHA-256, and forced-change gating; Entra binds by email first then object id with no JIT creation. No local SMTP; delivery is the provider's job. These policies are compatibility-sensitive and are added to, not removed from.
+
+## D38
+
+Follow-up hardening from the 2026-11 audit keeps behavior fail-closed. Fracttal catalog creation is capped at 500 new labels per sync run with a truncation warning instead of an unbounded insert burst. List helpers accept optional `limit`/`offset` while keeping the no-arg call unchanged. Error classification is typed (`ValidationError` to 400, SQLSTATE 23505 to controlled duplicate messages) with no message-text matching anywhere in routes or SQL stores. Export ceilings stay enforced at every layer: route, selection parser, and browser client.
