@@ -915,7 +915,7 @@ if (-not $SkipFirewall) {
     $webPorts = @('80')
     if ($Hostname) { $webPorts += '443' }
     foreach ($port in $webPorts) {
-      $rule = "Barrier Monitor web ($port)"
+      $rule = "SeaMonitor web ($port)"
       if (-not (Get-NetFirewallRule -DisplayName $rule -ErrorAction SilentlyContinue)) {
         New-NetFirewallRule -DisplayName $rule -Direction Inbound -Protocol TCP -LocalPort $port -Action Allow @fwScope | Out-Null
       } else {
@@ -928,7 +928,7 @@ if (-not $SkipFirewall) {
     if ($AllowedLanRanges.Count -eq 0) {
       Write-Need 'refusing to open the app port to the whole network: pass -AllowedLanRanges to scope it (TLS-less port) or leave it loopback-only.'
     }
-    $rule = "Barrier Monitor app ($AppPort)"
+    $rule = "SeaMonitor app ($AppPort)"
     if (-not (Get-NetFirewallRule -DisplayName $rule -ErrorAction SilentlyContinue)) {
       New-NetFirewallRule -DisplayName $rule -Direction Inbound -Protocol TCP -LocalPort $AppPort -Action Allow @fwScope | Out-Null
     } else {

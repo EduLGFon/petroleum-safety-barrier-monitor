@@ -116,6 +116,7 @@ function Register-NssmService([string]$Name, [string]$ServiceArgs, [string]$Desc
   & $NssmExe set $Name AppStopMethodWindow 5000 | Out-Null
   & $NssmExe set $Name AppStopMethodThreads $StopGraceMs | Out-Null
   & $NssmExe set $Name AppStopMethodSkip 2 | Out-Null
+  & $NssmExe set $Name AppKillProcessDelay $StopGraceMs | Out-Null
   $envLines = @("POOL_SIZE=$PoolSize", "DENO_DIR=$denoDir")
   & $NssmExe set $Name AppEnvironmentExtra ($envLines -join "`r`n") | Out-Null
   & $NssmExe start $Name | Out-Null
