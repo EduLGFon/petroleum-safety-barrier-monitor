@@ -38,14 +38,14 @@ function push(name: string, status: Status, detail: string): void {
 // parseEnvFile: minimal .env parser (KEY=VALUE, # comments, quotes stripped).
 // PowerShell has no `export $(grep ...)` equivalent, so this file is the
 // cross-platform reader the docs point at instead of shell one-liners.
-// Writer symmetry: deploy/windows/Setup-Production.ps1 quotes values with
-// whitespace/# /quotes and escapes `\`->`\\`, `"`->`\"`; this reader strips
-// the outer double quotes and unescapes `\\`/`\"` symmetrically, so a writer
-// round-trip is exact. Known asymmetry (documented, not fixed): Deno's
-// `--env-file` loader strips the outer quotes but keeps `\` and `\"`
-// literally, so a quoted value containing `\` or `"` reads differently at
-// runtime (Deno) than here (doctor). Generated secrets avoid both characters;
-// verify a quoted COMPANY_NAME carrying `\`/`"` in both readers.
+// Writer symmetry: deploy/windows/Setup-Production.ps1 never emits escapes -
+// it fails closed on values containing `"` or `\` and wraps values holding
+// whitespace, `#` or `'` in PLAIN double quotes. This reader strips the outer
+// double/single quotes (still unescaping the legacy `\\`/`\"` form, which
+// only .env files written by older setups carry), so every value the current
+// writer accepts round-trips exactly here AND under Deno's `--env-file`
+// loader, which strips the outer quotes but keeps the content literal: with
+// no escapes in the file, both readers agree.
 export function parseEnvFile(text: string): Record<string, string> {
   const out: Record<string, string> = {};
   for (const raw of text.split(/\r?\n/)) {
@@ -56,9 +56,10 @@ export function parseEnvFile(text: string): Record<string, string> {
     const key = line.slice(0, eq).trim();
     let val = line.slice(eq + 1).trim();
     if (val.length >= 2 && val.startsWith('"') && val.endsWith('"')) {
-      // Double-quoted: written by deploy/windows/Setup-Production.ps1, which
-      // escapes \ and " inside the quotes; unescape symmetrically here so a
-      // value like "A \"B\" C" round-trips.
+      // Double-quoted. The current writer (Setup-Production.ps1) puts no
+      // escapes inside, so plain stripping round-trips it; the `\\`/`\"`
+      // unescape below only matters for .env files written by older setups
+      // (current files carry none, and both readers then agree).
       val = val.slice(1, -1).replace(/\\(["\\])/g, "$1");
     } else if (val.length >= 2 && val.startsWith("'") && val.endsWith("'")) {
       val = val.slice(1, -1);

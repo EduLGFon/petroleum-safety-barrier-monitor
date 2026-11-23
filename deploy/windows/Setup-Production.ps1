@@ -4,8 +4,10 @@
 # non-secret arguments, each single-quoted) into a -EncodedCommand payload.
 # The Base64 alphabet has no spaces, quotes, $ or backticks, so Start-Process
 # receives one pre-quoted string and values survive the UAC hop. Windows UAC
-# does not inherit process environment variables, so secret env vars fail
-# closed before elevation. Setup.cmd forwards arguments untouched with
+# builds the elevated child's environment from the persisted User/Machine
+# variables and does NOT carry runtime-set process variables across, so a
+# secret visible in a non-elevated session's process env fails closed before
+# elevation. Setup.cmd forwards arguments untouched with
 # `powershell -File ... %*` (raw cmd forwarding, not a PowerShell array).
 <#
 .SYNOPSIS
@@ -40,16 +42,20 @@
   POSTGRES_SUPER_PASSWORD / FRACTTAL_SECRET in an already elevated PowerShell
   or answer the interactive prompts. Passing -AdminPassword / -DbPassword /
   -PostgresSuperPassword / -FracttalSecret on the command line aborts.
-  Self-elevation refuses to start when a secret env var is set in a
-  non-elevated session, because UAC cannot carry it to the child: run Setup
-  from an already elevated PowerShell in that case. -Elevated is internal to
+  Self-elevation refuses to start when a secret env var is visible in a
+  non-elevated session: UAC does not carry runtime-set process variables to
+  the child (persisted User/Machine variables do, but the parent cannot tell
+  them apart, so any visible secret aborts). Run Setup from an already
+  elevated PowerShell in that case. -Elevated is internal to
   the self-elevation hop and keeps the child from elevating again; -NoElevate
   never opens UAC and requires an already elevated session.
   Defaults target the APP10 production topology (SeaMonitor* services,
   database monitor, vendor PostgreSQL 18); every default is overridable, and
   passing -ServicePrefix Barrier restores the legacy Barrier* layout.
-  The app binds 127.0.0.1 by default; only -SkipCaddy -AllowLanAppPort (with
-  -AllowedLanRanges) switches it to 0.0.0.0 for scoped LAN plain HTTP.
+  The app binds 127.0.0.1 by default; the bind is enforced by
+  Register-Services.ps1 through the -BindHost value this setup passes (the
+  helper owns the service command line). Only -SkipCaddy -AllowLanAppPort
+  (with -AllowedLanRanges) switches it to 0.0.0.0 for scoped LAN plain HTTP.
 #>
 param(
   [string]$InstallDir = 'C:\srv\barrier-monitor',
@@ -123,14 +129,17 @@ function ConvertTo-SingleQuotedLiteral([string]$value) {
 # quotes/$/backticks breaks the same way. The Base64 alphabet contains no
 # spaces, quotes, $ or backticks, so the single -ArgumentList string is safe.
 #
-# Windows UAC does not pass process environment variables from a non-elevated
-# parent to the elevated child. Secret env vars are therefore never relied on
-# across the hop: if any is set here, fail closed before the child can start
-# with null secrets. The operator either runs Setup from an already elevated
-# PowerShell (env vars stay in-process) or clears them and lets the elevated
-# child prompt/generate. Non-secret arguments travel inside the encoded
-# command; no environment variable or temp file carries setup state across
-# the hop.
+# Windows UAC builds the elevated child's environment fresh from the
+# persisted User/Machine registry variables; runtime-set process variables
+# ($env:X in this session) do NOT cross the hop. The parent cannot tell a
+# persisted secret from a runtime-set one - both appear in its process env -
+# so any secret visible here fails closed before the child can start with
+# null secrets. Remedies: run Setup from an already elevated PowerShell
+# (persisted or runtime-set variables stay in-process and are read there),
+# persist the secret at User or Machine scope and start an elevated session,
+# or clear it and let the elevated child prompt/generate. Non-secret
+# arguments travel inside the encoded command; no environment variable or
+# temp file carries setup state across the hop.
 #
 # -Elevated marks the UAC child so it never elevates again (no loop).
 # -NoElevate is the operator opt-out for automation: it never opens UAC and
@@ -146,7 +155,7 @@ if (($Elevated -or $NoElevate) -and -not $isElevated) {
 if (-not $Elevated -and -not $NoElevate -and -not $isElevated) {
   $secretEnvSet = @($secretEnvByName.Values | Where-Object { -not [string]::IsNullOrEmpty([Environment]::GetEnvironmentVariable($_)) })
   if ($secretEnvSet.Count -gt 0) {
-    throw "SETUP ABORTED: secret environment variables are set in this non-elevated session ($($secretEnvSet -join ', ')), but Windows UAC does not pass process environment variables to the elevated child, so the values would be lost. Run Setup from an already elevated PowerShell (where the variables stay in-process and are read), persist POSTGRES_SUPER_PASSWORD at User or Machine scope and start an elevated session, or clear them and re-run to use the interactive prompts/generated secrets."
+    throw "SETUP ABORTED: secret environment variables are visible in this non-elevated session ($($secretEnvSet -join ', ')), and Windows UAC does not carry runtime-set process variables to the elevated child (persisted User/Machine variables do, but the parent cannot tell them apart). Run Setup from an already elevated PowerShell (where the variables stay in-process and are read), persist POSTGRES_SUPER_PASSWORD at User or Machine scope and start an elevated session, or clear them and re-run to use the interactive prompts/generated secrets."
   }
   if ([string]::IsNullOrWhiteSpace($PSCommandPath) -or -not (Test-Path -LiteralPath $PSCommandPath -PathType Leaf)) {
     throw "SETUP ABORTED: cannot resolve this setup script path ('$PSCommandPath') for the UAC child."
@@ -251,19 +260,27 @@ function Write-AllTextNoBom([string]$path, [string]$text) {
   [System.IO.File]::WriteAllText($path, $text, $utf8)
 }
 
-function Format-DotEnvValue([string]$value) {
-  # Quote values containing whitespace, # or quotes so `KEY=value with space`
-  # and `KEY=abc#def` survive a round trip (an unquoted # starts a comment for
-  # most .env readers). Double quotes with \ and " escaped; scripts/doctor.ts
-  # strips and unescapes them symmetrically. Known asymmetry (documented, not
-  # fixed): Deno's `--env-file` loader strips the outer quotes but keeps `\`
-  # and `\"` literally, while doctor.ts unescapes `\\`->`\` and `\"`->`"`, so
-  # a value containing `\` or `"` reads differently at runtime vs in doctor.
-  # Generated secrets avoid both characters and COMPANY_NAME rarely needs
-  # them; a quoted COMPANY_NAME with `\`/`"` must be verified in both readers.
-  if ($value -eq '' -or $value -match '[\s#"''"]' -or $value -match '^\s' -or $value -match '\s$') {
-    $esc = ($value -replace '\\', '\\') -replace '"', '\"'
-    return '"' + $esc + '"'
+function Format-DotEnvValue([string]$value, [string]$key = 'value') {
+  # Writer contract: NEVER emit backslash or double-quote escapes. Deno's
+  # `--env-file` loader strips the outer quotes but keeps `\` and `\"` inside
+  # the content literal, so an escaped value would read differently at runtime
+  # than in scripts/doctor.ts (which unescapes). The accepted subset instead:
+  #   - values containing `"` or `\` fail closed here (generated secrets and
+  #     the generated DATABASE_URL never contain them; an operator value must
+  #     be given without those characters);
+  #   - values holding whitespace, `#` or `'` are wrapped in PLAIN double
+  #     quotes: an unquoted # starts a comment for most .env readers, quoting
+  #     preserves leading/trailing spaces, and `'` is included because a bare
+  #     `'single'`-shaped value would lose its quotes when both readers strip
+  #     surrounding quotes;
+  #   - everything else is written bare.
+  # With no escapes in the file, the writer, Deno --env-file and doctor.ts
+  # parseEnvFile agree on every accepted value (accepted-subset round trip).
+  if ($value -match '["\\]') {
+    throw "SETUP ABORTED: value for $key contains a double quote or backslash; those characters cannot be written to .env without escapes and would read differently under Deno --env-file than in doctor.ts. Pass a value without either character."
+  }
+  if ($value -eq '' -or $value -match '[\s#'']') {
+    return '"' + $value + '"'
   }
   return $value
 }
@@ -282,9 +299,9 @@ function Set-DotEnvKey([string]$file, [string]$key, [string]$value) {
   $pattern = "^(#\s*)?" + [regex]::Escape($key) + '\s*=.*$'
   $done = $false
   $lines = $lines | ForEach-Object {
-    if (-not $done -and $_ -match $pattern) { $done = $true; "$key=$(Format-DotEnvValue $value)" } else { $_ }
+    if (-not $done -and $_ -match $pattern) { $done = $true; "$key=$(Format-DotEnvValue $value $key)" } else { $_ }
   }
-  if (-not $done) { $lines += "$key=$(Format-DotEnvValue $value)" }
+  if (-not $done) { $lines += "$key=$(Format-DotEnvValue $value $key)" }
   # BOM-free rewrite (see Write-AllTextNoBom): PS 5.1 Set-Content -Encoding
   # UTF8 would stamp a BOM on .env.
   Write-AllTextNoBom $file (($lines -join "`r`n") + "`r`n")
@@ -316,7 +333,10 @@ $svcAlerts = "${ServicePrefix}Alerts"
 $svcCaddy = "${ServicePrefix}Caddy"
 # The app binds loopback by default. Only the LAN plain-HTTP mode (no Caddy,
 # app port intentionally opened) binds all interfaces; Caddy always proxies to
-# 127.0.0.1. The service args, firewall rule and smoke test must agree.
+# 127.0.0.1. The bind itself is not set here: Register-Services.ps1 owns the
+# service command line and enforces it via the -BindHost value passed in
+# section 7, so the helper-support gate below is what keeps this choice true.
+# Service args, firewall rule and smoke test must agree.
 $appBindHost = '127.0.0.1'
 if ($SkipCaddy -and $AllowLanAppPort) { $appBindHost = '0.0.0.0' }
 # Ports travel as strings from the CLI; reject non-numeric/out-of-range early
@@ -332,7 +352,8 @@ foreach ($pair in @(@('PgPort', $PgPort), @('AppPort', $AppPort))) {
 }
 function Read-HiddenValue([string]$prompt) {
   # SecureString prompt for secrets that must be reachable in the elevated
-  # child: UAC cannot carry env vars there, so prompting is the safe fallback.
+  # child: UAC does not carry runtime-set process variables there (persisted
+  # User/Machine ones do), so prompting is the safe fallback.
   $sec = Read-Host -AsSecureString $prompt
   if ($sec -and $sec.Length -gt 0) {
     $ptr = [Runtime.InteropServices.Marshal]::SecureStringToBSTR($sec)
@@ -413,7 +434,9 @@ if (-not (Test-Path (Join-Path $PostgresBinDir 'pg_ctl.exe'))) {
 # Installing a second stack next to APP10's SeaMonitor* services (or a second
 # Postgres cluster, or grabbing a port this run needs) is always a mistake, so
 # the setup refuses instead of creating it. Re-run with the matching
-# -ServicePrefix / -PostgresBinDir to update the existing install.
+# -ServicePrefix / -PostgresBinDir to update the existing install. -SkipPostgres
+# does no Postgres work (it never installs or initializes a cluster), so the
+# second-Postgres guard does not fire under it; see the conflict loop below.
 function Test-ListenPort([int]$p) {
   try { $null -ne (Get-NetTCPConnection -LocalPort $p -State Listen -ErrorAction Stop) }
   catch { $false }
@@ -453,7 +476,15 @@ $portConflicts = @()
 if ($samePrefixServices.Count -eq 0) { $portConflicts = $occupiedPorts }
 $conflicts = @()
 foreach ($s in $foreignServices) { $conflicts += "service $s exists with a different prefix (this run would install ${ServicePrefix}* alongside it; re-run with the matching -ServicePrefix to update it instead)" }
-foreach ($b in $otherPgBins) { $conflicts += "PostgreSQL binaries found at $b outside the selected -PostgresBinDir $PostgresBinDir (re-run with the matching -PostgresBinDir, or -SkipPostgres)" }
+# Second-Postgres guard honors -SkipPostgres, matching its remedy message:
+# that switch performs no Postgres work (no install, no initdb; it only
+# reuses the cluster selected via -PostgresBinDir), so binaries elsewhere
+# cannot become a parallel instance this run creates. Without the switch the
+# conflict stands and both remedies are exact (matching -PostgresBinDir, or
+# -SkipPostgres to skip all Postgres work).
+if (-not $SkipPostgres) {
+  foreach ($b in $otherPgBins) { $conflicts += "PostgreSQL binaries found at $b outside the selected -PostgresBinDir $PostgresBinDir (re-run with the matching -PostgresBinDir, or -SkipPostgres)" }
+}
 foreach ($p in $portConflicts) { $conflicts += "port $p is already listening and no ${ServicePrefix}* service is installed, so it would not be updated by this run (free the port or re-run with the matching -ServicePrefix)" }
 
 # ── 0d. Readiness report: say what WOULD happen, change nothing ─────
@@ -495,7 +526,8 @@ if ($CheckOnly) {
   foreach ($b in $knownPgBins) {
     if (Test-Path (Join-Path $b 'pg_ctl.exe')) {
       if ($b -eq $PostgresBinDir) { Write-Host "INFO postgres: binaries at $b (selected via -PostgresBinDir)." }
-      else { Write-Host "WARN postgres: another install at $b (a real run ABORTS; pass -PostgresBinDir to select it)." -ForegroundColor Yellow }
+      elseif ($SkipPostgres) { Write-Host "INFO postgres: another install at $b (left untouched: -SkipPostgres does no Postgres work)." }
+      else { Write-Host "WARN postgres: another install at $b (a real run ABORTS; pass -PostgresBinDir to select it, or -SkipPostgres)." -ForegroundColor Yellow }
     }
   }
   if ($conflicts.Count -gt 0) {
@@ -517,12 +549,12 @@ if ($CheckOnly) {
   Write-Host "  install Deno $DenoVersion to $ToolsDir\deno (machine PATH)"
   Write-Host "  reuse PostgreSQL at $PostgresBinDir on port $PgPort (fresh host: EDB install to $pg16Bin); ensure role $DbUser + db $DbName"
   Write-Host "  migrate the database first, then run the doctor gate (fresh DBs pass)"
-  Write-Host "  register services $svcApp/$svcPoller/$svcAlerts$(if (-not $SkipCaddy) { "/$svcCaddy (port 80)" } else { ' (no proxy)' }); app binds ${appBindHost}:${AppPort}"
+  Write-Host "  register services $svcApp/$svcPoller/$svcAlerts$(if (-not $SkipCaddy) { "/$svcCaddy (port 80)" } else { ' (no proxy)' }); helper binds app ${appBindHost}:${AppPort} via -BindHost"
   Write-Host "  firewall: TCP $(if ($Hostname -or -not $SkipCaddy) { '80+443' } else { 'unchanged' })$(if ($AllowedLanRanges.Count) { " scoped to $($AllowedLanRanges -join ', ')" } else { ' (whole network: pass -AllowedLanRanges to scope)' })"
   Write-Host "  validate the generated Caddyfile (caddy validate) when Caddy is enabled"
   Write-Host "  nightly backup task BarrierBackup at 02:00 -> $BackupDir (db $DbName, pg tools $PostgresBinDir)"
   Write-Host "  smoke loopback :$AppPort, plus https://$Hostname when -Hostname is set"
-  Write-Host "  users would open: $(if ($Hostname) { "https://$Hostname" } else { "http://$ServerIp" })"
+  Write-Host "  users would open: $(if ($Hostname) { "https://$Hostname" } elseif (-not $SkipCaddy) { "http://$ServerIp via $svcCaddy (plain HTTP)" } elseif ($appBindHost -eq '0.0.0.0') { "http://${ServerIp}:${AppPort} (LAN plain HTTP)" } else { 'nothing LAN-facing: app stays loopback-only (helper -BindHost 127.0.0.1)' })"
   Write-Host 'Re-run without -CheckOnly to do it. Nothing was changed.'
   return
 }
@@ -531,7 +563,7 @@ if ($conflicts.Count -gt 0) {
 }
 if (-not $Unattended) {
   Write-Host ''
-  Write-Host "About to install Barrier Monitor into $InstallDir (${ServicePrefix}* services, Postgres $PostgresBinDir role $DbUser/db $DbName, app ${appBindHost}:${AppPort}, proxy port 80)."
+  Write-Host "About to install Barrier Monitor into $InstallDir (${ServicePrefix}* services, Postgres $PostgresBinDir role $DbUser/db $DbName, app ${appBindHost}:${AppPort} bound via helper -BindHost, proxy port 80)."
   $answer = Read-Host 'Type YES in capitals to continue, anything else aborts (nothing changes until then)'
   if ($answer -cne 'YES') { Write-Host 'aborted by operator; nothing was changed.'; return }
 }
@@ -570,9 +602,10 @@ $env:Path = "$denoDir;" + $env:Path
 # ── 2. PostgreSQL (vendor PG18 when present, EDB PG16 fallback) ───
 $pgCtl = Join-Path $PostgresBinDir 'pg_ctl.exe'
 if ((Test-Path $pgCtl) -and [string]::IsNullOrWhiteSpace($PostgresSuperPassword)) {
-  # Reusing an existing cluster needs its superuser now. The non-elevated
-  # parent's process env var cannot cross the UAC hop, so prompt securely in
-  # this elevated console; a fresh install below generates its own password.
+  # Reusing an existing cluster needs its superuser now. A non-elevated
+  # parent's runtime-set env var cannot cross the UAC hop (persisted
+  # User/Machine ones can), so prompt securely in this elevated console; a
+  # fresh install below generates its own password.
   if (-not $Unattended) {
     try {
       $PostgresSuperPassword = Read-HiddenValue 'Postgres superuser password (input hidden; set POSTGRES_SUPER_PASSWORD at User or Machine scope and start an elevated session to skip)'
@@ -702,7 +735,7 @@ if ($caddyWanted -and -not (Test-Path $caddyExe)) {
   Expand-Archive -Path $zip -DestinationPath (Split-Path $caddyExe) -Force
   Remove-Item $zip -Force -ErrorAction SilentlyContinue
 }
-if (-not $caddyWanted) { Write-Host 'Caddy skipped per -SkipCaddy: port 80 stays closed; app answers on loopback only.' }
+if (-not $caddyWanted) { Write-Host "Caddy skipped per -SkipCaddy: port 80 stays closed; the helper binds the app to ${appBindHost} via -BindHost." }
 
 # ── 5. .env (created once, never rotated on re-run) ─────────────────
 Write-Step 'Ensuring .env (created once; existing files are never overwritten)'
@@ -795,11 +828,12 @@ if (-not $regSupportsPrefix) {
   Write-Need "Register-Services.ps1 in this checkout does not declare -ServicePrefix, so it cannot register ${ServicePrefix}* services. Update the checkout to the revision that supports -ServicePrefix and re-run."
 }
 if (-not $regSupportsBindHost) {
-  Write-Need "Register-Services.ps1 in this checkout does not declare -BindHost, so the app listener would be left to its default (127.0.0.1 in current revisions). Update the checkout to the revision that supports -BindHost and re-run."
+  Write-Need "Register-Services.ps1 in this checkout does not declare -BindHost, so the helper cannot enforce the selected listener (loopback 127.0.0.1 by default; 0.0.0.0 only for -SkipCaddy -AllowLanAppPort): its own default would win and the loopback/LAN posture could not be guaranteed. Update the checkout to the revision that supports -BindHost and re-run."
 }
-# Pass the listener and port explicitly: the NSSM app command, Caddy proxy,
-# firewall rule and smoke test must all agree. BindHost is loopback by default
-# and 0.0.0.0 only for the scoped LAN plain-HTTP mode computed at the top.
+# Pass the listener and port explicitly: Register-Services.ps1 owns the NSSM
+# app command and enforces the bind via -BindHost; the Caddy proxy, firewall
+# rule and smoke test must agree with it. BindHost is loopback by default and
+# 0.0.0.0 only for the scoped LAN plain-HTTP mode computed at the top.
 $regArgs = @{ InstallDir = $InstallDir; NssmExe = $nssmExe; DenoExe = $denoExe; AppPort = $AppPort; BindHost = $appBindHost; ServicePrefix = $ServicePrefix }
 & "$deployDir\Register-Services.ps1" @regArgs
 $hasFracttal = $false
@@ -889,7 +923,7 @@ if (-not $SkipFirewall) {
         Set-NetFirewallRule -DisplayName $rule -RemoteAddress ($AllowedLanRanges -join ',') | Out-Null
       }
     }
-    Write-Host "inbound TCP $($webPorts -join '+') open, scoped to $($AllowedLanRanges -join ', '); app port stays loopback-only."
+    Write-Host "inbound TCP $($webPorts -join '+') open, scoped to $($AllowedLanRanges -join ', '); app port stays loopback-only (helper -BindHost $appBindHost)."
   } elseif ($AllowLanAppPort) {
     if ($AllowedLanRanges.Count -eq 0) {
       Write-Need 'refusing to open the app port to the whole network: pass -AllowedLanRanges to scope it (TLS-less port) or leave it loopback-only.'
@@ -902,7 +936,7 @@ if (-not $SkipFirewall) {
     }
     Write-Warning "TCP $AppPort is open to $($AllowedLanRanges -join ', ') without TLS: acceptable only behind VPN; prefer -Hostname with Caddy."
   } else {
-    Write-Host 'no inbound rules created: app reachable from this host only until a proxy is added.'
+    Write-Host "no inbound rules created: the helper binds the app to ${appBindHost} via -BindHost, so it stays reachable from this host only until a proxy is added."
   }
 } else {
   Write-Host 'firewall skipped per -SkipFirewall.'
@@ -960,8 +994,8 @@ OS: $os
 Code: $InstallDir (branch $Branch)
 Deno: $(& $denoExe --version | Select-Object -First 1)
 DB: ${DbUser}@localhost:${PgPort}/${DbName}
-App: http://127.0.0.1:$AppPort (service $svcApp, binds ${appBindHost})
-Public: $(if ($Hostname) { "https://$Hostname (service $svcCaddy)" } elseif ($caddyWanted) { "http://$ServerIp via $svcCaddy (plain HTTP: trusted LAN/VPN only)" } else { 'loopback-only (no proxy installed)' })
+App: http://127.0.0.1:$AppPort (service $svcApp, binds ${appBindHost} via Register-Services -BindHost)
+Public: $(if ($Hostname) { "https://$Hostname (service $svcCaddy)" } elseif ($caddyWanted) { "http://$ServerIp via $svcCaddy (plain HTTP: trusted LAN/VPN only)" } else { "app on ${appBindHost}:${AppPort} (no proxy installed; helper -BindHost)" })
 Backup task: BarrierBackup daily 02:00 -> $BackupDir (db $DbName)
 Logs: $InstallDir\logs
 "@

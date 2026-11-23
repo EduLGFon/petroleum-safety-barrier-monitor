@@ -7,8 +7,10 @@ REM with `powershell -File ... %*` (raw cmd forwarding, no -Command string
 REM splicing): spaces, quotes, $ and backticks in values survive intact.
 REM Setup-Production.ps1 self-elevates for the UAC prompt by encoding the
 REM whole child invocation (script path + non-secret arguments) in
-REM -EncodedCommand, so run or double-click this file from any shell. Secret
-REM env vars do not cross that UAC hop: set them in an elevated shell instead.
+REM -EncodedCommand, so run or double-click this file from any shell. Env vars
+REM set at runtime do not cross that UAC hop (persisted User/Machine ones do):
+REM set secrets in an elevated shell, persist them at User or Machine scope,
+REM or answer the prompts in the elevated window.
 REM In an already elevated shell, -NoElevate skips the UAC hop entirely.
 REM Limitation: cmd still expands %VAR% inside %* (Disable-DelayedExpansion
 REM only protects !), so a value containing % must invoke Setup-Production.ps1
