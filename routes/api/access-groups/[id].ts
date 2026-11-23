@@ -28,6 +28,8 @@ import {
 
 import {
   parseIdParam,
+  POSTGRES_UNIQUE_VIOLATION,
+  postgresErrorInfo,
   readJsonBodyCapped,
 } from "../../../lib/server/validation.ts";
 
@@ -36,6 +38,17 @@ import { loadServerConfig } from "../../../lib/server/config.ts";
 import { define } from "../../../utils.ts";
 
 import { denyIfCrossSite } from "../../../lib/server/csrf.ts";
+
+// duplicateMessage: a unique violation reported by the driver, mapped to a
+// controlled message. The SQLSTATE and the constraint name decide - never the
+// error text, so driver wording can never leak into a response.
+export function duplicateMessage(err: unknown): string | undefined {
+  const info = postgresErrorInfo(err);
+  if (info.code !== POSTGRES_UNIQUE_VIOLATION) return undefined;
+  return info.constraint === "access_groups_name_key"
+    ? "group name already exists"
+    : "duplicate value";
+}
 
 export const handler = define.handlers({
   async GET(ctx) {
@@ -177,9 +190,9 @@ export const handler = define.handlers({
       if (!updated) return notFound("Group not found", requestId);
       return ok(updated, requestId);
     } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
-      if (message.includes("unique") || message.includes("duplicate")) {
-        return badRequest("group name already exists", requestId);
+      const duplicate = duplicateMessage(err);
+      if (duplicate !== undefined) {
+        return badRequest(duplicate, requestId);
       }
       return internal(
         "PATCH /api/access-groups/:id",
