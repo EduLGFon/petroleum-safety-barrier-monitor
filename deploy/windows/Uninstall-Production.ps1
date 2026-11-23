@@ -90,8 +90,8 @@ foreach ($s in @($svcApp, $svcPoller, $svcAlerts, $svcCaddy)) {
 # Setup-Production.ps1 keeps the 'Barrier Monitor ...' display names on
 # purpose, so remove them for every prefix. A future prefixed rename is
 # covered by the second pattern without touching unrelated rules.
-$fwPatterns = @('Barrier Monitor*')
-if ($ServicePrefix -ne 'Barrier') { $fwPatterns += "${ServicePrefix} Monitor*" }
+$fwPatterns = @('Barrier Monitor*', 'SeaMonitor*')
+if ($ServicePrefix -ne 'Barrier' -and $ServicePrefix -ne 'SeaMonitor') { $fwPatterns += "${ServicePrefix}*" }
 $removedRules = 0
 foreach ($pattern in $fwPatterns) {
   $rules = @(Get-NetFirewallRule -DisplayName $pattern -ErrorAction SilentlyContinue)

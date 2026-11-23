@@ -90,7 +90,10 @@ function Resolve-PgTool([string]$ExeName, [string]$BinDir) {
     if (Test-Path $candidate) { return $candidate }
   }
   $command = Get-Command $ExeName -ErrorAction SilentlyContinue
-  if ($command) { return $command.Source }
+  if ($command) {
+    Write-Warning "$ExeName.exe not found under -PostgresBinDir '$BinDir'; falling back to PATH ($($command.Source))."
+    return $command.Source
+  }
   throw "$ExeName.exe not found under -PostgresBinDir '$BinDir' or PATH. Pass -PostgresBinDir with the PostgreSQL bin directory."
 }
 
