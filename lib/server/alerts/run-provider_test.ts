@@ -319,3 +319,200 @@ Deno.test("provider cycle accepts an event with no station audience once", async
   assertStrictEquals(store.accepted[0], 10);
   assertStrictEquals(logs.some((line) => line.includes("no audience")), true);
 });
+
+Deno.test("provider cycle first run with null watermark uses runStart for detect", async () => {
+  let seenSince: string | null = "unset";
+  const store = {
+    watermark() {
+      return Promise.resolve(null);
+    },
+    recentTransitions(since: string | null) {
+      seenSince = since;
+      return Promise.resolve([]);
+    },
+    enqueue() {
+      return Promise.resolve(0);
+    },
+    listUnsent() {
+      return Promise.resolve([]);
+    },
+    countDead() {
+      return Promise.resolve(0);
+    },
+    markDelivered() {
+      return Promise.resolve();
+    },
+    markFailed() {
+      return Promise.resolve();
+    },
+    reprocessDeadLetters() {
+      return Promise.resolve(0);
+    },
+    markProviderAccepted() {
+      return Promise.resolve();
+    },
+  } as unknown as AlertStore;
+  const today = new Date().toISOString().slice(0, 10);
+  await runProviderCycle({
+    store,
+    loadBarriers: () => Promise.resolve(new Map()),
+    sender: { post: () => Promise.resolve({} as never) },
+    recipients: [],
+    companyId: 1,
+    now: () => new Date(),
+    dryRun: true,
+  });
+  assertStrictEquals(seenSince, today);
+});
+
+Deno.test("provider cycle watermark advances to max transition date", async () => {
+  const store = {
+    watermark() {
+      return Promise.resolve(null);
+    },
+    recentTransitions() {
+      return Promise.resolve([
+        { barrierId: 1, transitionDate: "2026-10-20", statusId: 5 },
+      ]);
+    },
+    enqueue() {
+      return Promise.resolve(0);
+    },
+    listUnsent() {
+      return Promise.resolve([]);
+    },
+    countDead() {
+      return Promise.resolve(0);
+    },
+    markDelivered() {
+      return Promise.resolve();
+    },
+    markFailed() {
+      return Promise.resolve();
+    },
+    reprocessDeadLetters() {
+      return Promise.resolve(0);
+    },
+    markProviderAccepted() {
+      return Promise.resolve();
+    },
+  } as unknown as AlertStore;
+  const result = await runProviderCycle({
+    store,
+    loadBarriers: () => Promise.resolve(new Map([[1, wire()]])),
+    sender: { post: () => Promise.resolve({} as never) },
+    recipients: [{ email: "a@example.com" }],
+    companyId: 1,
+    dryRun: true,
+  });
+  assertStrictEquals(result.watermark, "2026-10-20");
+});
+
+Deno.test("provider cycle paginates and dedups unsent events", async () => {
+  const events: UnsentAlert[] = Array.from(
+    { length: 250 },
+    (_, i) => unsent({ id: i + 1 }),
+  );
+  const store = {
+    watermark() {
+      return Promise.resolve(null);
+    },
+    recentTransitions() {
+      return Promise.resolve([]);
+    },
+    enqueue() {
+      return Promise.resolve(0);
+    },
+    listUnsent(batch: number, offset: number) {
+      return Promise.resolve(events.slice(offset, offset + batch));
+    },
+    countDead() {
+      return Promise.resolve(0);
+    },
+    markDelivered() {
+      return Promise.resolve();
+    },
+    markFailed() {
+      return Promise.resolve();
+    },
+    reprocessDeadLetters() {
+      return Promise.resolve(0);
+    },
+    markProviderAccepted() {
+      return Promise.resolve();
+    },
+  } as unknown as AlertStore;
+  const posts: number[] = [];
+  const result = await runProviderCycle({
+    store,
+    loadBarriers: () => Promise.resolve(new Map([[1, wire()]])),
+    sender: {
+      post: () => {
+        posts.push(1);
+        return Promise.resolve({
+          ok: true,
+          duplicado: false,
+          parcial: false,
+          enfileirados: 1,
+          fila_ids: [],
+          por_canal: {},
+          rejeitados: [],
+          avisos: [],
+          aviso_token: null,
+          mensagem: "ok",
+        } as never);
+      },
+    },
+    recipients: [{ email: "a@example.com" }],
+    companyId: 1,
+    dryRun: false,
+    statusInfo: { labelOf: () => "Indisponivel", compliantOf: () => false },
+  });
+  assertStrictEquals(result.posted, 250);
+});
+
+Deno.test("provider cycle POST timeout marks failed for retry", async () => {
+  const marked: string[] = [];
+  const store = {
+    watermark() {
+      return Promise.resolve(null);
+    },
+    recentTransitions() {
+      return Promise.resolve([]);
+    },
+    enqueue() {
+      return Promise.resolve(0);
+    },
+    listUnsent() {
+      return Promise.resolve([unsent()]);
+    },
+    countDead() {
+      return Promise.resolve(0);
+    },
+    markDelivered() {
+      return Promise.resolve();
+    },
+    markFailed(_id: number, msg: string) {
+      marked.push(msg);
+      return Promise.resolve();
+    },
+    reprocessDeadLetters() {
+      return Promise.resolve(0);
+    },
+    markProviderAccepted() {
+      return Promise.resolve();
+    },
+  } as unknown as AlertStore;
+  const result = await runProviderCycle({
+    store,
+    loadBarriers: () => Promise.resolve(new Map([[1, wire()]])),
+    sender: { post: () => new Promise(() => {}) },
+    recipients: [{ email: "a@example.com" }],
+    companyId: 1,
+    dryRun: false,
+    statusInfo: { labelOf: () => "Indisponivel", compliantOf: () => false },
+  });
+  assertStrictEquals(result.failed, 1);
+  assertStrictEquals(marked.length, 1);
+  assertStrictEquals(marked[0]!.includes("timed out"), true);
+});
