@@ -4,7 +4,13 @@
 // from the session cookie alone; token auth is rejected. An email change is
 // an identity change: it requires the current password and revokes every
 // session, so a stolen cookie cannot move the account to another address.
-import { PostgresError } from "@db/postgres";
+import {
+  getUserById,
+  normalizeEmail,
+  normalizeName,
+  normalizePhone,
+  updateUser,
+} from "../../../lib/server/sql/users.ts";
 
 import {
   badRequest,
@@ -28,35 +34,29 @@ import {
 } from "../../../lib/server/auth/password.ts";
 
 import {
-  passwordThrottle,
-  routeClientKey,
-} from "../../../lib/server/throttle.ts";
-
-import {
-  getUserById,
-  normalizeEmail,
-  normalizeName,
-  normalizePhone,
-  updateUser,
-} from "../../../lib/server/sql/users.ts";
-
-import { deleteSessionsForUser } from "../../../lib/server/sql/sessions.ts";
-
-import {
   buildExpiredCookie,
   isSecureRequest,
 } from "../../../lib/server/auth/session.ts";
 
-import { loadServerConfig } from "../../../lib/server/config.ts";
+import {
+  passwordThrottle,
+  routeClientKey,
+} from "../../../lib/server/throttle.ts";
 
 import {
   readJsonBody,
   ValidationError,
 } from "../../../lib/server/validation.ts";
 
-import { define } from "../../../utils.ts";
+import { deleteSessionsForUser } from "../../../lib/server/sql/sessions.ts";
+
+import { loadServerConfig } from "../../../lib/server/config.ts";
 
 import { denyIfCrossSite } from "../../../lib/server/csrf.ts";
+
+import { PostgresError } from "@db/postgres";
+
+import { define } from "../../../utils.ts";
 
 // normalizeInput: the user store's email/name/phone normalizers throw plain
 // Error. Lift them into the typed rejection used by the catch below so a

@@ -232,12 +232,15 @@ function normalizeClientAssertionAlg(raw: string | undefined): string {
   return value;
 }
 
-// credentialFileModeError: pure POSIX permission gate for the Entra key and
-// certificate. Group or other access (read, write, or execute) is rejected:
-// a private key readable by another account is a leaked credential, and the
-// certificate pair is treated the same way to keep one rule. Windows ACLs are
-// not represented by Deno's mode bits, so the check is best-effort there and
-// deliberately skipped; document `icacls` restrictions in deployment instead.
+// credentialFileModeError: pure POSIX permission gate for file-backed Entra
+// key and certificate credentials only. A client-secret credential carries no
+// files and never reaches this check (assertCredentialFilesReadable returns
+// early for non-key types). Group or other access (read, write, or execute)
+// is rejected: a private key readable by another account is a leaked
+// credential, and the certificate pair is treated the same way to keep one
+// rule. Windows ACLs are not represented by Deno's mode bits, so the check is
+// best-effort there and deliberately skipped; document `icacls` restrictions
+// in deployment instead.
 export function credentialFileModeError(
   mode: number,
   platform: string,

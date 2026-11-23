@@ -8,11 +8,11 @@ import {
   isSecureRequest,
 } from "../../../lib/server/auth/session.ts";
 
-import { isCrossSiteRequest } from "../../../lib/server/csrf.ts";
-
 import { hashSessionToken } from "../../../lib/server/auth/session.ts";
 
 import { deleteSession } from "../../../lib/server/sql/sessions.ts";
+
+import { isCrossSiteRequest } from "../../../lib/server/csrf.ts";
 
 import { loadAuthConfig } from "../../../lib/server/config.ts";
 
