@@ -99,7 +99,15 @@ Deno.test("emailConfirmRequiredFor skips the prompt entirely for Entra rows", ()
 });
 
 Deno.test("emailConfirmRequiredFor follows emailRequiresPassword on local", () => {
-  assert(!emailConfirmRequiredFor("local", "ana@plataforma.br", "ANA@x.br"));
+  // Same identity (case + space only): no prompt, matches the server's
+  // normalizeEmail, so the PATCH stays a pure profile write.
+  assert(
+    !emailConfirmRequiredFor(
+      "local",
+      "ana@plataforma.br",
+      "  ANA@PLATAFORMA.BR  ",
+    ),
+  );
   assert(!emailConfirmRequiredFor("local", saved.email, saved.email));
   assert(emailConfirmRequiredFor("local", "ana@plataforma.br", "nova@x.br"));
 });
