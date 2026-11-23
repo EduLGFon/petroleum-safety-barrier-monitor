@@ -17,6 +17,85 @@ import type { AuthUser } from "../../lib/types.ts";
 
 import { useEffect, useState } from "preact/hooks";
 
+// SavedIdentity: the values the server actually has for this user, kept in
+// local state so the header card refreshes in place after a self-service
+// e-mail change (the prop is rendered once by the server route and does
+// not repopulate without a full navigation).
+interface SavedIdentity {
+  name: string;
+  email: string;
+  phone: string;
+}
+
+// normalizeClientEmail: mirrors the server's normalizeEmail on the two
+// fields that matter for change detection (trim + lowercase). Without it,
+// a case-only or space-only edit would trip the current-password prompt
+// and the server would then treat it as a no-op write.
+function normalizeClientEmail(value: string): string {
+  return value.trim().toLowerCase();
+}
+
+// emailRequiresPassword: pure decision the profile form uses to decide
+// whether the caller must confirm with their current password before the
+// PATCH goes out (see the AUTH contract on PATCH /api/auth/profile).
+// Exported so the regression test covers the exact comparison the form
+// uses without mounting the whole section under linkedom.
+export function emailRequiresPassword(loaded: string, draft: string): boolean {
+  return normalizeClientEmail(loaded) !== normalizeClientEmail(draft);
+}
+
+// emailConfirmRequiredFor: does the profile form need to show and collect
+// the current-password confirmation for this auth source and this draft?
+// Entra accounts have no local password (users.password_hash is null by
+// the auth_source_shape check), so the AUTH contract rejects an e-mail
+// change for them ("password login is not enabled for this account"); the
+// e-mail field is disabled for those accounts and no confirmation is
+// collected. Local accounts still confirm with their current password.
+// Extracted so the authSource branch is a pure decision under test, not
+// inline JSX logic.
+export function emailConfirmRequiredFor(
+  authSource: "local" | "entra",
+  loaded: string,
+  draft: string,
+): boolean {
+  return authSource !== "entra" && emailRequiresPassword(loaded, draft);
+}
+
+// buildProfileBody: pure request-builder for the profile PATCH. Name,
+// email, and phone always go; currentPassword is attached only when the
+// email differs from the loaded value AND a confirmation was typed, so an
+// unchanged profile never carries a password across the wire and an Entra
+// account (no local password to confirm with) sends a clean body.
+// emailEditableFor: Entra accounts have no local password, so the server
+// rejects an e-mail change for them ("password login is not enabled for
+// this account"); the e-mail field is disabled and explained instead of
+// collecting a confirmation that can never succeed.
+export function emailEditableFor(authSource: "local" | "entra"): boolean {
+  return authSource !== "entra";
+}
+
+export function buildProfileBody(
+  loaded: SavedIdentity,
+  draft: {
+    name: string;
+    email: string;
+    phone: string;
+    currentPassword: string;
+  },
+): Record<string, string> {
+  const body: Record<string, string> = {
+    name: draft.name,
+    email: draft.email,
+    phone: draft.phone,
+  };
+  if (emailRequiresPassword(loaded.email, draft.email)) {
+    if (draft.currentPassword !== "") {
+      body.currentPassword = draft.currentPassword;
+    }
+  }
+  return body;
+}
+
 // AccountSection: read-only profile card plus password form for the owner.
 export function AccountSection(
   { sessionUser }: { sessionUser?: AuthUser | null },
@@ -31,17 +110,41 @@ export function AccountSection(
   const [name, setName] = useState(sessionUser?.name ?? "");
   const [email, setEmail] = useState(sessionUser?.email ?? "");
   const [phone, setPhone] = useState(sessionUser?.phone ?? "");
+  // Current password required for an e-mail change: kept separate from the
+  // password-change field so the two forms never share a value in memory.
+  const [emailConfirmPassword, setEmailConfirmPassword] = useState("");
+  // Server-side identity, mirrored from the prop and refreshed from the
+  // PATCH response so the header reflects an e-mail change without a
+  // navigation (identity is session-derived and the browser is not told to
+  // re-fetch /me, so we hand the response back to the same panel).
+  const [saved, setSaved] = useState<SavedIdentity>({
+    name: sessionUser?.name ?? "",
+    email: sessionUser?.email ?? "",
+    phone: sessionUser?.phone ?? "",
+  });
   // Props arrive async (session fetch) and can change after a profile save
   // elsewhere: mirror them into the editable draft instead of freezing the
   // first render's values.
   useEffect(() => {
-    setName(sessionUser?.name ?? "");
-    setEmail(sessionUser?.email ?? "");
-    setPhone(sessionUser?.phone ?? "");
+    const draft = {
+      name: sessionUser?.name ?? "",
+      email: sessionUser?.email ?? "",
+      phone: sessionUser?.phone ?? "",
+    };
+    setName(draft.name);
+    setEmail(draft.email);
+    setPhone(draft.phone);
+    setSaved(draft);
+    // An external identity change invalidates any pending confirm password.
+    setEmailConfirmPassword("");
   }, [sessionUser?.name, sessionUser?.email, sessionUser?.phone]);
   const [profileBusy, setProfileBusy] = useState(false);
   const [profileError, setProfileError] = useState("");
   const [profileDone, setProfileDone] = useState(false);
+  const [profileEmailChanged, setProfileEmailChanged] = useState(false);
+  // Manual evidence: a successful local e-mail change revokes every session
+  // on the server (see PATCH /api/auth/profile), so this panel swaps to a
+  // login notice instead of the normal "Perfil atualizado." status.
 
   if (!sessionUser) {
     return (
@@ -78,18 +181,55 @@ export function AccountSection(
     );
   }
 
+  // The prompt only appears on a real email change; a case-only or
+  // space-only edit is the same identity on the server, so no password.
+  // Entra accounts have no local password to confirm with (the identity is
+  // the IdP's), so the confirmation field never shows for them and an
+  // e-mail change stays possible.
+  const emailConfirmRequired = emailConfirmRequiredFor(
+    sessionUser.authSource,
+    saved.email,
+    email,
+  );
+
   async function submitProfile(e: Event) {
     e.preventDefault();
     setProfileBusy(true);
     setProfileError("");
     try {
-      await adminApi("/api/auth/profile", {
+      const emailChanged =
+        normalizeClientEmail(saved.email) !== normalizeClientEmail(email);
+      const body = buildProfileBody(saved, {
+        name,
+        email,
+        phone,
+        currentPassword: emailConfirmPassword,
+      });
+      const updated = await adminApi("/api/auth/profile", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name, email, phone }),
-      });
+        body: JSON.stringify(body),
+      }) as Partial<SavedIdentity> | null;
+      // The server normalizes (trim + lowercase email); reflect the stored
+      // row back into both the identity card and the draft fields so the
+      // panel matches the DB and a follow-up save is a no-op write.
+      const snapshot: SavedIdentity = {
+        name: typeof updated?.name === "string" ? updated.name : name,
+        email: typeof updated?.email === "string" ? updated.email : email,
+        phone: typeof updated?.phone === "string" ? updated.phone : phone,
+      };
+      setSaved(snapshot);
+      setName(snapshot.name);
+      setEmail(snapshot.email);
+      setPhone(snapshot.phone);
+      // PRIVACY: never keep the confirm password in state after a success.
+      setEmailConfirmPassword("");
       setProfileDone(true);
+      setProfileEmailChanged(emailChanged);
     } catch (err) {
+      // adminApi already maps wire errors to pt-BR (400 bad request or 401
+      // wrong current password on the confirm path, 400 duplicate e-mail);
+      // show the localized message as-is.
       setProfileError(err instanceof Error ? err.message : String(err));
     } finally {
       setProfileBusy(false);
@@ -179,7 +319,7 @@ export function AccountSection(
     >
       <AdminCard>
         <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
-          <Avatar name={sessionUser.name || sessionUser.email} />
+          <Avatar name={saved.name || saved.email} />
           <span style={{ minWidth: 0, flex: "1 1 auto" }}>
             <div
               style={{
@@ -191,16 +331,16 @@ export function AccountSection(
                 whiteSpace: "nowrap",
               }}
             >
-              {sessionUser.email}
+              {saved.email}
             </div>
-            {sessionUser.name && (
+            {saved.name && (
               <div
                 style={{
                   fontSize: "var(--d-small)",
                   color: "var(--text-muted)",
                 }}
               >
-                {sessionUser.name}
+                {saved.name}
               </div>
             )}
           </span>
@@ -239,7 +379,36 @@ export function AccountSection(
             {profileError}
           </div>
         )}
-        {profileDone && (
+        {profileEmailChanged && (
+          <div
+            role="status"
+            style={{
+              fontSize: "var(--d-small)",
+              color: "#10b981",
+              fontWeight: 600,
+              display: "grid",
+              gap: 8,
+            }}
+          >
+            <span>
+              E-mail alterado. Sua sessão foi encerrada; entre novamente com o
+              novo endereço.
+            </span>
+            <a
+              href="/login"
+              className="lift"
+              style={{
+                ...primaryBtn,
+                display: "block",
+                textAlign: "center",
+                textDecoration: "none",
+              }}
+            >
+              Ir para o acesso
+            </a>
+          </div>
+        )}
+        {profileDone && !profileEmailChanged && (
           <div
             role="status"
             style={{
@@ -264,11 +433,44 @@ export function AccountSection(
             <input
               type="email"
               required
+              disabled={!emailEditableFor(sessionUser.authSource)}
               value={email}
               onInput={(e) => setEmail(e.currentTarget.value)}
-              style={inputSt}
+              style={{
+                ...inputSt,
+                opacity: emailEditableFor(sessionUser.authSource) ? 1 : 0.6,
+                cursor: sessionUser.authSource === "entra"
+                  ? "not-allowed"
+                  : "text",
+              }}
             />
+            {!emailEditableFor(sessionUser.authSource) && (
+              <span
+                style={{
+                  fontSize: "var(--d-small)",
+                  color: "var(--text-muted)",
+                  marginTop: 4,
+                  display: "block",
+                }}
+              >
+                O e-mail de contas Microsoft Entra é gerenciado pela organização
+                e não pode ser alterado aqui.
+              </span>
+            )}
           </Field>
+          {emailConfirmRequired && (
+            <Field label="Senha atual (confirmação para trocar o e-mail)">
+              <input
+                type="password"
+                required
+                autoComplete="current-password"
+                placeholder="Confirme com sua senha atual"
+                value={emailConfirmPassword}
+                onInput={(e) => setEmailConfirmPassword(e.currentTarget.value)}
+                style={inputSt}
+              />
+            </Field>
+          )}
           <Field label="Telefone">
             <input
               type="tel"

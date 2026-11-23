@@ -27,6 +27,21 @@ Deno.test("toPtError maps password-change errors to pt-BR", () => {
   assertStrictEquals(toPtError("session required"), "Sessão necessária");
 });
 
+Deno.test("toPtError maps profile email-change errors to pt-BR", () => {
+  assertStrictEquals(
+    toPtError("current password is required"),
+    "Informe a senha atual",
+  );
+  assertStrictEquals(
+    toPtError("password login is not enabled for this account"),
+    "Login por senha não está habilitado para esta conta",
+  );
+  assertStrictEquals(
+    toPtError("profile update failed"),
+    "Falha ao atualizar perfil",
+  );
+});
+
 Deno.test("toPtError passes through already-localized strings", () => {
   assertStrictEquals(toPtError("Erro 404"), "Erro 404");
   assertStrictEquals(toPtError("Falha ao carregar"), "Falha ao carregar");
