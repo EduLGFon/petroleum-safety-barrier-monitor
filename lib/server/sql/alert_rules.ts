@@ -80,16 +80,20 @@ export interface NewAlertRule {
 
 // normalizeRuleName: trims and caps; throws as 400 on empty.
 export function normalizeRuleName(raw: unknown): string {
-  if (typeof raw !== "string") throw new Error("name must be a string");
+  if (typeof raw !== "string") {
+    throw new ValidationError("name must be a string");
+  }
   const name = raw.trim().slice(0, 200);
-  if (!name) throw new Error("name must not be empty");
+  if (!name) throw new ValidationError("name must not be empty");
   return name;
 }
 
 // normalizeDescription: optional free text, capped.
 export function normalizeDescription(raw: unknown): string | undefined {
   if (raw === undefined) return undefined;
-  if (typeof raw !== "string") throw new Error("description must be a string");
+  if (typeof raw !== "string") {
+    throw new ValidationError("description must be a string");
+  }
   return raw.trim().slice(0, 2000);
 }
 
@@ -101,7 +105,9 @@ export function normalizeOptionalId(
 ): number | null {
   if (raw === undefined || raw === null) return null;
   if (typeof raw !== "number" || !Number.isInteger(raw) || raw < 0) {
-    throw new Error(`${field} must be a non-negative integer or null`);
+    throw new ValidationError(
+      `${field} must be a non-negative integer or null`,
+    );
   }
   return raw;
 }
@@ -115,20 +121,24 @@ export function normalizeIdList(
 ): number[] | null | undefined {
   if (raw === undefined) return undefined;
   if (raw === null) return null;
-  if (!Array.isArray(raw)) throw new Error(`${field} must be an array or null`);
+  if (!Array.isArray(raw)) {
+    throw new ValidationError(`${field} must be an array or null`);
+  }
   if (raw.length === 0) return null;
   const seen = new Set<number>();
   for (const v of raw) {
     if (typeof v !== "number" || !Number.isInteger(v)) {
-      throw new Error(`${field} must be an array of integers`);
+      throw new ValidationError(`${field} must be an array of integers`);
     }
     if (opts.min !== undefined && v < opts.min) {
-      throw new Error(`${field} values must be >= ${opts.min}`);
+      throw new ValidationError(`${field} values must be >= ${opts.min}`);
     }
     if (opts.max !== undefined && v > opts.max) {
-      throw new Error(`${field} values must be <= ${opts.max}`);
+      throw new ValidationError(`${field} values must be <= ${opts.max}`);
     }
-    if (v < 0) throw new Error(`${field} values must be non-negative`);
+    if (v < 0) {
+      throw new ValidationError(`${field} values must be non-negative`);
+    }
     seen.add(v);
   }
   return [...seen].sort((a, b) => a - b);
@@ -140,7 +150,9 @@ export function normalizeOptionalBoolean(
   field: string,
 ): boolean | undefined {
   if (raw === undefined) return undefined;
-  if (typeof raw !== "boolean") throw new Error(`${field} must be a boolean`);
+  if (typeof raw !== "boolean") {
+    throw new ValidationError(`${field} must be a boolean`);
+  }
   return raw;
 }
 
@@ -149,7 +161,7 @@ export function normalizeStaleDays(raw: unknown): number | null | undefined {
   if (raw === undefined) return undefined;
   if (raw === null) return null;
   if (typeof raw !== "number" || !Number.isInteger(raw) || raw <= 0) {
-    throw new Error("staleDays must be a positive integer or null");
+    throw new ValidationError("staleDays must be a positive integer or null");
   }
   return raw;
 }
@@ -162,7 +174,7 @@ export function normalizePositiveInt(
   if (raw === undefined) return undefined;
   if (raw === null) return null;
   if (typeof raw !== "number" || !Number.isInteger(raw) || raw <= 0) {
-    throw new Error(`${field} must be a positive integer or null`);
+    throw new ValidationError(`${field} must be a positive integer or null`);
   }
   return raw;
 }
@@ -177,7 +189,7 @@ export function normalizeHour(
   if (
     typeof raw !== "number" || !Number.isInteger(raw) || raw < 0 || raw > 23
   ) {
-    throw new Error(`${field} must be an hour 0-23 or null`);
+    throw new ValidationError(`${field} must be an hour 0-23 or null`);
   }
   return raw;
 }
@@ -186,7 +198,7 @@ export function normalizeHour(
 export function normalizeUrgency(raw: unknown): RuleUrgency | undefined {
   if (raw === undefined) return undefined;
   if (raw !== "any" && raw !== "urgent" && raw !== "critical") {
-    throw new Error("urgency must be one of any, urgent, critical");
+    throw new ValidationError("urgency must be one of any, urgent, critical");
   }
   return raw;
 }
@@ -195,10 +207,10 @@ export function normalizeUrgency(raw: unknown): RuleUrgency | undefined {
 export function normalizePriority(raw: unknown): number | undefined {
   if (raw === undefined) return undefined;
   if (typeof raw !== "number" || !Number.isInteger(raw)) {
-    throw new Error("priority must be an integer");
+    throw new ValidationError("priority must be an integer");
   }
   if (raw < -1000 || raw > 1000) {
-    throw new Error("priority must be between -1000 and 1000");
+    throw new ValidationError("priority must be between -1000 and 1000");
   }
   return raw;
 }
@@ -211,10 +223,12 @@ export function normalizeIsoDate(
   if (raw === undefined) return undefined;
   if (raw === null || raw === "") return null;
   if (typeof raw !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(raw)) {
-    throw new Error(`${field} must be YYYY-MM-DD or null`);
+    throw new ValidationError(`${field} must be YYYY-MM-DD or null`);
   }
   const t = Date.parse(`${raw}T00:00:00Z`);
-  if (Number.isNaN(t)) throw new Error(`${field} must be a valid date`);
+  if (Number.isNaN(t)) {
+    throw new ValidationError(`${field} must be a valid date`);
+  }
   return raw;
 }
 
@@ -356,7 +370,7 @@ export async function createAlertRule(input: NewAlertRule): Promise<AlertRule> {
     values,
   );
   const created = rows[0];
-  if (!created) throw new Error("createAlertRule returned no row");
+  if (!created) throw new ValidationError("createAlertRule returned no row");
   return rowToRule(created);
 }
 
@@ -493,7 +507,7 @@ export async function updateAlertRule(
       normalizePositiveInt(patch.staleRepeatDays, "staleRepeatDays"),
     );
   }
-  if (sets.length === 0) throw new Error("nothing to update");
+  if (sets.length === 0) throw new ValidationError("nothing to update");
   args.push(id);
   const rows = await queryRows<Record<string, unknown>>(
     `update alert_rules set ${sets.join(", ")} where id = $${args.length}

@@ -23,7 +23,13 @@ import {
 
 import { routeClientKey, writeThrottle } from "../../../lib/server/throttle.ts";
 
-import { parseIdParam, readJsonBody } from "../../../lib/server/validation.ts";
+import {
+  parseIdParam,
+  POSTGRES_UNIQUE_VIOLATION,
+  postgresErrorInfo,
+  readJsonBody,
+  ValidationError,
+} from "../../../lib/server/validation.ts";
 
 import { loadServerConfig } from "../../../lib/server/config.ts";
 
@@ -104,33 +110,22 @@ export const handler = define.handlers({
       if (!updated) return notFound("Rule not found", requestId);
       return ok(updated, requestId);
     } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
-      if (message.includes("duplicate") || message.includes("unique")) {
+      // Typed classification: a ValidationError is a client-input rejection
+      // and keeps its 400; a unique violation is a duplicate row the caller
+      // can fix (mapped by SQLSTATE + constraint, never by message text).
+      // Everything else is internal - database text never reaches a client.
+      if (err instanceof ValidationError) {
+        return badRequest(err.message, requestId);
+      }
+      const info = postgresErrorInfo(err);
+      if (info.code === POSTGRES_UNIQUE_VIOLATION) {
         return badRequest(
-          message.includes("name") || message.includes("alert_rules_name")
+          info.constraint === "alert_rules_name_key" ||
+            info.constraint === "alert_rules_name_unique"
             ? "rule name already exists"
             : "duplicate value",
           requestId,
         );
-      }
-      if (
-        message.includes("name") || message.includes("description") ||
-        message.includes("category") || message.includes("toStatus") ||
-        message.includes("fromStatus") || message.includes("critical") ||
-        message.includes("includeRecovery") || message.includes("staleDays") ||
-        message.includes("staleRepeat") ||
-        message.includes("notifyImmediate") ||
-        message.includes("active") || message.includes("urgency") ||
-        message.includes("location") || message.includes("typology") ||
-        message.includes("grouping") || message.includes("owner") ||
-        message.includes("cooldown") || message.includes("maxPerDay") ||
-        message.includes("quiet") || message.includes("activeDays") ||
-        message.includes("priority") || message.includes("validFrom") ||
-        message.includes("validTo") || message.includes("actionPlan") ||
-        message.includes("onTransition") ||
-        message.includes("nothing to update")
-      ) {
-        return badRequest(message, requestId);
       }
       return internal(
         "PATCH /api/alert-rules/:id",
