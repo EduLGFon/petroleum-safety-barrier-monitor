@@ -135,6 +135,8 @@ export function UserFormDialog(
   const submitAbortRef = useRef<AbortController | null>(null);
   // Whether our copy button put the one-time password in the clipboard.
   const copiedRef = useRef(false);
+  // Pending copy promise: acking before it settles must still wait for it.
+  const copyPromiseRef = useRef<Promise<void> | null>(null);
 
   useEffect(() => {
     aliveRef.current = true;
@@ -166,6 +168,7 @@ export function UserFormDialog(
     setTempPassword(null);
     setCopiaMsg("");
     copiedRef.current = false;
+    copyPromiseRef.current = null;
   }, [open, mode, user]);
 
   const groupOptions = accessGroups.map((g) => ({ id: g.id, label: g.name }));
@@ -187,15 +190,22 @@ export function UserFormDialog(
   // Copy the one-time password; it never leaves component state.
   async function copiarSenha() {
     if (!tempPassword) return;
-    try {
-      await navigator.clipboard.writeText(tempPassword.senha);
-      copiedRef.current = true;
-      setCopiaMsg(
-        "Senha copiada. Cole no campo de senha da pessoa, não em chat ou e-mail.",
-      );
-    } catch {
-      setCopiaMsg("Não foi possível copiar. Selecione e copie.");
-    }
+    const senha = tempPassword.senha;
+    const promise = (async () => {
+      try {
+        await navigator.clipboard.writeText(senha);
+        if (!aliveRef.current) return;
+        copiedRef.current = true;
+        setCopiaMsg(
+          "Senha copiada. Cole no campo de senha da pessoa, não em chat ou e-mail.",
+        );
+      } catch {
+        if (!aliveRef.current) return;
+        setCopiaMsg("Não foi possível copiar. Selecione e copie.");
+      }
+    })();
+    copyPromiseRef.current = promise;
+    await promise;
   }
 
   async function submit(e: Event) {
@@ -282,9 +292,17 @@ export function UserFormDialog(
 
   // Acknowledgement (the only close path while a secret is pending): wipe
   // the clipboard copy we made, then save-and-close (see D30).
-  function acknowledge() {
+  async function acknowledge() {
     const pending = tempPassword;
     if (!pending) return;
+    const copyPending = copyPromiseRef.current;
+    if (copyPending) {
+      try {
+        await copyPending;
+      } catch {
+        // The copy already reported its own failure; nothing to clear.
+      }
+    }
     if (copiedRef.current) {
       copiedRef.current = false;
       clearPasswordClipboard();
@@ -301,7 +319,7 @@ export function UserFormDialog(
       "button",
       {
         type: "button",
-        onClick: acknowledge,
+        onClick: () => void acknowledge(),
         className: "lift",
         style: ghostBtn,
       },

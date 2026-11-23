@@ -163,7 +163,10 @@ Deno.test("Já anotei is the only close path", async () => {
   try {
     const ack = m.buttonByText("Já anotei");
     assert(ack !== null, "the acknowledgement button must exist");
-    await act(() => ack!.click());
+    await act(async () => {
+      ack!.click();
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
     assertEquals(m.closeCount(), 1, "the ack closes exactly once");
   } finally {
     m.unmount();
@@ -182,7 +185,10 @@ Deno.test("copy then ack clears the clipboard; ack without copy leaves it alone"
       await flush();
       assertEquals(stub.writes, ["TEMP-pass-42"]);
       const ack = m.buttonByText("Já anotei");
-      await act(() => ack!.click());
+      await act(async () => {
+        ack!.click();
+        await new Promise((resolve) => setTimeout(resolve, 0));
+      });
       assertEquals(
         stub.writes,
         ["TEMP-pass-42", ""],
@@ -201,12 +207,73 @@ Deno.test("copy then ack clears the clipboard; ack without copy leaves it alone"
     const stub = stubClipboard();
     try {
       const ack = m.buttonByText("Já anotei");
-      await act(() => ack!.click());
+      await act(async () => {
+        ack!.click();
+        await new Promise((resolve) => setTimeout(resolve, 0));
+      });
       assertEquals(stub.writes, []);
       assertEquals(m.closeCount(), 1);
     } finally {
       m.unmount();
       stub.restore();
     }
+  }
+});
+
+function stubDeferredClipboard() {
+  let resolveWrite!: () => void;
+  const writes: string[] = [];
+  const nav = globalThis.navigator as unknown as Record<string, unknown>;
+  const prev = Object.getOwnPropertyDescriptor(nav, "clipboard");
+  Object.defineProperty(nav, "clipboard", {
+    configurable: true,
+    writable: true,
+    value: {
+      writeText: (text: string) => {
+        writes.push(text);
+        return new Promise<void>((resolve) => {
+          resolveWrite = resolve;
+        });
+      },
+    },
+  });
+  return {
+    writes,
+    resolve() {
+      resolveWrite();
+    },
+    restore() {
+      if (prev) Object.defineProperty(nav, "clipboard", prev);
+      else delete nav.clipboard;
+    },
+  };
+}
+
+Deno.test("ack before copy resolves still clears the clipboard (deferred)", async () => {
+  const m = await mountTempPassword();
+  const stub = stubDeferredClipboard();
+  try {
+    const copy = m.buttonByText("Copiar");
+    assert(copy !== null);
+    await act(() => copy!.click());
+    // The write is still pending; ack now must wait for it.
+    const ack = m.buttonByText("Já anotei");
+    assert(ack !== null);
+    await act(async () => {
+      ack!.click();
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      stub.resolve();
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+    await flush();
+    assertEquals(
+      stub.writes,
+      ["TEMP-pass-42", ""],
+      "the ack must wait for the pending copy, then blank the clipboard",
+    );
+    assertEquals(m.closeCount(), 1);
+  } finally {
+    m.unmount();
+    stub.restore();
   }
 });

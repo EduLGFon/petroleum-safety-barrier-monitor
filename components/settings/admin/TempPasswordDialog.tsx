@@ -41,29 +41,45 @@ export function TempPasswordDialog(
   const [copiaMsg, setCopiaMsg] = useState("");
   // Whether our button put the password in the clipboard during this reveal.
   const copiedRef = useRef(false);
+  // Pending copy promise: acking before it settles must still wait for it,
+  // otherwise the clipboard clear races ahead of the password write.
+  const copyPromiseRef = useRef<Promise<void> | null>(null);
 
   // Clear copy feedback and the copied marker for each new password.
   useEffect(() => {
     if (!open) return;
     setCopiaMsg("");
     copiedRef.current = false;
+    copyPromiseRef.current = null;
   }, [open, email, senha]);
 
   // Copy the one-time password; it never leaves component state.
   async function copiar() {
-    try {
-      await navigator.clipboard.writeText(senha);
-      copiedRef.current = true;
-      setCopiaMsg(
-        "Senha copiada. Cole no campo de senha da pessoa, não em chat ou e-mail.",
-      );
-    } catch {
-      setCopiaMsg("Não foi possível copiar. Selecione e copie.");
-    }
+    const promise = (async () => {
+      try {
+        await navigator.clipboard.writeText(senha);
+        copiedRef.current = true;
+        setCopiaMsg(
+          "Senha copiada. Cole no campo de senha da pessoa, não em chat ou e-mail.",
+        );
+      } catch {
+        setCopiaMsg("Não foi possível copiar. Selecione e copie.");
+      }
+    })();
+    copyPromiseRef.current = promise;
+    await promise;
   }
 
   // Acknowledgement is the only close path while the secret is pending.
-  function acknowledge() {
+  async function acknowledge() {
+    const pending = copyPromiseRef.current;
+    if (pending) {
+      try {
+        await pending;
+      } catch {
+        // The copy already reported its own failure; nothing to clear.
+      }
+    }
     if (copiedRef.current) {
       copiedRef.current = false;
       clearPasswordClipboard();
@@ -95,7 +111,7 @@ export function TempPasswordDialog(
           "button",
           {
             type: "button",
-            onClick: acknowledge,
+            onClick: () => void acknowledge(),
             className: "lift",
             style: ghostBtn,
           },

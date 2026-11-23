@@ -110,7 +110,13 @@ async function mountShell(
   await flush();
   const dialog = dom.document.querySelector("[data-admin-form-dialog]");
   assert(dialog !== null, "shell must portal-render under linkedom");
-  return { dom, dialog, closes, container };
+  return {
+    dom,
+    dialog,
+    closes,
+    container,
+    unmount: () => render(null, container),
+  };
 }
 
 function pressEscape(dom: ReturnType<typeof bootDom>, el: Element) {
@@ -177,44 +183,65 @@ Deno.test("requestClose confirms before discarding a dirty draft", () => {
 });
 
 Deno.test("idle shell closes from backdrop, Escape, and X", async () => {
-  const { dom, dialog, closes } = await mountShell();
-  await act(() => clickBackdrop(dom, dialog!));
-  await act(() => pressEscape(dom, dialog!));
-  await act(() => clickClose(dom));
-  assertEquals(closes.length, 3, "the three dismissal paths must work idle");
+  const m = await mountShell();
+  try {
+    await act(() => clickBackdrop(m.dom, m.dialog!));
+    await act(() => pressEscape(m.dom, m.dialog!));
+    await act(() => clickClose(m.dom));
+    assertEquals(
+      m.closes.length,
+      3,
+      "the three dismissal paths must work idle",
+    );
+  } finally {
+    m.unmount();
+  }
 });
 
 Deno.test("locked shell ignores backdrop, Escape, and X (D30)", async () => {
-  const { dom, dialog, closes } = await mountShell({ locked: true });
-  await act(() => clickBackdrop(dom, dialog!));
-  await act(() => pressEscape(dom, dialog!));
-  await act(() => clickClose(dom));
-  assertEquals(closes.length, 0, "a pending secret must survive dismissal");
-  const x = dom.document.querySelector<HTMLButtonElement>(
-    '[data-admin-form-dialog] button[aria-label="Fechar"]',
-  );
-  assert(x?.disabled, "the X button must be disabled while locked");
+  const m = await mountShell({ locked: true });
+  try {
+    await act(() => clickBackdrop(m.dom, m.dialog!));
+    await act(() => pressEscape(m.dom, m.dialog!));
+    await act(() => clickClose(m.dom));
+    assertEquals(m.closes.length, 0, "a pending secret must survive dismissal");
+    const x = m.dom.document.querySelector<HTMLButtonElement>(
+      '[data-admin-form-dialog] button[aria-label="Fechar"]',
+    );
+    assert(x?.disabled, "the X button must be disabled while locked");
+  } finally {
+    m.unmount();
+  }
 });
 
 Deno.test("busy shell ignores backdrop, Escape, and X mid-write", async () => {
-  const { dom, dialog, closes } = await mountShell({ busy: true });
-  await act(() => clickBackdrop(dom, dialog!));
-  await act(() => pressEscape(dom, dialog!));
-  await act(() => clickClose(dom));
-  assertEquals(closes.length, 0, "an in-flight write must not be discarded");
+  const m = await mountShell({ busy: true });
+  try {
+    await act(() => clickBackdrop(m.dom, m.dialog!));
+    await act(() => pressEscape(m.dom, m.dialog!));
+    await act(() => clickClose(m.dom));
+    assertEquals(
+      m.closes.length,
+      0,
+      "an in-flight write must not be discarded",
+    );
+  } finally {
+    m.unmount();
+  }
 });
 
 Deno.test("dirty shell asks before discarding on every path", async () => {
   const stub = stubConfirm(false);
+  const m = await mountShell({ dirty: true });
   try {
-    const { dom, dialog, closes } = await mountShell({ dirty: true });
-    await act(() => clickBackdrop(dom, dialog!));
-    await act(() => pressEscape(dom, dialog!));
-    await act(() => clickClose(dom));
-    assertEquals(closes.length, 0, "a denied discard keeps the dialog open");
+    await act(() => clickBackdrop(m.dom, m.dialog!));
+    await act(() => pressEscape(m.dom, m.dialog!));
+    await act(() => clickClose(m.dom));
+    assertEquals(m.closes.length, 0, "a denied discard keeps the dialog open");
     assertEquals(stub.calls.length, 3, "each path prompted once");
     assertEquals(stub.calls[0], DISCARD_CONFIRM_MSG);
   } finally {
+    m.unmount();
     stub.restore();
   }
 });
@@ -223,21 +250,22 @@ Deno.test("a click inside a dirty dialog does not prompt", async () => {
   const stub = stubConfirm(() => {
     throw new Error("inner click must not trigger discard");
   });
+  const m = await mountShell({ dirty: true });
   try {
-    const { dom, closes } = await mountShell({ dirty: true });
     // Dispatch from a child with no listeners of its own: the event
     // bubbles to the overlay, where the real handler only closes when
     // target === currentTarget (linkedom invokes bubbled listeners with
     // this = event.target, so a child without listeners short-circuits).
-    const content = dom.document.querySelector("[data-admin-form-dialog] p");
+    const content = m.dom.document.querySelector("[data-admin-form-dialog] p");
     assert(content !== null, "the dialog body must render");
     await act(() => {
       content.dispatchEvent(
-        newEvent(dom, "mousedown", { bubbles: true }),
+        newEvent(m.dom, "mousedown", { bubbles: true }),
       );
     });
-    assertEquals(closes.length, 0);
+    assertEquals(m.closes.length, 0);
   } finally {
+    m.unmount();
     stub.restore();
   }
 });

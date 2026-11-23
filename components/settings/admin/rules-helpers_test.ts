@@ -161,7 +161,7 @@ Deno.test("draftsDiffer is false for equal drafts and true per change", () => {
     draftsDiffer({ ...EMPTY_DRAFT, urgency: "urgent" }, EMPTY_DRAFT),
     true,
   );
-  // Id lists by content and by order (the multi-selects keep click order)
+  // Id lists by content; order is normalized by SearchMultiSelect
   assertEquals(
     draftsDiffer({ ...EMPTY_DRAFT, locationIds: [1] }, EMPTY_DRAFT),
     true,
@@ -171,7 +171,7 @@ Deno.test("draftsDiffer is false for equal drafts and true per change", () => {
       { ...EMPTY_DRAFT, categoryIds: [1, 2] },
       { ...EMPTY_DRAFT, categoryIds: [2, 1] },
     ),
-    true,
+    false,
   );
   assertEquals(
     draftsDiffer(

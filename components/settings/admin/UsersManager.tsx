@@ -76,6 +76,15 @@ function getUserSearchText(user: PublicUser): string {
   }`;
 }
 
+// canStartConvertToEntra: pure decision for the irreversible convert action.
+// The global busy guard must be checked BEFORE the confirmation prompt so a
+// mis-click during an in-flight write cannot queue a second destructive
+// action or race on patchBusy. Exported so the decision is testable without
+// mounting the manager.
+export function canStartConvertToEntra(patchBusy: number | null): boolean {
+  return patchBusy === null;
+}
+
 export function UsersManager(
   { onCount, currentUserId }: {
     onCount?: (n: number) => void;
@@ -241,6 +250,10 @@ export function UsersManager(
   // person out until a database fix. Confirm, then route through the same
   // patchBusy guard as every other row action (no double submit).
   async function convertToEntra(user: PublicUser) {
+    if (!canStartConvertToEntra(patchBusy)) {
+      setError("Aguarde a conclusão da operação em andamento.");
+      return;
+    }
     if (
       !confirm(
         `Converter ${user.email} para Microsoft Entra? A senha local deixa de funcionar e a conta passa a entrar somente pelo Entra. Esta tela não desfaz a conversão.`,
@@ -248,7 +261,6 @@ export function UsersManager(
     ) {
       return;
     }
-    if (patchBusy !== null) return;
     setPatchBusy(user.id);
     try {
       await adminApi(`/api/users/${user.id}`, {

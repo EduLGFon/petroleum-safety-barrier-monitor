@@ -47,10 +47,12 @@ export function emailRequiresPassword(loaded: string, draft: string): boolean {
 // emailConfirmRequiredFor: does the profile form need to show and collect
 // the current-password confirmation for this auth source and this draft?
 // Entra accounts have no local password (users.password_hash is null by
-// the auth_source_shape check), so the AUTH contract can only bind for
-// local accounts; prompting an Entra user would lock them out of the very
-// profile PATCH that lets them fix a stale IdP address. Extracted so the
-// authSource branch is a pure decision under test, not inline JSX logic.
+// the auth_source_shape check), so the AUTH contract rejects an e-mail
+// change for them ("password login is not enabled for this account"); the
+// e-mail field is disabled for those accounts and no confirmation is
+// collected. Local accounts still confirm with their current password.
+// Extracted so the authSource branch is a pure decision under test, not
+// inline JSX logic.
 export function emailConfirmRequiredFor(
   authSource: "local" | "entra",
   loaded: string,
@@ -131,6 +133,7 @@ export function AccountSection(
   const [profileBusy, setProfileBusy] = useState(false);
   const [profileError, setProfileError] = useState("");
   const [profileDone, setProfileDone] = useState(false);
+  const [profileEmailChanged, setProfileEmailChanged] = useState(false);
 
   if (!sessionUser) {
     return (
@@ -183,6 +186,8 @@ export function AccountSection(
     setProfileBusy(true);
     setProfileError("");
     try {
+      const emailChanged =
+        normalizeClientEmail(saved.email) !== normalizeClientEmail(email);
       const body = buildProfileBody(saved, {
         name,
         email,
@@ -209,6 +214,7 @@ export function AccountSection(
       // PRIVACY: never keep the confirm password in state after a success.
       setEmailConfirmPassword("");
       setProfileDone(true);
+      setProfileEmailChanged(emailChanged);
     } catch (err) {
       // adminApi already maps wire errors to pt-BR (400 bad request or 401
       // wrong current password on the confirm path, 400 duplicate e-mail);
@@ -362,7 +368,36 @@ export function AccountSection(
             {profileError}
           </div>
         )}
-        {profileDone && (
+        {profileEmailChanged && (
+          <div
+            role="status"
+            style={{
+              fontSize: "var(--d-small)",
+              color: "#10b981",
+              fontWeight: 600,
+              display: "grid",
+              gap: 8,
+            }}
+          >
+            <span>
+              E-mail alterado. Sua sessão foi encerrada; entre novamente com o
+              novo endereço.
+            </span>
+            <a
+              href="/login"
+              className="lift"
+              style={{
+                ...primaryBtn,
+                display: "block",
+                textAlign: "center",
+                textDecoration: "none",
+              }}
+            >
+              Ir para o acesso
+            </a>
+          </div>
+        )}
+        {profileDone && !profileEmailChanged && (
           <div
             role="status"
             style={{
@@ -387,10 +422,30 @@ export function AccountSection(
             <input
               type="email"
               required
+              disabled={sessionUser.authSource === "entra"}
               value={email}
               onInput={(e) => setEmail(e.currentTarget.value)}
-              style={inputSt}
+              style={{
+                ...inputSt,
+                opacity: sessionUser.authSource === "entra" ? 0.6 : 1,
+                cursor: sessionUser.authSource === "entra"
+                  ? "not-allowed"
+                  : "text",
+              }}
             />
+            {sessionUser.authSource === "entra" && (
+              <span
+                style={{
+                  fontSize: "var(--d-small)",
+                  color: "var(--text-muted)",
+                  marginTop: 4,
+                  display: "block",
+                }}
+              >
+                O e-mail de contas Microsoft Entra é gerenciado pela organização
+                e não pode ser alterado aqui.
+              </span>
+            )}
           </Field>
           {emailConfirmRequired && (
             <Field label="Senha atual (confirmação para trocar o e-mail)">

@@ -71,6 +71,10 @@ const PT_BY_EN: Record<string, string> = {
   "Login failed": "Falha no login",
   "Logout failed": "Falha ao sair",
   "Password change failed": "Falha ao trocar senha",
+  "current password is required": "Informe a senha atual",
+  "password login is not enabled for this account":
+    "Login por senha não está habilitado para esta conta",
+  "profile update failed": "Falha ao atualizar perfil",
   // Access-management guards. The route rewrites the generic messages to the
   // "your own account" variants when the caller is the target, so the admin
   // gets an explanation instead of only the policy.

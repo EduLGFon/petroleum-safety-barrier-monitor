@@ -196,10 +196,14 @@ export function toggleId(list: number[], id: number): number[] {
   return list.includes(id) ? list.filter((x) => x !== id) : [...list, id];
 }
 
-// numListsDiffer: order-sensitive id list compare (multi-selects keep
-// click order; a different order was a different user action).
+// numListsDiffer: order-insensitive id list compare. SearchMultiSelect
+// normalizes its selection to option order, so a reordered but equivalent
+// selection is not a change.
 function numListsDiffer(a: number[], b: number[]): boolean {
-  return a.length !== b.length || a.some((x, i) => x !== b[i]);
+  if (a.length !== b.length) return true;
+  const sa = [...a].sort((x, y) => x - y);
+  const sb = [...b].sort((x, y) => x - y);
+  return sa.some((x, i) => x !== sb[i]);
 }
 
 // draftsDiffer: dirty check for the rule editor. The editor keeps a large

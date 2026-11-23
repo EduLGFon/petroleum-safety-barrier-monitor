@@ -2,9 +2,10 @@
 // This is why it exists: the one-time password block must tell the admin
 // whether MSGFLOW delivered the notice, without ever rendering the raw
 // provider body that could carry the password.
-import { assertStrictEquals } from "jsr:@std/assert@^1";
+import { assertEquals, assertStrictEquals } from "jsr:@std/assert@^1";
 
 import { mensagemAviso } from "./user-notice.ts";
+import { canStartConvertToEntra } from "./UsersManager.tsx";
 
 Deno.test("mensagemAviso reports a delivered notice", () => {
   assertStrictEquals(
@@ -23,4 +24,9 @@ Deno.test("mensagemAviso reports a failed notice with the reason", () => {
 Deno.test("mensagemAviso returns null without an outcome", () => {
   assertStrictEquals(mensagemAviso(null), null);
   assertStrictEquals(mensagemAviso(undefined), null);
+});
+
+Deno.test("canStartConvertToEntra blocks while a write is in flight", () => {
+  assertEquals(canStartConvertToEntra(null), true);
+  assertEquals(canStartConvertToEntra(42), false);
 });
