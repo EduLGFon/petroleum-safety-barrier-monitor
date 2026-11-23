@@ -1,11 +1,18 @@
 // Unit tests for lib/export - row mapping, KPI/summary reconciliation, escaping.
-import { assert, assertEquals, assertStrictEquals } from "jsr:@std/assert@^1";
+import {
+  assert,
+  assertEquals,
+  assertStrictEquals,
+  assertThrows,
+} from "jsr:@std/assert@^1";
 
 import { browserTimeZone, escHtml, resolveTimeZone, ts } from "./html.ts";
 
 import { kpiStats, summaryRows } from "./summary.ts";
 
-import { csvCell } from "./csv.ts";
+import { csvCell, exportToCSV } from "./csv.ts";
+
+import { EXPORT_MAX_ROWS } from "./limits.ts";
 
 import { row } from "./rows.ts";
 
@@ -217,4 +224,24 @@ Deno.test("browserTimeZone names the runtime zone", () => {
   const zone = browserTimeZone();
   assertStrictEquals(typeof zone, "string");
   assert((zone as string).length > 0);
+});
+
+Deno.test("exportToCSV refuses a selection over the ceiling with the real count", () => {
+  // Client mode holds the whole file in the tab, so a selection past the
+  // ceiling throws instead of building a file the tab cannot hold. The
+  // browser check runs first, so stub document to reach the ceiling gate.
+  const globals = globalThis as unknown as Record<string, unknown>;
+  const previous = globals.document;
+  globals.document = {};
+  try {
+    const over = new Array(EXPORT_MAX_ROWS + 1).fill(mkBarrier());
+    assertThrows(
+      () => exportToCSV(over),
+      Error,
+      "CSV comporta até",
+    );
+  } finally {
+    if (previous === undefined) delete globals.document;
+    else globals.document = previous;
+  }
 });

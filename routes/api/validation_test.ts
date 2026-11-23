@@ -18,6 +18,8 @@ import { createThrottle } from "../../lib/server/throttle.ts";
 
 import { handler as userPatchHandler } from "./users/[id].ts";
 
+import { handler as exportHandler } from "./export.ts";
+
 import { duplicateMessage as accessGroupDuplicateMessage } from "./access-groups/[id].ts";
 
 import { handler as syncRunsRoute } from "./sync-runs.ts";
@@ -453,6 +455,24 @@ function loginRequest(body: unknown): Request {
     body: JSON.stringify(body),
   });
 }
+
+Deno.test("GET /api/export maps an unknown format to 400", async () => {
+  const get = exportHandler.GET;
+  if (!get) throw new Error("GET /api/export handler is missing");
+  await withAdminToken(async () => {
+    const res = await get(
+      routeCtx(
+        new Request("http://localhost/api/export?format=ods", {
+          headers: { authorization: "Bearer test-admin-token" },
+        }),
+      ),
+    );
+    assertStrictEquals(res.status, 400);
+    const body = await envelope(res);
+    assertStrictEquals(body.code, "BAD_REQUEST");
+    assertStrictEquals(body.error, "format must be csv, xlsx or pdf");
+  });
+});
 
 Deno.test("POST /api/auth/login maps an invalid email to 400 by type", async () => {
   const post = authLoginHandler.POST;
