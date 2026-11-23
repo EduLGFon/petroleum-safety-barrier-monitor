@@ -2,6 +2,7 @@
 // notifier must never break the fanout.
 import {
   consoleNotifier,
+  maskEmail,
   notifyFailureToAll,
   type SyncFailureInfo,
 } from "./notify.ts";
@@ -57,4 +58,29 @@ Deno.test("notifyFailureToAll fans out and swallows a throwing notifier", async 
   assertStrictEquals(called.join(","), "fracttal-live:FAL");
   assertStrictEquals(errors.length, 1);
   assertStrictEquals(errors[0]!.includes("relay down"), true);
+});
+
+Deno.test("maskEmail hides the local part of emails", () => {
+  const out = maskEmail("user@example.com failed");
+  assertStrictEquals(out.includes("user"), false);
+  assertStrictEquals(out.includes("u***@example.com"), true);
+});
+
+Deno.test("consoleNotifier masks emails in the note", async () => {
+  const calls: string[] = [];
+  const original = console.error;
+  console.error = (l: string) => calls.push(l);
+  try {
+    await consoleNotifier.syncFailed({
+      scope: "fracttal-live:FAL",
+      startedAt: "2026-09-12T10:00:00.000Z",
+      note: "boom user@example.com",
+      runId: 7,
+    });
+  } finally {
+    console.error = original;
+  }
+  assertStrictEquals(calls.length, 1);
+  assertStrictEquals(calls[0]!.includes("user@example.com"), false);
+  assertStrictEquals(calls[0]!.includes("u***@example.com"), true);
 });

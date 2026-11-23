@@ -183,6 +183,33 @@ Deno.test("buildWorkEvents counts no recovery without the id map", () => {
   assertStrictEquals(built.recovered, 0);
 });
 
+Deno.test("buildWorkEvents recovers empty code_item requests via itemIdToCode", () => {
+  const itemIdToCode = (id: number) => id === 1 ? "FAL-EQ-001" : null;
+  const built = buildWorkEvents(
+    [],
+    [
+      {
+        ...request({ types_2_description: "Corretiva Planejada" }),
+        code_item: "",
+        id_item: 1,
+      },
+      {
+        ...request({ types_2_description: "Corretiva Planejada" }),
+        code_item: "",
+        id_item: 999,
+      },
+      {
+        ...request({ types_2_description: "Corretiva Planejada" }),
+        code_item: "",
+      },
+    ],
+    { itemIdToCode },
+  );
+  assertStrictEquals(built.malformed.length, 2);
+  assertStrictEquals(built.recovered, 1);
+  assertStrictEquals(built.events.has("FAL-EQ-001"), true);
+});
+
 Deno.test("workOrderSlot flags contingency text without changing the slot", () => {
   const cont = workOrderSlot(
     parseWorkOrder(order({ description: "Falha com contingência GM-123" })),

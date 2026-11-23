@@ -541,8 +541,28 @@ export async function runSync(
     // station/category label postdates the seed (or a dump import) skips,
     // and a migrate-only database never reaches full tenant coverage.
     // Dry runs stay read-only, so they keep reporting those skips instead.
+    // Bounded catalog bootstrap: a runaway upstream (or a hostile tenant)
+    // could otherwise create an unbounded number of distinct labels in one
+    // run. Cap the distinct labels to MAX_CATALOG_LABELS per run; anything
+    // beyond is dropped with a warning so ops can investigate. Under the
+    // cap the payload is unchanged.
+    const MAX_CATALOG_LABELS = 500;
+    const rawNeeds = catalogNeeds(items);
+    let needs = rawNeeds;
+    const totalLabels = rawNeeds.categories.length + rawNeeds.locations.length;
+    if (totalLabels > MAX_CATALOG_LABELS) {
+      const catCap = Math.min(rawNeeds.categories.length, MAX_CATALOG_LABELS);
+      const locCap = Math.max(0, MAX_CATALOG_LABELS - catCap);
+      needs = {
+        categories: rawNeeds.categories.slice(0, catCap),
+        locations: rawNeeds.locations.slice(0, locCap),
+      };
+      console.warn(
+        `[fracttal-sync] catalog needs truncated: ${totalLabels} -> ${MAX_CATALOG_LABELS} labels`,
+      );
+    }
     if (!dryRun && io.ensureCatalog) {
-      await io.ensureCatalog(catalogNeeds(items));
+      await io.ensureCatalog(needs);
     }
 
     const ctx = await io.buildMapContext();
