@@ -39,7 +39,11 @@ export function createThrottle(options: ThrottleOptions): Throttle {
     }
     // Still over budget (all entries live): evict oldest first. Map
     // iteration order is insertion order, and hits refresh recency below,
-    // so the head is the least-recently-used key.
+    // so the head is the least-recently-used key. Warn so operators notice
+    // the 5000-key upper bound being exceeded by live buckets.
+    console.warn(
+      `throttle: evicting live (non-expired) bucket; map at ${buckets.size} keys (cap 5000)`,
+    );
     while (buckets.size > 5000) {
       const oldest = buckets.keys().next().value;
       if (oldest === undefined) break;

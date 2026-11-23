@@ -87,3 +87,19 @@ Deno.test("isIpLiteral rejects anything that is not an address", () => {
     assertStrictEquals(isIpLiteral(bad), false, bad);
   }
 });
+
+Deno.test("throttle warns when evicting live buckets past the cap", () => {
+  const t = createThrottle({ limit: 10, windowMs: 60_000, now: () => 0 });
+  const originalWarn = console.warn;
+  let warned = false;
+  console.warn = (...args: unknown[]) => {
+    if (String(args[0]).includes("evicting live")) warned = true;
+    originalWarn(...args);
+  };
+  try {
+    for (let i = 0; i < 5001; i++) t.check(`k${i}`);
+    if (!warned) throw new Error("expected console.warn on live eviction");
+  } finally {
+    console.warn = originalWarn;
+  }
+});

@@ -23,24 +23,45 @@ export interface AccessGroupRow {
   updated_at: string;
 }
 
-export async function listAccessGroups(): Promise<AccessGroup[]> {
+export async function listAccessGroups(
+  limit?: number,
+  offset?: number,
+): Promise<AccessGroup[]> {
   // Three queries total (groups, all locations, all members) instead of
   // 1 + 2N: the per-group lookups used to dominate load time. Mapping in
   // memory keeps the group order (by name) and the per-group id order.
-  const groups = await queryRows<AccessGroupRow>(
+  const args: unknown[] = [];
+  let groupSql =
     `select id, name, description, created_at::text, updated_at::text
-     from access_groups order by name`,
-  );
-  const locRows = await queryRows<{ group_id: number; location_id: number }>(
-    `select group_id, location_id
-     from access_group_locations
-     order by group_id, location_id`,
-  );
-  const userRows = await queryRows<{ group_id: number; user_id: number }>(
-    `select group_id, user_id
-     from user_access_groups
-     order by group_id, user_id`,
-  );
+     from access_groups order by name`;
+  if (limit !== undefined) {
+    args.push(limit);
+    groupSql += ` limit $${args.length}`;
+  }
+  if (offset !== undefined) {
+    args.push(offset);
+    groupSql += ` offset $${args.length}`;
+  }
+  const groups = await queryRows<AccessGroupRow>(groupSql, args);
+  const ids = groups.map((g) => g.id);
+  const locRows = ids.length
+    ? await queryRows<{ group_id: number; location_id: number }>(
+      `select group_id, location_id
+       from access_group_locations
+       where group_id = any($1::int[])
+       order by group_id, location_id`,
+      [ids],
+    )
+    : [];
+  const userRows = ids.length
+    ? await queryRows<{ group_id: number; user_id: number }>(
+      `select group_id, user_id
+       from user_access_groups
+       where group_id = any($1::int[])
+       order by group_id, user_id`,
+      [ids],
+    )
+    : [];
   const locMap = new Map<number, number[]>();
   for (const r of locRows) {
     const list = locMap.get(r.group_id);
