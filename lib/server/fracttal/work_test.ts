@@ -188,9 +188,20 @@ Deno.test("buildWorkEvents recovers empty code_item requests via itemIdToCode", 
   const built = buildWorkEvents(
     [],
     [
-      { ...request({ types_2_description: "Corretiva Planejada" }), code_item: "", id_item: 1 },
-      { ...request({ types_2_description: "Corretiva Planejada" }), code_item: "", id_item: 999 },
-      { ...request({ types_2_description: "Corretiva Planejada" }), code_item: "" },
+      {
+        ...request({ types_2_description: "Corretiva Planejada" }),
+        code_item: "",
+        id_item: 1,
+      },
+      {
+        ...request({ types_2_description: "Corretiva Planejada" }),
+        code_item: "",
+        id_item: 999,
+      },
+      {
+        ...request({ types_2_description: "Corretiva Planejada" }),
+        code_item: "",
+      },
     ],
     { itemIdToCode },
   );
