@@ -7,8 +7,12 @@
 #
 # Usage:
 #   1. Set the public hostname below (no trailing slash, matches APP_BASE_URL).
-#   2. caddy run --config C:\srv\barrier-monitor\deploy\windows\Caddyfile
-#   3. Keep TCP 80+443 open; close :8300 to the outside (loopback only).
+#   2. caddy validate --config C:\srv\barrier-monitor\deploy\windows\Caddyfile --adapter caddyfile
+#      Setup-Production.ps1 runs the same validation on its generated file
+#      before registering the service, so a bad template fails the install
+#      instead of crash-looping Caddy.
+#   3. caddy run --config C:\srv\barrier-monitor\deploy\windows\Caddyfile
+#   4. Keep TCP 80+443 open; close :8300 to the outside (loopback only).
 
 barreiras.example.com {
 	# Dashboard + API on the same origin (no CORS needed). The app trusts
