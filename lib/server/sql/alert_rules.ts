@@ -387,7 +387,7 @@ export async function createAlertRule(input: NewAlertRule): Promise<AlertRule> {
     throw err;
   }
   const created = rows[0];
-  if (!created) throw new Error("createAlertRule returned no row");
+  if (!created) throw new ValidationError("createAlertRule returned no row");
   return rowToRule(created);
 }
 
