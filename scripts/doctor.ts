@@ -38,7 +38,15 @@ function push(name: string, status: Status, detail: string): void {
 // parseEnvFile: minimal .env parser (KEY=VALUE, # comments, quotes stripped).
 // PowerShell has no `export $(grep ...)` equivalent, so this file is the
 // cross-platform reader the docs point at instead of shell one-liners.
-function parseEnvFile(text: string): Record<string, string> {
+// Writer symmetry: deploy/windows/Setup-Production.ps1 quotes values with
+// whitespace/# /quotes and escapes `\`->`\\`, `"`->`\"`; this reader strips
+// the outer double quotes and unescapes `\\`/`\"` symmetrically, so a writer
+// round-trip is exact. Known asymmetry (documented, not fixed): Deno's
+// `--env-file` loader strips the outer quotes but keeps `\` and `\"`
+// literally, so a quoted value containing `\` or `"` reads differently at
+// runtime (Deno) than here (doctor). Generated secrets avoid both characters;
+// verify a quoted COMPANY_NAME carrying `\`/`"` in both readers.
+export function parseEnvFile(text: string): Record<string, string> {
   const out: Record<string, string> = {};
   for (const raw of text.split(/\r?\n/)) {
     const line = raw.trim();
@@ -308,8 +316,8 @@ function checkPlatform(): void {
 // migrated yet (Postgres 42P01 / undefined_table). Setup-Production.ps1 runs
 // `db:migrate` before the doctor gate for exactly this reason; a manual
 // `deno task doctor` on a fresh database should point at the migration,
-// not fail the whole preflight.
-function isMissingTable(err: unknown): boolean {
+// not fail the whole preflight. Exported for unit tests (no DB needed).
+export function isMissingTable(err: unknown): boolean {
   const msg = err instanceof Error ? err.message : String(err);
   return /42P01|undefined_table|relation\s+"?\w+"?\s+does not exist/i.test(msg);
 }
@@ -499,4 +507,8 @@ async function main(): Promise<void> {
   if (fails > 0) Deno.exit(1);
 }
 
-await main();
+// Import-safe: unit tests import the pure helpers above without running the
+// live preflight (which needs --allow-env/net/read). `deno run` still runs it.
+if (import.meta.main) {
+  await main();
+}

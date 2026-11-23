@@ -12,8 +12,9 @@
   names instead - run Setup-Production.ps1 directly for those).
   Secrets are NEVER command-line arguments: set ADMIN_PASSWORD /
   DB_PASSWORD / POSTGRES_SUPER_PASSWORD / FRACTTAL_SECRET in the environment
-  or answer the setup prompts. Passing them here aborts the setup, because
-  Bootstrap forwards them to Setup-Production.ps1 on its command line.
+  or answer the setup prompts. Passing them here aborts before anything is
+  forwarded (in-process splatting keeps values off any command line, and the
+  real setup rejects them too).
 .EXAMPLE
   powershell -ExecutionPolicy Bypass -File .\Bootstrap.ps1 `
     -RepoZipUrl https://github.com/org/repo/archive/refs/heads/master.zip `
@@ -45,6 +46,14 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
+# Secrets never ride the command line (see Setup-Production.ps1): fail fast
+# here instead of forwarding them via splatting to the real setup, which
+# would abort there anyway. Use env vars or the interactive prompts instead.
+foreach ($s in @('AdminPassword', 'DbPassword', 'PostgresSuperPassword', 'FracttalSecret')) {
+  if ($PSBoundParameters.ContainsKey($s) -and $PSBoundParameters[$s]) {
+    throw "SETUP ABORTED: secret -$s was passed on the command line (visible in process lists/history). Set the $s env var or answer the interactive prompt instead."
+  }
+}
 if (-not $RepoZipUrl) {
   throw 'pass -RepoZipUrl https://github.com/ORG/REPO/archive/refs/heads/master.zip (or clone the repo and run Setup-Production.ps1 directly).'
 }

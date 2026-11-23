@@ -1,8 +1,10 @@
 #Requires -Version 5.1
 # NOTE: no `#Requires -RunAsAdministrator` here on purpose. The script
-# self-elevates below with an argument ARRAY (no string splicing), so spaces,
-# quotes, $ and backticks in arguments survive the UAC hop. Setup.cmd forwards
-# arguments untouched with `powershell -File ... %*` for the same reason.
+# self-elevates below via -EncodedCommand plus an inherited env-var JSON blob
+# (no Start-Process argument ARRAY and no -Command string splicing), so
+# spaces, quotes, $ and backticks in arguments survive the UAC hop.
+# Setup.cmd forwards arguments untouched with `powershell -File ... %*`
+# for the same reason (raw cmd forwarding, not a PowerShell array).
 <#
 .SYNOPSIS
   End-to-end production install of Barrier Monitor on Windows Server 2022/2025.
@@ -88,28 +90,67 @@ foreach ($s in @('AdminPassword', 'DbPassword', 'PostgresSuperPassword', 'Fractt
   }
 }
 
-# Self-elevation (UAC): rebuild the invocation as an argument ARRAY and hand
-# it to Start-Process -Verb RunAs, so spaces, quotes, $ and backticks survive
-# (no -Command string splicing anywhere). Secrets cannot be in the array: the
-# gate above already rejected them, and env vars are inherited by the
-# elevated process. Already elevated: skip straight to the install.
+# Self-elevation (UAC): forward via -EncodedCommand plus an inherited env-var
+# JSON blob (no Start-Process argument ARRAY, no -Command string splicing).
+# Why not `-ArgumentList $array`: Windows PowerShell 5.1 joins an array with
+# bare spaces and no quoting, so `-CompanyName "Seacrest Petróleo"` splits at
+# the space ("Petróleo" binds positionally to -InstallDir) and a script path
+# with spaces plus any embedded quotes/$/backticks breaks the same way. The
+# Base64 -EncodedCommand alphabet contains no spaces, quotes, $ or backticks,
+# so 5.1 joining is harmless, and the real arguments travel outside any
+# command line in $env:BM_SETUP_FORWARD_JSON (script path in
+# $env:BM_SETUP_SCRIPT), which the elevated child inherits and splats
+# in-process to the script file. Secrets are never in the blob: the CLI-secret
+# gate above already aborts when a secret rides the command line, and the
+# forwarder below drops AdminPassword/DbPassword/PostgresSuperPassword/
+# FracttalSecret defensively even if a future caller passes them, so nothing
+# secret lands in JSON, Base64, process lists, or history. Secrets set as env
+# vars (ADMIN_PASSWORD/DB_PASSWORD/POSTGRES_SUPER_PASSWORD/FRACTTAL_SECRET)
+# are inherited by the elevated child automatically and read via
+# Read-SecretEnvOrPrompt. Already elevated: skip straight to the install.
 if (-not ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
-  $elevateArgs = @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', $PSCommandPath)
+  $secretNames = @('AdminPassword', 'DbPassword', 'PostgresSuperPassword', 'FracttalSecret')
+  $forward = @{}
   foreach ($key in $PSBoundParameters.Keys) {
+    if ($key -in $secretNames) { continue }
     $val = $PSBoundParameters[$key]
     if ($val -is [switch]) {
-      if ($val.IsPresent) { $elevateArgs += "-$key" }
+      if ($val.IsPresent) { $forward[$key] = $true }
     } elseif ($val -is [System.Array]) {
-      foreach ($item in $val) { $elevateArgs += "-$key"; $elevateArgs += "$item" }
+      $forward[$key] = @($val | ForEach-Object { "$_" })
     } else {
-      $elevateArgs += "-$key"; $elevateArgs += "$val"
+      $forward[$key] = "$val"
     }
   }
+  $env:BM_SETUP_SCRIPT = $PSCommandPath
+  $env:BM_SETUP_FORWARD_JSON = ($forward | ConvertTo-Json -Depth 5 -Compress)
+  $bootstrap = @'
+$script = $env:BM_SETUP_SCRIPT
+$json = $env:BM_SETUP_FORWARD_JSON
+$ht = @{}
+if ($json) {
+  $j = $json | ConvertFrom-Json
+  foreach ($p in $j.PSObject.Properties) {
+    $v = $p.Value
+    if ($null -eq $v) { $ht[$p.Name] = @() }
+    elseif ($v -is [System.Object[]]) { $ht[$p.Name] = @($v | ForEach-Object { "$_" }) }
+    elseif ($v -is [bool]) { if ($v) { $ht[$p.Name] = $true } }
+    else { $ht[$p.Name] = "$v" }
+  }
+}
+Remove-Item Env:\BM_SETUP_FORWARD_JSON -ErrorAction SilentlyContinue
+& $script @ht
+exit $LASTEXITCODE
+'@
+  $b64 = [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($bootstrap))
   try {
-    $elevated = Start-Process powershell -Verb RunAs -ArgumentList $elevateArgs -Wait -PassThru
+    $elevated = Start-Process powershell -Verb RunAs -ArgumentList "-NoProfile -ExecutionPolicy Bypass -EncodedCommand $b64" -Wait -PassThru
     exit $elevated.ExitCode
   } catch {
     throw "SETUP ABORTED: elevation was refused or failed ($_). Right-click PowerShell -> Run as administrator and re-run."
+  } finally {
+    Remove-Item Env:\BM_SETUP_SCRIPT -ErrorAction SilentlyContinue
+    Remove-Item Env:\BM_SETUP_FORWARD_JSON -ErrorAction SilentlyContinue
   }
 }
 
@@ -156,7 +197,12 @@ function Format-DotEnvValue([string]$value) {
   # Quote values containing whitespace, # or quotes so `KEY=value with space`
   # and `KEY=abc#def` survive a round trip (an unquoted # starts a comment for
   # most .env readers). Double quotes with \ and " escaped; scripts/doctor.ts
-  # strips and unescapes them symmetrically.
+  # strips and unescapes them symmetrically. Known asymmetry (documented, not
+  # fixed): Deno's `--env-file` loader strips the outer quotes but keeps `\`
+  # and `\"` literally, while doctor.ts unescapes `\\`->`\` and `\"`->`"`, so
+  # a value containing `\` or `"` reads differently at runtime vs in doctor.
+  # Generated secrets avoid both characters and COMPANY_NAME rarely needs
+  # them; a quoted COMPANY_NAME with `\`/`"` must be verified in both readers.
   if ($value -eq '' -or $value -match '[\s#"''"]' -or $value -match '^\s' -or $value -match '\s$') {
     $esc = ($value -replace '\\', '\\') -replace '"', '\"'
     return '"' + $esc + '"'
@@ -171,7 +217,10 @@ function Set-DotEnvKey([string]$file, [string]$key, [string]$value) {
   if ($value -match '[\x00-\x08\x0b\x0c\x0e-\x1f]') {
     throw "SETUP ABORTED: value for $key contains control characters."
   }
-  $lines = @(Get-Content $file)
+  # -Encoding UTF8 on read: PS 5.1 Get-Content defaults to ANSI, so a BOM-free
+  # UTF-8 .env holding an accented COMPANY_NAME ("Petróleo") decodes as ANSI
+  # and the later BOM-free rewrite bakes the mojibake in permanently.
+  $lines = @(Get-Content $file -Encoding UTF8)
   $pattern = "^(#\s*)?" + [regex]::Escape($key) + '\s*=.*$'
   $done = $false
   $lines = $lines | ForEach-Object {
@@ -209,8 +258,12 @@ $svcAlerts = "${ServicePrefix}Alerts"
 $svcCaddy = "${ServicePrefix}Caddy"
 # Ports travel as strings from the CLI; reject non-numeric/out-of-range early
 # so neither CheckOnly nor the firewall rules get a garbage LocalPort.
+# [int]::TryParse (not a [int] cast): a huge digit string such as
+# '99999999999999999999' passes ^\d+$ but a cast throws/overflows instead of
+# failing validation, aborting with a cast error instead of the clear message.
 foreach ($pair in @(@('PgPort', $PgPort), @('AppPort', $AppPort))) {
-  if ($pair[1] -notmatch '^\d+$' -or [int]$pair[1] -lt 1 -or [int]$pair[1] -gt 65535) {
+  $portNum = 0
+  if (-not [int]::TryParse($pair[1], [ref]$portNum) -or $portNum -lt 1 -or $portNum -gt 65535) {
     Write-Need "-$($pair[0]) '$($pair[1])' invalid: must be a TCP port number 1-65535."
   }
 }
@@ -233,7 +286,12 @@ if (-not $DbPassword) {
   $fromEnv = Read-SecretEnvOrPrompt 'DB_PASSWORD' 'Postgres app password'
   if ($fromEnv) { $DbPassword = $fromEnv }
 }
-if (-not $PostgresSuperPassword -and (Test-Path (Join-Path $PostgresBinDir 'pg_ctl.exe'))) {
+if (-not $PostgresSuperPassword) {
+  # Read unconditionally (not only when the vendor path exists): EDB-only
+  # hosts fall back to $pg16Bin/$pg18Bin below, and gating on the vendor path
+  # left the fallback aborting for -PostgresSuperPassword even though the
+  # CLI-secret gate forbids passing it on the command line. Env (or the
+  # install-time prompt/generation in section 2) is the only path.
   # Existing Postgres needs the superuser now; missing value fails later with
   # a clear message (no silent generation over an existing cluster).
   $fromEnv = [Environment]::GetEnvironmentVariable('POSTGRES_SUPER_PASSWORD')
@@ -292,7 +350,11 @@ function Test-ListenPort([int]$p) {
   try { $null -ne (Get-NetTCPConnection -LocalPort $p -State Listen -ErrorAction Stop) }
   catch { $false }
 }
-$knownPrefixes = @('Barrier', 'SeaMonitor')
+# A custom -ServicePrefix would otherwise be invisible to the scan: its own
+# services would look like stray port occupants on re-run (false abort) and a
+# foreign custom stack would be missed. Merging it in keeps same-vs-foreign
+# exact for any prefix.
+$knownPrefixes = @('Barrier', 'SeaMonitor', $ServicePrefix) | Sort-Object -Unique
 $knownPgBins = @('C:\sites\seacrest\.vendor\pgsql18\bin', $pg16Bin, $pg18Bin)
 $samePrefixServices = @()
 $foreignServices = @()
@@ -632,7 +694,9 @@ $regArgs = @{ InstallDir = $InstallDir; NssmExe = $nssmExe; DenoExe = $denoExe; 
 if ($regSupportsPrefix) { $regArgs['ServicePrefix'] = $ServicePrefix }
 & "$deployDir\Register-Services.ps1" @regArgs
 $hasFracttal = $false
-foreach ($line in Get-Content $envFile) {
+# -Encoding UTF8 (see Set-DotEnvKey): ANSI decoding would corrupt an accented
+# COMPANY_NAME line before this scan even runs on PS 5.1.
+foreach ($line in Get-Content $envFile -Encoding UTF8) {
   if ($line -match '^\s*FRACTTAL_KEY\s*=\s*\S+') { $hasFracttal = $true }
 }
 if (-not $hasFracttal) {
