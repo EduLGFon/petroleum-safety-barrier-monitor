@@ -67,20 +67,6 @@ interface UserPatchBody {
   entraObjectId?: unknown;
 }
 
-// Last-admin guard texts raised by the user store. The pattern is anchored
-// on the exact guard family on purpose: a database error that merely mentions
-// "admin" must never be answered as a 400, and the guard text we return is
-// the policy wording the admin UI already localizes.
-const LAST_ADMIN_GUARD_RE =
-  /^cannot (demote|deactivate|delete|convert) the last active( local)? admin$/;
-
-// lastAdminMessage: the guard text when the failure is a last-admin guard,
-// undefined for every other failure (those stay on the 500 path).
-function lastAdminMessage(err: unknown): string | undefined {
-  if (!(err instanceof Error)) return undefined;
-  return LAST_ADMIN_GUARD_RE.test(err.message) ? err.message : undefined;
-}
-
 // duplicateMessage: a unique violation reported by the driver, mapped to a
 // controlled message. The SQLSTATE and the constraint name decide - never the
 // error text, so driver wording can never leak into a response.
@@ -343,24 +329,20 @@ export const handler = define.handlers({
       // wording. Everything else is internal - database text never reaches a
       // client, and no error is classified by matching words in a message.
       if (err instanceof ValidationError) {
-        return badRequest(err.message, requestId);
-      }
-      const duplicate = duplicateMessage(err);
-      if (duplicate !== undefined) {
-        return badRequest(duplicate, requestId);
-      }
-      const guard = lastAdminMessage(err);
-      if (guard !== undefined) {
         // A self-demotion/deactivation is still the last-admin guard, but the
         // caller can act on a clearer "your own account" explanation. The
         // wire message stays English; the UI localizes it.
         const publicMessage = auth.user?.id === id
-          ? guard.replace(
+          ? err.message.replace(
             "the last active admin",
             "your own account while you are the last active admin",
           )
-          : guard;
+          : err.message;
         return badRequest(publicMessage, requestId);
+      }
+      const duplicate = duplicateMessage(err);
+      if (duplicate !== undefined) {
+        return badRequest(duplicate, requestId);
       }
       return internal(
         "PATCH /api/users/:id",
@@ -406,16 +388,16 @@ export const handler = define.handlers({
       if (!removed) return notFound("User not found", requestId);
       return ok({ ok: true }, requestId);
     } catch (err) {
-      // Only the last-admin guard is a client-answerable rejection; every
-      // other failure stays internal so database text never leaks.
-      const guard = lastAdminMessage(err);
-      if (guard !== undefined) {
+      // A ValidationError (including the last-admin guards) is a
+      // client-answerable rejection; every other failure stays internal so
+      // database text never leaks.
+      if (err instanceof ValidationError) {
         const publicMessage = auth.user?.id === id
-          ? guard.replace(
+          ? err.message.replace(
             "the last active admin",
             "your own account while you are the last active admin",
           )
-          : guard;
+          : err.message;
         return badRequest(publicMessage, requestId);
       }
       return internal(
