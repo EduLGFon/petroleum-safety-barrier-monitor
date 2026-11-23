@@ -31,7 +31,10 @@ import {
 
 import {
   normalizeEntraObjectId,
+  POSTGRES_UNIQUE_VIOLATION,
+  postgresErrorInfo,
   readJsonBody,
+  ValidationError,
 } from "../../lib/server/validation.ts";
 
 import {
@@ -138,11 +141,13 @@ export const handler = define.handlers({
         : Array.isArray(body.accessGroupIds)
         ? body.accessGroupIds
         : (() => {
-          throw new Error("accessGroupIds must be an array");
+          throw new ValidationError("accessGroupIds must be an array");
         })();
       for (const id of groupIds) {
         if (typeof id !== "number" || !Number.isSafeInteger(id) || id <= 0) {
-          throw new Error("accessGroupIds must contain positive integers");
+          throw new ValidationError(
+            "accessGroupIds must contain positive integers",
+          );
         }
       }
       const authSource = body.authSource === "entra" ? "entra" : "local";
@@ -150,17 +155,17 @@ export const handler = define.handlers({
         body.authSource !== undefined && body.authSource !== "local" &&
         body.authSource !== "entra"
       ) {
-        throw new Error("authSource must be local or entra");
+        throw new ValidationError("authSource must be local or entra");
       }
       let user;
       let temporaryPassword: string | null = null;
       if (authSource === "entra") {
         const authConfig = loadAuthConfig();
         if (!authConfig.ssoEnabled || !authConfig.entra) {
-          throw new Error("SSO is not enabled");
+          throw new ValidationError("SSO is not enabled");
         }
         if (body.password !== undefined) {
-          throw new Error("password is not allowed for Entra users");
+          throw new ValidationError("password is not allowed for Entra users");
         }
         // The object id is optional on purpose. Supplying it binds the
         // identity up front; omitting it leaves the account pending, and the
@@ -242,23 +247,17 @@ export const handler = define.handlers({
         { headers: { "cache-control": "no-store" } },
       );
     } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
-      if (message.includes("duplicate") || message.includes("unique")) {
+      if (err instanceof ValidationError) {
+        return badRequest(err.message, requestId);
+      }
+      const info = postgresErrorInfo(err);
+      if (info.code === POSTGRES_UNIQUE_VIOLATION) {
         return badRequest(
-          message.includes("email") || message.includes("users_email")
+          info.constraint === "users_email_key"
             ? "email already exists"
             : "duplicate value",
           requestId,
         );
-      }
-      if (
-        message.includes("email") || message.includes("name") ||
-        message.includes("password") || message.includes("role") ||
-        message.includes("phone") || message.includes("invalid phone") ||
-        message.includes("accessGroupIds") || message.includes("authSource") ||
-        message.includes("entra") || message.includes("SSO")
-      ) {
-        return badRequest(message, requestId);
       }
       return internal(
         "POST /api/users",
