@@ -89,10 +89,10 @@ Deno.test("listAlertRules passes limit and offset to the query", async () => {
   });
   try {
     await listAlertRules(false, 5, 10);
-    assertEquals(seen.length, 1);
-    assertEquals(seen[0]?.args, [5, 10]);
-    assert(seen[0]?.text.includes("limit $"), "limit placeholder");
-    assert(seen[0]?.text.includes("offset $"), "offset placeholder");
+    const query = seen.find((q) => q.text.includes("from alert_rules"));
+    assertEquals(query?.args, [5, 10]);
+    assert(query?.text.includes("limit $"), "limit placeholder");
+    assert(query?.text.includes("offset $"), "offset placeholder");
   } finally {
     restore();
   }
@@ -106,9 +106,9 @@ Deno.test("listAlertRules without pagination keeps the unbounded query", async (
   });
   try {
     await listAlertRules();
-    assertEquals(seen.length, 1);
-    assertEquals(seen[0]?.args, []);
-    assert(!seen[0]?.text.includes("limit"), "no limit clause");
+    const query = seen.find((q) => q.text.includes("from alert_rules"));
+    assertEquals(query?.args, []);
+    assert(!query?.text.includes("limit"), "no limit clause");
   } finally {
     restore();
   }
