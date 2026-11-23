@@ -500,13 +500,15 @@ export function buildWorkEvents(
   });
   requests.forEach((raw, i) => {
     try {
-      const wr = parseWorkRequest(raw);
+      const patched = withItemCode(raw, opts.itemIdToCode);
+      const wr = parseWorkRequest(patched.row);
       const slot = workRequestSlot(wr);
       if (!slot) return;
+      if (patched.recovered) recovered++;
       const acc = events.get(wr.code_item) ?? blank();
       if (slot.urgent) acc.urgent = mergeEvent(acc.urgent, slot.urgent);
       if (slot.planned) acc.planned = mergeEvent(acc.planned, slot.planned);
-      const cont = slot.hasContingency || contingencyFromRaw(raw);
+      const cont = slot.hasContingency || contingencyFromRaw(patched.row);
       if (cont && (acc.contingencySource ?? "") === "") {
         const folio = (wr.wo_folio ?? "").trim();
         const desc = (wr.description ?? "").trim();
@@ -535,7 +537,11 @@ function withItemCode(
     return { row: raw, recovered: false };
   }
   const row = raw as Record<string, unknown>;
-  if (typeof row.code === "string" && row.code !== "") {
+  const hasCode = typeof row.code === "string";
+  const hasCodeItem = typeof row.code_item === "string";
+  const codeEmpty = hasCode && row.code === "";
+  const codeItemEmpty = hasCodeItem && row.code_item === "";
+  if (!codeEmpty && !codeItemEmpty) {
     return { row: raw, recovered: false };
   }
   if (typeof row.id_item !== "number") return { row: raw, recovered: false };
@@ -543,7 +549,8 @@ function withItemCode(
   if (typeof code !== "string" || code === "") {
     return { row: raw, recovered: false };
   }
-  return { row: { ...row, code }, recovered: true };
+  if (codeEmpty) return { row: { ...row, code }, recovered: true };
+  return { row: { ...row, code_item: code }, recovered: true };
 }
 
 // resolverFor adapts a merged map to the lookup runSync consumes.
