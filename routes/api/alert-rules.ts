@@ -30,7 +30,7 @@ import {
 
 import { loadServerConfig } from "../../lib/server/config.ts";
 
-import { readJsonBody } from "../../lib/server/validation.ts";
+import { readJsonBody, ValidationError } from "../../lib/server/validation.ts";
 
 import { define } from "../../utils.ts";
 
@@ -139,32 +139,8 @@ export const handler = define.handlers({
       });
       return created(rule, requestId);
     } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
-      if (message.includes("duplicate") || message.includes("unique")) {
-        return badRequest(
-          message.includes("name") || message.includes("alert_rules_name")
-            ? "rule name already exists"
-            : "duplicate value",
-          requestId,
-        );
-      }
-      if (
-        message.includes("name") || message.includes("description") ||
-        message.includes("category") || message.includes("toStatus") ||
-        message.includes("fromStatus") || message.includes("critical") ||
-        message.includes("includeRecovery") || message.includes("staleDays") ||
-        message.includes("staleRepeat") ||
-        message.includes("notifyImmediate") ||
-        message.includes("active") || message.includes("urgency") ||
-        message.includes("location") || message.includes("typology") ||
-        message.includes("grouping") || message.includes("owner") ||
-        message.includes("cooldown") || message.includes("maxPerDay") ||
-        message.includes("quiet") || message.includes("activeDays") ||
-        message.includes("priority") || message.includes("validFrom") ||
-        message.includes("validTo") || message.includes("actionPlan") ||
-        message.includes("onTransition")
-      ) {
-        return badRequest(message, requestId);
+      if (err instanceof ValidationError) {
+        return badRequest(err.message, requestId);
       }
       return internal(
         "POST /api/alert-rules",
