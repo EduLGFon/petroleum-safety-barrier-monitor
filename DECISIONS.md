@@ -118,3 +118,7 @@ decisive event with its reference, classification, detail, contingency signal, a
 minimizes stored personal data and avoids schema, migration, and wire changes; consumers stay read-only. Limitation:
 only the decisive event is stored, so competing work orders cannot be reconstructed. The rule text mirrors
 `docs/STATUSES.md`; unknown statuses keep a deterministic fallback.
+
+## D37
+
+Sync, alert, and auth policy alignment from the 2026-11 audit and deferred follow-ups. Fracttal sync stays read-only with host allow-list and adaptive backoff; station alias and mobile test-unit split remain the only normalization rules. Alert audience derives from active users and access groups filtered per station at delivery, with `alert_recipients` as the legacy manual list. Auth keeps lowercase emails, PBKDF2-SHA256 210k iterations, opaque 12h sessions stored as SHA-256, and forced-change gating; Entra binds by email first then object id with no JIT creation. No local SMTP; delivery is the provider's job. These policies are compatibility-sensitive and are added to, not removed from.

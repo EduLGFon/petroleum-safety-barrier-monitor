@@ -2280,7 +2280,7 @@ As fontes abaixo foram usadas para escrever e verificar este documento. Caminhos
 | Arquivo                            | Conteúdo                                                  |
 | ---------------------------------- | --------------------------------------------------------- |
 | `agents.md`                        | regras de trabalho, segurança, privacidade e documentação |
-| `DECISIONS.md`                     | decisões vinculantes D01 e D20 a D36                      |
+| `DECISIONS.md`                     | decisões vinculantes D01 e D20 a D37                      |
 | `scripts/check-migration-order.ts` | guarda de ordem do schema                                 |
 | `scripts/browser-smoke.ts`         | smoke headless de hidratação e interação                  |
 | `scripts/browser-capture.ts`       | captura de tela e PDF                                     |
