@@ -147,6 +147,37 @@ Deno.test("csvCell quotes, doubles quotes, and stringifies anything", () => {
   assertStrictEquals(csvCell(false), '"false"');
 });
 
+Deno.test("csvCell guards a formula lead with an apostrophe", () => {
+  // The classic injection leads: the cell would run as a formula on import.
+  assertStrictEquals(csvCell("=1+1"), '"\'=1+1"');
+  assertStrictEquals(csvCell("+1"), '"\'+1"');
+  assertStrictEquals(csvCell("-1"), '"\'-1"');
+  assertStrictEquals(csvCell("@SUM(A1)"), '"\'@SUM(A1)"');
+  assertStrictEquals(csvCell("\t=1+1"), '"\'\t=1+1"');
+  assertStrictEquals(csvCell("\r=1+1"), '"\'\r=1+1"');
+});
+
+Deno.test("csvCell guards a formula behind leading whitespace", () => {
+  // Spreadsheet apps trim the cell before evaluating it, so a leading space,
+  // tab or newline is enough to smuggle a formula in.
+  assertStrictEquals(csvCell(" =1+1"), '"\' =1+1"');
+  assertStrictEquals(csvCell("  =1+1"), '"\'  =1+1"');
+  assertStrictEquals(csvCell("\n=1+1"), '"\'\n=1+1"');
+  assertStrictEquals(csvCell("\t\r =1+1"), '"\'\t\r =1+1"');
+  assertStrictEquals(csvCell(" \n +1"), '"\' \n +1"');
+  // The apostrophe goes on the original cell: the text stays readable.
+  assertStrictEquals(csvCell(" =1+1"), '"\' =1+1"');
+});
+
+Deno.test("csvCell leaves harmless cells alone", () => {
+  // No leading trigger: nothing is prefixed, so the text never changes.
+  assertStrictEquals(csvCell("1+1"), '"1+1"');
+  assertStrictEquals(csvCell("a-b"), '"a-b"');
+  assertStrictEquals(csvCell("text "), '"text "');
+  assertStrictEquals(csvCell(" "), '" "');
+  assertStrictEquals(csvCell(""), '""');
+});
+
 Deno.test("escHtml escapes &, <, >, and double quotes", () => {
   assertStrictEquals(
     escHtml(`<script>"&"</script>`),
