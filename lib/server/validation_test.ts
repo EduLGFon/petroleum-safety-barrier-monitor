@@ -5,7 +5,10 @@ import {
   normalizeOptionalReference,
   normalizePhone,
   parsePositiveId,
+  POSTGRES_UNIQUE_VIOLATION,
+  postgresErrorInfo,
   readJsonBodyCapped,
+  ValidationError,
 } from "./validation.ts";
 
 import { assert, assertStrictEquals, assertThrows } from "jsr:@std/assert@^1";
@@ -123,4 +126,63 @@ Deno.test("readJsonBodyCapped rejects invalid and oversized request bodies", asy
   );
   assertStrictEquals(tooLarge.ok, false);
   if (!tooLarge.ok) assertStrictEquals(tooLarge.reason, "too-large");
+});
+
+Deno.test("normalizers reject with a typed ValidationError", () => {
+  // The type is what lets a route answer 400 without matching error text.
+  assertThrows(() => normalizeEmail(42), ValidationError, "must be a string");
+  assertThrows(
+    () => normalizeEmail("not-an-email"),
+    ValidationError,
+    "invalid email",
+  );
+  assertThrows(() => normalizeName(42), ValidationError, "must be a string");
+  assertThrows(
+    () => normalizePhone(42),
+    ValidationError,
+    "must be a string",
+  );
+  assertThrows(
+    () => normalizeOptionalReference(42, "ref"),
+    ValidationError,
+    "must be a string",
+  );
+  assertThrows(
+    () => parsePositiveId(0, "id"),
+    ValidationError,
+    "positive integer",
+  );
+  // A ValidationError is still an Error, so existing handlers keep working.
+  assertThrows(() => normalizeEmail(42), Error, "must be a string");
+});
+
+Deno.test("postgresErrorInfo reads the driver fields, never the message", () => {
+  // The driver reports the SQLSTATE and the violated constraint; the route
+  // classifies on those, so wording can never decide the status code.
+  type DriverError = {
+    fields: { code: string; constraint: string };
+    message: string;
+  };
+  const unique: DriverError = {
+    fields: { code: POSTGRES_UNIQUE_VIOLATION, constraint: "users_email_key" },
+    message: 'duplicate key value violates unique constraint "users_email_key"',
+  };
+  const info = postgresErrorInfo(unique);
+  assertStrictEquals(info.code, POSTGRES_UNIQUE_VIOLATION);
+  assertStrictEquals(info.constraint, "users_email_key");
+
+  // An error that merely mentions a known word is not a unique violation.
+  const other: DriverError = {
+    fields: { code: "23503", constraint: "barriers_location_id_fkey" },
+    message: "email must be unique",
+  };
+  const otherInfo = postgresErrorInfo(other);
+  assert(otherInfo.code !== POSTGRES_UNIQUE_VIOLATION);
+  assertStrictEquals(otherInfo.code, "23503");
+
+  // Anything that is not a driver error yields no fields at all.
+  assertStrictEquals(postgresErrorInfo(new Error("boom")).code, undefined);
+  assertStrictEquals(postgresErrorInfo("boom").constraint, undefined);
+  assertStrictEquals(postgresErrorInfo(null).code, undefined);
+  assertStrictEquals(postgresErrorInfo(undefined).code, undefined);
 });

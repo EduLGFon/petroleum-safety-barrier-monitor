@@ -27,54 +27,68 @@ import {
 } from "../../../lib/server/sql/barriers.ts";
 
 import {
+  parseIdParam,
+  readJsonBody,
+  ValidationError,
+} from "../../../lib/server/validation.ts";
+
+import {
   readThrottle,
   routeClientKey,
   writeThrottle,
 } from "../../../lib/server/throttle.ts";
 
-import { fanoutStatusChange } from "../../../lib/server/alerts/status-fanout.ts";
+import { isContingencyFlag } from "../../../lib/server/fracttal/barrier-rules.ts";
 
-import { parseIdParam, readJsonBody } from "../../../lib/server/validation.ts";
+import { fanoutStatusChange } from "../../../lib/server/alerts/status-fanout.ts";
 
 import { getOrCreateAuthor } from "../../../lib/server/sql/authors.ts";
 
 import { isOwnableField } from "../../../lib/field-ownership.ts";
 
-import { isContingencyFlag } from "../../../lib/server/fracttal/barrier-rules.ts";
-
-import { withTx } from "../../../lib/server/db.ts";
-
 import { loadServerConfig } from "../../../lib/server/config.ts";
-
-import { forRequest } from "../../../lib/server/log.ts";
-
-import { define } from "../../../utils.ts";
 
 import { denyIfCrossSite } from "../../../lib/server/csrf.ts";
 
+import { forRequest } from "../../../lib/server/log.ts";
+
+import { withTx } from "../../../lib/server/db.ts";
+
+import { define } from "../../../utils.ts";
+
+// optStr: optional free-text field. A wrong type is a client-input rejection
+// (ValidationError), so the route maps it to 400 by type - never by matching
+// words in an error message.
 function optStr(raw: unknown, max = 2000): string | undefined {
   if (raw === undefined) return undefined;
-  if (typeof raw !== "string") throw new Error("must be a string");
+  if (typeof raw !== "string") {
+    throw new ValidationError("must be a string");
+  }
   return raw.slice(0, max);
 }
 
 function optInt(raw: unknown, name: string): number | undefined {
   if (raw === undefined) return undefined;
-  if (typeof raw !== "number" || !Number.isInteger(raw) || raw < 0) {
-    throw new Error(`${name} must be a non-negative integer`);
+  if (typeof raw !== "number" || !Number.isSafeInteger(raw) || raw < 0) {
+    throw new ValidationError(`${name} must be a non-negative integer`);
   }
   return raw;
 }
 
 // optReleaseFields: validates the per-field "back to sync" list. Unknown or
-// non-string entries are a 400 (the route maps "must be" to badRequest).
+// non-string entries are a 400 (the route maps ValidationError to
+// badRequest).
 function optReleaseFields(raw: unknown): string[] | undefined {
   if (raw === undefined) return undefined;
-  if (!Array.isArray(raw)) throw new Error("releaseFields must be an array");
+  if (!Array.isArray(raw)) {
+    throw new ValidationError("releaseFields must be an array");
+  }
   const out = new Set<string>();
   for (const item of raw) {
     if (typeof item !== "string" || !isOwnableField(item)) {
-      throw new Error(`releaseFields must be known field names, got ${item}`);
+      throw new ValidationError(
+        `releaseFields must be known field names, got ${item}`,
+      );
     }
     out.add(item);
   }
@@ -336,12 +350,11 @@ export const handler = define.handlers({
 
       return ok(updated ?? existing, requestId);
     } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
-      if (
-        message.includes("must be") || message.includes("Invalid") ||
-        message.includes("string")
-      ) {
-        return badRequest(message, requestId);
+      // Typed classification: only a ValidationError is a client-input
+      // rejection (400). Every other failure is internal, so database and
+      // driver text can never be returned as a 400 with its wording.
+      if (err instanceof ValidationError) {
+        return badRequest(err.message, requestId);
       }
       return internal(
         `PATCH /api/barriers/${ctx.params.id}`,

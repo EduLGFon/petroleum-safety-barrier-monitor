@@ -12,11 +12,40 @@ export class ValidationError extends Error {
   }
 }
 
+// PostgresErrorInfo: the structured fields a Postgres driver reports for a
+// failed statement (SQLSTATE code plus the violated constraint name).
+// Classification reads these instead of the error text: the driver states
+// what went wrong, so a message that merely contains a word like "email"
+// can never be mistaken for a known domain rejection.
+export interface PostgresErrorInfo {
+  code?: string;
+  constraint?: string;
+}
+
+// postgresErrorInfo: reads the driver error fields, empty when the error did
+// not come from Postgres. Never throws, never inspects the message.
+export function postgresErrorInfo(err: unknown): PostgresErrorInfo {
+  if (typeof err !== "object" || err === null) return {};
+  const fields = (err as { fields?: unknown }).fields;
+  if (typeof fields !== "object" || fields === null) return {};
+  const f = fields as { code?: unknown; constraint?: unknown };
+  return {
+    code: typeof f.code === "string" ? f.code : undefined,
+    constraint: typeof f.constraint === "string" ? f.constraint : undefined,
+  };
+}
+
+// SQLSTATE 23505: unique_violation. The only database failure the API maps
+// to a 400 (a duplicate row the caller can act on).
+export const POSTGRES_UNIQUE_VIOLATION = "23505";
+
 export function normalizeEmail(raw: unknown): string {
-  if (typeof raw !== "string") throw new Error("email must be a string");
+  if (typeof raw !== "string") {
+    throw new ValidationError("email must be a string");
+  }
   const email = raw.trim().toLowerCase().slice(0, 254);
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-    throw new Error("invalid email address");
+    throw new ValidationError("invalid email address");
   }
   return email;
 }
@@ -24,7 +53,9 @@ export function normalizeEmail(raw: unknown): string {
 // normalizeName: trims free text; empty stays empty.
 export function normalizeName(raw: unknown): string {
   if (raw === undefined || raw === null) return "";
-  if (typeof raw !== "string") throw new Error("name must be a string");
+  if (typeof raw !== "string") {
+    throw new ValidationError("name must be a string");
+  }
   return raw.trim().slice(0, 200);
 }
 
@@ -35,14 +66,16 @@ export function normalizeName(raw: unknown): string {
 // code and non-domestic numbers. Returns digits only, capped at 13.
 export function normalizePhone(raw: unknown): string {
   if (raw === undefined || raw === null) return "";
-  if (typeof raw !== "string") throw new Error("phone must be a string");
+  if (typeof raw !== "string") {
+    throw new ValidationError("phone must be a string");
+  }
   const trimmed = raw.trim();
   if (trimmed === "") return "";
   const digits = trimmed.replace(/\D/g, "");
-  if (digits.length > 13) throw new Error("invalid phone number");
+  if (digits.length > 13) throw new ValidationError("invalid phone number");
   if (/^55\d{10,11}$/.test(digits)) return digits;
   if (/^\d{10,11}$/.test(digits)) return `55${digits}`;
-  throw new Error("invalid phone number");
+  throw new ValidationError("invalid phone number");
 }
 
 // parseIdParam: numeric path ids are positive safe integers, nothing else.
@@ -52,7 +85,7 @@ export function normalizePhone(raw: unknown): string {
 // Object ids are GUIDs; store them lowercase to keep uniqueness predictable.
 export function normalizeEntraObjectId(raw: unknown): string {
   if (typeof raw !== "string") {
-    throw new Error("entraObjectId must be a string");
+    throw new ValidationError("entraObjectId must be a string");
   }
   const value = raw.trim().toLowerCase();
   if (
@@ -60,7 +93,7 @@ export function normalizeEntraObjectId(raw: unknown): string {
       value,
     )
   ) {
-    throw new Error("entraObjectId must be a GUID");
+    throw new ValidationError("entraObjectId must be a GUID");
   }
   return value;
 }
@@ -74,7 +107,7 @@ export function parseIdParam(raw: string | undefined): number | undefined {
 
 export function parsePositiveId(raw: unknown, name: string): number {
   if (typeof raw !== "number" || !Number.isSafeInteger(raw) || raw <= 0) {
-    throw new Error(`${name} must be a positive integer`);
+    throw new ValidationError(`${name} must be a positive integer`);
   }
   return raw;
 }
@@ -84,9 +117,11 @@ export function normalizeOptionalReference(
   name: string,
 ): string {
   if (raw === undefined || raw === null) return "";
-  if (typeof raw !== "string") throw new Error(`${name} must be a string`);
+  if (typeof raw !== "string") {
+    throw new ValidationError(`${name} must be a string`);
+  }
   const value = raw.trim();
-  if (value.length > 2000) throw new Error(`${name} is too long`);
+  if (value.length > 2000) throw new ValidationError(`${name} is too long`);
   return value;
 }
 

@@ -38,11 +38,11 @@ import { getOrCreateAuthor } from "../../../../lib/server/sql/authors.ts";
 
 import { loadServerConfig } from "../../../../lib/server/config.ts";
 
+import { denyIfCrossSite } from "../../../../lib/server/csrf.ts";
+
 import { forRequest } from "../../../../lib/server/log.ts";
 
 import { define } from "../../../../utils.ts";
-
-import { denyIfCrossSite } from "../../../../lib/server/csrf.ts";
 
 interface StatusBody {
   statusId?: number;
@@ -121,13 +121,17 @@ export const handler = define.handlers({
     } else {
       authorId = body.authorId;
     }
-    if (!Number.isInteger(statusId) || (statusId as number) < 0) {
+    // Ids come from the lookup tables, whose ids start at 0: availability
+    // status 0 is "Disponível" (docs/STATUSES.md) and author 0 is a seeded
+    // author row, so zero is a real id here and only a negative, fractional
+    // or unsafe value is a client mistake.
+    if (!Number.isSafeInteger(statusId) || (statusId as number) < 0) {
       return badRequest(
         "statusId is a required non-negative integer",
         requestId,
       );
     }
-    if (!Number.isInteger(authorId) || (authorId as number) < 0) {
+    if (!Number.isSafeInteger(authorId) || (authorId as number) < 0) {
       return badRequest(
         "authorId is required for token callers (session callers derive it)",
         requestId,
