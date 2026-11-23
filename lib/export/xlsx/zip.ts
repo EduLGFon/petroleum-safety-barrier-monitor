@@ -104,7 +104,15 @@ async function* deflate(
         onRaw(chunk);
         await writer.write(chunk);
       }
-      if (!stopped) await writer.close();
+      if (stopped) {
+        try {
+          await writer.abort();
+        } catch {
+          // ignore abort failures on a cancelled stream
+        }
+      } else {
+        await writer.close();
+      }
     } catch (e) {
       // A throwing source would otherwise leave the reader hanging forever:
       // abort the writable so the read side errors and the failure surfaces.
@@ -129,6 +137,11 @@ async function* deflate(
     // unhandled rejection on a dead connection.
     stopped = true;
     reader.releaseLock();
+    try {
+      await writer.abort();
+    } catch {
+      // ignore: writable may already be closed or errored
+    }
     feed.catch(() => {});
   }
   await feed;
