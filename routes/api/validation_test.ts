@@ -20,6 +20,42 @@ import { handler as userPatchHandler } from "./users/[id].ts";
 
 import { handler as exportHandler } from "./export.ts";
 
+function loginHandler(): RouteHandler {
+  const handler = authLoginHandler.POST as unknown as RouteHandler | undefined;
+  if (!handler) throw new Error("POST /api/auth/login handler is missing");
+  return handler;
+}
+
+function passwordHandler(): RouteHandler {
+  const handler = authPasswordHandler.POST as unknown as
+    | RouteHandler
+    | undefined;
+  if (!handler) throw new Error("POST /api/auth/password handler is missing");
+  return handler;
+}
+
+function contingenciesPostHandler(): RouteHandler {
+  const handler = contingenciesHandler.POST as unknown as
+    | RouteHandler
+    | undefined;
+  if (!handler) throw new Error("POST contingencies handler is missing");
+  return handler;
+}
+
+function contingenciesPatchHandler(): RouteHandler {
+  const handler = contingenciesHandler.PATCH as unknown as
+    | RouteHandler
+    | undefined;
+  if (!handler) throw new Error("PATCH contingencies handler is missing");
+  return handler;
+}
+
+function exportGetHandler(): RouteHandler {
+  const handler = exportHandler.GET as unknown as RouteHandler | undefined;
+  if (!handler) throw new Error("GET /api/export handler is missing");
+  return handler;
+}
+
 import { duplicateMessage as accessGroupDuplicateMessage } from "./access-groups/[id].ts";
 
 import { handler as syncRunsRoute } from "./sync-runs.ts";
@@ -457,10 +493,8 @@ function loginRequest(body: unknown): Request {
 }
 
 Deno.test("GET /api/export maps an unknown format to 400", async () => {
-  const get = exportHandler.GET;
-  if (!get) throw new Error("GET /api/export handler is missing");
   await withAdminToken(async () => {
-    const res = await get(
+    const res = await exportGetHandler()(
       routeCtx(
         new Request("http://localhost/api/export?format=ods", {
           headers: { authorization: "Bearer test-admin-token" },
@@ -475,9 +509,7 @@ Deno.test("GET /api/export maps an unknown format to 400", async () => {
 });
 
 Deno.test("POST /api/auth/login maps an invalid email to 400 by type", async () => {
-  const post = authLoginHandler.POST;
-  if (!post) throw new Error("POST /api/auth/login handler is missing");
-  const res = await post(
+  const res = await loginHandler()(
     routeCtx(
       loginRequest({ email: "not-an-email", password: "whatever-123456" }),
     ),
@@ -489,17 +521,15 @@ Deno.test("POST /api/auth/login maps an invalid email to 400 by type", async () 
 });
 
 Deno.test("POST /api/auth/login maps a missing password to 400", async () => {
-  const post = authLoginHandler.POST;
-  if (!post) throw new Error("POST /api/auth/login handler is missing");
-  const res = await post(routeCtx(loginRequest({ email: "user@example.com" })));
+  const res = await loginHandler()(
+    routeCtx(loginRequest({ email: "user@example.com" })),
+  );
   assertStrictEquals(res.status, 400);
   const body = await envelope(res);
   assertStrictEquals(body.code, "BAD_REQUEST");
 });
 
 Deno.test("POST /api/auth/password maps a short new password to 400 by type", async () => {
-  const post = authPasswordHandler.POST;
-  if (!post) throw new Error("POST /api/auth/password handler is missing");
   const stored = await hashPassword("correct-current-123456");
   const restore = installPool(fakePool({
     session: {
@@ -531,7 +561,7 @@ Deno.test("POST /api/auth/password maps a short new password to 400 by type", as
         newPassword: "short",
       }),
     });
-    const res = await post(routeCtx(req));
+    const res = await passwordHandler()(routeCtx(req));
     assertStrictEquals(res.status, 400);
     const body = await envelope(res);
     assertStrictEquals(body.code, "BAD_REQUEST");
@@ -542,8 +572,6 @@ Deno.test("POST /api/auth/password maps a short new password to 400 by type", as
 });
 
 Deno.test("POST /api/barriers/:id/contingencies maps a bad id to 400 by type", async () => {
-  const post = contingenciesHandler.POST;
-  if (!post) throw new Error("POST contingencies handler is missing");
   await withAdminToken(async () => {
     const req = new Request(
       "http://localhost/api/barriers/abc/contingencies",
@@ -556,7 +584,7 @@ Deno.test("POST /api/barriers/:id/contingencies maps a bad id to 400 by type", a
         body: JSON.stringify({ contingencyBarrierId: 2 }),
       },
     );
-    const res = await post(routeCtx(req, { id: "abc" }));
+    const res = await contingenciesPostHandler()(routeCtx(req, { id: "abc" }));
     assertStrictEquals(res.status, 400);
     const body = await envelope(res);
     assertStrictEquals(body.code, "BAD_REQUEST");
@@ -564,8 +592,6 @@ Deno.test("POST /api/barriers/:id/contingencies maps a bad id to 400 by type", a
 });
 
 Deno.test("PATCH /api/barriers/:id/contingencies maps a bad reference to 400 by type", async () => {
-  const patch = contingenciesHandler.PATCH;
-  if (!patch) throw new Error("PATCH contingencies handler is missing");
   await withAdminToken(async () => {
     const req = new Request("http://localhost/api/barriers/1/contingencies", {
       method: "PATCH",
@@ -579,7 +605,7 @@ Deno.test("PATCH /api/barriers/:id/contingencies maps a bad reference to 400 by 
         riskAnalysis: "ok",
       }),
     });
-    const res = await patch(routeCtx(req, { id: "1" }));
+    const res = await contingenciesPatchHandler()(routeCtx(req, { id: "1" }));
     assertStrictEquals(res.status, 400);
     const body = await envelope(res);
     assertStrictEquals(body.code, "BAD_REQUEST");
