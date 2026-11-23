@@ -368,7 +368,9 @@ export async function updateUser(
           current.role === "admin" && current.active &&
           (await countActiveLocalAdmins(query)) <= 1
         ) {
-          throw new Error("cannot convert the last active local admin");
+          throw new ValidationError(
+            "cannot convert the last active local admin",
+          );
         }
         identityChanged = true;
         revokeSessions = true;
@@ -421,13 +423,15 @@ export async function updateUser(
       const role = normalizeRole(patch.role);
       if (current.role === "admin" && role !== "admin") {
         if ((await countActiveAdmins(query)) <= 1 && current.active) {
-          throw new Error("cannot demote the last active admin");
+          throw new ValidationError("cannot demote the last active admin");
         }
         if (
           current.auth_source === "local" && current.active &&
           (await countActiveLocalAdmins(query)) <= 1
         ) {
-          throw new Error("cannot demote the last active local admin");
+          throw new ValidationError(
+            "cannot demote the last active local admin",
+          );
         }
       }
       args.push(role);
@@ -439,13 +443,15 @@ export async function updateUser(
       }
       if (current.role === "admin" && patch.active === false) {
         if ((await countActiveAdmins(query)) <= 1 && current.active) {
-          throw new Error("cannot deactivate the last active admin");
+          throw new ValidationError("cannot deactivate the last active admin");
         }
         if (
           current.auth_source === "local" && current.active &&
           (await countActiveLocalAdmins(query)) <= 1
         ) {
-          throw new Error("cannot deactivate the last active local admin");
+          throw new ValidationError(
+            "cannot deactivate the last active local admin",
+          );
         }
       }
       args.push(patch.active);
@@ -498,13 +504,13 @@ export async function deleteUser(id: number): Promise<boolean> {
     if (!current) return false;
     if (current.role === "admin" && current.active) {
       if ((await countActiveAdmins(query)) <= 1) {
-        throw new Error("cannot delete the last active admin");
+        throw new ValidationError("cannot delete the last active admin");
       }
       if (
         current.auth_source === "local" &&
         (await countActiveLocalAdmins(query)) <= 1
       ) {
-        throw new Error("cannot delete the last active local admin");
+        throw new ValidationError("cannot delete the last active local admin");
       }
     }
     const rows = await query<{ id: number }>(
