@@ -39,7 +39,10 @@ import { getUserById, updateUser } from "../../../lib/server/sql/users.ts";
 
 import { loadServerConfig } from "../../../lib/server/config.ts";
 
-import { readJsonBody } from "../../../lib/server/validation.ts";
+import {
+  readJsonBody,
+  ValidationError,
+} from "../../../lib/server/validation.ts";
 
 import { denyIfCrossSite } from "../../../lib/server/csrf.ts";
 
@@ -140,9 +143,10 @@ export const handler = define.handlers({
         },
       });
     } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
-      if (message.includes("password") || message.includes("nothing")) {
-        return badRequest(message, requestId);
+      // Expected policy/domain rejections are typed; everything else stays a
+      // 500 envelope so database text never reaches the client.
+      if (err instanceof ValidationError) {
+        return badRequest(err.message, requestId);
       }
       return internal(
         "POST /api/auth/password",

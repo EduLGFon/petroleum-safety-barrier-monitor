@@ -2,6 +2,8 @@
 // This is why it exists: user logins need a salted, iterated digest without
 // pulling a Node/npm bcrypt build into a Deno-only workspace. Stored format
 // is `pbkdf2$iterations$salt_b64$hash_b64` so parameters stay auditable.
+import { ValidationError } from "../validation.ts";
+
 const ITERATIONS = 210_000;
 const SALT_BYTES = 16;
 const HASH_BYTES = 32;
@@ -84,13 +86,14 @@ export async function verifyPassword(
   }
 }
 
-// validateNewPassword: policy gate for registration and resets.
+// validateNewPassword: policy gate for registration and resets. A
+// ValidationError is the typed client rejection the API routes map to 400.
 export function validateNewPassword(raw: unknown): string {
   if (typeof raw !== "string" || raw.length < 12) {
-    throw new Error("password must be at least 12 characters");
+    throw new ValidationError("password must be at least 12 characters");
   }
   if (raw.length > 256) {
-    throw new Error("password must be at most 256 characters");
+    throw new ValidationError("password must be at most 256 characters");
   }
   return raw;
 }

@@ -6,7 +6,9 @@ import {
   verifyPassword,
 } from "./password.ts";
 
-import { assert, assertStrictEquals } from "jsr:@std/assert@^1";
+import { ValidationError } from "../validation.ts";
+
+import { assert, assertStrictEquals, assertThrows } from "jsr:@std/assert@^1";
 
 Deno.test("hashPassword verifies the same password", async () => {
   const hash = await hashPassword("correct-horse-1234");
@@ -49,13 +51,11 @@ Deno.test("generateTemporaryPassword does not repeat a drawn value", () => {
 });
 
 Deno.test("validateNewPassword enforces a minimum length", () => {
-  let threw = false;
-  try {
-    validateNewPassword("short");
-  } catch {
-    threw = true;
-  }
-  assertStrictEquals(threw, true);
+  assertThrows(() => validateNewPassword("short"), ValidationError);
+  assertThrows(
+    () => validateNewPassword("a".repeat(257)),
+    ValidationError,
+  );
   assertStrictEquals(
     validateNewPassword("long-enough-1234"),
     "long-enough-1234",

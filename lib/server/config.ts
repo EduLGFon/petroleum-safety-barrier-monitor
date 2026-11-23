@@ -232,6 +232,22 @@ function normalizeClientAssertionAlg(raw: string | undefined): string {
   return value;
 }
 
+// credentialFileModeError: pure POSIX permission gate for the Entra key and
+// certificate. Group or other access (read, write, or execute) is rejected:
+// a private key readable by another account is a leaked credential, and the
+// certificate pair is treated the same way to keep one rule. Windows ACLs are
+// not represented by Deno's mode bits, so the check is best-effort there and
+// deliberately skipped; document `icacls` restrictions in deployment instead.
+export function credentialFileModeError(
+  mode: number,
+  platform: string,
+): string | null {
+  if (platform === "windows") return null;
+  return (mode & 0o077) === 0
+    ? null
+    : "must not be accessible by group or other (chmod 600)";
+}
+
 function assertCredentialFilesReadable(credential: EntraCredential): void {
   if (credential.type !== "key") return;
   // Fail fast at boot: an unreadable key/cert path must surface here, not as
@@ -249,6 +265,8 @@ function assertCredentialFilesReadable(credential: EntraCredential): void {
       throw new Error(`${name} is not readable: ${path}`);
     }
     if (!stat.isFile) throw new Error(`${name} is not a file: ${path}`);
+    const modeError = credentialFileModeError(stat.mode ?? 0, Deno.build.os);
+    if (modeError) throw new Error(`${name} ${modeError}: ${path}`);
   }
 }
 
