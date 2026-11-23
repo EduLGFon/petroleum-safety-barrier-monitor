@@ -263,25 +263,81 @@ Deno.test("explainStatus keeps a deterministic rule for unknown statuses", () =>
   assertStrictEquals(result.cause.kind, "unknown");
 });
 
-Deno.test("explainStatus falls back to a newer emergency WO when import is selected", () => {
+Deno.test("explainStatus falls back to an older emergency WO when import is newest", () => {
   const result = explain({
     availability: "Indisponível",
     comments: "OS-107660: referência antiga",
     statusHistory: [
-      entry({ date: "2026-01-01", status: "Indisponível", note: "Importado do Fracttal" }),
-      entry({ date: "2026-02-01", status: "Indisponível", note: EMERGENCY_NOTE }),
+      entry({
+        date: "2026-02-01",
+        status: "Indisponível",
+        note: EMERGENCY_NOTE,
+      }),
+      entry({
+        date: "2026-03-01",
+        status: "Indisponível",
+        note: "Importado do Fracttal",
+      }),
     ],
   });
   assertStrictEquals(result.cause.kind, "work-order");
-  assertStrictEquals(result.cause.reference, "OS-24018: Falha no intertravamento");
+  assertStrictEquals(
+    result.cause.reference,
+    "OS-24018: Falha no intertravamento",
+  );
   assertStrictEquals(result.historyEntry?.note, EMERGENCY_NOTE);
 });
 
-Deno.test("explainStatus falls back to a newer planned SS when import is selected", () => {
+Deno.test("explainStatus selects the newer emergency WO directly when it is newest", () => {
+  const result = explain({
+    availability: "Indisponível",
+    comments: "OS-107660: referência antiga",
+    statusHistory: [
+      entry({
+        date: "2026-01-01",
+        status: "Indisponível",
+        note: "Importado do Fracttal",
+      }),
+      entry({
+        date: "2026-02-01",
+        status: "Indisponível",
+        note: EMERGENCY_NOTE,
+      }),
+    ],
+  });
+  assertStrictEquals(result.cause.kind, "work-order");
+  assertStrictEquals(
+    result.cause.reference,
+    "OS-24018: Falha no intertravamento",
+  );
+  assertStrictEquals(result.historyEntry?.note, EMERGENCY_NOTE);
+});
+
+Deno.test("explainStatus falls back to an older planned SS when import is newest", () => {
   const result = explain({
     availability: "Degradado",
     statusHistory: [
-      entry({ date: "2026-01-01", status: "Degradado", note: "Importado do Fracttal" }),
+      entry({ date: "2026-02-01", status: "Degradado", note: PLANNED_NOTE }),
+      entry({
+        date: "2026-03-01",
+        status: "Degradado",
+        note: "Importado do Fracttal",
+      }),
+    ],
+  });
+  assertStrictEquals(result.cause.kind, "work-request");
+  assertStrictEquals(result.cause.reference, "SS-11842: Leitura intermitente");
+});
+
+Deno.test("explainStatus selects the newer planned SS directly when it is newest", () => {
+  const result = explain({
+    availability: "Degradado",
+    statusHistory: [
+      entry({
+        date: "2026-01-01",
+        status: "Degradado",
+        note: "Importado do Fracttal",
+      }),
       entry({ date: "2026-02-01", status: "Degradado", note: PLANNED_NOTE }),
     ],
   });
@@ -294,24 +350,72 @@ Deno.test("explainStatus keeps import-only history as import", () => {
     availability: "Indisponível",
     comments: "OS-107660: referência antiga",
     statusHistory: [
-      entry({ date: "2026-01-01", status: "Indisponível", note: "Importado do Fracttal" }),
+      entry({
+        date: "2026-01-01",
+        status: "Indisponível",
+        note: "Importado do Fracttal",
+      }),
     ],
   });
   assertStrictEquals(result.cause.kind, "import");
   assertStrictEquals(result.cause.reference, "OS-107660: referência antiga");
 });
 
-Deno.test("explainStatus contingency overlay still matches base with fallback", () => {
+Deno.test("explainStatus contingency overlay falls back when import is newest", () => {
   const result = explain({
     availability: "Degradado Contingenciado",
     hasContingency: "Sim",
     contingencyDesc: "GM-09 em paralelo",
     statusHistory: [
-      entry({ date: "2026-01-01", status: "Degradado", note: "Importado do Fracttal" }),
+      entry({ date: "2026-02-01", status: "Degradado", note: PLANNED_NOTE }),
+      entry({
+        date: "2026-03-01",
+        status: "Degradado",
+        note: "Importado do Fracttal",
+      }),
+    ],
+  });
+  assertStrictEquals(result.cause.kind, "work-request");
+  assertStrictEquals(result.historyEntry?.status, "Degradado");
+  assertStrictEquals(result.cause.contingency, "GM-09 em paralelo");
+});
+
+Deno.test("explainStatus contingency overlay selects planned SS directly when newest", () => {
+  const result = explain({
+    availability: "Degradado Contingenciado",
+    hasContingency: "Sim",
+    contingencyDesc: "GM-09 em paralelo",
+    statusHistory: [
+      entry({
+        date: "2026-01-01",
+        status: "Degradado",
+        note: "Importado do Fracttal",
+      }),
       entry({ date: "2026-02-01", status: "Degradado", note: PLANNED_NOTE }),
     ],
   });
   assertStrictEquals(result.cause.kind, "work-request");
   assertStrictEquals(result.historyEntry?.status, "Degradado");
   assertStrictEquals(result.cause.contingency, "GM-09 em paralelo");
+});
+
+Deno.test("explainStatus keeps a newer manual edit over an older parseable WO", () => {
+  const result = explain({
+    availability: "Indisponível",
+    statusHistory: [
+      entry({
+        date: "2026-02-01",
+        status: "Indisponível",
+        note: EMERGENCY_NOTE,
+      }),
+      entry({
+        date: "2026-03-01",
+        status: "Indisponível",
+        note: "Edição de barreira",
+        author: "Maria",
+      }),
+    ],
+  });
+  assertStrictEquals(result.cause.kind, "manual");
+  assertStrictEquals(result.historyEntry?.note, "Edição de barreira");
 });

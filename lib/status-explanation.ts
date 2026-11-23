@@ -265,17 +265,15 @@ export function explainStatus(
   const selected = latestEntry(history, targets) ?? latestOf(history);
   const comments = b.comments.trim();
 
-  // When the newest matching entry is an import/unknown/non-parseable phrase,
+  // When the newest matching entry is an import/unknown phrase,
   // prefer the latest parseable work note in the same target set for the card
   // body, while keeping `since` and the displayed status/rule untouched.
   let resolved: StatusHistoryEntry = selected as StatusHistoryEntry;
   if (selected) {
-    const selectedParsed = parseWorkNote(selected.note);
     const selectedKind = causeKind(selected.note, selected.author, status);
     if (
       selectedKind === "import" ||
-      selectedKind === "unknown" ||
-      selectedParsed === null
+      selectedKind === "unknown"
     ) {
       const candidate = latestParseableEntry(history, targets);
       if (candidate) resolved = candidate;
