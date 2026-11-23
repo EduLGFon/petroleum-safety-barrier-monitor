@@ -1,6 +1,7 @@
 // Unit tests for server boot config (P4) - injected env getters, no
 // Deno.env permission needed.
 import {
+  credentialFileModeError,
   isDevFracttalRawEnabled,
   loadAuthConfig,
   loadServerConfig,
@@ -91,6 +92,26 @@ Deno.test("isDevFracttalRawEnabled reads the flag case-insensitively", () => {
   assertStrictEquals(isDevFracttalRawEnabled(env({ DEV: "1" })), false);
   assertStrictEquals(isDevFracttalRawEnabled(env({ DEV: "false" })), false);
   assertStrictEquals(isDevFracttalRawEnabled(env({})), false);
+});
+
+Deno.test("credentialFileModeError rejects group/other access on POSIX", () => {
+  assertStrictEquals(credentialFileModeError(0o600, "linux"), null);
+  assertStrictEquals(credentialFileModeError(0o400, "linux"), null);
+  assertStrictEquals(credentialFileModeError(0o700, "linux"), null);
+  assertEquals(
+    credentialFileModeError(0o640, "linux"),
+    "must not be accessible by group or other (chmod 600)",
+  );
+  assertEquals(
+    credentialFileModeError(0o604, "linux"),
+    "must not be accessible by group or other (chmod 600)",
+  );
+  assertEquals(
+    credentialFileModeError(0o644, "linux"),
+    "must not be accessible by group or other (chmod 600)",
+  );
+  // Windows has no POSIX mode bits; ACL validation is deployment's job.
+  assertStrictEquals(credentialFileModeError(0o666, "windows"), null);
 });
 
 Deno.test("loadAuthConfig defaults to local login only", () => {

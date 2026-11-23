@@ -43,6 +43,19 @@ export function isSameOrigin(req: Request): boolean {
   return isSameOriginRequest(req);
 }
 
+// isCrossSiteRequest: explicit cross-site signal on ANY method, including a
+// safe GET. isSameOriginRequest deliberately allows GET because reads must
+// not depend on CSRF headers; a GET that revokes server-side state (the
+// post-logout landing) must still refuse to act on a cross-site navigation,
+// where an embedded image or link would otherwise kill the victim's session.
+export function isCrossSiteRequest(req: Request): boolean {
+  const site = (req.headers.get("sec-fetch-site") ?? "").trim().toLowerCase();
+  if (site === "cross-site" || site === "cross_site") return true;
+  const origin = req.headers.get("origin");
+  if (!origin) return false;
+  return !originMatchesHost(req, origin);
+}
+
 // originMatchesHost: Origin host (incl. port) equals the request Host.
 function originMatchesHost(req: Request, origin: string): boolean {
   try {
