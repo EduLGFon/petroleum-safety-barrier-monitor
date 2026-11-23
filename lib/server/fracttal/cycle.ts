@@ -13,7 +13,7 @@ import type {
   TimerSource,
 } from "./runner.ts";
 
-import { notifyFailureToAll } from "./notify.ts";
+import { maskEmail, notifyFailureToAll } from "./notify.ts";
 
 import type { OpsNotifier } from "./notify.ts";
 
@@ -135,7 +135,7 @@ export function createCycleLoop<Shared>(
               );
             }
           }
-          logLine(`[cycle] shared fetch failed: ${note}`);
+          logLine(`[cycle] shared fetch failed: ${maskEmail(note)}`);
           return;
         }
         let ok = 0;

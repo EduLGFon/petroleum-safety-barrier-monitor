@@ -57,3 +57,18 @@ Deno.test("anonymizeAsset keeps the structural mapping fields", () => {
   assertStrictEquals(clean.location_code, "ST-ALFA");
   assertStrictEquals(clean.initial_date_out_of_service, "2026-01-10");
 });
+
+Deno.test("anonymizeAsset nulls the newly added free-text keys", () => {
+  const asset = {
+    ...base,
+    notes: "secret note",
+    groups_tasks_description: "task desc",
+    items_types_description: "type desc",
+    units_description: "units",
+  };
+  const clean = anonymizeAsset(asset as FracttalAsset);
+  assertStrictEquals(clean.notes, null);
+  assertStrictEquals(clean.groups_tasks_description, null);
+  assertStrictEquals(clean.items_types_description, null);
+  assertStrictEquals(clean.units_description, null);
+});
