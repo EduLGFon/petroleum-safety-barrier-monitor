@@ -450,4 +450,3 @@ Deno.test("typed error classification routes export handlers", () => {
     if (!h || typeof h !== "object") throw new Error("handler missing");
   }
 });
-});
