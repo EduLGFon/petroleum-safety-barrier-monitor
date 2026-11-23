@@ -6,9 +6,9 @@ import { Field, ghostBtn, inputSt, primaryBtn } from "./AdminPrimitives.tsx";
 
 import { RuleScopeFields, RuleTimingFields } from "./RuleEditorTabs.tsx";
 
-import type { Draft, Lookups } from "./rules-helpers.tsx";
+import { AdminFormDialog, requestClose } from "./AdminFormDialog.tsx";
 
-import { AdminFormDialog } from "./AdminFormDialog.tsx";
+import type { Draft, Lookups } from "./rules-helpers.tsx";
 
 import { numCoercionError } from "./rules-helpers.tsx";
 
@@ -30,6 +30,9 @@ interface Props {
   lookups: Lookups | null;
   modalError: string;
   busy: boolean;
+  // The live draft differs from the baseline loaded on open: closing the
+  // editor must ask before discarding, from any tab.
+  dirty: boolean;
   previewBusy: boolean;
   preview: { count: number; tags: string[] } | null;
   onClose: () => void;
@@ -47,6 +50,7 @@ export function RuleEditorModal({
   lookups,
   modalError,
   busy,
+  dirty,
   previewBusy,
   preview,
   onClose,
@@ -61,9 +65,16 @@ export function RuleEditorModal({
       onClose={onClose}
       error={modalError}
       width={920}
+      busy={busy}
+      dirty={dirty}
       footer={
         <>
-          <button type="button" onClick={onClose} style={ghostBtn}>
+          <button
+            type="button"
+            onClick={() => requestClose({ busy, dirty }, onClose)}
+            disabled={busy}
+            style={ghostBtn}
+          >
             Fechar
           </button>
           <button

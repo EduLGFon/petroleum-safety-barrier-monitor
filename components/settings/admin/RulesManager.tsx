@@ -19,6 +19,7 @@ import {
 import {
   AlertRule,
   Draft,
+  draftsDiffer,
   draftToPayload,
   EMPTY_DRAFT,
   Lookups,
@@ -95,6 +96,10 @@ function ruleSearchText(r: AlertRule): string {
 export function RulesManager({ onCount }: { onCount?: (n: number) => void }) {
   const [lookups, setLookups] = useState<Lookups | null>(null);
   const [form, setForm] = useState<Draft>(EMPTY_DRAFT);
+  // Baseline the editor was opened with (server row, or the empty draft on
+  // create): the close guard compares the live draft against it so a stray
+  // click cannot silently throw away a long rule configuration.
+  const [baseline, setBaseline] = useState<Draft>(EMPTY_DRAFT);
   const [busy, setBusy] = useState(false);
   const [rowBusy, setRowBusy] = useState<number | null>(null);
   const [confirmId, setConfirmId] = useState<number | null>(null);
@@ -192,6 +197,7 @@ export function RulesManager({ onCount }: { onCount?: (n: number) => void }) {
   function openCreate() {
     setEditingId(null);
     setForm(EMPTY_DRAFT);
+    setBaseline(EMPTY_DRAFT);
     setPreview(null);
     setModalError("");
     setTab("basic");
@@ -199,8 +205,10 @@ export function RulesManager({ onCount }: { onCount?: (n: number) => void }) {
   }
 
   function openEdit(r: AlertRule) {
+    const draft = ruleToDraft(r);
     setEditingId(r.id);
-    setForm(ruleToDraft(r));
+    setForm(draft);
+    setBaseline(draft);
     setPreview(null);
     setModalError("");
     setTab("basic");
@@ -209,6 +217,13 @@ export function RulesManager({ onCount }: { onCount?: (n: number) => void }) {
 
   async function save(e: Event) {
     e.preventDefault();
+    // The name input lives in the "basic" tab; when saving from another
+    // tab the browser cannot enforce the required attribute (the control
+    // is not in the DOM), so validate here like the numeric fields.
+    if (form.name.trim() === "") {
+      setModalError("Informe o nome da regra.");
+      return;
+    }
     const bad = [
       ["staleDays", form.staleDays],
       ["staleRepeatDays", form.staleRepeatDays],
@@ -669,6 +684,7 @@ export function RulesManager({ onCount }: { onCount?: (n: number) => void }) {
         lookups={lookups}
         modalError={modalError}
         busy={busy}
+        dirty={modalOpen && draftsDiffer(form, baseline)}
         previewBusy={previewBusy}
         preview={preview}
         onClose={() => setModalOpen(false)}

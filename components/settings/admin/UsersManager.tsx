@@ -208,7 +208,48 @@ export function UsersManager(
     }
   }
 
+  // Row actions that drop privileges or access confirm first, like the
+  // equivalent bulk buttons do; promotion and activation are not
+  // destructive and keep the one-click path.
+  async function requestRoleToggle(user: PublicUser) {
+    if (
+      user.role === "admin" &&
+      !confirm(
+        `Rebaixar ${user.email} para usuário? Esta pessoa perde o acesso de administração.`,
+      )
+    ) {
+      return;
+    }
+    await patch(user.id, { role: user.role === "admin" ? "user" : "admin" });
+  }
+
+  async function requestActiveToggle(user: PublicUser) {
+    if (
+      user.active &&
+      !confirm(
+        `Desativar ${user.email}? As sessões ativas são encerradas e a pessoa não poderá entrar.`,
+      )
+    ) {
+      return;
+    }
+    await patch(user.id, { active: !user.active });
+  }
+
+  // Irreversible from this screen: the server clears the local password,
+  // revokes sessions, and refuses both a password reset and a conversion
+  // back, so a mis-click on an address without Entra identity locks the
+  // person out until a database fix. Confirm, then route through the same
+  // patchBusy guard as every other row action (no double submit).
   async function convertToEntra(user: PublicUser) {
+    if (
+      !confirm(
+        `Converter ${user.email} para Microsoft Entra? A senha local deixa de funcionar e a conta passa a entrar somente pelo Entra. Esta tela não desfaz a conversão.`,
+      )
+    ) {
+      return;
+    }
+    if (patchBusy !== null) return;
+    setPatchBusy(user.id);
     try {
       await adminApi(`/api/users/${user.id}`, {
         method: "PATCH",
@@ -222,6 +263,8 @@ export function UsersManager(
       await refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setPatchBusy(null);
     }
   }
 
@@ -564,9 +607,7 @@ export function UsersManager(
                           type="button"
                           disabled={patchBusy === u.id}
                           onClick={() =>
-                            void patch(u.id, {
-                              role: u.role === "admin" ? "user" : "admin",
-                            })}
+                            void requestRoleToggle(u)}
                           style={ghostBtn}
                         >
                           {patchBusy === u.id
@@ -578,8 +619,7 @@ export function UsersManager(
                         <button
                           type="button"
                           disabled={patchBusy === u.id}
-                          onClick={() =>
-                            void patch(u.id, { active: !u.active })}
+                          onClick={() => void requestActiveToggle(u)}
                           style={u.active ? dangerBtn : ghostBtn}
                         >
                           {patchBusy === u.id
@@ -603,15 +643,19 @@ export function UsersManager(
                         {u.auth_source !== "entra" && (
                           <button
                             type="button"
+                            disabled={patchBusy === u.id}
                             onClick={() => void convertToEntra(u)}
                             style={ghostBtn}
                           >
-                            Converter para Entra
+                            {patchBusy === u.id
+                              ? "Aguarde…"
+                              : "Converter para Entra"}
                           </button>
                         )}
                         <button
                           type="button"
-                          onClick={() => void revokeSessions(u.id)}
+                          onClick={() =>
+                            void revokeSessions(u.id)}
                           style={ghostBtn}
                         >
                           Revogar sessões

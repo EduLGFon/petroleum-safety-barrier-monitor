@@ -3,6 +3,8 @@
 // same premium card language (Aurora tokens, density vars) without copies.
 import type { ComponentChildren } from "preact";
 
+import { createElement as h } from "preact";
+
 export type BadgeTone =
   | "active"
   | "inactive"
@@ -162,12 +164,16 @@ export function Avatar({ name }: { name: string }) {
 }
 
 // Field: labeled input wrapper for admin create forms.
+// Field: labeled control. Built with createElement because the linkedom
+// test harness cannot mount Fresh-precompiled JSX template vnodes (see
+// scripts/test-dom.ts) and the user form regression tests need the inputs.
 export function Field(
-  { label, children }: { label: string; children: ComponentChildren },
+  { label, children }: { label: string; children?: ComponentChildren },
 ) {
-  return (
-    <label
-      style={{
+  return h(
+    "label",
+    {
+      style: {
         display: "grid",
         gap: 5,
         fontSize: "var(--d-caption)",
@@ -177,11 +183,10 @@ export function Field(
         letterSpacing: ".08em",
         minWidth: 0,
         flex: "1 1 150px",
-      }}
-    >
-      {label}
-      {children}
-    </label>
+      },
+    },
+    label,
+    children,
   );
 }
 
