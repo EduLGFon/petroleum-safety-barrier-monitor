@@ -21,6 +21,8 @@ import {
   providerConfigFromEnv,
 } from "../lib/server/alerts/provider.ts";
 
+import { addSignalListenerBestEffort } from "../lib/server/fracttal/signals.ts";
+
 import { runProviderCycle } from "../lib/server/alerts/run-provider.ts";
 
 import { loadAlertAudience } from "../lib/server/sql/alert-audience.ts";
@@ -197,8 +199,10 @@ function main(): void {
     running = false;
     wake?.();
   };
-  Deno.addSignalListener("SIGINT", stop);
-  Deno.addSignalListener("SIGTERM", stop);
+  // Windows services (NSSM) never deliver SIGTERM and registering it threw
+  // at startup, crashing the service before the first cycle (audit F10):
+  // register the platform's deliverable stop signals, best-effort.
+  addSignalListenerBestEffort(stop);
   (async () => {
     while (running) {
       await cycle(provider, notifiers, new Date(), dashboardUrl);

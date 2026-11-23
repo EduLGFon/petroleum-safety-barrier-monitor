@@ -185,7 +185,9 @@ export function mapAsset(
   // (shared criticalityLabelFor); the sync never invents levels, so a rank
   // missing from the lookup table skips loudly instead of guessing an id.
   // Deploy order matters: db:migrate must seed the ranks before this runs,
-  // or every row skips at once (skips never delete, but the run is empty).
+  // or every row skips at once. Skips never delete: the reconcile protects
+  // every code seen upstream (see planReconcile protectedCodes), so the
+  // barrier stays visible until the rank is seeded.
   const prioridadeLabel = (asset.priorities_description ?? "").trim();
   const warnings: string[] = [];
   const rank = criticalityLabelFor(

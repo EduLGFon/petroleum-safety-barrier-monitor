@@ -81,22 +81,32 @@ export async function detectUrgentTransitions(
     const urgency = !compliant
       ? (isCriticalRankId(wire.criticalityId) ? "critical" : "urgent")
       : "none";
-    // Transition source: previous history entry before this landing, so
-    // from -> to rules can narrow (e.g. only Degradado -> Indisponível).
-    let fromStatusId: number | null = null;
-    for (let i = wire.statusHistory.length - 1; i >= 0; i--) {
-      const h = wire.statusHistory[i]!;
-      if (h.date.slice(0, 10) < c.transitionDate.slice(0, 10)) {
-        fromStatusId = h.statusId;
-        break;
-      }
-      if (
-        h.date.slice(0, 10) === c.transitionDate.slice(0, 10) &&
-        h.statusId !== c.statusId
-      ) {
-        fromStatusId = h.statusId;
+    // Transition source: the status immediately before this landing (the
+    // entry the transition replaced), so from -> to rules can narrow (e.g.
+    // only Degradado -> Indisponível). The candidate's history row is
+    // resolved by id (recentTransitions returns it); when the id is absent
+    // the latest same-day same-status entry stands in - the same resolution
+    // enrich.ts applies for the author/note. matchIdx - 1 is the only
+    // correct predecessor on same-day multi-transition histories: the old
+    // backward date walk let an older day (or a later same-day recovery)
+    // override the real predecessor (audit F4).
+    const history = wire.statusHistory;
+    let matchIdx = c.id === undefined
+      ? -1
+      : history.findIndex((h) => h.id === c.id);
+    if (matchIdx < 0) {
+      for (let i = 0; i < history.length; i++) {
+        const h = history[i]!;
+        if (
+          h.date.slice(0, 10) === c.transitionDate.slice(0, 10) &&
+          h.statusId === c.statusId
+        ) {
+          matchIdx = i;
+        }
       }
     }
+    const predecessor = matchIdx > 0 ? history[matchIdx - 1] : undefined;
+    const fromStatusId: number | null = predecessor?.statusId ?? null;
     const match = matchRules(
       {
         categoryId: wire.categoryId,
