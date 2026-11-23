@@ -247,24 +247,11 @@ function rowToRule(row: Record<string, unknown>): AlertRule {
   };
 }
 
-export async function listAlertRules(
-  activeOnly = false,
-  limit?: number,
-  offset?: number,
-): Promise<AlertRule[]> {
-  const args: unknown[] = [];
-  let sql = `select ${COLUMNS} from alert_rules`;
-  if (activeOnly) sql += ` where active`;
-  sql += ` order by priority desc, id`;
-  if (limit !== undefined) {
-    args.push(limit);
-    sql += ` limit $${args.length}`;
-  }
-  if (offset !== undefined) {
-    args.push(offset);
-    sql += ` offset $${args.length}`;
-  }
-  const rows = await queryRows<Record<string, unknown>>(sql, args);
+export async function listAlertRules(activeOnly = false): Promise<AlertRule[]> {
+  const rows = await queryRows<Record<string, unknown>>(
+    `select ${COLUMNS} from alert_rules
+     ${activeOnly ? "where active" : ""} order by priority desc, id`,
+  );
   return rows.map(rowToRule);
 }
 
