@@ -244,11 +244,14 @@ export async function runProviderCycle(
     logger(`[provider] reprocess cleared ${result.reprocessed} dead letters`);
   }
 
-  result.watermark = await store.watermark();
+  const rawWatermark = await store.watermark();
+  const runStart = now().toISOString().slice(0, 10);
+  const effectiveWatermark = rawWatermark ?? runStart;
+  result.watermark = rawWatermark;
   const detected = await detectUrgentTransitions(
     store,
     loadBarriers,
-    result.watermark,
+    effectiveWatermark,
     options.onlyBarrierIds,
     rules,
     hasAnyRule,
@@ -367,6 +370,21 @@ export async function runProviderCycle(
       }
     }
     result.detected += staleEvents.length;
+    const candidateDates = [
+      rawWatermark,
+      ...detected.map((e) => e.transitionDate),
+      ...staleEvents.map((e) => e.transitionDate),
+    ].filter((v): v is string => typeof v === "string" && v.length > 0);
+    if (candidateDates.length > 0) {
+      result.watermark = candidateDates.reduce((a, b) => a > b ? a : b);
+    }
+  }
+  const urgentDates = [
+    result.watermark,
+    ...detected.map((e) => e.transitionDate),
+  ].filter((v): v is string => typeof v === "string" && v.length > 0);
+  if (urgentDates.length > 0) {
+    result.watermark = urgentDates.reduce((a, b) => (a > b ? a : b));
   }
 
   const throttled: typeof detected = [];
@@ -445,11 +463,23 @@ export async function runProviderCycle(
   const SEND_CONCURRENCY = 4;
   const POST_TIMEOUT_MS = 15_000;
   const allUnsent: UnsentAlert[] = [];
-  for (let offset = 0;; offset += SEND_BATCH) {
+  const seenIds = new Set<number>();
+  let lastId = -1;
+  const MAX_SEND_PAGES = 1000;
+  for (let page = 0; page < MAX_SEND_PAGES; page++) {
+    const offset = page * SEND_BATCH;
     const batch = await store.listUnsent(SEND_BATCH, offset);
     if (batch.length === 0) break;
-    allUnsent.push(...batch);
+    const firstId = batch[0]!.id;
+    if (firstId <= lastId) break;
+    for (const e of batch) {
+      if (seenIds.has(e.id)) continue;
+      seenIds.add(e.id);
+      allUnsent.push(e);
+    }
+    lastId = batch[batch.length - 1]!.id;
     if (batch.length < SEND_BATCH) break;
+    if (offset + SEND_BATCH >= 200_000) break;
   }
   const sendable = allUnsent.filter((e) => !isDead(e.payload));
   result.skippedDead = await store.countDead();
