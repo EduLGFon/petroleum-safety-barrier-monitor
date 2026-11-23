@@ -18,6 +18,8 @@ import { createThrottle } from "../../lib/server/throttle.ts";
 
 import { handler as userPatchHandler } from "./users/[id].ts";
 
+import { duplicateMessage as accessGroupDuplicateMessage } from "./access-groups/[id].ts";
+
 import { handler as syncRunsRoute } from "./sync-runs.ts";
 
 Deno.test("parseIntParam rejects non-integers", () => {
@@ -400,4 +402,33 @@ Deno.test("admin password write with a too short password answers 400", async ()
       restore();
     }
   });
+});
+
+Deno.test("access-groups duplicateMessage: 23505 + access_groups_name_key -> group name already exists", () => {
+  const err = Object.assign(new Error("anything"), {
+    fields: { code: "23505", constraint: "access_groups_name_key" },
+  });
+  assertStrictEquals(
+    accessGroupDuplicateMessage(err),
+    "group name already exists",
+  );
+});
+
+Deno.test("access-groups duplicateMessage: other 23505 -> duplicate value", () => {
+  const err = Object.assign(new Error("anything"), {
+    fields: { code: "23505", constraint: "something_else" },
+  });
+  assertStrictEquals(accessGroupDuplicateMessage(err), "duplicate value");
+});
+
+Deno.test("access-groups duplicateMessage: non-23505 -> undefined", () => {
+  const err = Object.assign(new Error("anything"), {
+    fields: { code: "23503", constraint: "access_groups_name_key" },
+  });
+  assertStrictEquals(accessGroupDuplicateMessage(err), undefined);
+});
+
+Deno.test("access-groups duplicateMessage: message containing unique but no SQLSTATE -> undefined", () => {
+  const err = new Error("unique constraint violated");
+  assertStrictEquals(accessGroupDuplicateMessage(err), undefined);
 });

@@ -42,7 +42,7 @@ import { denyIfCrossSite } from "../../../lib/server/csrf.ts";
 // duplicateMessage: a unique violation reported by the driver, mapped to a
 // controlled message. The SQLSTATE and the constraint name decide - never the
 // error text, so driver wording can never leak into a response.
-function duplicateMessage(err: unknown): string | undefined {
+export function duplicateMessage(err: unknown): string | undefined {
   const info = postgresErrorInfo(err);
   if (info.code !== POSTGRES_UNIQUE_VIOLATION) return undefined;
   return info.constraint === "access_groups_name_key"
