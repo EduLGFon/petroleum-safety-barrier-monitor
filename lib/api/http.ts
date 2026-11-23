@@ -70,6 +70,26 @@ export function httpAdapterFactory(
   // Per-adapter URL cache (never shared: different baseUrls must never
   // serve each other's bytes).
   const etagCache = new Map<string, { etag: string; body: unknown }>();
+
+  // rememberBody: stores the latest tagged body per URL (bounded per
+  // adapter, oldest entry evicted first); an untagged response drops the
+  // entry. Collections and single rows share it.
+  function rememberBody(
+    path: string,
+    etag: string | null,
+    body: unknown,
+  ): void {
+    if (etag) {
+      if (etagCache.size >= MAX_CACHED_URLS && !etagCache.has(path)) {
+        const oldest = etagCache.keys().next();
+        if (!oldest.done) etagCache.delete(oldest.value);
+      }
+      etagCache.set(path, { etag, body });
+    } else {
+      etagCache.delete(path);
+    }
+  }
+
   // GETs JSON path from baseUrl; throws on non-OK status. Aborts via opts.
   async function fetchJson<T>(
     path: string,
@@ -102,16 +122,7 @@ export function httpAdapterFactory(
     }
     if (!res.ok) throw new Error(`Erro ${res.status} ao carregar dados`);
     const body = await res.json() as T;
-    const etag = res.headers.get("etag");
-    if (etag) {
-      if (etagCache.size >= MAX_CACHED_URLS && !etagCache.has(path)) {
-        const oldest = etagCache.keys().next();
-        if (!oldest.done) etagCache.delete(oldest.value);
-      }
-      etagCache.set(path, { etag, body });
-    } else {
-      etagCache.delete(path);
-    }
+    rememberBody(path, res.headers.get("etag"), body);
     return body;
   }
 
@@ -170,13 +181,29 @@ export function httpAdapterFactory(
     // can tell "missing" from "broken". Anonymous camouflage (envelope error
     // exactly "not found") throws AuthExpiredError like the collections so
     // logged-out callers redirect to login instead of seeing a null row.
+    // Single rows share the collections' ETag cache: the detail modal
+    // refetches on demand and after every sync, so an unchanged row answers
+    // from a 304 + cached bytes instead of re-downloading.
     async getBarrierById(id, opts) {
       const path = `/api/barriers/${id}`;
+      const cached = etagCache.get(path);
       const res = await fetchOrFail(`${baseUrl}${path}`, {
-        headers: { "Accept": "application/json" },
+        headers: {
+          "Accept": "application/json",
+          ...(cached ? { "If-None-Match": cached.etag } : {}),
+        },
         credentials: "same-origin",
         ...(opts?.signal ? { signal: opts.signal } : {}),
       });
+      // 304 confirms the cached bytes are current - resolve them from
+      // memory without re-downloading and re-parsing. Untagged 304s (no
+      // cache entry) are an error: the server only confirms tags it issued.
+      if (res.status === 304) {
+        if (cached) {
+          return resolveBarriers([cached.body as WireBarrier], labels)[0];
+        }
+        throw new Error(`Erro ${res.status} ao carregar dados`);
+      }
       if (res.status === 404) {
         let camouflaged = false;
         try {
@@ -191,6 +218,7 @@ export function httpAdapterFactory(
       if (res.status === 401) throw new AuthExpiredError(401, path);
       if (!res.ok) throw new Error(`Erro ${res.status} ao carregar dados`);
       const w = await res.json() as WireBarrier;
+      rememberBody(path, res.headers.get("etag"), w);
       return resolveBarriers([w], labels)[0];
     },
     // HTTP getKpi: fetches wire KPI snapshot and resolves to domain.

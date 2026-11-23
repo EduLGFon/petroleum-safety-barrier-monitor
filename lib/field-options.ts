@@ -3,6 +3,8 @@
 // registry (keys, pt-BR labels, seed defaults from the Fracttal-fed barriers
 // table), so option lists stay consistent without hardcoded copies per
 // consumer.
+import { ValidationError } from "./server/validation.ts";
+
 export const FIELD_KEYS = [
   "origin",
   "installLocal",
@@ -140,17 +142,21 @@ export const MAX_OPTION_LEN = 200;
 // normalizeOptions: trims, drops empties, dedupes (exact match), caps count
 // and length. Throws as 400 on non-array input or an empty result.
 export function normalizeOptions(raw: unknown): string[] {
-  if (!Array.isArray(raw)) throw new Error("options must be an array");
+  if (!Array.isArray(raw)) {
+    throw new ValidationError("options must be an array");
+  }
   const seen = new Set<string>();
   const out: string[] = [];
   for (const item of raw) {
-    if (typeof item !== "string") throw new Error("options must be strings");
+    if (typeof item !== "string") {
+      throw new ValidationError("options must be strings");
+    }
     const v = item.trim().replace(/\s+/g, " ").slice(0, MAX_OPTION_LEN);
     if (!v || seen.has(v)) continue;
     seen.add(v);
     out.push(v);
     if (out.length >= MAX_OPTIONS) break;
   }
-  if (out.length === 0) throw new Error("options must not be empty");
+  if (out.length === 0) throw new ValidationError("options must not be empty");
   return out;
 }

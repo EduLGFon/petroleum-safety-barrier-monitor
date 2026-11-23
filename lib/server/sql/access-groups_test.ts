@@ -1,5 +1,5 @@
 // Pure batch validation tests for access groups.
-import { assertEquals, assertThrows } from "jsr:@std/assert@^1";
+import { assert, assertEquals, assertThrows } from "jsr:@std/assert@^1";
 
 import { validateAccessGroupBatch } from "./access-groups.ts";
 
@@ -139,4 +139,68 @@ Deno.test("access group batch rejects unknown and removed actions", () => {
     () => validateAccessGroupBatch({ action: "addStations", ids: [1] }),
     ValidationError,
   );
+});
+
+Deno.test("listAccessGroups passes limit and offset to the groups query", async () => {
+  const { listAccessGroups } = await import("./access-groups.ts");
+  const seen: Array<{ text: string; args: unknown[] }> = [];
+  const globals = globalThis as unknown as { __barrierPool?: unknown };
+  const previous = globals.__barrierPool;
+  const groupRow = {
+    id: 1,
+    name: "Ops",
+    description: "",
+    created_at: "2026-01-01T00:00:00Z",
+    updated_at: "2026-01-01T00:00:00Z",
+  };
+  globals.__barrierPool = {
+    connect: () =>
+      Promise.resolve({
+        queryObject: (text: string, args: unknown[] = []) => {
+          seen.push({ text, args });
+          if (text.includes("from access_groups")) {
+            return Promise.resolve({ rows: [groupRow] });
+          }
+          return Promise.resolve({ rows: [] });
+        },
+        release: () => {},
+      }),
+    end: () => Promise.resolve(),
+  };
+  try {
+    const groups = await listAccessGroups(10, 20);
+    assertEquals(groups.length, 1);
+    const groupsQuery = seen.find((q) => q.text.includes("from access_groups"));
+    assertEquals(groupsQuery?.args, [10, 20]);
+    assert(groupsQuery?.text.includes("limit $1"), "limit placeholder");
+    assert(groupsQuery?.text.includes("offset $2"), "offset placeholder");
+  } finally {
+    globals.__barrierPool = previous;
+  }
+});
+
+Deno.test("listAccessGroups without pagination keeps the unbounded query", async () => {
+  const { listAccessGroups } = await import("./access-groups.ts");
+  const seen: Array<{ text: string; args: unknown[] }> = [];
+  const globals = globalThis as unknown as { __barrierPool?: unknown };
+  const previous = globals.__barrierPool;
+  globals.__barrierPool = {
+    connect: () =>
+      Promise.resolve({
+        queryObject: (text: string, args: unknown[] = []) => {
+          seen.push({ text, args });
+          return Promise.resolve({ rows: [] });
+        },
+        release: () => {},
+      }),
+    end: () => Promise.resolve(),
+  };
+  try {
+    await listAccessGroups();
+    const groupsQuery = seen.find((q) => q.text.includes("from access_groups"));
+    assertEquals(groupsQuery?.args, []);
+    assert(!groupsQuery?.text.includes("limit"), "no limit clause");
+  } finally {
+    globals.__barrierPool = previous;
+  }
 });

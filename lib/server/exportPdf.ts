@@ -11,6 +11,8 @@ import type { Bytes } from "../export/pdf/writer.ts";
 
 import { pdfChunks } from "../export/pdf/writer.ts";
 
+import { chunkStream } from "./exportStream.ts";
+
 import type { KpiSnapshot } from "../types.ts";
 
 import type { Barrier } from "../types.ts";
@@ -34,30 +36,10 @@ export function streamExportPdf(
   meta: PdfMeta,
 ): ReadableStream<Bytes> {
   const pages = pdfReportPages(batches, meta);
-  const chunks = pdfChunks(pages, {
-    title: meta.title,
-    author: meta.companyName || "Monitor de Barreiras de Segurança",
-  });
-  return new ReadableStream<Bytes>({
-    async pull(controller) {
-      try {
-        const { value, done } = await chunks.next();
-        if (done) {
-          controller.close();
-          return;
-        }
-        controller.enqueue(value);
-      } catch (e) {
-        try {
-          await chunks.return?.(undefined);
-        } catch {
-          // Ignore cleanup failures; the source error is what matters.
-        }
-        throw e;
-      }
-    },
-    async cancel() {
-      await chunks.return?.(undefined);
-    },
-  });
+  return chunkStream(
+    pdfChunks(pages, {
+      title: meta.title,
+      author: meta.companyName || "Monitor de Barreiras de Segurança",
+    }),
+  );
 }

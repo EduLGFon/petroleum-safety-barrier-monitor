@@ -93,13 +93,26 @@ async function* deflate(
 ): AsyncGenerator<Bytes> {
   const cs = new CompressionStream("deflate-raw");
   const writer = cs.writable.getWriter();
+  // Set when the consumer walks away (the client hung up): the feed must
+  // stop pulling from the source, or the export keeps reading the database
+  // behind a dead connection.
+  let stopped = false;
   const feed = (async () => {
     try {
       for await (const chunk of source) {
+        if (stopped) break;
         onRaw(chunk);
         await writer.write(chunk);
       }
-      await writer.close();
+      if (stopped) {
+        try {
+          await writer.abort();
+        } catch {
+          // ignore abort failures on a cancelled stream
+        }
+      } else {
+        await writer.close();
+      }
     } catch (e) {
       // A throwing source would otherwise leave the reader hanging forever:
       // abort the writable so the read side errors and the failure surfaces.
@@ -119,7 +132,17 @@ async function* deflate(
       if (value) yield value;
     }
   } finally {
+    // An early return (the client hung up) skips the await below: the feed
+    // stops here and its failure stays handled, so it cannot surface as an
+    // unhandled rejection on a dead connection.
+    stopped = true;
     reader.releaseLock();
+    try {
+      await writer.abort();
+    } catch {
+      // ignore: writable may already be closed or errored
+    }
+    feed.catch(() => {});
   }
   await feed;
 }

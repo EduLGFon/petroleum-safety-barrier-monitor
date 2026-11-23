@@ -9,6 +9,12 @@ import {
 } from "../../lib/server/errors.ts";
 
 import {
+  POSTGRES_UNIQUE_VIOLATION,
+  postgresErrorInfo,
+  readJsonBodyCapped,
+} from "../../lib/server/validation.ts";
+
+import {
   authStoreUnavailable,
   denyByCredentials,
   requireAdminAuth,
@@ -25,13 +31,11 @@ import {
   writeThrottle,
 } from "../../lib/server/throttle.ts";
 
-import { readJsonBodyCapped } from "../../lib/server/validation.ts";
-
 import { loadServerConfig } from "../../lib/server/config.ts";
 
-import { define } from "../../utils.ts";
-
 import { denyIfCrossSite } from "../../lib/server/csrf.ts";
+
+import { define } from "../../utils.ts";
 
 // parseIdList: strict positive-integer list. Throws on any non-number,
 // string, float, NaN, or non-positive entry so bad ids 400 instead of
@@ -148,8 +152,9 @@ export const handler = define.handlers({
       });
       return created(group, requestId);
     } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
-      if (message.includes("unique") || message.includes("duplicate")) {
+      if (
+        postgresErrorInfo(err).code === POSTGRES_UNIQUE_VIOLATION
+      ) {
         return badRequest("group name already exists", requestId);
       }
       return internal(

@@ -1,11 +1,17 @@
 // Unit tests for the xlsx primitives: zip framing, XML escaping/references,
 // the style registry and the width fit. The zip cases run the real deflate
 // path, so a broken data descriptor or CRC fails here rather than in Excel.
+import {
+  colName,
+  escXml,
+  inlineStr,
+  utf8,
+  XLSX_CELL_MAX_CHARS,
+} from "./xml.ts";
+
 import { assert, assertEquals, assertStrictEquals } from "jsr:@std/assert@^1";
 
 import { alignmentOf, dataRow, sheetStyles } from "./dataSheet.ts";
-
-import { colName, escXml, inlineStr, utf8 } from "./xml.ts";
 
 import { bytesOf, crc32Update, writeZip } from "./zip.ts";
 
@@ -136,6 +142,38 @@ Deno.test("escXml escapes markup and drops illegal control bytes", () => {
   // Tab, newline and carriage return survive; other C0 controls do not.
   assertStrictEquals(escXml("a\tb\nc\rd"), "a\tb\nc\rd");
   assertStrictEquals(escXml("a\u0000b\u0008c\u001fd"), "abcd");
+});
+
+Deno.test("escXml drops every character XML 1.0 cannot carry", () => {
+  // U+FFFE and U+FFFF are never characters.
+  assertStrictEquals(escXml("a\uFFFEb\uFFFFc"), "abc");
+  // A lone surrogate is not a character either; Excel rejects the whole
+  // workbook over one of them.
+  assertStrictEquals(escXml("a\uD800b"), "ab");
+  assertStrictEquals(escXml("a\uDC00b"), "ab");
+  // A well-formed pair is one astral character and must survive whole.
+  assertStrictEquals(escXml("a\uD83D\uDE00b"), "a\uD83D\uDE00b");
+  // The C1 block is legal in XML 1.0 but stripped: Excel's reader is
+  // stricter than the specification.
+  assertStrictEquals(escXml("a\u0085b\u009Fc"), "abc");
+});
+
+Deno.test("inlineStr caps a cell at Excel's character limit", () => {
+  // Excel refuses a cell with more than 32.767 characters: it answers with
+  // a repair prompt, so the text is cut here instead.
+  const long = "x".repeat(XLSX_CELL_MAX_CHARS + 500);
+  const cell = inlineStr("A1", long);
+  const text = cell.match(/<t xml:space="preserve">([\s\S]*)<\/t>/)?.[1] ?? "";
+  assertStrictEquals(text.length, XLSX_CELL_MAX_CHARS);
+  // A cell inside the limit is untouched.
+  const ok = inlineStr("A1", "x".repeat(10));
+  assertStrictEquals(ok.includes("x".repeat(10)), true);
+  assertStrictEquals(
+    inlineStr("A1", "x".repeat(XLSX_CELL_MAX_CHARS)).includes(
+      "x".repeat(XLSX_CELL_MAX_CHARS),
+    ),
+    true,
+  );
 });
 
 Deno.test("colName maps column indexes to spreadsheet letters", () => {
@@ -313,4 +351,32 @@ Deno.test("xlsxColWidths fits the content and caps free text", () => {
   const empty = xlsxColWidths([]);
   assert(empty.every((w) => w >= 6));
   assert(empty[4] > 6); // "Categoria" header
+});
+
+Deno.test("writeZip cancellation runs source finally", async () => {
+  let sourceFinally = false;
+  async function* source() {
+    try {
+      yield new Uint8Array([1, 2, 3]) as Bytes;
+      // keep producing so the consumer can break mid-stream
+      await new Promise((r) => setTimeout(r, 5));
+      yield new Uint8Array([4, 5, 6]) as Bytes;
+    } finally {
+      sourceFinally = true;
+    }
+  }
+  const gen = writeZip((async function* () {
+    yield { name: "a.xml", chunks: source() };
+  })());
+  // consume only the first chunk then break
+  const it = gen[Symbol.asyncIterator]();
+  await it.next();
+  await it.next();
+  try {
+    const _ret = it.return as (v?: unknown) => Promise<IteratorResult<unknown>>;
+    await _ret();
+  } catch { /* ignore */ }
+  // give microtasks/macrotasks a chance
+  await new Promise((r) => setTimeout(r, 20));
+  assert(sourceFinally, "source finally did not run");
 });

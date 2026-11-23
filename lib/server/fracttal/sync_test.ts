@@ -193,6 +193,39 @@ Deno.test("planReconcile soft-deletes only non-deleted scoped locals", () => {
   assertStrictEquals(plan.counts.inserts, 1);
 });
 
+// Regression (audit F1): a mapping skip must never soft-delete the barrier
+// it belongs to. The row exists upstream - only its mapping failed here - so
+// its code is protected and the local row stays live.
+Deno.test("planReconcile keeps a local row whose code was seen but unmapped", () => {
+  const skipped = localRow({
+    id: 13,
+    externalCode: "FAL-EQ-UNMAPPED",
+    signature: fieldsSignature(
+      baseInput({ externalCode: "FAL-EQ-UNMAPPED" }),
+    ),
+  });
+  const plan = planReconcile([baseInput()], [skipped], {
+    protectedCodes: ["FAL-EQ-UNMAPPED"],
+  });
+  assertStrictEquals(plan.counts.deletes, 0);
+  assertStrictEquals(kinds(plan).join(","), "insert");
+});
+
+// The protection is narrow: a code upstream genuinely removed (absent from
+// the sweep entirely) still soft-deletes, or retired assets would pile up.
+Deno.test("planReconcile still retires codes upstream truly removed", () => {
+  const ghost = localRow({
+    id: 14,
+    externalCode: "FAL-EQ-GONE",
+    signature: fieldsSignature(baseInput({ externalCode: "FAL-EQ-GONE" })),
+  });
+  const plan = planReconcile([baseInput()], [ghost], {
+    protectedCodes: ["FAL-EQ-UNRELATED"],
+  });
+  assertStrictEquals(plan.counts.deletes, 1);
+  assertStrictEquals(kinds(plan).join(","), "delete,insert");
+});
+
 Deno.test("countPlan totals a mixed plan", () => {
   const plan = planReconcile(
     [baseInput(), baseInput({ externalCode: "C2" })],
@@ -433,6 +466,125 @@ Deno.test("runSync reconciles a station move as an update, never a delete", asyn
   );
   assertStrictEquals(result.plan.counts.inserts, 1);
   assertStrictEquals(result.plan.counts.updates, 1);
+  assertStrictEquals(result.plan.counts.deletes, 0);
+});
+
+// Regression (audit F1): the concrete end-to-end case. Other assets of the
+// same station map fine, so the station is in the sync scope and the skipped
+// row's barrier loads by scope - it must NOT land in the reconcile delete
+// set (the old behavior soft-deleted it on every applying run until the
+// upstream mapping was fixed).
+Deno.test("runSync keeps the barrier of a row that skipped mapping", async () => {
+  const { io } = makeFakeIo();
+  const skippedLocal = localRow({
+    id: 15,
+    externalCode: "FAL-EQ-SKIP",
+    signature: fieldsSignature(baseInput({ externalCode: "FAL-EQ-SKIP" })),
+  });
+  const scopingIo: SyncIo = {
+    ...io,
+    loadLocal() {
+      // The scope arm loads the whole station, skipped row included.
+      return Promise.resolve([skippedLocal]);
+    },
+  };
+  const rows = [
+    rawRow(),
+    // Unmapped category: ensureCatalog is absent on the fake, so this row
+    // skips mapping while its neighbor maps and scopes the station.
+    rawRow({
+      id: 45,
+      code: "FAL-EQ-SKIP",
+      groups_description: "Categoria Inexistente",
+    }),
+  ];
+  const result = await runSync(() => Promise.resolve(rows), {
+    io: scopingIo,
+    dryRun: true,
+  });
+  assertStrictEquals(result.mappingSkips.length, 1);
+  assertStrictEquals(result.mappingSkips[0]!.code, "FAL-EQ-SKIP");
+  assertStrictEquals(result.plan.counts.deletes, 0);
+});
+
+// Regression (audit F1, malformed arm): upstream schema drift (unknown
+// item_type) leaves the row malformed, but its code is still readable, so
+// the barrier it owns keeps its local row too.
+Deno.test("runSync keeps the barrier of a malformed row", async () => {
+  const { io } = makeFakeIo();
+  const malformedLocal = localRow({
+    id: 16,
+    externalCode: "FAL-EQ-BAD",
+    signature: fieldsSignature(baseInput({ externalCode: "FAL-EQ-BAD" })),
+  });
+  const scopingIo: SyncIo = {
+    ...io,
+    loadLocal() {
+      return Promise.resolve([malformedLocal]);
+    },
+  };
+  const rows = [
+    rawRow(),
+    rawRow({ id: 46, code: "FAL-EQ-BAD", id_type_item: 99 }),
+  ];
+  const result = await runSync(() => Promise.resolve(rows), {
+    io: scopingIo,
+    dryRun: true,
+  });
+  assertStrictEquals(result.malformed.length, 1);
+  assertStrictEquals(result.plan.counts.deletes, 0);
+});
+
+// Regression (audit F8 half, duplicated code): a mid-sweep upstream write
+// can hand the sweep the same row twice while a different row went missing;
+// each code must map once so the plan cannot double-count.
+Deno.test("runSync maps a duplicated code once", async () => {
+  const { io, state } = makeFakeIo();
+  const result = await runSync(
+    () => Promise.resolve([rawRow(), rawRow({ id: 47 })]),
+    { io, dryRun: true },
+  );
+  assertStrictEquals(result.parsed, 2);
+  assertStrictEquals(result.plan.counts.inserts, 1);
+  assertStrictEquals(state.calls.startRun.length, 0);
+});
+
+// Regression (review of audit F1 fix): the protection set must hold TRIMMED
+// codes. mapAsset trims the upstream code before storing external_code, so a
+// whitespace-padded code that skips mapping protects the same barrier its
+// mapped form would - the untrimmed set left the barrier soft-deleted.
+Deno.test("runSync protects a padded code that skipped mapping", async () => {
+  const { io } = makeFakeIo();
+  const paddedLocal = localRow({
+    id: 17,
+    externalCode: "FAL-EQ-PAD",
+    signature: fieldsSignature(baseInput({ externalCode: "FAL-EQ-PAD" })),
+  });
+  const scopingIo: SyncIo = {
+    ...io,
+    loadLocal() {
+      return Promise.resolve([paddedLocal]);
+    },
+  };
+  const rows = [
+    rawRow(),
+    // Padded upstream code, unmappable category: stored trimmed as
+    // external_code by the previous cycle, so it must not retire.
+    rawRow({
+      id: 48,
+      code: " FAL-EQ-PAD ",
+      groups_description: "Categoria Inexistente",
+    }),
+  ];
+  const result = await runSync(() => Promise.resolve(rows), {
+    io: scopingIo,
+    dryRun: true,
+  });
+  assertStrictEquals(result.mappingSkips.length, 1);
+  assertStrictEquals(
+    result.mappingSkips[0]!.code.includes("FAL-EQ-PAD"),
+    true,
+  );
   assertStrictEquals(result.plan.counts.deletes, 0);
 });
 

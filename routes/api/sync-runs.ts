@@ -20,6 +20,8 @@ import { loadServerConfig } from "../../lib/server/config.ts";
 
 import { getSyncRuns } from "../../lib/server/sql/sync.ts";
 
+import { parseIntParam } from "./_params.ts";
+
 import { define } from "../../utils.ts";
 
 export const handler = define.handlers({
@@ -50,8 +52,13 @@ export const handler = define.handlers({
     let take = 10;
     try {
       const raw = new URL(ctx.req.url).searchParams.get("limit");
-      if (raw !== null) {
-        take = Math.max(1, Math.min(50, Number.parseInt(raw, 10) || 10));
+      if (raw !== null && raw !== "") {
+        // Strict parse: only a whole decimal number is a limit. "12abc",
+        // "0x10", "1e2" and "NaN" are not numbers the caller may have meant,
+        // so they fall back to the default instead of silently becoming 12,
+        // 16 or 100.
+        const parsed = parseIntParam(raw);
+        take = parsed === undefined ? 10 : Math.max(1, Math.min(50, parsed));
       }
     } catch {
       // Malformed URL: fall back to the default limit.

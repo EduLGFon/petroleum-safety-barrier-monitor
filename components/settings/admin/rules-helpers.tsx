@@ -110,6 +110,17 @@ export const EMPTY_DRAFT: Draft = {
 
 export const WEEKDAYS = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
 
+// ruleNameError: pure validation decision for the alert-rule name. The
+// browser's required attribute does not cover saves triggered from other
+// tabs, so the editor validates the trimmed name in JS. Returns null when
+// the name is usable.
+export function ruleNameError(name: string): string | null {
+  return name.trim() === "" ? "Informe o nome da regra." : null;
+}
+// Backwards-compatible aliases for the same decision.
+export const validateRuleName = ruleNameError;
+export const ruleNameRequired = ruleNameError;
+
 export function numOrNull(s: string): number | null {
   const t = s.trim();
   if (t === "") return null;
@@ -194,4 +205,50 @@ export function ruleToDraft(r: AlertRule): Draft {
 
 export function toggleId(list: number[], id: number): number[] {
   return list.includes(id) ? list.filter((x) => x !== id) : [...list, id];
+}
+
+// numListsDiffer: order-insensitive id list compare. SearchMultiSelect
+// normalizes its selection to option order, so a reordered but equivalent
+// selection is not a change.
+function numListsDiffer(a: number[], b: number[]): boolean {
+  if (a.length !== b.length) return true;
+  const sa = [...a].sort((x, y) => x - y);
+  const sb = [...b].sort((x, y) => x - y);
+  return sa.some((x, i) => x !== sb[i]);
+}
+
+// draftsDiffer: dirty check for the rule editor. The editor keeps a large
+// multi-tab draft, so the close guard compares it against the baseline
+// loaded from the server row (or EMPTY_DRAFT on create). Exported pure so
+// the regression tests cover the exact comparison.
+export function draftsDiffer(a: Draft, b: Draft): boolean {
+  return (
+    a.name !== b.name ||
+    a.description !== b.description ||
+    a.urgency !== b.urgency ||
+    numListsDiffer(a.categoryIds, b.categoryIds) ||
+    numListsDiffer(a.fromStatusIds, b.fromStatusIds) ||
+    numListsDiffer(a.toStatusIds, b.toStatusIds) ||
+    numListsDiffer(a.locationIds, b.locationIds) ||
+    numListsDiffer(a.criticalityIds, b.criticalityIds) ||
+    numListsDiffer(a.typologyIds, b.typologyIds) ||
+    numListsDiffer(a.groupingIds, b.groupingIds) ||
+    numListsDiffer(a.ownerIds, b.ownerIds) ||
+    a.includeRecovery !== b.includeRecovery ||
+    a.onTransition !== b.onTransition ||
+    a.onlyNoActionPlan !== b.onlyNoActionPlan ||
+    a.criticalOnly !== b.criticalOnly ||
+    a.staleDays !== b.staleDays ||
+    a.staleRepeatDays !== b.staleRepeatDays ||
+    a.cooldownMinutes !== b.cooldownMinutes ||
+    a.maxPerDay !== b.maxPerDay ||
+    a.quietStart !== b.quietStart ||
+    a.quietEnd !== b.quietEnd ||
+    numListsDiffer(a.activeDays, b.activeDays) ||
+    a.priority !== b.priority ||
+    a.validFrom !== b.validFrom ||
+    a.validTo !== b.validTo ||
+    a.notifyImmediate !== b.notifyImmediate ||
+    a.active !== b.active
+  );
 }

@@ -1,5 +1,14 @@
 #Requires -Version 5.1
-#Requires -RunAsAdministrator
+# NOTE: no `#Requires -RunAsAdministrator` here on purpose. The script
+# self-elevates below by encoding the whole child invocation (script path plus
+# non-secret arguments, each single-quoted) into a -EncodedCommand payload.
+# The Base64 alphabet has no spaces, quotes, $ or backticks, so Start-Process
+# receives one pre-quoted string and values survive the UAC hop. Windows UAC
+# builds the elevated child's environment from the persisted User/Machine
+# variables and does NOT carry runtime-set process variables across, so a
+# secret visible in a non-elevated session's process env fails closed before
+# elevation. Setup.cmd forwards arguments untouched with
+# `powershell -File ... %*` (raw cmd forwarding, not a PowerShell array).
 <#
 .SYNOPSIS
   End-to-end production install of Barrier Monitor on Windows Server 2022/2025.
@@ -20,18 +29,39 @@
   before touching anything.
 .EXAMPLE
   powershell -ExecutionPolicy Bypass -File .\deploy\windows\Setup-Production.ps1 `
-    -Hostname barreiras.example.com -CompanyName "Seacrest Petróleo" `
+    -Hostname monitor.example.com -CompanyName "Seacrest Petróleo" `
     -AdminEmail you@example.com -RepoUrl https://github.com/org/repo.git
 .EXAMPLE
   IP-only office server (no domain), LAN-scoped plain HTTP on port 80.
   powershell -ExecutionPolicy Bypass -File .\deploy\windows\Setup-Production.ps1 `
     -CompanyName "Seacrest Petróleo" -AdminEmail you@example.com `
     -AllowedLanRanges '10.0.0.0/8','192.168.0.0/16' -SourceZip C:\temp\repo.zip
+.NOTES
+  Secrets are NEVER command-line arguments: a CLI value stays visible in
+  process lists and shell history. Set ADMIN_PASSWORD / DB_PASSWORD /
+  POSTGRES_SUPER_PASSWORD / FRACTTAL_SECRET in an already elevated PowerShell
+  or answer the interactive prompts. Passing -AdminPassword / -DbPassword /
+  -PostgresSuperPassword / -FracttalSecret on the command line aborts.
+  Self-elevation refuses to start when a secret env var is visible in a
+  non-elevated session: UAC does not carry runtime-set process variables to
+  the child (persisted User/Machine variables do, but the parent cannot tell
+  them apart, so any visible secret aborts). Run Setup from an already
+  elevated PowerShell in that case. -Elevated is internal to
+  the self-elevation hop and keeps the child from elevating again; -NoElevate
+  never opens UAC and requires an already elevated session.
+  Defaults target the APP10 production topology (SeaMonitor* services,
+  database monitor, vendor PostgreSQL 18); every default is overridable, and
+  passing -ServicePrefix Barrier restores the legacy Barrier* layout.
+  The app binds 127.0.0.1 by default; the bind is enforced by
+  Register-Services.ps1 through the -BindHost value this setup passes (the
+  helper owns the service command line). Only -SkipCaddy -AllowLanAppPort
+  (with -AllowedLanRanges) switches it to 0.0.0.0 for scoped LAN plain HTTP.
 #>
 param(
   [string]$InstallDir = 'C:\srv\barrier-monitor',
   [string]$ToolsDir = 'C:\tools',
-  [string]$BackupDir = 'D:\backups\barreiras',
+  [string]$BackupDir = 'D:\backups\monitor',
+  [string]$ServicePrefix = 'SeaMonitor',
   [string]$Hostname = '',
   [string]$ServerIp = '',
   [string[]]$AllowedLanRanges = @(),
@@ -39,7 +69,7 @@ param(
   [string]$AdminEmail = '',
   [string]$AdminPassword = '',
   [string]$DbUser = 'barrier',
-  [string]$DbName = 'barreiras',
+  [string]$DbName = 'monitor',
   [string]$DbPassword = '',
   [string]$PgPort = '5432',
   [string]$PostgresSuperPassword = '',
@@ -48,27 +78,148 @@ param(
   [string]$CaddyVersion = 'v2.11.7',
   [string]$NssmVersion = '2.24',
   [string]$PostgresInstallerUrl = 'https://get.enterprisedb.com/postgresql/postgresql-16.4-1-windows-x64.exe',
-  [string]$PostgresBinDir = 'C:\Program Files\PostgreSQL\16\bin',
+  [string]$PostgresBinDir = 'C:\sites\seacrest\.vendor\pgsql18\bin',
   [string]$RepoUrl = '',
   [string]$SourceZip = '',
   [string]$Branch = 'master',
   [string]$FracttalKey = '',
   [string]$FracttalSecret = '',
-  [string]$SmtpHost = '',
-  [string]$SmtpPort = '587',
-  [string]$SmtpUser = '',
-  [string]$SmtpPass = '',
-  [string]$OpsEmailTo = '',
   [switch]$SkipPostgres,
   [switch]$SkipCaddy,
   [switch]$SkipBackup,
   [switch]$SkipFirewall,
   [switch]$AllowLanAppPort,
   [switch]$Unattended,
-  [switch]$CheckOnly
+  [switch]$CheckOnly,
+  [switch]$Elevated,
+  [switch]$NoElevate
 )
 
 $ErrorActionPreference = 'Stop'
+
+# Secrets never ride the command line: a CLI value stays visible in process
+# lists (Get-CimInstance/task manager) and shell history. This gate runs
+# BEFORE elevation so a secret can never be forwarded to the elevated child
+# either. Use the matching env var or the interactive prompt instead.
+$secretEnvByName = @{
+  AdminPassword = 'ADMIN_PASSWORD'
+  DbPassword = 'DB_PASSWORD'
+  PostgresSuperPassword = 'POSTGRES_SUPER_PASSWORD'
+  FracttalSecret = 'FRACTTAL_SECRET'
+}
+foreach ($s in $secretEnvByName.Keys) {
+  if ($PSBoundParameters.ContainsKey($s) -and $PSBoundParameters[$s]) {
+    throw "SETUP ABORTED: secret -$s was passed on the command line (visible in process lists/history). Set the $($secretEnvByName[$s]) environment variable or answer the interactive prompt instead."
+  }
+}
+
+function ConvertTo-SingleQuotedLiteral([string]$value) {
+  # PowerShell single-quoted literal: doubling ' is the only escape; $ and `
+  # stay literal. Rebuilding the child command with this keeps every argument
+  # one literal token through the UAC hop.
+  return "'" + $value.Replace("'", "''") + "'"
+}
+
+# Self-elevation (UAC): rebuild the entire child invocation as a literal
+# PowerShell command, single-quoting every argument (internal ' doubled), and
+# Base64-encode it into -EncodedCommand. Why not `-ArgumentList $array`:
+# Windows PowerShell 5.1 joins an array with bare spaces and no quoting, so
+# `-CompanyName "Seacrest Petróleo"` splits at the space ("Petróleo" binds
+# positionally to -InstallDir) and a script path with spaces plus embedded
+# quotes/$/backticks breaks the same way. The Base64 alphabet contains no
+# spaces, quotes, $ or backticks, so the single -ArgumentList string is safe.
+#
+# Windows UAC builds the elevated child's environment fresh from the
+# persisted User/Machine registry variables; runtime-set process variables
+# ($env:X in this session) do NOT cross the hop. The parent cannot tell a
+# persisted secret from a runtime-set one - both appear in its process env -
+# so any secret visible here fails closed before the child can start with
+# null secrets. Remedies: run Setup from an already elevated PowerShell
+# (persisted or runtime-set variables stay in-process and are read there),
+# persist the secret at User or Machine scope and start an elevated session,
+# or clear it and let the elevated child prompt/generate. Non-secret
+# arguments travel inside the encoded command; no environment variable or
+# temp file carries setup state across the hop.
+#
+# -Elevated marks the UAC child so it never elevates again (no loop).
+# -NoElevate is the operator opt-out for automation: it never opens UAC and
+# aborts unless the current session is already elevated. Both are rejected
+# together. Already elevated without either switch: skip to the install.
+$isElevated = ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
+if ($Elevated -and $NoElevate) {
+  throw 'SETUP ABORTED: -Elevated and -NoElevate are mutually exclusive; -Elevated is internal to the UAC hop.'
+}
+if (($Elevated -or $NoElevate) -and -not $isElevated) {
+  throw 'SETUP ABORTED: this session is not elevated. -Elevated is the internal UAC-child marker and -NoElevate never opens UAC, so neither can grant administrator rights. Start PowerShell as administrator and re-run.'
+}
+if (-not $Elevated -and -not $NoElevate -and -not $isElevated) {
+  $secretEnvSet = @($secretEnvByName.Values | Where-Object { -not [string]::IsNullOrEmpty([Environment]::GetEnvironmentVariable($_)) })
+  if ($secretEnvSet.Count -gt 0) {
+    throw "SETUP ABORTED: secret environment variables are visible in this non-elevated session ($($secretEnvSet -join ', ')), and Windows UAC does not carry runtime-set process variables to the elevated child (persisted User/Machine variables do, but the parent cannot tell them apart). Run Setup from an already elevated PowerShell (where the variables stay in-process and are read), persist POSTGRES_SUPER_PASSWORD at User or Machine scope and start an elevated session, or clear them and re-run to use the interactive prompts/generated secrets."
+  }
+  if ([string]::IsNullOrWhiteSpace($PSCommandPath) -or -not (Test-Path -LiteralPath $PSCommandPath -PathType Leaf)) {
+    throw "SETUP ABORTED: cannot resolve this setup script path ('$PSCommandPath') for the UAC child."
+  }
+  $setupScriptLiteral = ConvertTo-SingleQuotedLiteral $PSCommandPath
+  $childArgs = @('&', $setupScriptLiteral)
+  foreach ($key in $PSBoundParameters.Keys) {
+    if ($secretEnvByName.ContainsKey($key) -or $key -in @('Elevated', 'NoElevate')) { continue }
+    $val = $PSBoundParameters[$key]
+    if ($val -is [switch]) {
+      if ($val.IsPresent) { $childArgs += "-$key" }
+    } elseif ($val -is [System.Array]) {
+      $items = @($val | ForEach-Object { ConvertTo-SingleQuotedLiteral "$_" })
+      if ($items.Count -eq 0) { continue }
+      $childArgs += "-$key"
+      $childArgs += ($items -join ',')
+    } else {
+      $childArgs += "-$key"
+      $childArgs += (ConvertTo-SingleQuotedLiteral "$val")
+    }
+  }
+  $childArgs += '-Elevated'
+  $literalInvocation = $childArgs -join ' '
+  # The encoded payload resolves the script and wraps the literal invocation
+  # so a missing/renamed script, an unknown argument, or a script that reports
+  # failure can never finish with exit 0 after doing nothing: both guards write
+  # an explicit error to stderr and exit 1. `$?` covers a non-terminating
+  # failure of the invocation; invocation and binding errors are terminating
+  # and hit the catch. No env var or temp file carries the child state, and no
+  # secret enters the Base64 payload.
+  $childBootstrap = @(
+    "`$ErrorActionPreference = 'Stop'"
+    "`$setupScript = $setupScriptLiteral"
+    'if (-not (Test-Path -LiteralPath $setupScript -PathType Leaf)) {'
+    '  [Console]::Error.WriteLine("SETUP ABORTED: elevated child cannot find the setup script at $setupScript")'
+    '  exit 1'
+    '}'
+    'try {'
+    "  $literalInvocation"
+    "  if (-not `$?) { throw 'the elevated setup invocation reported failure' }"
+    '} catch {'
+    '  [Console]::Error.WriteLine("SETUP ABORTED: elevated child failed before completing: $($_.Exception.Message)")'
+    '  exit 1'
+    '}'
+  ) -join "`r`n"
+  $b64 = [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($childBootstrap))
+  try {
+    $elevated = Start-Process powershell -Verb RunAs -ArgumentList "-NoProfile -ExecutionPolicy Bypass -EncodedCommand $b64" -Wait -PassThru
+  } catch {
+    throw "SETUP ABORTED: elevation was refused or failed ($_). Start PowerShell as administrator and re-run."
+  }
+  # A Process created through ShellExecute can report $null here (PowerShell
+  # swallows the property exception). Never treat an unknown exit code as
+  # success: the child writes its own stderr on failure.
+  $childExitCode = $null
+  if ($elevated) { $childExitCode = $elevated.ExitCode }
+  if ($null -eq $childExitCode) {
+    throw 'SETUP ABORTED: the elevated child exited but its exit code could not be read; check the elevated console output. Refusing to report success.'
+  }
+  if ($childExitCode -ne 0) {
+    [Console]::Error.WriteLine("SETUP ABORTED: the elevated child exited with code $childExitCode; review the elevated console output.")
+  }
+  exit [int]$childExitCode
+}
 
 function Write-Step([string]$msg) { Write-Host "`n==> $msg" -ForegroundColor Cyan }
 function Write-Need([string]$msg) { throw "SETUP ABORTED: $msg" }
@@ -101,6 +252,39 @@ function Invoke-Download([string]$url, [string]$outFile) {
   }
 }
 
+function Write-AllTextNoBom([string]$path, [string]$text) {
+  # PowerShell 5.1 `Set-Content -Encoding UTF8` writes a BOM, which breaks
+  # naive .env/Caddyfile readers. .NET with UTF8Encoding($false) is BOM-free
+  # on every PowerShell version (5.1 has no -Encoding utf8NoBOM).
+  $utf8 = New-Object System.Text.UTF8Encoding $false
+  [System.IO.File]::WriteAllText($path, $text, $utf8)
+}
+
+function Format-DotEnvValue([string]$value, [string]$key = 'value') {
+  # Writer contract: NEVER emit backslash or double-quote escapes. Deno's
+  # `--env-file` loader strips the outer quotes but keeps `\` and `\"` inside
+  # the content literal, so an escaped value would read differently at runtime
+  # than in scripts/doctor.ts (which unescapes). The accepted subset instead:
+  #   - values containing `"` or `\` fail closed here (generated secrets and
+  #     the generated DATABASE_URL never contain them; an operator value must
+  #     be given without those characters);
+  #   - values holding whitespace, `#` or `'` are wrapped in PLAIN double
+  #     quotes: an unquoted # starts a comment for most .env readers, quoting
+  #     preserves leading/trailing spaces, and `'` is included because a bare
+  #     `'single'`-shaped value would lose its quotes when both readers strip
+  #     surrounding quotes;
+  #   - everything else is written bare.
+  # With no escapes in the file, the writer, Deno --env-file and doctor.ts
+  # parseEnvFile agree on every accepted value (accepted-subset round trip).
+  if ($value -match '["\\]') {
+    throw "SETUP ABORTED: value for $key contains a double quote or backslash; those characters cannot be written to .env without escapes and would read differently under Deno --env-file than in doctor.ts. Pass a value without either character."
+  }
+  if ($value -eq '' -or $value -match '[\s#'']') {
+    return '"' + $value + '"'
+  }
+  return $value
+}
+
 function Set-DotEnvKey([string]$file, [string]$key, [string]$value) {
   # Sanitize: strip CR/LF so a pasted secret can never inject extra .env lines
   # (e.g. "pass`nEVIL=1"). Tabs/spaces are preserved; only line breaks are cut.
@@ -108,14 +292,19 @@ function Set-DotEnvKey([string]$file, [string]$key, [string]$value) {
   if ($value -match '[\x00-\x08\x0b\x0c\x0e-\x1f]') {
     throw "SETUP ABORTED: value for $key contains control characters."
   }
-  $lines = Get-Content $file
+  # -Encoding UTF8 on read: PS 5.1 Get-Content defaults to ANSI, so a BOM-free
+  # UTF-8 .env holding an accented COMPANY_NAME ("Petróleo") decodes as ANSI
+  # and the later BOM-free rewrite bakes the mojibake in permanently.
+  $lines = @(Get-Content $file -Encoding UTF8)
   $pattern = "^(#\s*)?" + [regex]::Escape($key) + '\s*=.*$'
   $done = $false
   $lines = $lines | ForEach-Object {
-    if (-not $done -and $_ -match $pattern) { $done = $true; "$key=$value" } else { $_ }
+    if (-not $done -and $_ -match $pattern) { $done = $true; "$key=$(Format-DotEnvValue $value $key)" } else { $_ }
   }
-  if (-not $done) { $lines += "$key=$value" }
-  Set-Content -Path $file -Value $lines -Encoding UTF8
+  if (-not $done) { $lines += "$key=$(Format-DotEnvValue $value $key)" }
+  # BOM-free rewrite (see Write-AllTextNoBom): PS 5.1 Set-Content -Encoding
+  # UTF8 would stamp a BOM on .env.
+  Write-AllTextNoBom $file (($lines -join "`r`n") + "`r`n")
 }
 
 # ── 0. Host and inputs ──────────────────────────────────────────────
@@ -132,25 +321,51 @@ foreach ($pair in @(@('DbUser', $DbUser), @('DbName', $DbName))) {
     Write-Need "$($pair[0]) '$($pair[1])' invalid: must match ^[a-z_][a-z0-9_]{0,62}$ (lowercase, digits, underscore; max 63 chars)."
   }
 }
-# Secrets hygiene: CLI args leak via process list + shell history. Prefer env
-# (ADMIN_PASSWORD / DB_PASSWORD / POSTGRES_SUPER_PASSWORD / FRACTTAL_SECRET /
-# SMTP_PASS) or an interactive prompt; CLI values below only warn and proceed
-# for backward compatibility. Never echo secrets to logs (see summary box).
-foreach ($s in @('AdminPassword', 'DbPassword', 'PostgresSuperPassword', 'FracttalSecret', 'SmtpPass')) {
-  if ($PSBoundParameters.ContainsKey($s) -and $PSBoundParameters[$s]) {
-    Write-Warning "secret -$s was passed on the CLI (visible in process list/history); prefer the $s env var or interactive prompt next time."
+# Service identity: every service this setup manages carries the prefix
+# (APP10 production uses SeaMonitor*; -ServicePrefix Barrier restores the
+# legacy Barrier* layout). Names are derived once and used everywhere below.
+if ($ServicePrefix -cnotmatch '^[A-Za-z][A-Za-z0-9]{0,31}$') {
+  Write-Need "-ServicePrefix '$ServicePrefix' invalid: must start with a letter, then letters/digits (max 32 chars)."
+}
+$svcApp = "${ServicePrefix}App"
+$svcPoller = "${ServicePrefix}Poller"
+$svcAlerts = "${ServicePrefix}Alerts"
+$svcCaddy = "${ServicePrefix}Caddy"
+# The app binds loopback by default. Only the LAN plain-HTTP mode (no Caddy,
+# app port intentionally opened) binds all interfaces; Caddy always proxies to
+# 127.0.0.1. The bind itself is not set here: Register-Services.ps1 owns the
+# service command line and enforces it via the -BindHost value passed in
+# section 7, so the helper-support gate below is what keeps this choice true.
+# Service args, firewall rule and smoke test must agree.
+$appBindHost = '127.0.0.1'
+if ($SkipCaddy -and $AllowLanAppPort) { $appBindHost = '0.0.0.0' }
+# Ports travel as strings from the CLI; reject non-numeric/out-of-range early
+# so neither CheckOnly nor the firewall rules get a garbage LocalPort.
+# [int]::TryParse (not a [int] cast): a huge digit string such as
+# '99999999999999999999' passes ^\d+$ but a cast throws/overflows instead of
+# failing validation, aborting with a cast error instead of the clear message.
+foreach ($pair in @(@('PgPort', $PgPort), @('AppPort', $AppPort))) {
+  $portNum = 0
+  if (-not [int]::TryParse($pair[1], [ref]$portNum) -or $portNum -lt 1 -or $portNum -gt 65535) {
+    Write-Need "-$($pair[0]) '$($pair[1])' invalid: must be a TCP port number 1-65535."
   }
 }
-function Read-SecretEnvOrPrompt([string]$envName, [string]$label) {
-  $v = [Environment]::GetEnvironmentVariable($envName)
-  if (-not [string]::IsNullOrEmpty($v)) { return $v }
-  $sec = Read-Host -AsSecureString "$label (input hidden, from env $envName or type here; empty = generate)"
+function Read-HiddenValue([string]$prompt) {
+  # SecureString prompt for secrets that must be reachable in the elevated
+  # child: UAC does not carry runtime-set process variables there (persisted
+  # User/Machine ones do), so prompting is the safe fallback.
+  $sec = Read-Host -AsSecureString $prompt
   if ($sec -and $sec.Length -gt 0) {
     $ptr = [Runtime.InteropServices.Marshal]::SecureStringToBSTR($sec)
     try { return [Runtime.InteropServices.Marshal]::PtrToStringBSTR($ptr) }
     finally { [Runtime.InteropServices.Marshal]::ZeroFreeBSTR($ptr) }
   }
   return ''
+}
+function Read-SecretEnvOrPrompt([string]$envName, [string]$label) {
+  $v = [Environment]::GetEnvironmentVariable($envName)
+  if (-not [string]::IsNullOrEmpty($v)) { return $v }
+  return Read-HiddenValue "$label (input hidden, from env $envName or type here; empty = generate)"
 }
 if (-not $AdminPassword) {
   $fromEnv = Read-SecretEnvOrPrompt 'ADMIN_PASSWORD' 'Admin password'
@@ -160,23 +375,20 @@ if (-not $DbPassword) {
   $fromEnv = Read-SecretEnvOrPrompt 'DB_PASSWORD' 'Postgres app password'
   if ($fromEnv) { $DbPassword = $fromEnv }
 }
-if (-not $PostgresSuperPassword -and (Test-Path (Join-Path $PostgresBinDir 'pg_ctl.exe'))) {
-  # Existing Postgres needs the superuser now; missing value fails later with
-  # a clear message (no silent generation over an existing cluster).
+if (-not $PostgresSuperPassword) {
+  # Read unconditionally (not only when the vendor path exists): EDB-only
+  # hosts fall back to $pg16Bin/$pg18Bin below, and gating on the vendor path
+  # left the fallback aborting for a missing POSTGRES_SUPER_PASSWORD even
+  # though the CLI-secret gate forbids passing it on the command line. Env is
+  # read here for an already-elevated shell; an existing cluster in the UAC
+  # child gets a hidden prompt in section 2, and a fresh install generates its
+  # own superuser password there.
   $fromEnv = [Environment]::GetEnvironmentVariable('POSTGRES_SUPER_PASSWORD')
   if ($fromEnv) { $PostgresSuperPassword = $fromEnv }
 }
 if (-not $FracttalSecret) {
   $fromEnv = [Environment]::GetEnvironmentVariable('FRACTTAL_SECRET')
   if ($fromEnv) { $FracttalSecret = $fromEnv }
-}
-if (-not $SmtpPass) {
-  $fromEnv = [Environment]::GetEnvironmentVariable('SMTP_PASS')
-  if ($fromEnv) { $SmtpPass = $fromEnv }
-  if (-not $SmtpPass) {
-    $alt = [Environment]::GetEnvironmentVariable('OPS_SMTP_PASS')
-    if ($alt) { $SmtpPass = $alt }
-  }
 }
 if ([string]::IsNullOrWhiteSpace($AdminEmail) -or $AdminEmail -notlike '*@*') {
   Write-Need 'pass -AdminEmail you@example.com (first admin account).'
@@ -201,23 +413,128 @@ if (-not $Hostname) {
   Write-Warning "IP mode: users will open http://${ServerIp} in plain HTTP (no encryption possible without a domain). Keep port 80 reachable from the trusted office network/VPN only - never the internet. Re-run with -Hostname once a domain exists to get automatic https."
 }
 
-# ── 0b. Readiness report: say what WOULD happen, change nothing ─────
+# ── 0b. Postgres location: vendor path first, installed fallback ───
+# APP10 serves Postgres from C:\sites\seacrest\.vendor\pgsql18; a host that
+# only has the classic EDB install keeps working via the fallback below.
+# Anything else (or two clusters at once) is an explicit operator choice, not
+# a silent default: ambiguity aborts in 0c instead of spawning a second DB.
+$pg16Bin = 'C:\Program Files\PostgreSQL\16\bin'
+$pg18Bin = 'C:\Program Files\PostgreSQL\18\bin'
+if (-not (Test-Path (Join-Path $PostgresBinDir 'pg_ctl.exe'))) {
+  if (-not $PSBoundParameters.ContainsKey('PostgresBinDir')) {
+    $pgFallback = @($pg16Bin, $pg18Bin) | Where-Object { Test-Path (Join-Path $_ 'pg_ctl.exe') }
+    if (@($pgFallback).Count -eq 1) {
+      Write-Warning "Postgres binaries not found at the default $PostgresBinDir; using the installed $($pgFallback[0]) instead. Pass -PostgresBinDir explicitly to choose."
+      $PostgresBinDir = $pgFallback[0]
+    }
+  }
+}
+
+# ── 0c. Parallel-instance guards: scan now, report in CheckOnly, abort live
+# Installing a second stack next to APP10's SeaMonitor* services (or a second
+# Postgres cluster, or grabbing a port this run needs) is always a mistake, so
+# the setup refuses instead of creating it. Re-run with the matching
+# -ServicePrefix / -PostgresBinDir to update the existing install. -SkipPostgres
+# does no Postgres work (it never installs or initializes a cluster), so the
+# second-Postgres guard does not fire under it; see the conflict loop below.
 function Test-ListenPort([int]$p) {
   try { $null -ne (Get-NetTCPConnection -LocalPort $p -State Listen -ErrorAction Stop) }
   catch { $false }
 }
+# A custom -ServicePrefix would otherwise be invisible to the scan: its own
+# services would look like stray port occupants on re-run (false abort) and a
+# foreign custom stack would be missed. Merging it in keeps same-vs-foreign
+# exact for any prefix.
+$knownPrefixes = @('Barrier', 'SeaMonitor', $ServicePrefix) | Sort-Object -Unique
+$knownPgBins = @('C:\sites\seacrest\.vendor\pgsql18\bin', $pg16Bin, $pg18Bin)
+$samePrefixServices = @()
+$foreignServices = @()
+foreach ($prefix in $knownPrefixes) {
+  foreach ($suffix in @('App', 'Poller', 'Alerts', 'Caddy')) {
+    $nm = "$prefix$suffix"
+    if (Get-Service $nm -ErrorAction SilentlyContinue) {
+      if ($prefix -eq $ServicePrefix) { $samePrefixServices += $nm } else { $foreignServices += $nm }
+    }
+  }
+}
+$otherPgBins = @($knownPgBins | Where-Object { $_ -ne $PostgresBinDir -and (Test-Path (Join-Path $_ 'pg_ctl.exe')) })
+# Only ports this run will actually bind can be conflicts. The selected PgPort
+# is always exempt: reusing an existing PostgreSQL is the normal path (the
+# second-PG-data-dir guard above still catches a second install), and a
+# partial retry with Postgres up but ${ServicePrefix}* services not registered
+# yet must not be blocked. Caddy ports count only when Caddy runs, and 443
+# only when a hostname makes it terminate TLS. The fixed 8300 is not watched
+# when -AppPort selects another port.
+$portWatch = @([int]$AppPort)
+if (-not $SkipCaddy) {
+  $portWatch += 80
+  if ($Hostname) { $portWatch += 443 }
+}
+$portWatch = @($portWatch | Sort-Object -Unique)
+$occupiedPorts = @($portWatch | Where-Object { Test-ListenPort $_ })
+$portConflicts = @()
+if ($samePrefixServices.Count -eq 0) { $portConflicts = $occupiedPorts }
+$conflicts = @()
+foreach ($s in $foreignServices) { $conflicts += "service $s exists with a different prefix (this run would install ${ServicePrefix}* alongside it; re-run with the matching -ServicePrefix to update it instead)" }
+# Second-Postgres guard honors -SkipPostgres, matching its remedy message:
+# that switch performs no Postgres work (no install, no initdb; it only
+# reuses the cluster selected via -PostgresBinDir), so binaries elsewhere
+# cannot become a parallel instance this run creates. Without the switch the
+# conflict stands and both remedies are exact (matching -PostgresBinDir, or
+# -SkipPostgres to skip all Postgres work).
+if (-not $SkipPostgres) {
+  foreach ($b in $otherPgBins) { $conflicts += "PostgreSQL binaries found at $b outside the selected -PostgresBinDir $PostgresBinDir (re-run with the matching -PostgresBinDir, or -SkipPostgres)" }
+}
+foreach ($p in $portConflicts) { $conflicts += "port $p is already listening and no ${ServicePrefix}* service is installed, so it would not be updated by this run (free the port or re-run with the matching -ServicePrefix)" }
+
+# ── 0d. Readiness report: say what WOULD happen, change nothing ─────
 if ($CheckOnly) {
   Write-Step 'Readiness report (nothing installed, nothing changed)'
   $drive = Split-Path -Qualifier $InstallDir
   $freeGB = [math]::Round((Get-PSDrive $drive.TrimEnd(':')).Free / 1GB, 1)
   if ($freeGB -ge 10) { Write-Host "PASS disk: $freeGB GB free on $drive (need ~2 GB + backups)." -ForegroundColor Green }
   else { Write-Host "WARN disk: only $freeGB GB free on $drive." -ForegroundColor Yellow }
-  foreach ($p in @(80, 443, 8300, 5432)) {
-    if (Test-ListenPort $p) { Write-Host "WARN port ${p}: already in use (setup continues; 5432 busy = Postgres already here)." -ForegroundColor Yellow }
+  $bDrive = Split-Path -Qualifier $BackupDir
+  try {
+    $bFreeGB = [math]::Round((Get-PSDrive $bDrive.TrimEnd(':')).Free / 1GB, 1)
+    if (Test-Path $BackupDir) { $bState = 'exists' } else { $bState = 'absent (setup would create it)' }
+    if ($bFreeGB -ge 5) { Write-Host "PASS backup: $bDrive has $bFreeGB GB free; $BackupDir $bState." -ForegroundColor Green }
+    else { Write-Host "WARN backup: only $bFreeGB GB free on $bDrive for $BackupDir ($bState)." -ForegroundColor Yellow }
+  } catch {
+    Write-Host "WARN backup: cannot stat $bDrive for $BackupDir ($_)." -ForegroundColor Yellow
+  }
+  foreach ($p in $portWatch) {
+    if (Test-ListenPort $p) {
+      if ($samePrefixServices.Count -gt 0) { Write-Host "WARN port ${p}: already in use (a ${ServicePrefix}* service is installed, so a real run would refresh it and continue)." -ForegroundColor Yellow }
+      else { Write-Host "WARN port ${p}: already in use with no ${ServicePrefix}* service installed (a real run would ABORT)." -ForegroundColor Yellow }
+    }
     else { Write-Host "PASS port ${p}: free." -ForegroundColor Green }
   }
-  foreach ($s in @('BarrierApp', 'BarrierPoller', 'BarrierAlerts', 'BarrierCaddy', 'postgresql-x64-16')) {
-    if (Get-Service $s -ErrorAction SilentlyContinue) { Write-Host "INFO service ${s}: already exists (setup will refresh it)." }
+  if (Test-ListenPort ([int]$PgPort)) { Write-Host "INFO port ${PgPort}: already listening (the selected PgPort is exempt from the guard; verify it is the intended PostgreSQL)." }
+  foreach ($prefix in $knownPrefixes) {
+    foreach ($suffix in @('App', 'Poller', 'Alerts', 'Caddy')) {
+      $s = "$prefix$suffix"
+      if (Get-Service $s -ErrorAction SilentlyContinue) {
+        if ($prefix -eq $ServicePrefix) { Write-Host "INFO service ${s}: already exists (setup will refresh it)." }
+        else { Write-Host "WARN service ${s}: foreign prefix installed (a real run ABORTS; re-run with -ServicePrefix $prefix to update it)." -ForegroundColor Yellow }
+      }
+    }
+  }
+  foreach ($s in @('postgresql-x64-16', 'postgresql-x64-18')) {
+    if (Get-Service $s -ErrorAction SilentlyContinue) { Write-Host "INFO service ${s}: already exists (Postgres cluster present)." }
+  }
+  foreach ($b in $knownPgBins) {
+    if (Test-Path (Join-Path $b 'pg_ctl.exe')) {
+      if ($b -eq $PostgresBinDir) { Write-Host "INFO postgres: binaries at $b (selected via -PostgresBinDir)." }
+      elseif ($SkipPostgres) { Write-Host "INFO postgres: another install at $b (left untouched: -SkipPostgres does no Postgres work)." }
+      else { Write-Host "WARN postgres: another install at $b (a real run ABORTS; pass -PostgresBinDir to select it, or -SkipPostgres)." -ForegroundColor Yellow }
+    }
+  }
+  if ($conflicts.Count -gt 0) {
+    Write-Host 'WARN guards: a real run would ABORT now:' -ForegroundColor Yellow
+    foreach ($c in $conflicts) { Write-Host "  - $c" -ForegroundColor Yellow }
+  } else {
+    Write-Host 'PASS guards: no foreign services, no second Postgres, no stray ports.' -ForegroundColor Green
   }
   if (Test-Path "$InstallDir\deno.jsonc") { Write-Host 'INFO code: already present (setup will pull latest).' }
   else { Write-Host 'INFO code: will be fetched (zip/clone, no git required for zip).' }
@@ -230,17 +547,23 @@ if ($CheckOnly) {
   Write-Host ''
   Write-Host 'PLAN (what a real run would do):'
   Write-Host "  install Deno $DenoVersion to $ToolsDir\deno (machine PATH)"
-  Write-Host "  install or reuse PostgreSQL 16 on port $PgPort; ensure role $DbUser + db $DbName"
-  Write-Host "  register services BarrierApp/Poller/Alerts$(if (-not $SkipCaddy) { ' + BarrierCaddy (port 80)' } else { ' (no proxy)' })"
+  Write-Host "  reuse PostgreSQL at $PostgresBinDir on port $PgPort (fresh host: EDB install to $pg16Bin); ensure role $DbUser + db $DbName"
+  Write-Host "  migrate the database first, then run the doctor gate (fresh DBs pass)"
+  Write-Host "  register services $svcApp/$svcPoller/$svcAlerts$(if (-not $SkipCaddy) { "/$svcCaddy (port 80)" } else { ' (no proxy)' }); helper binds app ${appBindHost}:${AppPort} via -BindHost"
   Write-Host "  firewall: TCP $(if ($Hostname -or -not $SkipCaddy) { '80+443' } else { 'unchanged' })$(if ($AllowedLanRanges.Count) { " scoped to $($AllowedLanRanges -join ', ')" } else { ' (whole network: pass -AllowedLanRanges to scope)' })"
-  Write-Host "  nightly backup task BarrierBackup at 02:00 -> $BackupDir"
-  Write-Host "  users would open: $(if ($Hostname) { "https://$Hostname" } else { "http://$ServerIp" })"
+  Write-Host "  validate the generated Caddyfile (caddy validate) when Caddy is enabled"
+  Write-Host "  nightly backup task BarrierBackup at 02:00 -> $BackupDir (db $DbName, pg tools $PostgresBinDir)"
+  Write-Host "  smoke loopback :$AppPort, plus https://$Hostname when -Hostname is set"
+  Write-Host "  users would open: $(if ($Hostname) { "https://$Hostname" } elseif (-not $SkipCaddy) { "http://$ServerIp via $svcCaddy (plain HTTP)" } elseif ($appBindHost -eq '0.0.0.0') { "http://${ServerIp}:${AppPort} (LAN plain HTTP)" } else { 'nothing LAN-facing: app stays loopback-only (helper -BindHost 127.0.0.1)' })"
   Write-Host 'Re-run without -CheckOnly to do it. Nothing was changed.'
   return
 }
+if ($conflicts.Count -gt 0) {
+  throw ("SETUP ABORTED: refusing to create a parallel instance:`n - " + ($conflicts -join "`n - "))
+}
 if (-not $Unattended) {
   Write-Host ''
-  Write-Host "About to install Barrier Monitor into $InstallDir (Postgres role $DbUser, app port $AppPort, proxy port 80)."
+  Write-Host "About to install Barrier Monitor into $InstallDir (${ServicePrefix}* services, Postgres $PostgresBinDir role $DbUser/db $DbName, app ${appBindHost}:${AppPort} bound via helper -BindHost, proxy port 80)."
   $answer = Read-Host 'Type YES in capitals to continue, anything else aborts (nothing changes until then)'
   if ($answer -cne 'YES') { Write-Host 'aborted by operator; nothing was changed.'; return }
 }
@@ -276,10 +599,23 @@ if (-not (Test-Path $denoExe)) {
 $env:Path = "$denoDir;" + $env:Path
 & $denoExe --version
 
-# ── 2. PostgreSQL 16 ────────────────────────────────────────────────
+# ── 2. PostgreSQL (vendor PG18 when present, EDB PG16 fallback) ───
 $pgCtl = Join-Path $PostgresBinDir 'pg_ctl.exe'
 if ((Test-Path $pgCtl) -and [string]::IsNullOrWhiteSpace($PostgresSuperPassword)) {
-  Write-Need 'PostgreSQL is already installed: pass -PostgresSuperPassword (superuser) so the role/database can be ensured.'
+  # Reusing an existing cluster needs its superuser now. A non-elevated
+  # parent's runtime-set env var cannot cross the UAC hop (persisted
+  # User/Machine ones can), so prompt securely in this elevated console; a
+  # fresh install below generates its own password.
+  if (-not $Unattended) {
+    try {
+      $PostgresSuperPassword = Read-HiddenValue 'Postgres superuser password (input hidden; set POSTGRES_SUPER_PASSWORD at User or Machine scope and start an elevated session to skip)'
+    } catch {
+      $PostgresSuperPassword = ''
+    }
+  }
+}
+if ((Test-Path $pgCtl) -and [string]::IsNullOrWhiteSpace($PostgresSuperPassword)) {
+  Write-Need 'PostgreSQL is already installed but the superuser password is unavailable (empty answer or -Unattended). Persist POSTGRES_SUPER_PASSWORD at User or Machine scope (for example [Environment]::SetEnvironmentVariable(''POSTGRES_SUPER_PASSWORD'', ''<secret>'', ''User'')), start PowerShell as administrator, and re-run. Secrets are never accepted on the command line because they leak through process lists and history.'
 }
 $pgPassOwn = $false
 if (-not $SkipPostgres -and -not (Test-Path $pgCtl)) {
@@ -308,6 +644,14 @@ if (-not $SkipPostgres -and -not (Test-Path $pgCtl)) {
     # Winget/EDB default superuser password is `postgres`; rotate immediately.
     $PostgresSuperPassword = 'postgres'
     $pgPassOwn = $true
+  }
+  # The EDB installer always lands in Program Files: adopt it when the
+  # default vendor path was requested but is still absent, so a fresh host
+  # keeps the old one-command install behavior instead of failing below.
+  if (-not (Test-Path $pgCtl) -and (Test-Path (Join-Path $pg16Bin 'pg_ctl.exe')) -and -not $PSBoundParameters.ContainsKey('PostgresBinDir')) {
+    Write-Warning "using the freshly installed PostgreSQL at $pg16Bin (default vendor path $PostgresBinDir not present)."
+    $PostgresBinDir = $pg16Bin
+    $pgCtl = Join-Path $PostgresBinDir 'pg_ctl.exe'
   }
 }
 if (-not (Test-Path $pgCtl)) {
@@ -345,7 +689,7 @@ try {
 # ── 3. Application code ─────────────────────────────────────────────
 Write-Step "Ensuring application code at $InstallDir"
 if (Test-Path "$InstallDir\deno.jsonc") {
-  if (Test-Path "$InstallDir\.git" -and (Get-Command git -ErrorAction SilentlyContinue)) {
+  if ((Test-Path "$InstallDir\.git") -and (Get-Command git -ErrorAction SilentlyContinue)) {
     Push-Location $InstallDir
     git fetch origin 2>$null
     git checkout $Branch 2>$null
@@ -391,7 +735,7 @@ if ($caddyWanted -and -not (Test-Path $caddyExe)) {
   Expand-Archive -Path $zip -DestinationPath (Split-Path $caddyExe) -Force
   Remove-Item $zip -Force -ErrorAction SilentlyContinue
 }
-if (-not $caddyWanted) { Write-Host 'Caddy skipped per -SkipCaddy: port 80 stays closed; app answers on loopback only.' }
+if (-not $caddyWanted) { Write-Host "Caddy skipped per -SkipCaddy: port 80 stays closed; the helper binds the app to ${appBindHost} via -BindHost." }
 
 # ── 5. .env (created once, never rotated on re-run) ─────────────────
 Write-Step 'Ensuring .env (created once; existing files are never overwritten)'
@@ -435,17 +779,26 @@ if ($envCreated) {
     Remove-Item Env:\PGPASSWORD -ErrorAction SilentlyContinue
   }
 }
-icacls $envFile /inheritance:r /grant:r 'Administrators:F' 'SYSTEM:F' | Out-Null
+# Lock .env to Administrators + SYSTEM. Well-known SIDs (not the English group
+# names) so the ACL is identical on localized Windows (e.g. pt-BR
+# "Administradores"): S-1-5-32-544 = Administrators, S-1-5-18 = SYSTEM.
+icacls $envFile /inheritance:r /grant:r '*S-1-5-32-544:F' '*S-1-5-18:F' | Out-Null
 
-# ── 6. Validate, build, migrate, first admin (hard gates) ───────────
-Write-Step 'Running doctor gate (fails the setup on any failure)'
-Push-Location $InstallDir
-& $denoExe task doctor
-if ($LASTEXITCODE -ne 0) { Pop-Location; Write-Need 'doctor failed; fix .env and re-run.' }
+# ── 6. Build, migrate, doctor gate, first admin (hard gates) ──────
+# Order matters: migrations run BEFORE the doctor gate, because a fresh
+# database has no users/auth_flows tables yet and the SSO checks would abort
+# with `relation "users" does not exist`. scripts/doctor.ts also tolerates
+# missing tables with a warn (pointing at db:migrate) for manual runs.
 Write-Step 'Building the Fresh bundle'
+Push-Location $InstallDir
 & $denoExe task build
+if ($LASTEXITCODE -ne 0) { Pop-Location; Write-Need 'build failed; fix the error above and re-run.' }
 Write-Step 'Applying database migrations (idempotent)'
 & $denoExe task db:migrate
+if ($LASTEXITCODE -ne 0) { Pop-Location; Write-Need 'db:migrate failed; fix DATABASE_URL/role grants and re-run.' }
+Write-Step 'Running doctor gate (fails the setup on any failure)'
+& $denoExe task doctor
+if ($LASTEXITCODE -ne 0) { Pop-Location; Write-Need 'doctor failed; fix .env and re-run.' }
 Write-Step "Ensuring admin $AdminEmail (warning is fine when it already exists)"
 # Secrets via env, never CLI: --password would leak through the process list.
 $env:ADMIN_PASSWORD = $AdminPassword
@@ -458,16 +811,41 @@ try {
 Pop-Location
 
 # ── 7. Services ─────────────────────────────────────────────────────
-Write-Step 'Registering Barrier services (app + poller + alerts)'
-& "$deployDir\Register-Services.ps1" -InstallDir $InstallDir -NssmExe $nssmExe -DenoExe $denoExe -AppPort $AppPort
+Write-Step "Registering $ServicePrefix services (app + poller + alerts)"
+# Parameter detection must be exact: Register-Services.ps1 in a revision
+# before -ServicePrefix is hardcoded to Barrier* names, and a revision before
+# -BindHost ignores the explicit listener; either silently diverges from this
+# run. Fail with a precise message instead of special-casing any one prefix;
+# once the script declares both, default and custom layouts proceed unchanged.
+$regScript = Get-Command "$deployDir\Register-Services.ps1" -ErrorAction SilentlyContinue
+$regSupportsPrefix = $false
+$regSupportsBindHost = $false
+if ($regScript -and $regScript.Parameters) {
+  $regSupportsPrefix = $regScript.Parameters.ContainsKey('ServicePrefix')
+  $regSupportsBindHost = $regScript.Parameters.ContainsKey('BindHost')
+}
+if (-not $regSupportsPrefix) {
+  Write-Need "Register-Services.ps1 in this checkout does not declare -ServicePrefix, so it cannot register ${ServicePrefix}* services. Update the checkout to the revision that supports -ServicePrefix and re-run."
+}
+if (-not $regSupportsBindHost) {
+  Write-Need "Register-Services.ps1 in this checkout does not declare -BindHost, so the helper cannot enforce the selected listener (loopback 127.0.0.1 by default; 0.0.0.0 only for -SkipCaddy -AllowLanAppPort): its own default would win and the loopback/LAN posture could not be guaranteed. Update the checkout to the revision that supports -BindHost and re-run."
+}
+# Pass the listener and port explicitly: Register-Services.ps1 owns the NSSM
+# app command and enforces the bind via -BindHost; the Caddy proxy, firewall
+# rule and smoke test must agree with it. BindHost is loopback by default and
+# 0.0.0.0 only for the scoped LAN plain-HTTP mode computed at the top.
+$regArgs = @{ InstallDir = $InstallDir; NssmExe = $nssmExe; DenoExe = $denoExe; AppPort = $AppPort; BindHost = $appBindHost; ServicePrefix = $ServicePrefix }
+& "$deployDir\Register-Services.ps1" @regArgs
 $hasFracttal = $false
-foreach ($line in Get-Content $envFile) {
+# -Encoding UTF8 (see Set-DotEnvKey): ANSI decoding would corrupt an accented
+# COMPANY_NAME line before this scan even runs on PS 5.1.
+foreach ($line in Get-Content $envFile -Encoding UTF8) {
   if ($line -match '^\s*FRACTTAL_KEY\s*=\s*\S+') { $hasFracttal = $true }
 }
 if (-not $hasFracttal) {
-  Stop-Service BarrierPoller -ErrorAction SilentlyContinue
-  Set-Service BarrierPoller -StartupType Disabled
-  Write-Warning 'no FRACTTAL_KEY in .env: BarrierPoller disabled (exits code 2 without creds by design). Enable after adding keys.'
+  Stop-Service $svcPoller -ErrorAction SilentlyContinue
+  Set-Service $svcPoller -StartupType Disabled
+  Write-Warning "no FRACTTAL_KEY in .env: $svcPoller disabled (exits code 2 without creds by design). Enable after adding keys."
 }
 if ($caddyWanted) {
   Write-Step "Registering Caddy reverse proxy for $Hostname"
@@ -476,7 +854,8 @@ if ($caddyWanted) {
   New-Item -ItemType Directory -Force -Path "$InstallDir\logs" | Out-Null
   $logPath = Join-Path $InstallDir 'logs\caddy-access.log'
   $site = if ($Hostname) { $Hostname } else { ':80' }
-  Set-Content -Path "$caddyDir\Caddyfile" -Encoding UTF8 -Value @"
+  # BOM-free write: a BOM before the site address breaks naive parsers.
+  Write-AllTextNoBom "$caddyDir\Caddyfile" @"
 # Generated by Setup-Production.ps1. Do not edit by hand: re-run the setup
 # script to regenerate (template: deploy/windows/Caddyfile).
 $site {
@@ -497,21 +876,25 @@ $site {
 	}
 }
 "@
-  $svc = Get-Service BarrierCaddy -ErrorAction SilentlyContinue
+  Write-Step 'Validating the generated Caddyfile (fails the setup when invalid)'
+  & $caddyExe validate --config "$caddyDir\Caddyfile" --adapter caddyfile
+  if ($LASTEXITCODE -ne 0) { Write-Need 'caddy validate rejected the generated Caddyfile; fix the template/inputs and re-run.' }
+  Write-Host 'Caddyfile valid.'
+  $svc = Get-Service $svcCaddy -ErrorAction SilentlyContinue
   if ($svc) {
-    & $nssmExe stop BarrierCaddy | Out-Null
-    & $nssmExe remove BarrierCaddy confirm | Out-Null
+    & $nssmExe stop $svcCaddy | Out-Null
+    & $nssmExe remove $svcCaddy confirm | Out-Null
   }
-  & $nssmExe install BarrierCaddy "`"$caddyExe`"" "run --config `"$caddyDir\Caddyfile`" --adapter caddyfile" | Out-Null
-  & $nssmExe set BarrierCaddy AppDirectory $caddyDir | Out-Null
-  & $nssmExe set BarrierCaddy Description 'Barrier Monitor TLS reverse proxy (Caddy)' | Out-Null
-  & $nssmExe set BarrierCaddy Start SERVICE_AUTO_START | Out-Null
-  & $nssmExe set BarrierCaddy AppStdout "$InstallDir\logs\BarrierCaddy-out.log" | Out-Null
-  & $nssmExe set BarrierCaddy AppStderr "$InstallDir\logs\BarrierCaddy-err.log" | Out-Null
-  & $nssmExe set BarrierCaddy AppRotateFiles 1 | Out-Null
-  & $nssmExe set BarrierCaddy AppRotateOnline 1 | Out-Null
-  & $nssmExe start BarrierCaddy | Out-Null
-  Write-Host 'service BarrierCaddy: installed + started.'
+  & $nssmExe install $svcCaddy "`"$caddyExe`"" "run --config `"$caddyDir\Caddyfile`" --adapter caddyfile" | Out-Null
+  & $nssmExe set $svcCaddy AppDirectory $caddyDir | Out-Null
+  & $nssmExe set $svcCaddy Description 'Barrier Monitor TLS reverse proxy (Caddy)' | Out-Null
+  & $nssmExe set $svcCaddy Start SERVICE_AUTO_START | Out-Null
+  & $nssmExe set $svcCaddy AppStdout "$InstallDir\logs\$svcCaddy-out.log" | Out-Null
+  & $nssmExe set $svcCaddy AppStderr "$InstallDir\logs\$svcCaddy-err.log" | Out-Null
+  & $nssmExe set $svcCaddy AppRotateFiles 1 | Out-Null
+  & $nssmExe set $svcCaddy AppRotateOnline 1 | Out-Null
+  & $nssmExe start $svcCaddy | Out-Null
+  Write-Host "service ${svcCaddy}: installed + started."
 }
 
 # ── 8. Firewall ─────────────────────────────────────────────────────
@@ -519,6 +902,8 @@ $site {
 # required below. Web ports (80/443) REQUIRE -AllowedLanRanges (office/VPN
 # CIDRs); opening them to the whole internet in plain HTTP or even https is
 # refused - pass the LAN ranges or -SkipFirewall (and document the exception).
+# Rule display names stay 'Barrier Monitor ...' on purpose: Uninstall-Production
+# (WIN2-owned) removes them by that prefix, so renaming would orphan rules.
 if (-not $SkipFirewall) {
   Write-Step 'Configuring Windows Firewall'
   $fwScope = @{}
@@ -530,7 +915,7 @@ if (-not $SkipFirewall) {
     $webPorts = @('80')
     if ($Hostname) { $webPorts += '443' }
     foreach ($port in $webPorts) {
-      $rule = "Barrier Monitor web ($port)"
+      $rule = "SeaMonitor web ($port)"
       if (-not (Get-NetFirewallRule -DisplayName $rule -ErrorAction SilentlyContinue)) {
         New-NetFirewallRule -DisplayName $rule -Direction Inbound -Protocol TCP -LocalPort $port -Action Allow @fwScope | Out-Null
       } else {
@@ -538,12 +923,12 @@ if (-not $SkipFirewall) {
         Set-NetFirewallRule -DisplayName $rule -RemoteAddress ($AllowedLanRanges -join ',') | Out-Null
       }
     }
-    Write-Host "inbound TCP $($webPorts -join '+') open, scoped to $($AllowedLanRanges -join ', '); app port stays loopback-only."
+    Write-Host "inbound TCP $($webPorts -join '+') open, scoped to $($AllowedLanRanges -join ', '); app port stays loopback-only (helper -BindHost $appBindHost)."
   } elseif ($AllowLanAppPort) {
     if ($AllowedLanRanges.Count -eq 0) {
       Write-Need 'refusing to open the app port to the whole network: pass -AllowedLanRanges to scope it (TLS-less port) or leave it loopback-only.'
     }
-    $rule = "Barrier Monitor app ($AppPort)"
+    $rule = "SeaMonitor app ($AppPort)"
     if (-not (Get-NetFirewallRule -DisplayName $rule -ErrorAction SilentlyContinue)) {
       New-NetFirewallRule -DisplayName $rule -Direction Inbound -Protocol TCP -LocalPort $AppPort -Action Allow @fwScope | Out-Null
     } else {
@@ -551,19 +936,24 @@ if (-not $SkipFirewall) {
     }
     Write-Warning "TCP $AppPort is open to $($AllowedLanRanges -join ', ') without TLS: acceptable only behind VPN; prefer -Hostname with Caddy."
   } else {
-    Write-Host 'no inbound rules created: app reachable from this host only until a proxy is added.'
+    Write-Host "no inbound rules created: the helper binds the app to ${appBindHost} via -BindHost, so it stays reachable from this host only until a proxy is added."
   }
 } else {
   Write-Host 'firewall skipped per -SkipFirewall.'
 }
 
 # ── 9. Nightly backup task ──────────────────────────────────────────
+# The task name stays 'BarrierBackup' on purpose: Uninstall-Production
+# (WIN2-owned) deletes it by that exact name, so renaming would orphan it.
+# The task carries the selected database, bin dir and dump directory so a
+# legacy -ServicePrefix Barrier -DbName barreiras install backs up barreiras
+# instead of the helper's default database.
 if (-not $SkipBackup) {
   Write-Step "Registering nightly backup task (02:00, $BackupDir)"
   New-Item -ItemType Directory -Force -Path $BackupDir | Out-Null
   schtasks /delete /tn 'BarrierBackup' /f 2>$null | Out-Null
   schtasks /create /tn 'BarrierBackup' /sc daily /st 02:00 /ru SYSTEM /rl HIGHEST /f `
-    /tr "powershell -NoProfile -ExecutionPolicy Bypass -File `"$deployDir\Backup-Database.ps1`" -BackupDir `"$BackupDir`"" | Out-Null
+    /tr "powershell -NoProfile -ExecutionPolicy Bypass -File `"$deployDir\Backup-Database.ps1`" -BackupDir `"$BackupDir`" -DbName `"$DbName`" -PostgresBinDir `"$PostgresBinDir`"" | Out-Null
   Write-Host 'scheduled task BarrierBackup registered.'
 } else {
   Write-Host 'backup skipped per -SkipBackup (no dumps will run).'
@@ -580,10 +970,22 @@ for ($i = 0; $i -lt 24 -and -not $ok; $i++) {
     Start-Sleep -Seconds 5
   }
 }
-if (-not $ok) { Write-Need "app did not answer /api/health after ~2 min; see $InstallDir\logs\BarrierApp-err.log." }
+if (-not $ok) { Write-Need "app did not answer /api/health after ~2 min; see $InstallDir\logs\$svcApp-err.log." }
 $login = Invoke-WebRequest -Uri "http://127.0.0.1:$AppPort/login" -UseBasicParsing
 if ($login.StatusCode -notin @(200, 302)) { Write-Need "/login returned $($login.StatusCode)." }
 Write-Host "health ok, /login -> $($login.StatusCode)."
+if ($Hostname) {
+  # Public smoke: warn-only, because Caddy keeps retrying certificate issuance
+  # after DNS propagates; a hard abort here would brick an otherwise good
+  # install while the CA is still being contacted.
+  try {
+    $pub = Invoke-WebRequest -Uri "https://$Hostname/login" -UseBasicParsing -TimeoutSec 20
+    if ($pub.StatusCode -notin @(200, 302)) { Write-Warning "public https://$Hostname/login returned $($pub.StatusCode); Caddy may still be issuing its certificate - re-check shortly." }
+    else { Write-Host "public smoke ok: https://$Hostname/login -> $($pub.StatusCode)." }
+  } catch {
+    Write-Warning "public smoke failed ($_); Caddy retries certificate issuance automatically - verify DNS + ports 80/443 and re-check."
+  }
+}
 
 # ── 11. Summary (no secrets except the one-time box below) ──────────
 $summary = @"
@@ -592,12 +994,13 @@ OS: $os
 Code: $InstallDir (branch $Branch)
 Deno: $(& $denoExe --version | Select-Object -First 1)
 DB: ${DbUser}@localhost:${PgPort}/${DbName}
-App: http://127.0.0.1:$AppPort (service BarrierApp)
-Public: $(if ($Hostname) { "https://$Hostname (service BarrierCaddy)" } elseif ($caddyWanted) { "http://$ServerIp via BarrierCaddy (plain HTTP: trusted LAN/VPN only)" } else { 'loopback-only (no proxy installed)' })
-Backup task: BarrierBackup daily 02:00 -> $BackupDir
+App: http://127.0.0.1:$AppPort (service $svcApp, binds ${appBindHost} via Register-Services -BindHost)
+Public: $(if ($Hostname) { "https://$Hostname (service $svcCaddy)" } elseif ($caddyWanted) { "http://$ServerIp via $svcCaddy (plain HTTP: trusted LAN/VPN only)" } else { "app on ${appBindHost}:${AppPort} (no proxy installed; helper -BindHost)" })
+Backup task: BarrierBackup daily 02:00 -> $BackupDir (db $DbName)
 Logs: $InstallDir\logs
 "@
-Set-Content -Path "$InstallDir\logs\install-summary.txt" -Value $summary -Encoding UTF8
+# BOM-free write (PS 5.1 Set-Content -Encoding UTF8 would stamp a BOM).
+Write-AllTextNoBom "$InstallDir\logs\install-summary.txt" $summary
 Write-Host ''
 Write-Host $summary -ForegroundColor Green
 Write-Host ''

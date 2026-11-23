@@ -20,6 +20,7 @@ import {
   parseIdParam,
   parsePositiveId,
   readJsonBodyCapped,
+  ValidationError,
 } from "../../../../lib/server/validation.ts";
 
 import {
@@ -207,12 +208,8 @@ export const handler = define.handlers({
       }
       return ok({ created: true }, requestId);
     } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
-      if (
-        message.includes("must be") || message.includes("too long") ||
-        message.includes("is required")
-      ) {
-        return badRequest(message, requestId);
+      if (err instanceof ValidationError) {
+        return badRequest(err.message, requestId);
       }
       return internal(
         `POST /api/barriers/${barrierId}/contingencies`,
@@ -279,9 +276,8 @@ export const handler = define.handlers({
       if (!updated) return notFound("Contingency link not found", requestId);
       return ok({ updated: true }, requestId);
     } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
-      if (message.includes("must be") || message.includes("too long")) {
-        return badRequest(message, requestId);
+      if (err instanceof ValidationError) {
+        return badRequest(err.message, requestId);
       }
       return internal(
         `PATCH /api/barriers/${barrierId}/contingencies`,

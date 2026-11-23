@@ -14,7 +14,7 @@ import type { Fmt } from "../../lib/export/format.ts";
 
 import { exportFromServer } from "./export-server.ts";
 
-import { setupDom } from "../../scripts/test-dom.ts";
+import { setupDom, waitFor } from "../../scripts/test-dom.ts";
 
 interface Seen {
   url: string;
@@ -35,6 +35,7 @@ function harness(
 ): {
   seen: Seen[];
   downloads: string[];
+  revokes: string[];
   // Mutable counter: the client calls onExpired() on a dead session.
   expired: { count: number };
   fetch: typeof globalThis.fetch;
@@ -43,8 +44,11 @@ function harness(
   const seen: Seen[] = [];
   const expired = { count: 0 };
   const clicks: string[] = [];
+  const revokes: string[] = [];
   URL.createObjectURL = () => "blob:stub";
-  URL.revokeObjectURL = () => {};
+  URL.revokeObjectURL = (url: string) => {
+    revokes.push(url);
+  };
   const doc = document;
   const originalCreate = doc.createElement.bind(doc);
   doc.createElement = ((tag: string) => {
@@ -58,6 +62,7 @@ function harness(
   return {
     seen,
     downloads: clicks,
+    revokes,
     expired,
     fetch: (input: string | URL | Request, init?: RequestInit) => {
       const req = seen[seen.length] = {
@@ -134,6 +139,27 @@ Deno.test("exportFromServer downloads every format as one file", async () => {
     "barreiras-2026-09-27.xlsx",
     "barreiras-2026-09-27.pdf",
   ]);
+});
+
+Deno.test("exportFromServer defers the blob URL revoke", async () => {
+  // Regression: the revoke used to run synchronously right after the
+  // anchor click. The click is asynchronous inside the browser, so a
+  // synchronous revoke aborts the download in some browsers and the user
+  // silently gets no file. The shared download helper revokes on a timer.
+  const h = harness(() => okResponse("payload"));
+  const original = globalThis.fetch;
+  globalThis.fetch = h.fetch;
+  try {
+    await run("xlsx", h, [1]);
+    assertEquals(h.downloads, ["barreiras-2026-09-27.xlsx"]);
+    // The click already happened; the URL must still be alive here.
+    assertEquals(h.revokes, [], "revoke must not run before the click lands");
+    // The URL is still released, deferred - never leaked.
+    await waitFor(() => h.revokes.length > 0, 3000);
+    assertEquals(h.revokes, ["blob:stub"]);
+  } finally {
+    globalThis.fetch = original;
+  }
 });
 
 Deno.test("exportFromServer downloads a large PDF in one request", async () => {

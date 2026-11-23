@@ -94,9 +94,19 @@ const ADMIN_COLUMNS = `${PUBLIC_COLUMNS}, entra_oid`;
 const USER_COLUMNS =
   "id, email, name, coalesce(phone, '') as phone, password_hash, role, active, created_at::text, auth_source, entra_tid, entra_oid, must_change_password";
 
-export async function listUsers(): Promise<AdminUser[]> {
-  const rows = await queryRows<AdminUser>(
-    `select ${ADMIN_COLUMNS} from users order by id`,
+// LIST_USERS_MAX_ROWS: hard ceiling for the admin list. The admin screen
+// paginates client-side over the whole array, so this is a whole-list bound,
+// not a page. 5000 matches the batch ceiling and keeps a pathological users
+// table from exhausting memory on GET /api/users; normal deployments stay far
+// below it.
+export const LIST_USERS_MAX_ROWS = 5000;
+
+export async function listUsers(
+  query: TxQuery = queryRows,
+): Promise<AdminUser[]> {
+  const rows = await query<AdminUser>(
+    `select ${ADMIN_COLUMNS} from users order by id limit $1`,
+    [LIST_USERS_MAX_ROWS],
   );
   return rows;
 }
@@ -358,7 +368,9 @@ export async function updateUser(
           current.role === "admin" && current.active &&
           (await countActiveLocalAdmins(query)) <= 1
         ) {
-          throw new Error("cannot convert the last active local admin");
+          throw new ValidationError(
+            "cannot convert the last active local admin",
+          );
         }
         identityChanged = true;
         revokeSessions = true;
@@ -411,13 +423,15 @@ export async function updateUser(
       const role = normalizeRole(patch.role);
       if (current.role === "admin" && role !== "admin") {
         if ((await countActiveAdmins(query)) <= 1 && current.active) {
-          throw new Error("cannot demote the last active admin");
+          throw new ValidationError("cannot demote the last active admin");
         }
         if (
           current.auth_source === "local" && current.active &&
           (await countActiveLocalAdmins(query)) <= 1
         ) {
-          throw new Error("cannot demote the last active local admin");
+          throw new ValidationError(
+            "cannot demote the last active local admin",
+          );
         }
       }
       args.push(role);
@@ -429,13 +443,15 @@ export async function updateUser(
       }
       if (current.role === "admin" && patch.active === false) {
         if ((await countActiveAdmins(query)) <= 1 && current.active) {
-          throw new Error("cannot deactivate the last active admin");
+          throw new ValidationError("cannot deactivate the last active admin");
         }
         if (
           current.auth_source === "local" && current.active &&
           (await countActiveLocalAdmins(query)) <= 1
         ) {
-          throw new Error("cannot deactivate the last active local admin");
+          throw new ValidationError(
+            "cannot deactivate the last active local admin",
+          );
         }
       }
       args.push(patch.active);
@@ -488,13 +504,13 @@ export async function deleteUser(id: number): Promise<boolean> {
     if (!current) return false;
     if (current.role === "admin" && current.active) {
       if ((await countActiveAdmins(query)) <= 1) {
-        throw new Error("cannot delete the last active admin");
+        throw new ValidationError("cannot delete the last active admin");
       }
       if (
         current.auth_source === "local" &&
         (await countActiveLocalAdmins(query)) <= 1
       ) {
-        throw new Error("cannot delete the last active local admin");
+        throw new ValidationError("cannot delete the last active local admin");
       }
     }
     const rows = await query<{ id: number }>(

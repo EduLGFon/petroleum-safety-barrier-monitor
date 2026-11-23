@@ -10,6 +10,10 @@ import type { FracttalAsset } from "./types.ts";
 const FREE_TEXT_KEYS = new Set<string>([
   "description",
   "parent_description",
+  "notes",
+  "units_description",
+  "groups_tasks_description",
+  "items_types_description",
 ]);
 
 // ALLOWLIST: the only keys that may survive into a committed fixture.

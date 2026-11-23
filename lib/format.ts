@@ -2,15 +2,40 @@
 // This is why it exists: one locale policy (today-relative durations,
 // DD/MM/YYYY, thousands separators) instead of scattered toLocaleString calls.
 
+// parseUtcMs: the instant of an ISO timestamp string, read in UTC.
+// A bare date is UTC midnight (the ECMAScript rule for date-only forms).
+// A date-time without an offset is read as UTC too: JavaScript reads it as
+// local time, and the day count then depends on the zone the process runs
+// in - the export server runs in UTC while the browser runs in
+// America/Sao_Paulo, so the same row came out one day apart. An explicit
+// offset (Z or +/-HH:MM) is honoured as given.
+// Returns null for input that is not a timestamp at all.
+function parseUtcMs(value: string): number | null {
+  const s = value.trim();
+  if (!s) return null;
+  const naive = /^(\d{4}-\d{2}-\d{2})[T ](\d{2}:\d{2}(:\d{2}(\.\d+)?)?)$/.exec(
+    s,
+  );
+  if (naive) {
+    const ms = Date.parse(`${naive[1]}T${naive[2]}Z`);
+    return Number.isFinite(ms) ? ms : null;
+  }
+  const ms = Date.parse(s);
+  return Number.isFinite(ms) ? ms : null;
+}
+
 // Days from ISO date to today, floored and clamped at 0 so future dates
 // never go negative; malformed input yields 0 instead of NaN downstream.
+// Both instants are read in UTC (see parseUtcMs), so the count never
+// depends on the zone the process runs in.
 // The optional nowMs (default Date.now()) keeps it deterministic in tests.
 export function daysSince(d: string, nowMs: number = Date.now()): number {
-  const ms = new Date(d).getTime();
-  if (!Number.isFinite(ms)) return 0;
+  const ms = parseUtcMs(d);
+  if (ms === null) return 0;
+  const now = Number.isFinite(nowMs) ? nowMs : Date.now();
   return Math.max(
     0,
-    Math.floor((nowMs - ms) / 86_400_000),
+    Math.floor((now - ms) / 86_400_000),
   );
 }
 

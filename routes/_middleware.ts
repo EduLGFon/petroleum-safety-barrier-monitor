@@ -18,11 +18,28 @@ function isImmutableAsset(pathname: string): boolean {
     pathname === "/favicon.ico";
 }
 
-// isAuthPage: pages that can carry a user's address or SSO state in the
-// response. Fresh page components cannot attach headers themselves, so the
-// middleware marks these responses private and uncacheable here.
-function isAuthPage(pathname: string): boolean {
-  return pathname === "/login" || pathname === "/trocar-senha";
+// isPrivatePage: HTML documents that can carry a signed-in person's data,
+// address, or SSO state. Fresh page components cannot attach headers
+// themselves, so the middleware marks these responses private and uncacheable
+// here. The dashboard root is included because it renders the authenticated
+// workspace and must never be stored by a shared cache.
+function isPrivatePage(pathname: string): boolean {
+  return pathname === "/" || pathname === "/login" ||
+    pathname === "/trocar-senha";
+}
+
+// appendVary: add one request header to Vary without dropping an existing
+// value or duplicating it case-insensitively.
+function appendVary(headers: Headers, value: string): void {
+  const current = headers.get("vary");
+  if (!current) {
+    headers.set("vary", value);
+    return;
+  }
+  const has = current.split(",").some((part) =>
+    part.trim().toLowerCase() === value.toLowerCase()
+  );
+  if (!has) headers.set("vary", `${current}, ${value}`);
 }
 
 function isCompressible(contentType: string | null): boolean {
@@ -143,11 +160,14 @@ export const handler = define.middleware(async (ctx) => {
         }),
       );
     }
-    // Auth pages may render a user's email or an SSO hand-off. They are never
-    // shared-cacheable, and a handler that already chose a policy keeps it.
-    if (isAuthPage(url.pathname) && !res.headers.has("cache-control")) {
+    // Private pages may render a user's email or an SSO hand-off, and the
+    // dashboard root renders the authenticated workspace. They are never
+    // shared-cacheable: private + no-store, and Vary: Cookie so any cache
+    // still in front keys by session. API responses keep their own policy.
+    if (isPrivatePage(url.pathname)) {
       const next = new Headers(res.headers);
-      next.set("cache-control", "no-store, private");
+      next.set("cache-control", "private, no-store");
+      appendVary(next, "Cookie");
       return applySecurityHeaders(
         ctx.req,
         new Response(res.body, {

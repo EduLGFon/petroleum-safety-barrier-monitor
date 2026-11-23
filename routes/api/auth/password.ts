@@ -39,11 +39,24 @@ import { getUserById, updateUser } from "../../../lib/server/sql/users.ts";
 
 import { loadServerConfig } from "../../../lib/server/config.ts";
 
-import { readJsonBody } from "../../../lib/server/validation.ts";
+import {
+  POSTGRES_UNIQUE_VIOLATION,
+  postgresErrorInfo,
+  readJsonBody,
+  ValidationError,
+} from "../../../lib/server/validation.ts";
 
 import { denyIfCrossSite } from "../../../lib/server/csrf.ts";
 
 import { define } from "../../../utils.ts";
+
+// duplicateMessage: a unique violation reported by the driver, mapped to a
+// controlled message. The SQLSTATE decides - never the error text.
+function duplicateMessage(err: unknown): string | undefined {
+  const info = postgresErrorInfo(err);
+  if (info.code !== POSTGRES_UNIQUE_VIOLATION) return undefined;
+  return "duplicate value";
+}
 
 export const handler = define.handlers({
   // POST { currentPassword, newPassword } - verifies the current password,
@@ -140,10 +153,11 @@ export const handler = define.handlers({
         },
       });
     } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
-      if (message.includes("password") || message.includes("nothing")) {
-        return badRequest(message, requestId);
+      if (err instanceof ValidationError) {
+        return badRequest(err.message, requestId);
       }
+      const duplicate = duplicateMessage(err);
+      if (duplicate) return badRequest(duplicate, requestId);
       return internal(
         "POST /api/auth/password",
         err,

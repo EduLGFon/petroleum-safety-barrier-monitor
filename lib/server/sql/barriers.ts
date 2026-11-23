@@ -39,9 +39,32 @@ import { buildWhere, resolveOrderBy, SORTABLE } from "./where.ts";
 
 export type { BarrierRow, HistoryEntry } from "./mappers.ts";
 
-import { queryRows, type TxQuery } from "../db.ts";
+import { queryRows, type TxQuery, withTx } from "../db.ts";
 
 import { EXPORT_MAX_ROWS } from "../../export/limits.ts";
+
+// buildListOrderBy: shared ORDER BY for every paged list and walk. The
+// secondary `b.id asc` key makes ties deterministic: a single-column sort
+// (same status, owner, or location) otherwise has no defined row order, so
+// OFFSET pages and the export keyset walk could repeat or skip rows.
+export function buildListOrderBy(
+  sortCol: string | undefined,
+  sortDir: string | undefined,
+): string {
+  return `${resolveOrderBy(sortCol, sortDir)}, b.id asc`;
+}
+
+// runAtomic: run fn inside the caller's transaction when one was supplied;
+// otherwise open one here. The begin hook is a parameter only so tests can
+// prove the no-query paths are transactional without a database; production
+// callers never pass it.
+export async function runAtomic<T>(
+  query: TxQuery | undefined,
+  fn: (q: TxQuery) => Promise<T>,
+  begin: (fn: (q: TxQuery) => Promise<T>) => Promise<T> = withTx,
+): Promise<T> {
+  return query === undefined ? await begin(fn) : await fn(query);
+}
 
 // Lists paged wire barriers + total for the given BarriersQuery filters.
 // Single round-trip: the total rides along as count(*) OVER() on every row,
@@ -64,7 +87,7 @@ export async function listBarriers(
   );
   const offset = (page - 1) * pageSize;
   const where = buildWhere(q);
-  const orderBy = resolveOrderBy(q.sortCol, q.sortDir);
+  const orderBy = buildListOrderBy(q.sortCol, q.sortDir);
   const limitIdx = where.args.length + 1;
   const offsetIdx = where.args.length + 2;
 
@@ -121,7 +144,7 @@ export async function listBarrierWindow(
   offset: number,
 ): Promise<WireBarrier[]> {
   const where = buildWhere(q);
-  const orderBy = `${resolveOrderBy(q.sortCol, q.sortDir)}, b.id asc`;
+  const orderBy = buildListOrderBy(q.sortCol, q.sortDir);
   const rows = await queryRows<BarrierRow>(
     `select ${SELECT_LIST_COLUMNS} from barriers b
      join locations loc on loc.id = b.location_id
@@ -184,7 +207,7 @@ export async function listBarrierWindowAfter(
   const sortKey = q.sortCol && SORTABLE[q.sortCol] ? q.sortCol : "id";
   const dir = q.sortDir === "desc" ? "desc" : "asc";
   const where = buildWhere(q);
-  const orderBy = `${resolveOrderBy(q.sortCol, q.sortDir)}, b.id asc`;
+  const orderBy = buildListOrderBy(q.sortCol, q.sortDir);
   let text = `select ${SELECT_LIST_COLUMNS}, ${
     cursorSelect(sortKey)
   } from barriers b
@@ -258,7 +281,7 @@ export async function getBarriersByIds(
 // selection only needs ids; full rows come from the page or export.
 export async function listBarrierIds(q: BarriersQuery): Promise<number[]> {
   const where = buildWhere(q);
-  const orderBy = `${resolveOrderBy(q.sortCol, q.sortDir)}, b.id asc`;
+  const orderBy = buildListOrderBy(q.sortCol, q.sortDir);
   const lim = where.args.length + 1;
   const rows = await queryRows<{ id: number }>(
     `select b.id from barriers b
@@ -282,6 +305,10 @@ export async function listBarrierIds(q: BarriersQuery): Promise<number[]> {
 // Never UPDATE availability_id directly from application code (the DB
 // guard trigger rejects it). No-op when the status already matches, so
 // retried PATCHes never duplicate history rows or re-fire alerts.
+// The row lock is only meaningful in the same transaction as
+// record_status_change(). Callers that embed this in their own transaction
+// pass `query`; the public status route does not, so withTx owns the lock,
+// the no-op check, the write, and the re-read as one unit.
 export async function transitionBarrierStatus(
   barrierId: number,
   statusId: number,
@@ -289,20 +316,22 @@ export async function transitionBarrierStatus(
   note = "",
   query?: TxQuery,
 ): Promise<WireBarrier | null> {
-  const q = query ?? queryRows;
-  // Lock the row so two concurrent transitions cannot both observe the old
-  // status and append duplicate history rows.
-  await q("select id from barriers where id = $1 for update", [barrierId]);
-  const current = await getBarrierById(barrierId, { query: q });
-  if (!current) return null;
-  if (current.availabilityId === statusId) return current;
-  await q("select record_status_change($1, $2, $3, $4)", [
-    barrierId,
-    statusId,
-    authorId,
-    note,
-  ]);
-  return getBarrierById(barrierId, { query: q });
+  const run = async (q: TxQuery): Promise<WireBarrier | null> => {
+    // Lock the row so two concurrent transitions cannot both observe the old
+    // status and append duplicate history rows.
+    await q("select id from barriers where id = $1 for update", [barrierId]);
+    const current = await getBarrierById(barrierId, { query: q });
+    if (!current) return null;
+    if (current.availabilityId === statusId) return current;
+    await q("select record_status_change($1, $2, $3, $4)", [
+      barrierId,
+      statusId,
+      authorId,
+      note,
+    ]);
+    return await getBarrierById(barrierId, { query: q });
+  };
+  return await runAtomic(query, run);
 }
 
 export interface BarrierUpdatePayload {
@@ -337,12 +366,14 @@ export interface BarrierUpdatePayload {
 // Every key sent with a value joins barriers.manual_fields, so the Fracttal
 // sync stops overwriting it; opts.releaseFields removes keys (validated by
 // the caller - unknown entries throw) so they follow the sync again.
+// The manual_fields merge is a read-modify-write, so the FOR UPDATE lock and
+// the UPDATE must share one transaction. Callers that already hold one pass
+// `query` (barrier PATCH); otherwise withTx owns the lock, merge, and write.
 export async function updateBarrier(
   id: number,
   patch: BarrierUpdatePayload,
   opts: { releaseFields?: string[]; query?: TxQuery } = {},
 ): Promise<WireBarrier | null> {
-  const q = opts.query ?? queryRows;
   const sets: string[] = [];
   const args: unknown[] = [id];
 
@@ -457,69 +488,72 @@ export async function updateBarrier(
   }
 
   const release = opts.releaseFields ?? [];
-  if (owned.length > 0 || release.length > 0) {
-    // Only newly-different values join manual_fields: the editor submits
-    // every field on save, and a no-change save must not freeze the row.
-    const current = await q<Record<string, unknown>>(
-      `select tag, location_id, typology_id, category_id, grouping_id,
-              owner_id, criticality_id, comments, action_plan, origin,
-              install_local, equip_typology, field_installed,
-              field_operational, op_status, has_maint_plan, plan_followed,
-              failure_free, maint_status, has_contingency, contingency_desc,
-              evidence_code, degradation_desc, extra_comments, manual_fields
-         from barriers where id = $1 for update`,
-      [id],
-    );
-    const cur = current[0];
-    const norm = (v: unknown) =>
-      (typeof v === "string" ? v : v == null ? "" : String(v)).trim();
-    const changed = (key: string): boolean => {
-      if (!cur) return true;
-      switch (key) {
-        case "ownerId":
-          return (patch.ownerId == null || patch.ownerId <= 0
-            ? null
-            : patch.ownerId) !== (cur["owner_id"] as number | null);
-        case "comments":
-        case "actionPlan":
-        case "tag": {
-          const col = key === "comments"
-            ? "comments"
-            : key === "actionPlan"
-            ? "action_plan"
-            : "tag";
-          const raw = patch[key as "comments" | "actionPlan" | "tag"];
-          return (raw ?? "").trim() !== norm(cur[col]);
+  const run = async (q: TxQuery): Promise<WireBarrier | null> => {
+    if (owned.length > 0 || release.length > 0) {
+      // Only newly-different values join manual_fields: the editor submits
+      // every field on save, and a no-change save must not freeze the row.
+      const current = await q<Record<string, unknown>>(
+        `select tag, location_id, typology_id, category_id, grouping_id,
+                owner_id, criticality_id, comments, action_plan, origin,
+                install_local, equip_typology, field_installed,
+                field_operational, op_status, has_maint_plan, plan_followed,
+                failure_free, maint_status, has_contingency, contingency_desc,
+                evidence_code, degradation_desc, extra_comments, manual_fields
+           from barriers where id = $1 for update`,
+        [id],
+      );
+      const cur = current[0];
+      const norm = (v: unknown) =>
+        (typeof v === "string" ? v : v == null ? "" : String(v)).trim();
+      const changed = (key: string): boolean => {
+        if (!cur) return true;
+        switch (key) {
+          case "ownerId":
+            return (patch.ownerId == null || patch.ownerId <= 0
+              ? null
+              : patch.ownerId) !== (cur["owner_id"] as number | null);
+          case "comments":
+          case "actionPlan":
+          case "tag": {
+            const col = key === "comments"
+              ? "comments"
+              : key === "actionPlan"
+              ? "action_plan"
+              : "tag";
+            const raw = patch[key as "comments" | "actionPlan" | "tag"];
+            return (raw ?? "").trim() !== norm(cur[col]);
+          }
+          default: {
+            const col = FIELD_COLUMNS[key as OwnableFieldKey];
+            const raw = patch[key as keyof BarrierUpdatePayload];
+            const next = typeof raw === "number"
+              ? raw
+              : (typeof raw === "string" ? raw.trim() : "") || null;
+            const prev = (cur[col] as number | string | null) ?? null;
+            return (next ?? "") !== (prev ?? "");
+          }
         }
-        default: {
-          const col = FIELD_COLUMNS[key as OwnableFieldKey];
-          const raw = patch[key as keyof BarrierUpdatePayload];
-          const next = typeof raw === "number"
-            ? raw
-            : (typeof raw === "string" ? raw.trim() : "") || null;
-          const prev = (cur[col] as number | string | null) ?? null;
-          return (next ?? "") !== (prev ?? "");
-        }
-      }
-    };
-    const next = mergeOwnership(
-      (cur?.["manual_fields"] as string[] | null) ?? [],
-      owned.filter(changed),
-      release,
-    );
-    args.push(next);
-    sets.push(`manual_fields = $${args.length}`);
-  }
+      };
+      const next = mergeOwnership(
+        (cur?.["manual_fields"] as string[] | null) ?? [],
+        owned.filter(changed),
+        release,
+      );
+      args.push(next);
+      sets.push(`manual_fields = $${args.length}`);
+    }
 
-  if (sets.length > 0) {
-    await q(
-      `update barriers set ${
-        sets.join(", ")
-      } where id = $1 and deleted_at is null`,
-      args,
-    );
-  }
-  return getBarrierById(id, { query: q });
+    if (sets.length > 0) {
+      await q(
+        `update barriers set ${
+          sets.join(", ")
+        } where id = $1 and deleted_at is null`,
+        args,
+      );
+    }
+    return await getBarrierById(id, { query: q });
+  };
+  return await runAtomic(opts.query, run);
 }
 
 // KPI aggregation lives in kpi.ts to keep the list/write path smaller.

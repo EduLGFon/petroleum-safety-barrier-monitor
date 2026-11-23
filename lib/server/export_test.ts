@@ -204,3 +204,99 @@ Deno.test("streamExportPdf carries no page URL anywhere", async () => {
   assertStrictEquals(all.includes("https://"), false);
   assertStrictEquals(/localhost/i.test(all), false);
 });
+
+// slowSource: a row source that yields one batch every few milliseconds, so
+// a cancel lands while a pull is still in flight. The returned promise
+// resolves when the source is closed, which is what releases the database
+// cursor.
+function slowSource(): {
+  source: AsyncIterable<Barrier[]>;
+  released: Promise<void>;
+  wasStarted: () => boolean;
+} {
+  let markReleased: () => void = () => {};
+  let started = false;
+  const released = new Promise<void>((r) => {
+    markReleased = r;
+  });
+  const source = {
+    async *[Symbol.asyncIterator](): AsyncGenerator<Barrier[]> {
+      started = true;
+      try {
+        for (;;) {
+          await new Promise((r) => setTimeout(r, 5));
+          yield [mkBarrier()];
+        }
+      } finally {
+        markReleased();
+      }
+    },
+  };
+  return { source, released, wasStarted: () => started };
+}
+
+// settles: waits for a promise, with a guard timer that is always cleared
+// (a leaked timer would fail the test sanitizer).
+async function settles(p: Promise<void>): Promise<boolean> {
+  let timer = 0;
+  const timeout = new Promise<boolean>((r) => {
+    timer = setTimeout(() => r(false), 2_000);
+  });
+  const ok = await Promise.race([p.then(() => true), timeout]);
+  clearTimeout(timer);
+  return ok;
+}
+
+Deno.test("cancelling an export mid-pull releases the rows and never throws", async () => {
+  // The client hung up (browser closed, connection dropped) while the
+  // database was still answering: the stream must stop, the row source must
+  // be closed (no leaked cursor) and the late pull must not throw on a
+  // cancelled controller.
+  const cases: Array<{
+    name: string;
+    open: (source: AsyncIterable<Barrier[]>) => ReadableStream<Uint8Array>;
+  }> = [
+    {
+      name: "csv",
+      open: (source) => streamExportCsv(source, kpiOf([mkBarrier()])),
+    },
+    {
+      name: "xlsx",
+      open: (source) =>
+        streamExportXlsx(source, {
+          companyName: "Petrobras",
+          kpi: kpiOf([mkBarrier()]),
+        }),
+    },
+    {
+      name: "pdf",
+      open: (source) =>
+        streamExportPdf(source, {
+          companyName: "Petrobras",
+          kpi: kpiOf([mkBarrier()]),
+          title: "barreiras",
+        }),
+    },
+  ];
+  for (const c of cases) {
+    const { source, released, wasStarted } = slowSource();
+    const reader = c.open(source).getReader();
+    // The first chunk proves the row source is open.
+    const first = await reader.read();
+    assertStrictEquals(first.done, false, c.name);
+    // The next read is still in flight when the client hangs up: the pull is
+    // waiting for the next batch.
+    const pending = reader.read();
+    await new Promise((r) => setTimeout(r, 1));
+    await reader.cancel();
+    // The read in flight settles instead of throwing on the cancelled
+    // stream, and the stream itself closed without an error.
+    await pending;
+    await reader.closed;
+    // The row source was closed: the cursor is not left open. A source that
+    // was never opened has no cursor to release.
+    if (wasStarted()) {
+      assertStrictEquals(await settles(released), true, c.name);
+    }
+  }
+});

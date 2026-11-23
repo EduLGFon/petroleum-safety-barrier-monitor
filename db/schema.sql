@@ -623,21 +623,13 @@ create trigger trg_access_groups_updated_at
   before update on access_groups
   for each row execute function set_updated_at();
 
--- Backward compatibility: preserve existing non-admin access on first migrate.
+-- The default group row stays for deployments that already use it, but this
+-- migration must never (re)grant memberships or station locations: an admin
+-- who removes one must not see it return on the next `db:migrate`. Station
+-- access stays fail-closed for a non-admin with no group (DECISIONS.md#D21).
 insert into access_groups (name, description)
 values ('Acesso geral', 'Grupo padrão criado na migração; acesso a todas as estações.')
 on conflict (name) do nothing;
-
-insert into access_group_locations (group_id, location_id)
-select g.id, l.id from access_groups g cross join locations l
-where g.name = 'Acesso geral'
-on conflict do nothing;
-
-insert into user_access_groups (user_id, group_id)
-select u.id, g.id
-from users u cross join access_groups g
-where u.role = 'user' and g.name = 'Acesso geral'
-on conflict do nothing;
 
 -- User authentication extensions and sessions.
 create index if not exists idx_users_role on users(role);

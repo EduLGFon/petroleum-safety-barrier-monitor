@@ -4,7 +4,10 @@
 # the same image and the same boot path as local runs. Secrets live in the
 # host-side `.env` (mounted read-only, never baked into the image).
 #
-# Fresh host (Linux, macOS, Windows with Docker Desktop + WSL2 backend):
+# Fresh host (Linux or macOS; Windows only for development via Docker Desktop + WSL2):
+# Compose stays supported but is not the Windows Server production path; the
+# native path in docs/DEPLOY-WINDOWS.md is. Loopback binds and the prod guard
+# (deploy/check-compose-prod.sh) are unchanged.
 #   cp .env.example .env        # defaults already point host->localhost, containers->db
 #   set PUBLIC_API_MODE=http    # production refuses the mock/demo dataset
 #   docker compose up -d --build # starts db first (health-gated), then app/poller/alerts

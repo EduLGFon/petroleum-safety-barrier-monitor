@@ -38,7 +38,15 @@ function push(name: string, status: Status, detail: string): void {
 // parseEnvFile: minimal .env parser (KEY=VALUE, # comments, quotes stripped).
 // PowerShell has no `export $(grep ...)` equivalent, so this file is the
 // cross-platform reader the docs point at instead of shell one-liners.
-function parseEnvFile(text: string): Record<string, string> {
+// Writer symmetry: deploy/windows/Setup-Production.ps1 never emits escapes -
+// it fails closed on values containing `"` or `\` and wraps values holding
+// whitespace, `#` or `'` in PLAIN double quotes. This reader strips the outer
+// double/single quotes (still unescaping the legacy `\\`/`\"` form, which
+// only .env files written by older setups carry), so every value the current
+// writer accepts round-trips exactly here AND under Deno's `--env-file`
+// loader, which strips the outer quotes but keeps the content literal: with
+// no escapes in the file, both readers agree.
+export function parseEnvFile(text: string): Record<string, string> {
   const out: Record<string, string> = {};
   for (const raw of text.split(/\r?\n/)) {
     const line = raw.trim();
@@ -47,10 +55,13 @@ function parseEnvFile(text: string): Record<string, string> {
     if (eq < 0) continue;
     const key = line.slice(0, eq).trim();
     let val = line.slice(eq + 1).trim();
-    if (
-      (val.startsWith('"') && val.endsWith('"')) ||
-      (val.startsWith("'") && val.endsWith("'"))
-    ) {
+    if (val.length >= 2 && val.startsWith('"') && val.endsWith('"')) {
+      // Double-quoted. The current writer (Setup-Production.ps1) puts no
+      // escapes inside, so plain stripping round-trips it; the `\\`/`\"`
+      // unescape below only matters for .env files written by older setups
+      // (current files carry none, and both readers then agree).
+      val = val.slice(1, -1).replace(/\\(["\\])/g, "$1");
+    } else if (val.length >= 2 && val.startsWith("'") && val.endsWith("'")) {
       val = val.slice(1, -1);
     }
     out[key] = val;
@@ -302,6 +313,16 @@ function checkPlatform(): void {
   }
 }
 
+// isMissingTable: true when a query failed only because the schema is not
+// migrated yet (Postgres 42P01 / undefined_table). Setup-Production.ps1 runs
+// `db:migrate` before the doctor gate for exactly this reason; a manual
+// `deno task doctor` on a fresh database should point at the migration,
+// not fail the whole preflight. Exported for unit tests (no DB needed).
+export function isMissingTable(err: unknown): boolean {
+  const msg = err instanceof Error ? err.message : String(err);
+  return /42P01|undefined_table|relation\s+"?\w+"?\s+does not exist/i.test(msg);
+}
+
 async function checkSso(): Promise<void> {
   let config;
   try {
@@ -390,17 +411,42 @@ async function checkSso(): Promise<void> {
     try {
       const client = await pool.connect();
       try {
-        const result = await client.queryObject<{ n: string }>(
-          "select count(*)::text as n from users where role = 'admin' and active and auth_source = 'local'",
-        );
-        const count = Number(result.rows[0]?.n ?? 0);
+        let adminCount = 0;
+        try {
+          const result = await client.queryObject<{ n: string }>(
+            "select count(*)::text as n from users where role = 'admin' and active and auth_source = 'local'",
+          );
+          adminCount = Number(result.rows[0]?.n ?? 0);
+        } catch (err) {
+          if (isMissingTable(err)) {
+            push(
+              "sso-schema",
+              "warn",
+              "users table missing: run `deno task db:migrate` before using doctor as a gate",
+            );
+            return;
+          }
+          throw err;
+        }
         push(
           "sso-local-admin",
-          count > 0 ? "ok" : "fail",
-          `${count} active local admin(s)`,
+          adminCount > 0 ? "ok" : "fail",
+          `${adminCount} active local admin(s)`,
         );
-        await client.queryArray("select 1 from auth_flows limit 1");
-        push("sso-auth-flows", "ok", "auth_flows table present");
+        try {
+          await client.queryArray("select 1 from auth_flows limit 1");
+          push("sso-auth-flows", "ok", "auth_flows table present");
+        } catch (err) {
+          if (isMissingTable(err)) {
+            push(
+              "sso-auth-flows",
+              "warn",
+              "auth_flows table missing: run `deno task db:migrate`",
+            );
+          } else {
+            throw err;
+          }
+        }
       } finally {
         client.release();
       }
@@ -462,4 +508,8 @@ async function main(): Promise<void> {
   if (fails > 0) Deno.exit(1);
 }
 
-await main();
+// Import-safe: unit tests import the pure helpers above without running the
+// live preflight (which needs --allow-env/net/read). `deno run` still runs it.
+if (import.meta.main) {
+  await main();
+}

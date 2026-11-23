@@ -1,11 +1,18 @@
 // Unit tests for lib/export - row mapping, KPI/summary reconciliation, escaping.
-import { assert, assertEquals, assertStrictEquals } from "jsr:@std/assert@^1";
+import {
+  assert,
+  assertEquals,
+  assertStrictEquals,
+  assertThrows,
+} from "jsr:@std/assert@^1";
 
 import { browserTimeZone, escHtml, resolveTimeZone, ts } from "./html.ts";
 
 import { kpiStats, summaryRows } from "./summary.ts";
 
-import { csvCell } from "./csv.ts";
+import { csvCell, exportToCSV } from "./csv.ts";
+
+import { EXPORT_MAX_ROWS } from "./limits.ts";
 
 import { row } from "./rows.ts";
 
@@ -147,6 +154,37 @@ Deno.test("csvCell quotes, doubles quotes, and stringifies anything", () => {
   assertStrictEquals(csvCell(false), '"false"');
 });
 
+Deno.test("csvCell guards a formula lead with an apostrophe", () => {
+  // The classic injection leads: the cell would run as a formula on import.
+  assertStrictEquals(csvCell("=1+1"), '"\'=1+1"');
+  assertStrictEquals(csvCell("+1"), '"\'+1"');
+  assertStrictEquals(csvCell("-1"), '"\'-1"');
+  assertStrictEquals(csvCell("@SUM(A1)"), '"\'@SUM(A1)"');
+  assertStrictEquals(csvCell("\t=1+1"), '"\'\t=1+1"');
+  assertStrictEquals(csvCell("\r=1+1"), '"\'\r=1+1"');
+});
+
+Deno.test("csvCell guards a formula behind leading whitespace", () => {
+  // Spreadsheet apps trim the cell before evaluating it, so a leading space,
+  // tab or newline is enough to smuggle a formula in.
+  assertStrictEquals(csvCell(" =1+1"), '"\' =1+1"');
+  assertStrictEquals(csvCell("  =1+1"), '"\'  =1+1"');
+  assertStrictEquals(csvCell("\n=1+1"), '"\'\n=1+1"');
+  assertStrictEquals(csvCell("\t\r =1+1"), '"\'\t\r =1+1"');
+  assertStrictEquals(csvCell(" \n +1"), '"\' \n +1"');
+  // The apostrophe goes on the original cell: the text stays readable.
+  assertStrictEquals(csvCell(" =1+1"), '"\' =1+1"');
+});
+
+Deno.test("csvCell leaves harmless cells alone", () => {
+  // No leading trigger: nothing is prefixed, so the text never changes.
+  assertStrictEquals(csvCell("1+1"), '"1+1"');
+  assertStrictEquals(csvCell("a-b"), '"a-b"');
+  assertStrictEquals(csvCell("text "), '"text "');
+  assertStrictEquals(csvCell(" "), '" "');
+  assertStrictEquals(csvCell(""), '""');
+});
+
 Deno.test("escHtml escapes &, <, >, and double quotes", () => {
   assertStrictEquals(
     escHtml(`<script>"&"</script>`),
@@ -186,4 +224,24 @@ Deno.test("browserTimeZone names the runtime zone", () => {
   const zone = browserTimeZone();
   assertStrictEquals(typeof zone, "string");
   assert((zone as string).length > 0);
+});
+
+Deno.test("exportToCSV refuses a selection over the ceiling with the real count", () => {
+  // Client mode holds the whole file in the tab, so a selection past the
+  // ceiling throws instead of building a file the tab cannot hold. The
+  // browser check runs first, so stub document to reach the ceiling gate.
+  const globals = globalThis as unknown as Record<string, unknown>;
+  const previous = globals.document;
+  globals.document = {};
+  try {
+    const over = new Array(EXPORT_MAX_ROWS + 1).fill(mkBarrier());
+    assertThrows(
+      () => exportToCSV(over),
+      Error,
+      "CSV comporta até",
+    );
+  } finally {
+    if (previous === undefined) delete globals.document;
+    else globals.document = previous;
+  }
 });

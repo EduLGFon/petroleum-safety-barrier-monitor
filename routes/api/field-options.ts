@@ -32,7 +32,7 @@ import {
 
 import { isFieldKey, normalizeOptions } from "../../lib/field-options.ts";
 
-import { readJsonBody } from "../../lib/server/validation.ts";
+import { readJsonBody, ValidationError } from "../../lib/server/validation.ts";
 
 import { loadServerConfig } from "../../lib/server/config.ts";
 
@@ -117,8 +117,9 @@ export const handler = define.handlers({
       const saved = await upsertFieldOptionSet(field, options, "admin");
       return ok(saved, requestId);
     } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
-      if (message.includes("options")) return badRequest(message, requestId);
+      if (err instanceof ValidationError) {
+        return badRequest(err.message, requestId);
+      }
       return internal(
         "PUT /api/field-options",
         err,

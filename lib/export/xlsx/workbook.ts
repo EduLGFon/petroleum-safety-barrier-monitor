@@ -96,58 +96,71 @@ async function* xlsxEntries(
   const book = styleBook();
   const styles = sheetStyles(book);
   const iterator = batches[Symbol.asyncIterator]();
-  // First batch decides the column widths; it is replayed right after the
-  // header block so no row is lost.
-  const first = await iterator.next();
-  const head: Barrier[] = first.done ? [] : first.value;
-  const widths = xlsxColWidths(head.slice(0, WIDTH_SAMPLE_ROWS).map(row));
-  const rest = (async function* (): AsyncGenerator<Barrier[]> {
-    if (head.length > 0) yield head;
-    for (;;) {
-      const next = await iterator.next();
-      if (next.done) break;
-      yield next.value;
-    }
-  })();
-  const title = withBrand(
-    meta.companyName,
-    "Monitor de Barreiras de Segurança",
-  );
-  yield { name: "[Content_Types].xml", chunks: [utf8(contentTypes())] };
-  yield { name: "_rels/.rels", chunks: [utf8(rootRels())] };
-  yield {
-    name: "docProps/core.xml",
-    chunks: [utf8(coreProps(title, meta.companyName))],
-  };
-  yield { name: "docProps/app.xml", chunks: [utf8(appProps())] };
-  yield { name: "xl/workbook.xml", chunks: [utf8(workbook())] };
-  yield { name: "xl/_rels/workbook.xml.rels", chunks: [utf8(workbookRels())] };
-  yield {
-    name: "xl/worksheets/sheet1.xml",
-    chunks: dataSheetChunks(rest, meta, styles, widths),
-  };
-  yield { name: "xl/styles.xml", chunks: [utf8(book.xml())] };
-  // The summary rows are fully known here (a handful of indicators), so both
-  // columns fit their longest content through the same fitter as the data.
-  const summary = summaryRowsFrom(meta.kpi);
-  const summaryWidths = xlsxColWidths(
-    summary.map(([label, value]) => [label, value]),
-    ["Resumo", "Qtd."],
-  );
-  yield {
-    name: "xl/worksheets/sheet2.xml",
-    chunks: [
-      utf8(
-        summarySheet(
-          summary,
-          styles.brand,
-          styles.header,
-          styles.kpiValue("FF1E3A5F"),
-          [summaryWidths[0] ?? 6, summaryWidths[1] ?? 6],
+  try {
+    // First batch decides the column widths; it is replayed right after the
+    // header block so no row is lost.
+    const first = await iterator.next();
+    const head: Barrier[] = first.done ? [] : first.value;
+    const widths = xlsxColWidths(head.slice(0, WIDTH_SAMPLE_ROWS).map(row));
+    const rest = (async function* (): AsyncGenerator<Barrier[]> {
+      if (head.length > 0) yield head;
+      for (;;) {
+        const next = await iterator.next();
+        if (next.done) break;
+        yield next.value;
+      }
+    })();
+    const title = withBrand(
+      meta.companyName,
+      "Monitor de Barreiras de Segurança",
+    );
+    yield { name: "[Content_Types].xml", chunks: [utf8(contentTypes())] };
+    yield { name: "_rels/.rels", chunks: [utf8(rootRels())] };
+    yield {
+      name: "docProps/core.xml",
+      chunks: [utf8(coreProps(title, meta.companyName))],
+    };
+    yield { name: "docProps/app.xml", chunks: [utf8(appProps())] };
+    yield { name: "xl/workbook.xml", chunks: [utf8(workbook())] };
+    yield {
+      name: "xl/_rels/workbook.xml.rels",
+      chunks: [utf8(workbookRels())],
+    };
+    yield {
+      name: "xl/worksheets/sheet1.xml",
+      chunks: dataSheetChunks(rest, meta, styles, widths),
+    };
+    yield { name: "xl/styles.xml", chunks: [utf8(book.xml())] };
+    // The summary rows are fully known here (a handful of indicators), so both
+    // columns fit their longest content through the same fitter as the data.
+    const summary = summaryRowsFrom(meta.kpi);
+    const summaryWidths = xlsxColWidths(
+      summary.map(([label, value]) => [label, value]),
+      ["Resumo", "Qtd."],
+    );
+    yield {
+      name: "xl/worksheets/sheet2.xml",
+      chunks: [
+        utf8(
+          summarySheet(
+            summary,
+            styles.brand,
+            styles.header,
+            styles.kpiValue("FF1E3A5F"),
+            [summaryWidths[0] ?? 6, summaryWidths[1] ?? 6],
+          ),
         ),
-      ),
-    ],
-  };
+      ],
+    };
+  } finally {
+    // The client can hang up mid-export: the row source is closed here, so
+    // the database cursor is released with it instead of staying open.
+    try {
+      await iterator.return?.(undefined);
+    } catch {
+      // Ignore cleanup failures; the export is already over.
+    }
+  }
 }
 
 // xlsxChunks: the finished .xlsx as a byte stream, row batches consumed as
