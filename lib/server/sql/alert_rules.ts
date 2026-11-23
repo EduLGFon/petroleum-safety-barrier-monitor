@@ -6,7 +6,11 @@
 // writes behind admin auth.
 import { queryRows, type TxQuery, withTx } from "../db.ts";
 
-import { ValidationError } from "../validation.ts";
+import {
+  POSTGRES_UNIQUE_VIOLATION,
+  postgresErrorInfo,
+  ValidationError,
+} from "../validation.ts";
 
 export type RuleUrgency = "any" | "urgent" | "critical";
 
@@ -372,10 +376,10 @@ export async function createAlertRule(input: NewAlertRule): Promise<AlertRule> {
       values,
     );
   } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
-    if (message.includes("duplicate") || message.includes("unique")) {
+    const info = postgresErrorInfo(err);
+    if (info.code === POSTGRES_UNIQUE_VIOLATION) {
       throw new ValidationError(
-        message.includes("name") || message.includes("alert_rules_name")
+        info.constraint === "alert_rules_name_key"
           ? "rule name already exists"
           : "duplicate value",
       );
@@ -383,7 +387,7 @@ export async function createAlertRule(input: NewAlertRule): Promise<AlertRule> {
     throw err;
   }
   const created = rows[0];
-  if (!created) throw new ValidationError("createAlertRule returned no row");
+  if (!created) throw new Error("createAlertRule returned no row");
   return rowToRule(created);
 }
 
