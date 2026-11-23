@@ -262,3 +262,56 @@ Deno.test("explainStatus keeps a deterministic rule for unknown statuses", () =>
   assertStrictEquals(result.rule, "Sem regra documentada para este status.");
   assertStrictEquals(result.cause.kind, "unknown");
 });
+
+Deno.test("explainStatus falls back to a newer emergency WO when import is selected", () => {
+  const result = explain({
+    availability: "Indisponível",
+    comments: "OS-107660: referência antiga",
+    statusHistory: [
+      entry({ date: "2026-01-01", status: "Indisponível", note: "Importado do Fracttal" }),
+      entry({ date: "2026-02-01", status: "Indisponível", note: EMERGENCY_NOTE }),
+    ],
+  });
+  assertStrictEquals(result.cause.kind, "work-order");
+  assertStrictEquals(result.cause.reference, "OS-24018: Falha no intertravamento");
+  assertStrictEquals(result.historyEntry?.note, EMERGENCY_NOTE);
+});
+
+Deno.test("explainStatus falls back to a newer planned SS when import is selected", () => {
+  const result = explain({
+    availability: "Degradado",
+    statusHistory: [
+      entry({ date: "2026-01-01", status: "Degradado", note: "Importado do Fracttal" }),
+      entry({ date: "2026-02-01", status: "Degradado", note: PLANNED_NOTE }),
+    ],
+  });
+  assertStrictEquals(result.cause.kind, "work-request");
+  assertStrictEquals(result.cause.reference, "SS-11842: Leitura intermitente");
+});
+
+Deno.test("explainStatus keeps import-only history as import", () => {
+  const result = explain({
+    availability: "Indisponível",
+    comments: "OS-107660: referência antiga",
+    statusHistory: [
+      entry({ date: "2026-01-01", status: "Indisponível", note: "Importado do Fracttal" }),
+    ],
+  });
+  assertStrictEquals(result.cause.kind, "import");
+  assertStrictEquals(result.cause.reference, "OS-107660: referência antiga");
+});
+
+Deno.test("explainStatus contingency overlay still matches base with fallback", () => {
+  const result = explain({
+    availability: "Degradado Contingenciado",
+    hasContingency: "Sim",
+    contingencyDesc: "GM-09 em paralelo",
+    statusHistory: [
+      entry({ date: "2026-01-01", status: "Degradado", note: "Importado do Fracttal" }),
+      entry({ date: "2026-02-01", status: "Degradado", note: PLANNED_NOTE }),
+    ],
+  });
+  assertStrictEquals(result.cause.kind, "work-request");
+  assertStrictEquals(result.historyEntry?.status, "Degradado");
+  assertStrictEquals(result.cause.contingency, "GM-09 em paralelo");
+});

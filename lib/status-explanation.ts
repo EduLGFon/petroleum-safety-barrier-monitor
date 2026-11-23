@@ -164,6 +164,23 @@ function latestOf(history: StatusHistoryEntry[]): StatusHistoryEntry | null {
   return best;
 }
 
+// Latest history entry (within the target status set) whose note parses as a
+// deterministic work note. Used as a fallback body when the newest matching
+// entry is only an import/unknown/non-parseable phrase, so the modal can still
+// show the decisive WO/WR card instead of an import sentence.
+function latestParseableEntry(
+  history: StatusHistoryEntry[],
+  targets: Set<string>,
+): StatusHistoryEntry | null {
+  let best: StatusHistoryEntry | null = null;
+  for (const entry of history) {
+    if (!targets.has(entry.status)) continue;
+    if (!parseWorkNote(entry.note)) continue;
+    if (!best || entry.date >= best.date) best = entry;
+  }
+  return best;
+}
+
 function isKnownSyncPhrase(note: string): boolean {
   if (parseWorkNote(note)) return true;
   const n = note.toLowerCase();
@@ -248,6 +265,23 @@ export function explainStatus(
   const selected = latestEntry(history, targets) ?? latestOf(history);
   const comments = b.comments.trim();
 
+  // When the newest matching entry is an import/unknown/non-parseable phrase,
+  // prefer the latest parseable work note in the same target set for the card
+  // body, while keeping `since` and the displayed status/rule untouched.
+  let resolved: StatusHistoryEntry = selected as StatusHistoryEntry;
+  if (selected) {
+    const selectedParsed = parseWorkNote(selected.note);
+    const selectedKind = causeKind(selected.note, selected.author, status);
+    if (
+      selectedKind === "import" ||
+      selectedKind === "unknown" ||
+      selectedParsed === null
+    ) {
+      const candidate = latestParseableEntry(history, targets);
+      if (candidate) resolved = candidate;
+    }
+  }
+
   if (!selected) {
     return {
       status,
@@ -261,19 +295,19 @@ export function explainStatus(
     };
   }
 
-  const parsed = parseWorkNote(selected.note);
-  const suffix = splitContingency(selected.note).text;
-  const kind = causeKind(selected.note, selected.author, status);
+  const parsed = parseWorkNote(resolved.note);
+  const suffix = splitContingency(resolved.note).text;
+  const kind = causeKind(resolved.note, resolved.author, status);
   const reference = parsed?.reference ||
     (comments && status !== "Disponível" ? comments : "");
   const contingency = suffix ||
     (b.hasContingency === "Sim" ? b.contingencyDesc.trim() : "");
   const cause: StatusCause = {
     kind,
-    date: selected.date,
-    author: selected.author,
-    ...(selected.participants && selected.participants.length > 0
-      ? { participants: selected.participants }
+    date: resolved.date,
+    author: resolved.author,
+    ...(resolved.participants && resolved.participants.length > 0
+      ? { participants: resolved.participants }
       : {}),
     ...(parsed
       ? {
@@ -288,9 +322,9 @@ export function explainStatus(
     ...(reference ? { reference } : {}),
     ...(contingency ? { contingency } : {}),
     ...(kind === "manual" || kind === "unknown"
-      ? { rawNote: selected.note }
+      ? { rawNote: resolved.note }
       : {}),
   };
 
-  return { status, rule, since: b.statusSince, cause, historyEntry: selected };
+  return { status, rule, since: b.statusSince, cause, historyEntry: resolved };
 }
