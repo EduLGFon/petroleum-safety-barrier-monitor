@@ -298,6 +298,90 @@ Deno.test("detect leaves fromStatusId null for a first landing", async () => {
   assertStrictEquals(legacy.length, 1);
 });
 
+// ---- note-only same-status appends (sync WO change, unchanged status) ----
+
+Deno.test("detect skips same-status note-only appends", async () => {
+  // The sync appends a history row on a decisive work-order change even
+  // when availability is unchanged, so the row repeats the previous
+  // status. It is a note, not a transition: no alert may fire.
+  const unavailable = [
+    historyEntry(101, "2026-09-13T10:00:00Z", 5),
+    historyEntry(102, "2026-09-13T11:00:00Z", 5),
+  ];
+  const unavailableOut = await detectUrgentTransitions(
+    storeFor([
+      { id: 102, barrierId: 1, transitionDate: "2026-09-13", statusId: 5 },
+    ]),
+    loaderFor(unavailable),
+    null,
+  );
+  assertStrictEquals(unavailableOut.length, 0);
+
+  const degraded = [
+    historyEntry(201, "2026-09-13T10:00:00Z", 4),
+    historyEntry(202, "2026-09-13T11:00:00Z", 4),
+  ];
+  const degradedOut = await detectUrgentTransitions(
+    storeFor([
+      { id: 202, barrierId: 1, transitionDate: "2026-09-13", statusId: 4 },
+    ]),
+    loaderFor(degraded),
+    null,
+  );
+  assertStrictEquals(degradedOut.length, 0);
+});
+
+Deno.test("detect emits one event when a landing gets a note-only append", async () => {
+  // Real landing (0 -> 5) followed by the same-status note row the sync
+  // appends on the next WO change: only the landing alerts, and the fresh
+  // history id on the note row can never mint a second dedup key.
+  const history = [
+    historyEntry(301, "2026-09-13T10:00:00Z", 0),
+    historyEntry(302, "2026-09-13T11:00:00Z", 5),
+    historyEntry(303, "2026-09-13T12:00:00Z", 5),
+  ];
+  const out = await detectUrgentTransitions(
+    storeFor([
+      { id: 302, barrierId: 1, transitionDate: "2026-09-13", statusId: 5 },
+      { id: 303, barrierId: 1, transitionDate: "2026-09-13", statusId: 5 },
+    ]),
+    loaderFor(history),
+    null,
+  );
+  assertStrictEquals(out.length, 1);
+  assertStrictEquals(out[0]!.historyId, 302);
+  assertStrictEquals(out[0]!.dedupKey, "1:2026-09-13:5:302");
+});
+
+Deno.test("detect still alerts first landings and real transitions", async () => {
+  // First landing: no predecessor, so fromStatusId stays null and the
+  // legacy path still reports the non-compliant landing.
+  const firstLanding = await detectUrgentTransitions(
+    storeFor([
+      { id: 401, barrierId: 1, transitionDate: "2026-09-13", statusId: 5 },
+    ]),
+    loaderFor([historyEntry(401, "2026-09-13T10:00:00Z", 5)]),
+    null,
+  );
+  assertStrictEquals(firstLanding.length, 1);
+  assertStrictEquals(firstLanding[0]!.historyId, 401);
+
+  // Real transition: predecessor status differs, so the guard must not
+  // swallow a genuine 0 -> 5 landing.
+  const transition = await detectUrgentTransitions(
+    storeFor([
+      { id: 502, barrierId: 1, transitionDate: "2026-09-13", statusId: 5 },
+    ]),
+    loaderFor([
+      historyEntry(501, "2026-09-13T10:00:00Z", 0),
+      historyEntry(502, "2026-09-13T11:00:00Z", 5),
+    ]),
+    null,
+  );
+  assertStrictEquals(transition.length, 1);
+  assertStrictEquals(transition[0]!.historyId, 502);
+});
+
 // ---- id-absent candidates (fallback branch, no id in production calls) ----
 
 Deno.test("detect id-absent candidates fall back to the same-day match", async () => {

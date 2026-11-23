@@ -1,5 +1,7 @@
 // Sync apply regression: an admin-set availability must survive the next
 // sync, while a sync-owned availability still converges to upstream.
+// Same-status decisive WO changes append one history note row without
+// touching availability/status_since, and never duplicate that row.
 // Needs a real Postgres: skipped with a log line when DATABASE_URL is unset
 // so `deno task test` stays green without a database. When set, it touches
 // one existing barrier and restores it via the sanctioned path in `finally`.
@@ -229,11 +231,13 @@ Deno.test("sync does not revert an admin-set availability", async () => {
       adminStatus,
       "admin-set availability was reverted by sync",
     );
-    // The audit row must not claim an availability change that never landed.
+    // The audit row must not claim an availability change that never
+    // landed: both sides stay at the plan-time snapshot, which the admin
+    // override does not move.
     const audits = await auditFor(runId, row.id);
     assertStrictEquals(audits.length, 1);
-    assertStrictEquals(audits[0]!.old_availability_id, adminStatus);
-    assertStrictEquals(audits[0]!.new_availability_id, adminStatus);
+    assertStrictEquals(audits[0]!.old_availability_id, row.availability_id);
+    assertStrictEquals(audits[0]!.new_availability_id, row.availability_id);
     assertStrictEquals(
       JSON.stringify(audits[0]!.changed_fields).includes("availabilityId"),
       false,
@@ -284,7 +288,19 @@ Deno.test("sync still propagates a remote change to a sync-owned status", async 
       statusChanged: true,
     };
     await defaultSyncIo.applyPlan([entry], runId);
+    // Read the run's history row before closeRun: deleting sync_state
+    // nulls sync_run_id through the FK, so the correlation is gone after.
+    const history = await historyForRun(row.id, runId);
+    assertStrictEquals(history.length, 1);
+    assertStrictEquals(history[0]?.sync_run_id, runId);
+    assertStrictEquals(history[0]?.source_author, "Pessoa autora");
+    assertStrictEquals(history[0]?.note, "Justificativa sintética");
+    assertStrictEquals(
+      JSON.stringify(history[0]?.participants).includes("Pessoa executora"),
+      true,
+    );
   } finally {
+    await dropHistoryForRun(row.id, runId);
     await closeRun(runId);
   }
   const current = await getBarrierById(row.id);
@@ -292,25 +308,6 @@ Deno.test("sync still propagates a remote change to a sync-owned status", async 
     current!.availabilityId,
     remoteStatus,
     "sync-owned status was not propagated to upstream",
-  );
-  const history = await queryRows<{
-    sync_run_id: number | null;
-    source_author: string | null;
-    participants: unknown;
-    note: string;
-  }>(
-    `select sync_run_id, source_author, participants, note
-     from barrier_status_history
-     where barrier_id = $1 and sync_run_id = $2`,
-    [row.id, runId],
-  );
-  assertStrictEquals(history.length, 1);
-  assertStrictEquals(history[0]?.sync_run_id, runId);
-  assertStrictEquals(history[0]?.source_author, "Pessoa autora");
-  assertStrictEquals(history[0]?.note, "Justificativa sintética");
-  assertStrictEquals(
-    JSON.stringify(history[0]?.participants).includes("Pessoa executora"),
-    true,
   );
   // Restore the seed barrier and remove the setup history row.
   await queryRows(
@@ -324,4 +321,193 @@ Deno.test("sync still propagates a remote change to a sync-owned status", async 
     authorId,
     "reg-test cleanup",
   );
+});
+
+// ─── Same-status note appends (decisive WO change, unchanged status) ───────
+
+interface HistoryRow {
+  id: number;
+  date: string;
+  status_id: number;
+  author_id: number;
+  note: string;
+  sync_run_id: number | null;
+  source_author: string | null;
+  participants: unknown;
+}
+
+async function historyForRun(
+  barrierId: number,
+  runId: number,
+): Promise<HistoryRow[]> {
+  return await queryRows<HistoryRow>(
+    `select id, date::text as date, status_id, author_id, note, sync_run_id,
+            source_author, participants
+     from barrier_status_history
+     where barrier_id = $1 and sync_run_id = $2
+     order by id`,
+    [barrierId, runId],
+  );
+}
+
+async function barrierState(
+  id: number,
+): Promise<{ availability_id: number; status_since: string }> {
+  const rows = await queryRows<{
+    availability_id: number;
+    status_since: string;
+  }>(
+    `select availability_id, status_since::text as status_since
+     from barriers where id = $1`,
+    [id],
+  );
+  assert(rows[0], "barrier disappeared mid-test");
+  return rows[0];
+}
+
+async function dropHistoryForRun(
+  barrierId: number,
+  runId: number,
+): Promise<void> {
+  await queryRows(
+    `delete from barrier_status_history
+     where barrier_id = $1 and sync_run_id = $2`,
+    [barrierId, runId],
+  );
+}
+
+Deno.test("sync appends one note row for a same-status WO change", async () => {
+  if (!Deno.env.get("DATABASE_URL")) {
+    console.log("skip: DATABASE_URL unset - needs a real Postgres");
+    return;
+  }
+  const row = await firstBarrier();
+  if (!row) {
+    console.log("skip: no barriers to exercise");
+    return;
+  }
+  // Latest history row sync-owned: upstream owns the current status.
+  await queryRows(
+    `insert into barrier_status_history
+       (barrier_id, date, status_id, author_id, note)
+     values ($1, current_date, $2, $3, 'reg-test sync-owned base')`,
+    [row.id, row.availability_id, SYNC_AUTHOR_ID],
+  );
+  const before = await barrierState(row.id);
+  const runId = await openRun();
+  const note = `Ordem de serviço OS-${runId} em aberto`;
+  const input = toInput(row, row.availability_id);
+  input.history = {
+    note,
+    sourceAuthor: "Pessoa autora sintética",
+    participants: [{ name: "Pessoa executora", role: "Pessoal" }],
+  };
+  try {
+    await defaultSyncIo.applyPlan([
+      { kind: "update", local: toLocal(row), input, statusChanged: false },
+    ], runId);
+    const history = await historyForRun(row.id, runId);
+    assertStrictEquals(history.length, 1);
+    assertStrictEquals(history[0]!.status_id, row.availability_id);
+    assertStrictEquals(history[0]!.author_id, SYNC_AUTHOR_ID);
+    assertStrictEquals(history[0]!.note, note);
+    assertStrictEquals(history[0]!.source_author, "Pessoa autora sintética");
+    assertStrictEquals(
+      JSON.stringify(history[0]!.participants).includes("Pessoa executora"),
+      true,
+    );
+    // Backdated to the current status_since, which must stay untouched:
+    // the note row is not a transition and must not reset the clock.
+    assertStrictEquals(history[0]!.date, before.status_since);
+    const after = await barrierState(row.id);
+    assertStrictEquals(after.status_since, before.status_since);
+    assertStrictEquals(after.availability_id, before.availability_id);
+  } finally {
+    await dropHistoryForRun(row.id, runId);
+    await closeRun(runId);
+    await queryRows(
+      `delete from barrier_status_history
+       where barrier_id = $1 and note = 'reg-test sync-owned base'`,
+      [row.id],
+    );
+  }
+});
+
+Deno.test("sync does not repeat the history row for an unchanged note", async () => {
+  if (!Deno.env.get("DATABASE_URL")) {
+    console.log("skip: DATABASE_URL unset - needs a real Postgres");
+    return;
+  }
+  const row = await firstBarrier();
+  if (!row) {
+    console.log("skip: no barriers to exercise");
+    return;
+  }
+  const note = "Nota de ordem de serviço já sincronizada";
+  // The latest sync-owned note already equals what upstream sends again.
+  await queryRows(
+    `insert into barrier_status_history
+       (barrier_id, date, status_id, author_id, note)
+     values ($1, current_date, $2, $3, $4)`,
+    [row.id, row.availability_id, SYNC_AUTHOR_ID, note],
+  );
+  const runId = await openRun();
+  const input = toInput(row, row.availability_id);
+  input.history = { note, sourceAuthor: null, participants: [] };
+  try {
+    await defaultSyncIo.applyPlan([
+      { kind: "update", local: toLocal(row), input, statusChanged: false },
+    ], runId);
+    assertStrictEquals((await historyForRun(row.id, runId)).length, 0);
+  } finally {
+    await dropHistoryForRun(row.id, runId);
+    await closeRun(runId);
+    await queryRows(
+      `delete from barrier_status_history
+       where barrier_id = $1 and note = $2`,
+      [row.id, note],
+    );
+  }
+});
+
+Deno.test("sync does not append a note row over an admin-owned status", async () => {
+  if (!Deno.env.get("DATABASE_URL")) {
+    console.log("skip: DATABASE_URL unset - needs a real Postgres");
+    return;
+  }
+  const row = await firstBarrier();
+  if (!row) {
+    console.log("skip: no barriers to exercise");
+    return;
+  }
+  const adminId = await firstAuthorId();
+  const adminNote = "Ajuste manual de disponibilidade";
+  // Admin-authored latest row: the sync must not append on top of it.
+  await queryRows(
+    `insert into barrier_status_history
+       (barrier_id, date, status_id, author_id, note)
+     values ($1, current_date, $2, $3, $4)`,
+    [row.id, row.availability_id, adminId, adminNote],
+  );
+  const runId = await openRun();
+  const input = toInput(row, row.availability_id);
+  input.history = {
+    note: "Nota do sync que não pode sobrepor o admin",
+    sourceAuthor: null,
+    participants: [],
+  };
+  try {
+    await defaultSyncIo.applyPlan([
+      { kind: "update", local: toLocal(row), input, statusChanged: false },
+    ], runId);
+    assertStrictEquals((await historyForRun(row.id, runId)).length, 0);
+  } finally {
+    await dropHistoryForRun(row.id, runId);
+    await closeRun(runId);
+    await queryRows(
+      `delete from barrier_status_history
+       where barrier_id = $1 and note = $2`,
+      [row.id, adminNote],
+    );
+  }
 });
