@@ -21,7 +21,11 @@ import {
 
 import { routeClientKey, writeThrottle } from "../../../lib/server/throttle.ts";
 
-import { parseIdParam, readJsonBody } from "../../../lib/server/validation.ts";
+import {
+  parseIdParam,
+  readJsonBody,
+  ValidationError,
+} from "../../../lib/server/validation.ts";
 
 import { loadServerConfig } from "../../../lib/server/config.ts";
 
@@ -77,13 +81,12 @@ export const handler = define.handlers({
       if (!updated) return notFound("Recipient not found", requestId);
       return ok(updated, requestId);
     } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
-      if (
-        message.includes("name") || message.includes("phone") ||
-        message.includes("active") ||
-        message.includes("nothing to update")
-      ) {
-        return badRequest(message, requestId);
+      // Typed classification: a ValidationError is a client-input rejection
+      // and keeps its 400. Everything else is internal - database text never
+      // reaches a client, and no error is classified by matching words in a
+      // message.
+      if (err instanceof ValidationError) {
+        return badRequest(err.message, requestId);
       }
       return internal(
         "PATCH /api/recipients/:id",

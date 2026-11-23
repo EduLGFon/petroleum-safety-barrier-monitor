@@ -77,12 +77,12 @@ export async function updateRecipient(
   }
   if (patch.active !== undefined) {
     if (typeof patch.active !== "boolean") {
-      throw new Error("active must be a boolean");
+      throw new ValidationError("active must be a boolean");
     }
     args.push(patch.active);
     sets.push(`active = $${args.length}`);
   }
-  if (sets.length === 0) throw new Error("nothing to update");
+  if (sets.length === 0) throw new ValidationError("nothing to update");
   args.push(id);
   const rows = await queryRows<AlertRecipient>(
     `update alert_recipients set ${sets.join(", ")}
